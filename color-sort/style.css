@@ -169,6 +169,14 @@ html, body {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* ТЗ №24: место под вертикальный баннер ВК справа на ПК. Переменную
+   ставит только vk_platform.js (0 без баннера), экраны — absolute
+   внутри body и ужимаются вместе с ним. */
+body {
+  width: auto;
+  right: var(--vk-banner-reserve-right, 0px);
+}
+
 /* Игровой контейнер (п.1.6.2.7) — явно, поверх глобального правила
    выше: ПКМ/протяжка над полем не должны выделять текст или открывать
    системное меню (contextmenu гасится в main.js). */
@@ -416,7 +424,7 @@ body {
    в showRetentionToast, тот же приём, что и winFlash/board-fade). */
 .retention-toast {
   position: fixed;
-  left: 50%;
+  left: calc((100% - var(--vk-banner-reserve-right, 0px)) / 2);
   top: max(14px, env(safe-area-inset-top));
   transform: translateX(-50%) translateY(-8px);
   background: var(--card);

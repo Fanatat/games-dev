@@ -1,30 +1,84 @@
 /* ============================================================
-   sound.js — короткие звуки на Web Audio (без файлов, бандл лёгкий).
-   Фаза 6. Единственная точка синтеза звука в игре.
+   sound.js — звуки игры. Единственная точка воспроизведения звука.
 
-   AudioContext создаётся ЛЕНИВО — на первый реальный вызов play*(),
-   который случится не раньше первого клика игрока (браузеры блокируют
-   автозапуск звука без пользовательского жеста). Отдельный «анлок»
-   не нужен: создание контекста внутри обработчика клика само по себе
-   и есть тот жест.
+   ТЗ №24: синтез на осцилляторах (квадратные и синус-«бипы» 700–1800 Гц)
+   заменён записанными звуками — капля, стеклянный стук, колокольчик,
+   мягкий глухой удар (пак Kenney, CC0). Данные — SFX_DATA из
+   sfx_data.js (WAV в base64, генерирует gen_sfx.py), без сети и без
+   отдельных файлов в сборке. Высота сэмпла меняется playbackRate —
+   нарастание по заполненности и по собранным колбам сохранено.
+
+   AudioContext создаётся на ПЕРВЫЙ жест игрока (pointerdown/keydown,
+   фаза захвата — раньше обработчика клика, который зовёт play*()), там
+   же декодируются все сэмплы: к моменту клика они уже готовы. Пока
+   сэмпл не декодирован или Web Audio нет — просто тишина, игра живая.
+
+   Всё идёт через общую шину: громкость -> лимитер -> выход. Наложение
+   звуков (перелив + приземление + колокольчик) не перегружает выход.
 
    suspend()/resume() — вызываются из pauseGame()/resumeGame() в
-   main.js (реклама, сворачивание вкладки). state.muted проверяется
-   на каждый play*() — если звук выключен, просто ничего не звучит.
+   main.js (реклама, сворачивание вкладки). muted проверяется на каждый
+   play*() — если звук выключен, ничего не звучит.
    ============================================================ */
 const Sound = (() => {
   let ctx = null;
+  let bus = null;
   let muted = false;
+  const buffers = {};
+
+  const MASTER_GAIN = 0.8;
+
+  function decodeAll() {
+    if (typeof SFX_DATA === 'undefined') return;
+    Object.keys(SFX_DATA).forEach((name) => {
+      try {
+        const bin = atob(SFX_DATA[name]);
+        const bytes = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        // Колбэчная форма — старый Safari не возвращает Promise; у
+        // новых браузеров Promise ловим отдельно, чтобы ошибка
+        // декодирования не всплыла unhandled rejection.
+        const p = ctx.decodeAudioData(bytes.buffer, (buf) => { buffers[name] = buf; }, () => {});
+        if (p && typeof p.catch === 'function') p.catch(() => {});
+      } catch (e) { /* битый сэмпл — этот звук просто молчит */ }
+    });
+  }
 
   function ensureContext() {
     if (!ctx) {
       const AC = window.AudioContext || window.webkitAudioContext;
       if (!AC) return null; // нет Web Audio — тихо деградируем, игра живая
-      ctx = new AC();
+      try {
+        ctx = new AC();
+      } catch (e) {
+        return null;
+      }
+      const gain = ctx.createGain();
+      gain.gain.value = MASTER_GAIN;
+      const limiter = ctx.createDynamicsCompressor();
+      limiter.threshold.value = -8;
+      limiter.knee.value = 6;
+      limiter.ratio.value = 12;
+      limiter.attack.value = 0.002;
+      limiter.release.value = 0.15;
+      gain.connect(limiter);
+      limiter.connect(ctx.destination);
+      bus = gain;
+      decodeAll();
     }
     ctx.resume(); // безопасно и при уже 'running' — браузер делает no-op
     return ctx;
   }
+
+  // Первый жест игрока создаёт контекст до клика (см. шапку). Слушатели
+  // снимаются после первого срабатывания.
+  function onFirstGesture() {
+    ensureContext();
+    ['pointerdown', 'touchstart', 'keydown'].forEach((t) =>
+      window.removeEventListener(t, onFirstGesture, true));
+  }
+  ['pointerdown', 'touchstart', 'keydown'].forEach((t) =>
+    window.addEventListener(t, onFirstGesture, true));
 
   function setMuted(value) {
     muted = value;
@@ -42,109 +96,72 @@ const Sound = (() => {
     if (ctx) ctx.resume();
   }
 
-  /* ---------- Один короткий тон (строительный блок всех звуков) ---------- */
-  function tone({ freq, duration, type = 'sine', gain = 0.15, delay = 0, freqEnd = null }) {
+  /* ---------- Один сэмпл (строительный блок всех звуков) ----------
+     semis — сдвиг высоты в полутонах (через playbackRate). */
+  function play(name, { gain = 0.5, semis = 0, delay = 0 } = {}) {
     if (muted) return;
     const audioCtx = ensureContext();
-    if (!audioCtx) return;
-
-    const osc = audioCtx.createOscillator();
-    const gainNode = audioCtx.createGain();
-    osc.type = type;
-
-    const t0 = audioCtx.currentTime + delay;
-    osc.frequency.setValueAtTime(freq, t0);
-    if (freqEnd !== null) {
-      osc.frequency.exponentialRampToValueAtTime(Math.max(1, freqEnd), t0 + duration);
-    }
-    gainNode.gain.setValueAtTime(0, t0);
-    gainNode.gain.linearRampToValueAtTime(gain, t0 + 0.012);
-    gainNode.gain.exponentialRampToValueAtTime(0.0001, t0 + duration);
-
-    osc.connect(gainNode);
-    gainNode.connect(audioCtx.destination);
-    osc.start(t0);
-    osc.stop(t0 + duration + 0.02);
+    if (!audioCtx || !buffers[name]) return;
+    const src = audioCtx.createBufferSource();
+    src.buffer = buffers[name];
+    src.playbackRate.value = Math.pow(2, semis / 12);
+    const g = audioCtx.createGain();
+    g.gain.value = gain;
+    src.connect(g);
+    g.connect(bus);
+    src.start(audioCtx.currentTime + delay);
   }
 
   /* ---------- Игровые звуки ---------- */
   /* fillRatio — насколько заполнена колба-ПРИЁМНИК ПОСЛЕ этого перелива
-     (0..1, задача 9): выше заполненность → выше высота тона. Диапазон
-     340-720 Гц подобран так, чтобы даже соседние ступени (перелив по
-     одному элементу, capacity=4 → шаг 0.25) были на слух различимы.
-     game.js вызывает ДО фактического splice — считает по актуальным
-     length'ам источника/цели и count хода, здесь чистая функция от
-     готового числа. */
+     (0..1, задача 9): выше заполненность → выше капля. ±4 полутона на
+     весь диапазон: соседние ступени (capacity=4 → шаг 0.25, два
+     полутона) различимы, а капля не уходит в писк. game.js вызывает
+     ДО фактического splice — считает по актуальным length'ам. */
   function playPour(fillRatio = 0.5) {
     const r = Math.max(0, Math.min(1, fillRatio));
-    const freq = 340 + r * 380;
-    tone({ freq, freqEnd: freq * 0.73, duration: 0.14, type: 'sine', gain: 0.12 });
+    play('pour', { gain: 0.55, semis: (r - 0.5) * 8 });
   }
+  /* Приземление — стеклянный стук, один из трёх записанных вариантов
+     и лёгкий разброс высоты: сотни ходов подряд не звучат одинаково. */
+  const SETTLE_VARIANTS = ['settle1', 'settle2', 'settle3'];
   function playSettle() {
-    tone({ freq: 300, freqEnd: 160, duration: 0.09, type: 'triangle', gain: 0.14 });
+    const name = SETTLE_VARIANTS[Math.floor(Math.random() * SETTLE_VARIANTS.length)];
+    play(name, { gain: 0.3, semis: Math.random() - 0.5 });
   }
-  /* «Щелчок-замок» (задача 9) — колба-приёмник только что стала
-     ПОЛНОСТЬЮ собрана (заполнена, один тип элементов). Намеренно другой
-     тембр, чем playSettle (мягкий triangle-спад): короткий square-клик
-     + отдельная более высокая sine-нота следом — звучит как «защёлкнулось»,
-     не спутать с обычным приземлением. Вызывается ВМЕСТО playSettle для
-     этого хода (game.js), не вместе с ним. */
-  // ТЗ №22, B3: step — сколько колб уровня уже было собрано ДО этой
-  // (0 — первая). Каждая следующая звучит на тон выше (мажорная гамма
-  // от A5), потолок — октава: прогресс по уровню слышен.
+  /* «Колба собрана» (задача 9) — колокольчик ВМЕСТО playSettle для этого
+     хода (game.js), не вместе с ним. ТЗ №22, B3: step — сколько колб
+     уровня уже было собрано ДО этой (0 — первая). Каждая следующая
+     звучит на ступень выше по мажорной гамме, потолок — октава. */
   const LOCK_STEPS = [0, 2, 4, 5, 7, 9, 11, 12];
   function playLock(step = 0) {
     const semis = LOCK_STEPS[Math.max(0, Math.min(LOCK_STEPS.length - 1, step | 0))];
-    const k = Math.pow(2, semis / 12);
-    tone({ freq: 900 * k, duration: 0.035, type: 'square', gain: 0.09 });
-    tone({ freq: 880 * k, duration: 0.12, type: 'sine', gain: 0.12, delay: 0.03 });
+    play('lock', { gain: 0.45, semis });
   }
+  // Недопустимый ход — мягкий глухой удар, без жужжания.
   function playInvalid() {
-    tone({ freq: 180, duration: 0.16, type: 'square', gain: 0.05 });
-  }
-  function playWin() {
-    // Заметная, но короткая «ta-da»: восходящее арпеджио (C5-E5-G5-C6)
-    // + финальный мажорный аккорд на более тёплой (triangle) волне.
-    // Всё укладывается меньше чем в секунду — антистресс-темп сохранён,
-    // просто момент теперь читается как награда, а не тихий бип.
-    const arpeggio = [523.25, 659.25, 783.99, 1046.5];
-    arpeggio.forEach((freq, i) => {
-      tone({ freq, duration: 0.16, type: 'sine', gain: 0.13, delay: i * 0.07 });
-    });
-    const chordDelay = arpeggio.length * 0.07 + 0.02;
-    [523.25, 659.25, 783.99].forEach(freq => {
-      tone({ freq, duration: 0.5, type: 'triangle', gain: 0.11, delay: chordDelay });
-    });
+    play('invalid', { gain: 0.6 });
   }
   function playClick() {
-    tone({ freq: 700, duration: 0.05, type: 'sine', gain: 0.07 });
+    play('click', { gain: 0.5 });
   }
-  /* Экран завершения ГЛАВЫ (задача 9) — «чуть богаче» обычного playWin
-     (пятая нота в арпеджио, на полтона шире финальный аккорд), но
-     короче и тише playFanfare ниже: глава — промежуточная награда,
-     не финал кампании. */
+
+  /* Победные звуки — восходящее арпеджио колокольчиком и финальный
+     аккорд длинным колоколом. Три ступени награды:
+     уровень < глава (задача 9) < вся кампания. */
+  function chime(arpeggio, step, chord, chordGain) {
+    arpeggio.forEach((semis, i) => play('lock', { gain: 0.32, semis, delay: i * step }));
+    const chordDelay = arpeggio.length * step + 0.03;
+    chord.forEach((semis) => play('bell', { gain: chordGain, semis, delay: chordDelay }));
+  }
+  function playWin() {
+    chime([0, 4, 7, 12], 0.08, [0, 7], 0.22);
+  }
   function playChapterWin() {
-    const arpeggio = [523.25, 659.25, 783.99, 987.77, 1174.66];
-    arpeggio.forEach((freq, i) => {
-      tone({ freq, duration: 0.15, type: 'sine', gain: 0.13, delay: i * 0.06 });
-    });
-    const chordDelay = arpeggio.length * 0.06 + 0.02;
-    [523.25, 659.25, 783.99, 987.77].forEach(freq => {
-      tone({ freq, duration: 0.55, type: 'triangle', gain: 0.1, delay: chordDelay });
-    });
+    chime([0, 4, 7, 12, 16], 0.075, [0, 4, 7], 0.2);
   }
-  /* Экран завершения ВСЕЙ кампании (не отдельного уровня) — тот же
-     язык, что и playWin, но шире и с более длинным финальным
-     аккордом: разовый момент заслуживает более заметную награду. */
   function playFanfare() {
-    const arpeggio = [523.25, 659.25, 783.99, 1046.5, 1318.51];
-    arpeggio.forEach((freq, i) => {
-      tone({ freq, duration: 0.18, type: 'sine', gain: 0.13, delay: i * 0.08 });
-    });
-    const chordDelay = arpeggio.length * 0.08 + 0.02;
-    [523.25, 659.25, 783.99, 1046.5].forEach(freq => {
-      tone({ freq, duration: 0.8, type: 'triangle', gain: 0.1, delay: chordDelay });
-    });
+    chime([0, 4, 7, 12, 16, 19], 0.09, [0, 4, 7, 12], 0.2);
   }
 
   return { setMuted, suspend, resume, playPour, playSettle, playLock, playInvalid, playWin, playChapterWin, playClick, playFanfare };

@@ -154,7 +154,7 @@ const Platform = (() => {
      раньше на ВК этого поля не было вовсе (undefined, не строка),
      плашка молчала всегда независимо от сборки; main.js трогать не
      нужно, правка живёт ТОЛЬКО здесь и в build.py. */
-  const BUILD = 'b47-1005832-20260924';
+  const BUILD = 'b50-f083baf-20260924';
 
   /* ---------- Единая точка времени (ТЗ №18) ----------
      Симметрично platform.js (Яндекс) — см. комментарий там же. Оба
@@ -259,7 +259,79 @@ const Platform = (() => {
     // Кнопка подсказки НЕ прячется здесь: VKWebAppCheckNativeAds
     // ненадёжен для превентивной проверки (см. журнал наверху, п.1) —
     // доступность рекламы обрабатывается реактивно, в showRewarded().
+    try { showDesktopBanner(); } catch (e) { console.warn('[vk_platform] баннер:', e); }
     return true;
+  }
+
+  /* ---------- Баннер справа на ПК (ТЗ №24, R-13 — решение основателя) ----------
+     Только десктопный сайт ВК (vk_platform=desktop_*): вертикальный
+     баннер у правого края. Параметры — dev.vk.com/ru/bridge/
+     VKWebAppShowBannerAd (сверено 2026-09-24): banner_align работает
+     только при layout_type:'overlay', а overlay — только при
+     banner_location:'bottom'; orientation учитывается только на
+     десктопе. Overlay площадка НЕ сдвигает контент — место резервирует
+     игра: body ужимается справа на banner_width из ответа
+     (--vk-banner-reserve-right, style.css).
+     Урок Нонограмм (ТЗ №11, 21.08): место резервирует ЛИБО площадка,
+     ЛИБО игра. Если окно всё же сузилось само — свой отступ снимаем.
+     Закрыл игрок крестиком — отступ снимаем и не переоткрываем до
+     следующего запуска. Ошибка/нет рекламы — баннера нет, игра как была. */
+  const BANNER_FALLBACK_WIDTH_PX = 300; // если ширина не пришла в ответе
+  const BANNER_SELF_RESIZE_PX = 40;     // порог «площадка сама ужала окно»
+  const BANNER_SETTLE_MS = 400;
+  let bannerReservePx = 0;
+  let platformResizedForBanner = false;
+
+  function isDesktopWeb() {
+    try {
+      return /^desktop/.test(new URLSearchParams(location.search).get('vk_platform') || '');
+    } catch (e) { return false; }
+  }
+
+  function setBannerReserve(px) {
+    const next = Math.max(0, Math.round(px) || 0);
+    if (next === bannerReservePx) return;
+    bannerReservePx = next;
+    document.documentElement.style.setProperty('--vk-banner-reserve-right', next + 'px');
+    // Поле и частицы меряют себя по resize окна — ширина body сменилась
+    // без него, поэтому сообщаем сами.
+    window.dispatchEvent(new Event('resize'));
+  }
+
+  function applyBannerInfo(info) {
+    if (platformResizedForBanner) return;
+    if (!info || info.result === false) { setBannerReserve(0); return; }
+    const w = Number(info.banner_width);
+    setBannerReserve(w > 0 ? w : BANNER_FALLBACK_WIDTH_PX);
+  }
+
+  function showDesktopBanner() {
+    if (!isDesktopWeb()) return;
+    const widthBefore = window.innerWidth;
+    if (typeof vkBridge.subscribe === 'function') vkBridge.subscribe((e) => {
+      const type = e && e.detail && e.detail.type;
+      if (type === 'VKWebAppBannerAdUpdated') applyBannerInfo(e.detail.data);
+      if (type === 'VKWebAppBannerAdClosedByUser') setBannerReserve(0);
+    });
+    withTimeout(vkBridge.send('VKWebAppShowBannerAd', {
+      banner_location: 'bottom',
+      layout_type: 'overlay',
+      banner_align: 'right',
+      orientation: 'vertical',
+    }), INTERSTITIAL_TIMEOUT_MS).then((info) => {
+      console.log('[vk_platform] баннер:', JSON.stringify(info));
+      applyBannerInfo(info);
+      setTimeout(() => {
+        // Наш отступ ужимает body, не окно — innerWidth меняет только площадка.
+        if (widthBefore - window.innerWidth >= BANNER_SELF_RESIZE_PX) {
+          platformResizedForBanner = true;
+          setBannerReserve(0);
+          console.log('[vk_platform] баннер: площадка сама сузила окно, свой отступ снят');
+        }
+      }, BANNER_SETTLE_MS);
+    }).catch((e) => {
+      console.warn('[vk_platform] баннер недоступен:', e);
+    });
   }
 
   /* ---------- Game Ready ----------

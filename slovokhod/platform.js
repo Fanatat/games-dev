@@ -45,8 +45,11 @@
                                  result.result === true → досмотрено, награда;
                                  result !== true → показан, но не досмотрен → БЕЗ награды;
                                  reject/таймаут → награда БЕСПЛАТНО (ЭТАП 2, п.1.1)
-     showBanner(onInset)        → VKWebAppShowBannerAd {banner_location:'bottom', layout_type:'resize'};
-                                  onInset(px) — сколько баннер перекрывает снизу (0 при resize).
+     showBanner(onInset)        → VKWebAppShowBannerAd: мобайл {banner_location:'bottom',
+                                  layout_type:'resize'}; ПК (vk_platform=desktop_*) —
+                                  {layout_type:'overlay', banner_align:'right', orientation:'vertical'}.
+                                  onInset(px, side) — сколько баннер перекрывает: side 'bottom'
+                                  (0 при resize) или 'right' (ширина вертикального баннера).
                                  Гарантированная поверхность (задача Б) — не завязана на гейт
                                  interstitial/rewarded, вызывается один раз при старте.
      haptic(kind)              → 'select' → VKWebAppTapticSelectionChanged {};
@@ -348,30 +351,85 @@ window.Platform = (() => {
   /* ---------- Стики-баннер (задача Б) ----------
      Гарантированная рекламная поверхность: не зависит от гейта
      interstitial/rewarded в main.js и не требует показа по клику.
-     layout_type:'resize' — клиент VK сам уменьшает область мини-аппа под
-     баннер, вручную резервировать место в CSS не нужно.
      Params сверены по исходникам @vkontakte/vk-bridge
-     (packages/core/src/types/data.ts): ShowBannerAdRequest. */
+     (packages/core/src/types/data.ts): ShowBannerAdRequest, и по доке
+     dev.vk.ru/ru/bridge/VKWebAppShowBannerAd («Баннерная реклама», таблица
+     «Десктопная версия сайта», копия — docs/Баннерная реклама для VK.txt).
+     Мобайл (b23, решение основателя 13.09): баннер СНИЗУ, layout_type:
+       'resize' — клиент сам ужимает окно мини-аппа.
+     ПК (b24): вертикальный баннер СПРАВА — layout_type:'overlay',
+       banner_align:'right', orientation:'vertical'. banner_align и
+       orientation действуют только на десктопе и только с overlay; resize
+       там не описан (Нонограм ТЗ №53: с resize на ПК баннера не было).
+       Overlay кладёт баннер поверх окна — отступ делаем сами: main.js
+       получает ширину баннера и сужает #app (CSS --banner-w).
+     Размер уточняют VKWebAppBannerAdUpdated; после крестика
+     (VKWebAppBannerAdClosedByUser) полоса снимается, повторного показа нет. */
+  const BANNER_DESKTOP_FALLBACK_W = 300;   // пока мост не прислал banner_width — с запасом
+  let bannerSide = 'bottom';
+  let bannerOnInset = null;
+  let bannerSubscribed = false;
+
+  function isDesktop() {
+    try {
+      const p = new URLSearchParams(location.search).get('vk_platform') || '';
+      return p.indexOf('desktop_') === 0;   // desktop_web, desktop_web_messenger, desktop_app_messenger
+    } catch (_) { return false; }
+  }
+
+  // Сколько пикселей баннер перекрывает с нашей стороны по ответу моста
+  // (ShowBannerAd/CheckBannerAd/BannerAdUpdated — одна схема ответа).
+  function bannerInset(r) {
+    if (!r || r.result === false) return 0;
+    if (r.layout_type !== 'overlay') return 0;   // resize — клиент ужал окно сам
+    const v = bannerSide === 'right' ? r.banner_width : r.banner_height;
+    return (typeof v === 'number' && v > 0) ? v : 0;
+  }
+
+  function reportInset(px) {
+    if (typeof bannerOnInset === 'function') bannerOnInset(px, bannerSide);
+  }
+
+  function subscribeBanner() {
+    if (bannerSubscribed || typeof vkBridge.subscribe !== 'function') return;
+    bannerSubscribed = true;
+    vkBridge.subscribe((e) => {
+      const d = e && e.detail;
+      if (!d) return;
+      if (d.type === 'VKWebAppBannerAdUpdated') {
+        console.log('[platform] banner обновлён: ' + JSON.stringify(d.data));
+        reportInset(bannerInset(d.data));
+      } else if (d.type === 'VKWebAppBannerAdClosedByUser') {
+        console.log('[platform] banner закрыт игроком');
+        reportInset(0);
+      }
+    });
+  }
+
   function showBanner(onInset) {
     if (!ready) {
       console.warn('[platform] dev: banner пропущен');
       return;
     }
-    // b23 (решение основателя 13.09): баннер СНИЗУ на постоянной основе.
-    // layout_type:'resize' — клиент сам ужимает окно; если клиент ответил
-    // 'overlay', сообщаем main.js высоту баннера, чтобы экран отступил.
-    vkBridge.send('VKWebAppShowBannerAd', {
-      banner_location: 'bottom',
-      layout_type: 'resize',
-      height_type: 'compact',
-      orientation: 'vertical',
-    }).then((r) => {
-      const overlay = !!(r && r.layout_type === 'overlay');
-      const h = (overlay && typeof r.banner_height === 'number') ? r.banner_height : 0;
-      console.log('[platform] banner: ' + JSON.stringify(r) + ' → полоса снизу ' + h + 'px');
-      if (typeof onInset === 'function') onInset(h);
+    bannerOnInset = onInset;
+    const desktop = isDesktop();
+    bannerSide = desktop ? 'right' : 'bottom';
+    const params = desktop
+      ? { banner_location: 'bottom', layout_type: 'overlay', banner_align: 'right', orientation: 'vertical' }
+      : { banner_location: 'bottom', layout_type: 'resize', height_type: 'compact', orientation: 'vertical' };
+    subscribeBanner();
+    // ПК: место справа держим сразу, чтобы баннер ни кадра не лежал на
+    // игре; ответ моста уточнит ширину.
+    if (desktop) reportInset(BANNER_DESKTOP_FALLBACK_W);
+    vkBridge.send('VKWebAppShowBannerAd', params).then((r) => {
+      let px = bannerInset(r);
+      if (desktop && !px && r && r.result !== false && r.layout_type !== 'resize') px = BANNER_DESKTOP_FALLBACK_W;
+      console.log('[platform] banner ' + JSON.stringify(params) + ' → ' + JSON.stringify(r) +
+        ' → полоса ' + bannerSide + ' ' + px + 'px');
+      reportInset(px);
     }).catch((e) => {
       console.warn('[platform] banner недоступен:', e);
+      reportInset(0);
     });
   }
 

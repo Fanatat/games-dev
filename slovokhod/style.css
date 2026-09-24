@@ -19,6 +19,7 @@
   --gold-tint: #f8e9c3;      /* светлый тон под фон золотого чипа */
   --gold-ink: #7a5a12;       /* текст на золотом */
   --banner-h: 0px;           /* b23: полоса под баннер площадки снизу, ставит main.js setBannerInset */
+  --banner-w: 0px;           /* b24: полоса под вертикальный баннер справа (ПК ВК), там же */
   --radius: 14px;
 }
 
@@ -60,7 +61,7 @@ html, body {
 /* Игра занимает всю доступную область (п.1.6.1.1 / 1.6.2.1). */
 #app {
   position: relative;
-  width: 100%;
+  width: calc(100% - var(--banner-w, 0px));   /* b24: игра левее баннера справа */
   height: 100dvh;
   overflow: hidden;
 }
@@ -574,7 +575,7 @@ html, body {
 /* --- Тост наград модуля --- */
 .retention-toast {
   position: fixed;
-  left: 50%;
+  left: calc((100% - var(--banner-w, 0px)) / 2);   /* b24: по центру игры, не окна */
   top: max(14px, env(safe-area-inset-top));
   transform: translate(-50%, -12px);
   z-index: 40;

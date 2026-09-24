@@ -432,14 +432,18 @@
      баннер перекрывает снизу: ВК с layout_type:'resize' — 0 (клиент сам
      ужимает окно мини-аппа), Яндекс sticky — высота баннера. Экраны
      заканчиваются выше на эту величину (CSS --banner-h), поле
-     пересчитывается. */
-  function setBannerInset(px) {
+     пересчитывается.
+     b24: на ПК-версии ВК баннер вертикальный справа (overlay) — side
+     'right', ширина уходит в --banner-w, #app сужается слева от баннера. */
+  function setBannerInset(px, side) {
     var v = (typeof px === 'number' && px > 0) ? Math.round(px) : 0;
+    var right = side === 'right';
     var rootEl = document.documentElement;
     if (rootEl && rootEl.style && typeof rootEl.style.setProperty === 'function') {
-      rootEl.style.setProperty('--banner-h', v + 'px');
+      rootEl.style.setProperty(right ? '--banner-w' : '--banner-h', v + 'px');
+      rootEl.style.setProperty(right ? '--banner-h' : '--banner-w', '0px');
     }
-    console.log('[platform] полоса под баннер снизу: ' + v + 'px');
+    console.log('[platform] полоса под баннер ' + (right ? 'справа' : 'снизу') + ': ' + v + 'px');
     if (typeof Board !== 'undefined' && typeof Board.fit === 'function') Board.fit();
   }
 
@@ -1541,7 +1545,7 @@
       // Стики-баннер (задача Б): гарантированная рекламная поверхность,
       // не зависящая от гейта interstitial/rewarded. No-op на площадках
       // без поддержки — метод обязан существовать в контракте у всех.
-      Platform.showBanner(function (insetPx) { setBannerInset(insetPx); });   // b23: полоса под баннер
+      Platform.showBanner(function (insetPx, side) { setBannerInset(insetPx, side); });   // b23/b24: полоса под баннер
 
       // Прогресс грузим параллельно, чтобы не задерживать Game Ready.
       Platform.load().then(function (data) {

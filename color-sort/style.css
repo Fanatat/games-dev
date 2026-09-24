@@ -1,0 +1,1105 @@
+/* ============================================================
+   Color Sort
+   Палитра стандарта студии: кремовый фон + чернила.
+   Все цвета в :root — перекраска дешёвая.
+
+   ТЗ №4, задача B: тема больше не {c1,c2,c3} — полный набор токенов,
+   покрывающий ВСЁ, что раньше было захардкожено (фон страницы, фон
+   панели/карточек, текст, второстепенный текст, рамки, акцентная
+   кнопка, фон игрового поля). Смена темы = смена значений этих
+   переменных на :root через атрибут [data-theme] (main.js applyTheme) —
+   ни один экран/обработчик тему не знает (B3). «Тёплая» (этот блок,
+   без атрибута) — лицо студии, НЕ переделывается (B1), кроме c3
+   (задача A, board.js). Остальные три темы — блоки
+   :root[data-theme="..."] ниже, полностью свободны по цвету (B4).
+
+   --ink-rgb/--card-rgb — те же цвета ink/card, но «R, G, B» без #, для
+   rgba(var(--ink-rgb), альфа) в полупрозрачных подложках (задача B3:
+   ни одного захардкоженного rgba(число,число,число,...) в файле).
+   --board-bg — фон игрового поля (подложка под колбами, board.js
+   канвас) — НАРОЧНО отдельный от --paper токен (B2): у трёх платных
+   тем это заметно другой (умеренный «поднос»), у Тёплой оставлен РАВНЫМ
+   --paper (нулевое визуальное изменение, B1) — известное исключение,
+   см. check_palette.py и отчёт (с max()-метрикой фигура/поле, ТЗ №5
+   задача B, все проверки B5 зелёные и у Тёплой — старое несоответствие
+   этого коммента снято).
+
+   ТЗ №9, задача C: --texture-dot/--texture-size/--texture-gap —
+   параметры бумажной крупки (см. правило body ниже), токены темы, как
+   и цвета. У Тёплой значения совпадают с исторической константой
+   (0.5px точка/22px шаг/rgba(ink,0.18)) — визуально не меняются. */
+:root {
+  --paper:   #f3ead6;  /* кремовый фон */
+  --ink:     #2b2723;  /* чернила */
+  --ink-soft:#6b6258;
+  --card:    #fbf5e9;
+  /* ТЗ №10, задача C: акцент приведён к c1 базовой темы (board.js,
+     #d25c35, сдвинутому ТЗ №9) — раньше кнопка «Играть» и терракотовая
+     фигура на поле читались как два разных оттенка одного цвета.
+     --accent-ink затемнён (#fff8ef → #1a1108, тёмно-коричневый вместо
+     кремового): против ПОЛНОГО сдвига акцента кремовый текст проваливал
+     контраст (4.74:1 → 3.74:1, ниже WCAG 4.5:1) — частичный сдвиг акцента
+     держал контраст, но оставлял видимое рассогласование с фигурой c1
+     (см. отчёт, оба варианта с числами). Решение основателя: полный сдвиг
+     + тёмный текст (5.32:1). Меняет цвет текста ВСЕХ акцентных кнопок
+     игры (не только «Играть») — единый токен, как и было. */
+  --accent:  #d25c35;
+  --accent-ink: #1a1108;
+  --board-bg: #f3ead6; /* = --paper (см. коммент выше — Тёплая не переделывается) */
+  --ink-rgb:  43, 39, 35;
+  --card-rgb: 251, 245, 233;
+  /* ТЗ №10, задача B: скрим оверлея победы/главы — ОТДЕЛЬНЫЙ токен, не
+     rgba(--ink-rgb, ...) напрямую. --ink лечит контраст ТЕКСТА и поэтому
+     СВЕТЛЫЙ у тёмных тем (Морская/Ягодная — читаемый текст на тёмном
+     фоне) — тонировка экрана этим цветом на тёмной теме высветляет его
+     до блёклого серого, роняя тон палитры (жалоба: «у Морской просто
+     серый», без узнаваемого оттенка). --scrim-rgb всегда ТЁМНЫЙ и свой
+     на тему (см. блоки ниже) — держит палитру при любом направлении
+     темы, тот же класс урока, что «фон резко сменяется на другой цвет»
+     (ТЗ №9). У Тёплой совпадает со старым ink-rgb — она уже читалась
+     верно (тёплая обводка тёмным чернильным тоном), трогать не нужно. */
+  --scrim-rgb: 43, 39, 35;
+  --shadow:  rgba(var(--ink-rgb), 0.18);
+  --texture-dot: rgba(var(--ink-rgb), 0.18);
+  --texture-size: 0.5px;
+  --texture-gap: 22px;
+  --header-h: 72px; /* фактическая высота .game-header — обновляется из main.js */
+  /* ТЗ №10, задача E: ОДНА длительность на все переходы игры (экраны,
+     тема, уровень) — ориентир ТЗ 150-250мс, «мягко», а не «медленно».
+     Токен, а не голое число в каждом правиле, — ускорить/замедлить всю
+     игру разом, не собирая правки по файлу. Не зависит от темы (одна
+     запись в :root, темы её не переопределяют). */
+  --transition-ms: 200ms;
+}
+
+/* Морская — тёмная (ночной океан), ТЗ №4 задача B4 (решение основателя).
+   ТЗ №9, задача C: крупка реже и светлее прозрачностью Тёплой — на
+   тёмном фоне частые/яркие точки читались бы как шум, не бумага. */
+:root[data-theme="sea"] {
+  --paper:   #091016;
+  --card:    #17232c;
+  --ink:     #e8f3f1;
+  --ink-soft:#9fb7bc;
+  --accent:  #e8bb5c;
+  --accent-ink: #241a0d;
+  --board-bg: #3f738d;
+  --ink-rgb:  232, 243, 241;
+  --card-rgb: 23, 35, 44;
+  /* Задача B, ТЗ №10: --ink тут светлый (232,243,241 — текст на тёмном
+     фоне), скрим на нём светлел бы до блёклого серого — берём вместо
+     этого --paper (#091016, уже тёмный ночной океан) под свой токен. */
+  --scrim-rgb: 9, 16, 22;
+  --texture-dot: rgba(var(--ink-rgb), 0.10);
+  --texture-size: 0.6px;
+  --texture-gap: 26px;
+}
+
+/* Лесная — светлая (дневной луг), ТЗ №4 задача B4: единственная светлая
+   из трёх платных (решение основателя по вариантам исполнителя). ТЗ №9,
+   задача C: светлая тема — крупка близка по духу к Тёплой. */
+:root[data-theme="forest"] {
+  --paper:   #e6eedd;
+  --card:    #f5f8f2;
+  --ink:     #1d2e19;
+  --ink-soft:#5c6f52;
+  --accent:  #b7502e;
+  --accent-ink: #fff8ef;
+  --board-bg: #54763d;
+  --ink-rgb:  29, 46, 25;
+  --card-rgb: 245, 248, 242;
+  /* Задача B, ТЗ №10: светлая тема — --ink уже тёмный (совпадает с тем,
+     что нужно скриму), отдельного цвета не требуется, но токен явный. */
+  --scrim-rgb: 29, 46, 25;
+  --texture-dot: rgba(var(--ink-rgb), 0.16);
+  --texture-size: 0.5px;
+  --texture-gap: 20px;
+}
+
+/* Ягодная — тёмная (винный погреб), ТЗ №4 задача B4. ТЗ №9, задача C:
+   та же логика, что у Морской — тёмный фон, крупка тише Тёплой. */
+:root[data-theme="berry"] {
+  --paper:   #170814;
+  --card:    #2e142c;
+  --ink:     #f5eaf0;
+  --ink-soft:#c2a3b8;
+  --accent:  #e8bb5c;
+  --accent-ink: #2b1130;
+  --board-bg: #913b85;
+  --ink-rgb:  245, 234, 240;
+  --texture-dot: rgba(var(--ink-rgb), 0.12);
+  --texture-size: 0.6px;
+  --texture-gap: 24px;
+  --card-rgb: 46, 20, 44;
+  /* Задача B, ТЗ №10: та же логика, что у Морской — --ink светлый,
+     скрим берёт --paper (#170814, уже тёмный винный погреб) отдельным
+     токеном. */
+  --scrim-rgb: 23, 8, 20;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+/* ТЗ №10, задача E: смена темы — перекрашивание, не скачок. Токены
+   темы (--paper/--card/--ink/--accent/--board-bg/...) меняются ОДНИМ
+   атрибутом [data-theme] на <html> (applyTheme(), main.js) — без этого
+   правила любой background/color/border/box-shadow, читающий их,
+   переключался бы мгновенно. Универсально на *, а не по списку
+   селекторов — темой красится весь интерфейс, перечислять каждый класс
+   отдельно означало бы гарантированно забыть один при следующей правке
+   стиля. Свойства, у которых УЖЕ есть собственный transition (.btn,
+   .grid-tile, .board-wrap, .screen — их transition-шорткод замещает
+   ЭТОТ целиком, шорткоды не суммируются в CSS), несут те же токены
+   явным списком у себя — см. эти правила. */
+* {
+  transition: background-color var(--transition-ms) ease, color var(--transition-ms) ease,
+    border-color var(--transition-ms) ease, box-shadow var(--transition-ms) ease;
+}
+
+html, body {
+  height: 100%;
+  /* Анти-скролл: страница не «гуляет» под пальцем (урок филворда) */
+  overflow: hidden;
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  touch-action: none;
+  overscroll-behavior: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Игровой контейнер (п.1.6.2.7) — явно, поверх глобального правила
+   выше: ПКМ/протяжка над полем не должны выделять текст или открывать
+   системное меню (contextmenu гасится в main.js). */
+#screen-game {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  user-select: none;
+}
+
+body {
+  font-family: Georgia, 'Times New Roman', serif; /* системный serif — стандарт студии */
+  background-color: var(--paper);
+  color: var(--ink);
+  /* Бумажная крупка — как в филворде/нонограммах. ТЗ №9, задача C: цвет
+     точки/её размер/шаг сетки — токены темы (--texture-*, см. :root
+     блоки выше), не общая на все темы константа — раньше сюда попадал
+     только цвет (через --shadow), а плотность/размер точки у платных
+     тем оставались параметрами Тёплой, из-за чего текстура выглядела
+     заимствованной, а не частью темы. */
+  background-image: radial-gradient(var(--texture-dot) var(--texture-size), transparent var(--texture-size));
+  background-size: var(--texture-gap) var(--texture-gap);
+}
+
+/* ---------- Экраны ---------- */
+/* ТЗ №10, задача E: раньше .screen { display:none/flex } переключался
+   мгновенно (main.js show()) — резкая смена экрана. Теперь ВСЕ экраны
+   всегда в потоке рендера (display:flex), видимость и интерактивность —
+   через opacity/pointer-events, оба на CSS-transition: main.js show()
+   по-прежнему просто снимает/ставит один класс .active, а кроссфейд
+   (старый экран гаснет, новый проявляется поверх) получается сам —
+   классы у ВСЕХ экранов меняются в одном синхронном проходе show().
+   pointer-events:none у неактивных — БЕЗ задержки (в отличие от
+   классического opacity+visibility-паттерна): погашенный экран не
+   должен ловить тапы уже в момент начала fade-out, иначе быстрый
+   повторный тап в area, где раньше была кнопка, срабатывает на ней. */
+.screen {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  /* Было justify-content:center — центрирование самого flex-контейнера
+     конфликтует с overflow (flexbugs #10): когда контент-коробка
+     (.menu-box и т.п.) выше вьюпорта, центрирование обрезает её
+     СИММЕТРИЧНО сверху и снизу, и обрезанная часть НЕ доскроллиевается
+     (застревает в отрицательном/недостижимом scroll-диапазоне) — живой
+     прогон и видео Яндекса (отказ, landscape, п.1.10.1): в телефоне
+     боком карточка меню выше короткого вьюпорта, верх режет тулбар
+     браузера, низ (кнопка звука) обрезан краем экрана, докрутить нельзя.
+     Центрирование теперь на самих коробках (margin:auto 0 у .menu-box/
+     .loading-box/.energy-wall-box/.win-box) — при нехватке высоты auto-
+     margin схлопывается в 0, и коробка просто прижимается к верху
+     скролл-области, откуда достижима докруткой, вместо неразрешимого
+     обрезания. Экраны без такой коробки (grid/shop/oformlenie/game) не
+     зависят от justify-content — их контент уже позиционируется
+     собственным position:absolute-слоем (#grid-wrap/.shop-wrap/
+     .picker-wrap) или flex:1 (#board-wrap), которым direction контейнера
+     не указывает, где встать. */
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--transition-ms) ease;
+  /* Тот же приём, что у #grid-wrap/.shop-wrap ниже: внутренний скролл
+     .screen (изолированный слой внутри html/body c overflow:hidden) не
+     нарушает анти-скролл страницы. */
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
+}
+.screen.active { opacity: 1; pointer-events: auto; }
+
+/* ---------- Загрузка ---------- */
+/* margin:auto 0 вместо опоры на .screen{justify-content:center}: если
+   контент выше вьюпорта (лэндскейп-фикс выше — .screen{overflow-y:auto}),
+   auto-margin в колоночном flex-контейнере схлопывается до 0 и коробка
+   просто прижимается к верху скролл-области — доступна докруткой,
+   вместо неразрешимого симметричного обрезания сверху/снизу
+   (flexbugs #10: justify-content:center конфликтует с overflow). */
+.loading-box { text-align: center; margin: auto 0; }
+.loading-title { font-size: 2rem; font-weight: bold; margin-bottom: 18px; }
+.loading-dots span {
+  display: inline-block;
+  width: 10px; height: 10px;
+  margin: 0 4px;
+  border-radius: 50%;
+  background: var(--ink-soft);
+  animation: pulse 1.2s infinite ease-in-out;
+}
+.loading-dots span:nth-child(2) { animation-delay: 0.2s; }
+.loading-dots span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes pulse {
+  0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+  40% { transform: scale(1); opacity: 1; }
+}
+
+/* ---------- Меню ---------- */
+.menu-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 32px 28px;
+  background: var(--card);
+  border: 2px solid var(--ink);
+  border-radius: 14px;
+  box-shadow: 4px 4px 0 var(--shadow);
+  min-width: 260px;
+  /* см. .loading-box — тот же приём против симметричного обрезания в
+     лэндскейпе, где карточка меню (заголовок+серия входов+энергия+4
+     кнопки) выше короткого широкого вьюпорта (отказ Яндекса, п.1.10.1). */
+  margin: auto 0;
+}
+.game-title { font-size: 2.2rem; margin-bottom: 6px; text-align: center; }
+
+.btn {
+  font-family: inherit;
+  font-size: 1.1rem;
+  padding: 12px 28px;
+  border: 2px solid var(--ink);
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--ink);
+  cursor: pointer;
+  box-shadow: 3px 3px 0 var(--shadow);
+  /* Собственный transition замещает универсальный (* выше) целиком —
+     перечисляем цветовые свойства тут же, иначе кнопка потеряла бы
+     плавную перекраску темы (ТЗ №10, задача E). box-shadow НАРОЧНО не
+     включён сюда: у него уже есть своя, БЫСТРАЯ роль — мгновенный
+     сдвиг тени на :active (нажатие), 200мс сделали бы отклик на тап
+     вялым. Тень на смену темы просто щёлкнет мгновенно — цена малая
+     (тонкий 3px акцент, не поле цвета). */
+  transition: transform 0.06s ease, background-color var(--transition-ms) ease,
+    color var(--transition-ms) ease, border-color var(--transition-ms) ease;
+  min-width: 200px;
+}
+.btn:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--shadow); }
+.btn-primary { background: var(--accent); color: var(--accent-ink); border-color: var(--ink); }
+
+/* ТЗ №14, этап 3, п.3.1: «Играть» — единственное доминирующее действие
+   главного экрана (деконструкция каталога Яндекса, 22.08 — у лидеров
+   одно доминирующее действие, путь до первого хода короче). Классы
+   СВОИ, не правка .btn-primary/.btn — та же пара классов несёт кнопки
+   магазина и оверлеев победы/главы/кампании в других местах игры,
+   трогать их вес здесь не нужно и не просили. */
+.btn-play-hero {
+  font-size: 1.35rem;
+  padding: 18px 44px;
+  min-width: 240px;
+}
+.btn-menu-secondary {
+  font-size: 0.9rem;
+  padding: 8px 18px;
+  min-width: 140px;
+  box-shadow: 2px 2px 0 var(--shadow);
+  background: transparent;
+}
+.btn-icon {
+  min-width: 0;
+  width: 48px; height: 48px;
+  padding: 0;
+  font-size: 1.3rem;
+  border-radius: 50%;
+  position: relative;
+}
+.hidden { display: none !important; }
+
+/* Плашка номера билда (задача 14, перенесено из feature/vk-resubmit —
+   свой аналог для Яндекс-адаптера) — position:fixed (не привязана к
+   конкретному .screen, видна поверх активного экрана без правки
+   разметки каждого из них), крайний нижний левый угол с учётом
+   safe-area. pointer-events:none — неинтерактивна, не перехватывает тап
+   по .undo-btn (тот же угол экрана, но выше: bottom:18px против
+   bottom предельно у края здесь) и не мешает антискроллу страницы.
+   ТЗ №4, задача B6: раньше плашка была рассчитана только на светлый
+   фон (голый var(--ink) при opacity 0.32 — на тёмных темах читалась бы
+   еле-еле поверх произвольного фона экрана). Добавлена собственная
+   полупрозрачная подложка цвета панели (--card-rgb) — контраст
+   текст/подложка тот же var(--ink)/var(--card), что у обычных карточек
+   (уже проверен check_palette.py, ≥4.5:1 на всех темах), а не
+   var(--ink) поверх ЧЕГО ПРИДЁТСЯ. */
+.build-badge {
+  position: fixed;
+  left: max(4px, env(safe-area-inset-left));
+  bottom: max(2px, env(safe-area-inset-bottom));
+  padding: 1px 5px;
+  font-family: inherit;
+  font-size: 9px;
+  line-height: 1.4;
+  color: var(--ink);
+  background: rgba(var(--card-rgb), 0.55);
+  border-radius: 3px;
+  opacity: 0.55;
+  pointer-events: none;
+  user-select: none;
+  white-space: nowrap;
+  z-index: 9999;
+}
+
+/* ---------- Модуль удержания (ТЗ №14/№15, retention.js) ----------
+   .retention-line — стиль строки серии входов (меню, ВСЕГДА видна) —
+   обычный второстепенный текст, тот же токен --ink-soft, что у
+   .stat-label/.hint-ad-label.
+   .game-header-stacked — шапка в два ряда: строка кнопок/заголовка
+   (.game-header-row) горизонтальна, ниже — доп. контент отдельным
+   рядом (ТЗ №15: индикатор энергии на игровом экране; было у сетки
+   уровней в ТЗ №14 этап 3 под раздатчик — тот убран этапом 1 ТЗ №15,
+   класс переименован из .game-header-grid, механика та же). Высота
+   растёт сама, syncHeaderSpace() (main.js) меряет реальный рендер и
+   прокидывает в --header-h — board-wrap/grid-wrap подстраиваются без
+   отдельной правки. */
+.retention-line {
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+  text-align: center;
+  margin: 0;
+}
+/* Отказ Яндекса (landscape, п.1.10.1): селектор ЗДЕСЬ (.game-header-stacked)
+   и .game-header (ниже, "Игровой экран") имеют равную специфичность —
+   align-items:center у .game-header, идущего ПОЗЖЕ в файле, побеждал
+   align-items:stretch по порядку источника. Без stretch .game-header-row
+   не растягивался на всю ширину шапки, а сжимался под контент и
+   центрировался — в портрете разница почти не видна (строка и так
+   занимает почти всю ширину), в лэндскейпе (широкий короткий вьюпорт)
+   кнопки «назад»/звук вместо краёв шапки сбивались в кучку у центра и
+   наезжали на текст уровня. Комбинированный селектор — специфичность
+   выше .game-header НАВСЕГДА, а не только по случайному порядку файла. */
+.game-header.game-header-stacked {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  padding-bottom: 10px;
+}
+.game-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* Тост отклика (п.2.4 контракта модуля — «тихих улучшений не бывает»):
+   поверх ЛЮБОГО активного экрана (не привязан к .screen), тот же приём
+   translateX(-50%)-центрирования, что у .hint-toast, но фиксирован
+   относительно вьюпорта (rewarded-выдача может случиться с любого
+   экрана — меню, сетка). hidden управляет main.js, .is-visible — CSS-
+   переход на opacity/transform (перезапускается requestAnimationFrame
+   в showRetentionToast, тот же приём, что и winFlash/board-fade). */
+.retention-toast {
+  position: fixed;
+  left: 50%;
+  top: max(14px, env(safe-area-inset-top));
+  transform: translateX(-50%) translateY(-8px);
+  background: var(--card);
+  border: 2px solid var(--ink);
+  border-radius: 10px;
+  padding: 8px 16px;
+  font-size: 0.9rem;
+  box-shadow: 3px 3px 0 var(--shadow);
+  white-space: nowrap;
+  z-index: 9998;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--transition-ms) ease, transform var(--transition-ms) ease;
+}
+.retention-toast.is-visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+/* ТЗ №15: игровой экран несёт двухрядную шапку (.game-header-stacked,
+   энергия вторым рядом) — фиксированный верхний край перекрывал бы её
+   (см. main.js showRetentionToast). --header-h уже держит реальную
+   высоту (syncHeaderSpace). */
+.retention-toast.below-header {
+  top: calc(var(--header-h, 72px) + 10px);
+}
+
+/* ---------- Энергия (ТЗ №15, этап 1) ----------
+   Одна разметка, три места (меню/игра/стена) — main.js рендерит ВСЕ
+   инстансы разом через querySelectorAll по этим классам (см.
+   renderEnergyIndicator), не завязано на конкретный id. Полоса — не
+   только цифра (п.1.4: «заполнение читается глазом»), разборчива на
+   320px (min-width полосы 90px даже в компактном варианте — деления по
+   1 энергии на 90px это ~9px/деление, ещё различимо). */
+.energy-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  justify-content: center;
+}
+.energy-label {
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+.energy-bar {
+  width: 120px;
+  height: 10px;
+  border: 1.5px solid var(--ink);
+  border-radius: 5px;
+  background: var(--card);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.energy-bar-fill {
+  height: 100%;
+  /* Тот же акцентный токен темы, что у .btn-primary — энергия читается
+     как «ресурс/валюта», не игровой элемент поля (карточка приёмки: не
+     должна путаться с цветами колб на игровом экране). */
+  background: var(--accent);
+  /* Заметное, не мгновенное изменение при трате/пополнении (ТЗ №15,
+     п.1.4: «расход виден... заметно, не молча») — общий токен
+     длительности игры, тот же, что у остальных переходов. */
+  transition: width var(--transition-ms) ease;
+}
+.energy-value-text {
+  font-size: 0.85rem;
+  font-weight: bold;
+  white-space: nowrap;
+  min-width: 2.6em;
+}
+.energy-next-text {
+  font-size: 0.72rem;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+.energy-indicator-compact .energy-bar { width: 84px; }
+.energy-indicator-compact .energy-label { display: none; }
+.energy-indicator-compact .energy-next-text { display: none; } /* время — только в меню/на стене, в игре мешало бы шапке на 320px */
+
+/* ---------- Стена энергии (ТЗ №15, п.1.1/1.4/1.6) ----------
+   Отдельный .screen (тот же приём кроссфейда, что у остальных экранов,
+   см. .screen/.screen.active) — не оверлей поверх игры: уровень при
+   энергии 0 вообще не должен начинать грузиться/рисоваться. */
+.energy-wall-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 32px 28px;
+  background: var(--card);
+  border: 2px solid var(--ink);
+  border-radius: 14px;
+  box-shadow: 4px 4px 0 var(--shadow);
+  max-width: 320px;
+  text-align: center;
+  /* см. .menu-box/.loading-box — тот же приём против обрезания в лэндскейпе. */
+  margin: auto 0;
+}
+.energy-wall-icon {
+  font-size: 2.4rem;
+  line-height: 1;
+}
+.energy-wall-text {
+  font-size: 0.95rem;
+  color: var(--ink-soft);
+}
+
+/* ---------- Магазин (ТЗ №2 — вкладка вместо карточки в меню) ----------
+   Тот же приём анти-скролла и резерва под шапку, что у .grid-wrap
+   (top: var(--header-h), НЕ padding-top, НЕ 100vh — шрам ВК-порта, см.
+   журнал). Список карточек — вертикальный flex, рассчитан на рост
+   ассортимента (main.js рендерит из SHOP_THEMES, не хардкод одной
+   темы), при переполнении скроллится ВНУТРИ контейнера. */
+.shop-wrap,
+.picker-wrap {
+  position: absolute;
+  top: var(--header-h);
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 16px 28px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
+}
+.shop-list,
+.picker-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  max-width: 340px;
+}
+.shop-item,
+.picker-item {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  background: var(--card);
+  border: 2px solid var(--ink);
+  border-radius: 10px;
+  box-shadow: 3px 3px 0 var(--shadow);
+}
+/* Активная (сейчас применённая) тема — акцентная рамка, без лишней
+   разметки: одна и та же карточка, другой бордер. */
+.shop-item.active,
+.picker-item.active { border-color: var(--accent); }
+.shop-item-top,
+.picker-item-top { display: flex; align-items: center; gap: 14px; }
+/* Мини-макет колбы — тот же силуэт, что рисует board.js (открытый
+   верх, скруглённое дно), с фигурами круг/квадрат/круг в цветах темы.
+   column-reverse укладывает первый добавленный элемент (c1) в НИЗ
+   макета — как элементы реально лежат в колбе снизу вверх. */
+.shop-vial-preview,
+.picker-vial-preview {
+  width: 44px;
+  height: 76px;
+  flex-shrink: 0;
+  border: 2px solid var(--ink);
+  border-top: none;
+  border-radius: 0 0 12px 12px;
+  background: rgba(var(--ink-rgb), 0.04);
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 4px;
+  padding: 5px 0;
+}
+.shop-vial-el,
+.picker-vial-el { width: 24px; height: 24px; border: 1.5px solid var(--ink); flex-shrink: 0; }
+.shop-vial-el.circle,
+.picker-vial-el.circle { border-radius: 50%; }
+.shop-vial-el.square,
+.picker-vial-el.square { border-radius: 4px; }
+.shop-item-info,
+.picker-item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1;
+  min-width: 0;
+}
+.shop-item-label,
+.picker-item-label { font-weight: 700; font-size: 0.9rem; }
+/* Нижний ряд — кнопка («Купить»-с-ценой/«Применить») ИЛИ один из
+   статусных лейблов (активна/недоступно), одна ширина на всю карточку. */
+.shop-item-actions,
+.picker-item-actions { display: flex; align-items: center; gap: 10px; }
+.shop-item-btn,
+.picker-item-btn { flex: 1; min-width: 0; padding: 10px 8px; font-size: 0.92rem; }
+.shop-item-status,
+.picker-item-status { font-size: 0.95rem; color: var(--ink); }
+/* Иконка валюты (getPriceCurrencyImage, п.1.13.2) — вплотную к цене
+   внутри кнопки «Купить». ТЗ №8, задача A: элемент попадает в DOM
+   (main.js) только ПОСЛЕ подтверждённой загрузки, поэтому здесь
+   единственная забота CSS — не дать высокой/квадратной картинке
+   растянуться под высоту кнопки; ширина всегда пропорциональна height. */
+.shop-item-currency-icon { height: 1em; width: auto; max-width: 1.6em; vertical-align: -0.15em; }
+/* Отказ покупки (ТЗ №7, задача A) — текст внутри карточки, не alert()/
+   полноэкранный блок (п.1.16). Приглушённый цвет: сообщение нейтральное,
+   не пугающее — уместно и при отмене, и при техническом сбое. */
+.shop-item-message { font-size: 0.85rem; color: var(--ink-soft); }
+
+/* Подсказка экрана «Оформление» (ТЗ №17) — объясняет, откуда берутся
+   новые оформления, чтобы экран с одной карточкой не читался как
+   поломка. Приглушённая и НИЖЕ карточек: это пояснение, а не заголовок
+   и не призыв. Ширина совпадает с .shop-list, чтобы строка переносилась
+   по той же сетке, что и карточки. */
+.picker-hint {
+  width: 100%;
+  max-width: 340px;
+  margin: 2px 0 0;
+  font-size: 0.85rem;
+  line-height: 1.35;
+  color: var(--ink-soft);
+  text-align: center;
+}
+
+/* Перечёркнутая нота — CSS-чертой, не символом (стандарт студии) */
+.btn-icon.muted::after {
+  content: '';
+  position: absolute;
+  left: 10px; right: 10px; top: 50%;
+  height: 2px;
+  background: var(--ink);
+  transform: rotate(-40deg);
+}
+
+/* ---------- Экран сетки уровней ----------
+   Высота #grid-wrap ограничена реальной вёрсткой экрана (top:
+   var(--header-h) до низа .screen), НЕ 100vh — на ВК Web игра живёт в
+   iframe фиксированной высоты, 100vh раздувает страницу площадки
+   (шрам порта нонограмм). Если сетка не помещается без скролла
+   (156 плиток на узком экране), она скроллится ВНУТРИ этого
+   контейнера (overflow-y), html/body остаются overflow:hidden —
+   страница целиком не двигается (анти-скролл, стандарт студии).
+
+   ВАЖНО: резерв под шапку — через position/top (граница СОБСТВЕННОГО
+   бокса контейнера), а НЕ через padding-top. Padding — часть
+   прокручиваемого содержимого: при скролле он "уезжает" вместе с
+   тайлами, и первая же строка сетки заезжает ПОД полупрозрачную
+   .game-header (шапка position:absolute, рисуется поверх, а не
+   раздвигает поток) — проверено скриншотом, где plaque "2 3 4" вылезала
+   из-под шапки при scrollTop=88 (это и есть высота старого padding-top).
+   top: var(--header-h) держит верхнюю границу бокса НИЖЕ шапки всегда,
+   вне зависимости от scrollTop. */
+.grid-wrap {
+  position: absolute;
+  top: var(--header-h);
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: flex-start; /* было center — при скролле центрирование даёт "уезжающий вверх" контент до отрицательного scrollTop */
+  justify-content: center;
+  padding: 16px 12px 28px;
+  overflow-y: auto;
+  overscroll-behavior: contain; /* доп. страховка поверх overflow:hidden html/body — скролл сетки не должен утекать на страницу */
+  touch-action: pan-y; /* разрешаем вертикальный тач-скролл именно здесь, поверх touch-action:none на html/body */
+  -webkit-overflow-scrolling: touch;
+}
+.level-grid {
+  display: grid;
+  gap: 8px;
+  justify-content: center;
+  align-content: center;
+}
+.grid-tile {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--ink);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--ink);
+  font-family: inherit;
+  cursor: pointer;
+  box-shadow: 2px 2px 0 var(--shadow);
+  padding: 0;
+  /* См. коммент у .btn — собственный transition замещает универсальный,
+     box-shadow нарочно не включён (та же причина: :active должен щёлкать
+     мгновенно, не тянуться 200мс). */
+  transition: transform 0.06s ease, background-color var(--transition-ms) ease,
+    color var(--transition-ms) ease, border-color var(--transition-ms) ease;
+}
+.grid-tile:active { transform: translate(1px, 1px); box-shadow: 1px 1px 0 var(--shadow); }
+.grid-tile.current { border-color: var(--accent); border-width: 3px; }
+.grid-tile.locked {
+  background: rgba(var(--ink-rgb), 0.06);
+  color: var(--ink-soft);
+  cursor: default;
+  box-shadow: none;
+}
+.grid-tile.locked:active { transform: none; }
+.spacer { visibility: hidden; }
+
+/* Замок на закрытой плитке — код-рисунок (студия не использует
+   картинки-эмодзи ради консистентности рендера между платформами). */
+.lock-icon {
+  position: relative;
+  width: 38%;
+  height: 32%;
+  margin-top: 18%;
+  border: 2px solid var(--ink-soft);
+  border-radius: 2px;
+  background: var(--paper);
+}
+.lock-icon::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 100%;
+  width: 62%;
+  height: 55%;
+  border: 2px solid var(--ink-soft);
+  border-bottom: none;
+  border-radius: 50% 50% 0 0;
+  transform: translateX(-50%);
+}
+
+/* ---------- Игровой экран ---------- */
+.game-header {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+}
+.level-indicator { font-size: 1.05rem; }
+.board-wrap {
+  flex: 1;
+  min-height: 0; /* без этого flex-item не сжимается ниже intrinsic-размера canvas — переполняет экран */
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* сверху — реальная высота шапки (--header-h, меряется в JS) + зазор;
+     снизу резерв под будущую кнопку подсказки (урок филворда) */
+  padding: calc(var(--header-h) + 16px) 12px 90px;
+  /* Задача 8: смена уровня подмышивается плавным fade — данные
+     подменяются, пока поле уже невидимо (main.js добавляет/снимает
+     board-fade вокруг loadLevel), игрок не видит момент подмены. ТЗ №10,
+     задача E: длительность — общий токен --transition-ms (было 180ms
+     хардкодом — единая длительность по игре); main.js BOARD_FADE_MS
+     держит то же число (200), иначе JS-таймер и CSS-переход разойдутся
+     и подмена уровня будет видна на полу-прозрачном холсте. */
+  transition: opacity var(--transition-ms) ease, transform var(--transition-ms) ease;
+}
+.board-wrap.board-fade {
+  opacity: 0;
+  transform: translateY(8px);
+}
+#board-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0; /* та же причина: canvas — тоже flex-item (в board-wrap) */
+  /* ТЗ №4, задача B2/B5: подложка игрового поля — отдельный токен
+     (--board-bg), НЕ равный --paper у трёх платных тем («поднос»
+     умеренного тона — только так фигуры/обводка проходят контраст
+     ≥2.0 против фона поля, см. check_palette.py). У Тёплой оставлен
+     равным --paper (задача B1, известное исключение — см. отчёт). */
+  background: var(--board-bg);
+  /* ТЗ №9, задача B: мягкий край — статичный (не пропорциональный
+     размеру, см. board.js resize()) радиус, специально небольшой:
+     живой прогон поймал, что крупный радиус срезает угол хит-теста у
+     границы padded-зоны колбы на тесных раскладках (Board.hitTest не
+     видит пиксели в скруглённом углу, см. отчёт) — 10px держит
+     большой запас против PAD (≥18px в board.js) с любым запасом
+     Board.hitTest (+8px). Растворение — box-shadow цветом поля наружу
+     за границу canvas; у Тёплой --board-bg = --paper (задача B1,
+     известное исключение), поэтому ореол сливается со страницей и
+     визуально не виден — это ожидаемо, не регрессия. */
+  border-radius: 10px;
+  box-shadow: 0 0 28px 6px var(--board-bg);
+  touch-action: none;
+}
+/* Нижний ряд кнопок игрового экрана — зеркалит шапку (назад слева, звук справа). */
+.undo-btn {
+  position: absolute;
+  left: 14px;
+  bottom: 18px;
+}
+/* ТЗ №22, A3: рестарт — правее отмены, место постоянное (отмена может
+   прятаться — рестарт от этого не прыгает). .armed — первый тап принят,
+   ждём второй (подтверждение R-09 без модального окна). */
+.restart-btn {
+  position: absolute;
+  left: 72px;
+  bottom: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.restart-btn.armed {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+/* ТЗ №22, C3: мягкий зов внимания к кнопке (застрял/тупик) — пульс
+   масштабом, без смены цвета: подсказка остаётся той же кнопкой. */
+.btn.attention { animation: attentionPulse 1.1s ease-in-out infinite; }
+@keyframes attentionPulse {
+  0%, 100% { transform: scale(1); box-shadow: 3px 3px 0 var(--shadow); }
+  50% { transform: scale(1.12); box-shadow: 0 0 0 6px rgba(var(--ink-rgb), 0.12), 3px 3px 0 var(--shadow); }
+}
+.fx-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+/* Кнопка подсказки: явный знак «это реклама» (п.4.5.1) — значок ▶ на
+   самой кнопке + подпись под ней. Ясность цепочки реклама → подсказка
+   видна ДО тапа, не после. */
+.hint-wrap {
+  position: absolute;
+  right: 14px;
+  bottom: 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+.hint-btn {
+  position: relative;
+}
+.hint-ad-badge {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 0.6rem;
+  line-height: 18px;
+  text-align: center;
+  border: 1.5px solid var(--ink);
+  pointer-events: none;
+}
+/* Бейдж остатка бесплатных подсказок (ТЗ №14, этап 3, п.3.2 — перенос
+   решения нонограмм ТЗ №03 модуля retention.js). Угол, ЗЕРКАЛЬНЫЙ
+   .hint-ad-badge (left вместо right) — оба бейджа независимы, не
+   перекрываются. pointer-events:none — тап достаётся кнопке, не
+   бейджу (сам бейдж не увеличивает и не уменьшает тап-таргет кнопки —
+   чистый overlay, .hint-btn/.btn-icon габариты не меняет). Скрыт
+   классом .hidden при нуле (main.js renderHintBonusBadge), min-width
+   вместо фиксированной ширины — двузначные числа не обрежутся. */
+.hint-bonus-badge {
+  position: absolute;
+  top: -3px;
+  left: -3px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 3px;
+  border-radius: 9px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 0.62rem;
+  font-weight: bold;
+  line-height: 18px;
+  text-align: center;
+  border: 1.5px solid var(--ink);
+  pointer-events: none;
+}
+.hint-ad-label {
+  font-size: 0.68rem;
+  color: var(--ink-soft);
+  white-space: nowrap;
+  background: var(--card);
+  border: 1.5px solid var(--ink);
+  border-radius: 8px;
+  padding: 2px 8px;
+  pointer-events: none;
+}
+.hint-toast {
+  position: absolute;
+  left: 50%;
+  bottom: 78px;
+  transform: translateX(-50%);
+  background: var(--card);
+  border: 2px solid var(--ink);
+  border-radius: 10px;
+  padding: 8px 16px;
+  font-size: 0.95rem;
+  box-shadow: 3px 3px 0 var(--shadow);
+  white-space: nowrap;
+}
+
+/* ---------- Оверлей победы ---------- */
+.win-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  /* flex-direction:column ОБЯЗАТЕЛЕН — без него это была реальная
+     регрессия (баг основателя, скрин 2026-09, портрет): по умолчанию
+     flex — row, тогда align-items:center центрирует .win-box только по
+     кросс-оси (вертикали), а justify-content по главной оси (горизонт.)
+     молча остаётся flex-start — карточка прижималась к левому краю
+     экрана вместо центра. .screen (откуда скопирован приём) эту строку
+     несёт, здесь её потеряли при копировании. */
+  flex-direction: column;
+  align-items: center;
+  /* Было justify-content:center — см. развёрнутый комментарий у .screen:
+     тот же конфликт center+overflow (flexbugs #10). Центрирование теперь
+     на .win-box (margin: auto 0). */
+  /* ТЗ №10, задача B: --scrim-rgb, не --ink-rgb — см. комментарий у
+     токена в :root (--ink светлый на тёмных темах, скрим на нём терял
+     оттенок темы, читался плоско-серым). */
+  background: rgba(var(--scrim-rgb), 0.4);
+  /* Вспышка света при появлении — момент читается как награда,
+     не просто смена экрана. Перезапускается сама (.hidden = display:none). */
+  animation: winFlash 0.5s ease-out;
+  /* Отказ Яндекса (landscape, п.1.10.1): та же коробка-выше-вьюпорта
+     логика, что у .screen/.menu-box (см. комментарии там) — этот
+     оверлей несёт также .campaign-box (4 плашки статистики + кнопка),
+     самую высокую карточку игры, реальный кандидат на обрезание в
+     лэндскейпе, хоть в присланных скриншотах и не пойман. */
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
+}
+.win-box {
+  position: relative; /* конфетти-канвас поверх, координаты — от оверлея */
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  padding: 32px 28px;
+  background: var(--card);
+  border: 2px solid var(--ink);
+  border-radius: 14px;
+  box-shadow: 4px 4px 0 var(--shadow);
+  min-width: 240px;
+  /* Лёгкая полировка: мягкое появление с небольшим перехлёстом
+     («поп») — антистресс-темп, но ощущается как награда. */
+  animation: winPop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  /* см. .menu-box — та же защита от симметричного обрезания. */
+  margin: auto 0;
+}
+.win-title { font-size: 1.6rem; text-align: center; }
+
+/* Полоса прогресса главы на обычном экране победы (фаза 3 «хук экрана
+   победы», решение основателя) — N из 12, N = позиция уровня внутри
+   текущей главы. Только этот, обычный win-overlay: экран «Глава
+   пройдена» и финал показывают свою статистику, полосы у них нет и
+   не будет — не трогаем их разметку/стили. */
+.win-chapter-progress {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+.progress-track {
+  width: 100%;
+  height: 10px;
+  background: rgba(var(--ink-rgb), 0.12);
+  border: 1.5px solid var(--ink);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 4px 0 0 4px;
+}
+.progress-label { font-size: 0.85rem; color: var(--ink-soft); }
+
+/* ТЗ №22, C1: цель дня на экране победы — три точки, новая заливается
+   с «попом» (main.js добавляет .just-filled на только что заработанную). */
+.win-daily {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.daily-pips { display: flex; gap: 10px; }
+.daily-pips span {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid var(--ink);
+  background: transparent;
+}
+.daily-pips span.filled { background: var(--accent); }
+.daily-pips span.just-filled { animation: pipPop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 0.25s both; }
+@keyframes pipPop {
+  0%   { transform: scale(0.4); background: transparent; }
+  60%  { transform: scale(1.35); }
+  100% { transform: scale(1); }
+}
+.win-daily-label { font-size: 0.85rem; color: var(--ink-soft); text-align: center; }
+.daily-goal-line.done { color: var(--ink); font-weight: bold; }
+
+/* Кнопка «Дальше» — главный элемент экрана (п.2 фазы 3), крупнее
+   обычной .btn-primary. */
+.btn-next-big { min-width: 220px; font-size: 1.15rem; padding: 16px 30px; }
+.confetti-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none; /* не мешает тапу по кнопкам оверлея */
+  z-index: 2;
+}
+
+/* ---------- Оверлей завершения кампании ---------- */
+.campaign-box { max-width: 320px; }
+.campaign-note {
+  font-size: 0.95rem;
+  color: var(--ink-soft);
+  text-align: center;
+  margin-top: -8px;
+}
+.campaign-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px 20px;
+  width: 100%;
+}
+.stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.stat-value { font-size: 1.3rem; font-weight: bold; }
+.stat-label { font-size: 0.75rem; color: var(--ink-soft); text-align: center; }
+
+/* ---------- Оверлей завершения главы (легче финального: слабее
+   затемнение фона, без вспышки/попа, компактнее карточка — если
+   не отличать на глаз от campaign-overlay, финал перестаёт быть
+   событием) ---------- */
+.chapter-overlay {
+  background: rgba(var(--scrim-rgb), 0.26); /* ТЗ №10, задача B */
+  animation: none;
+}
+.chapter-box {
+  max-width: 280px;
+  padding: 26px 24px;
+  animation: none;
+}
+.chapter-title { font-size: 1.3rem; }
+
+@keyframes winPop {
+  0%   { transform: scale(0.7); opacity: 0; }
+  60%  { transform: scale(1.06); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+@keyframes winFlash {
+  0%   { background: rgba(var(--card-rgb), 0.9); }
+  100% { background: rgba(var(--scrim-rgb), 0.4); } /* ТЗ №10, задача B */
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loading-dots span { animation: none; }
+  .btn { transition: none; }
+  .win-box { animation: none; }
+  .win-overlay { animation: none; }
+  .board-wrap { transition: none; }
+  .btn.attention { animation: none; outline: 3px solid var(--accent); }
+  .daily-pips span.just-filled { animation: none; }
+  /* ТЗ №10, задача E: экраны/тема — тот же принцип, что у уже
+     существующих правил выше (анимация выключается целиком, не
+     ускоряется). Кастомное свойство обязано жить ВНУТРИ блока правила
+     (:root), голое объявление прямо в @media — синтаксическая ошибка,
+     браузер её молча проигнорирует. Обнуление --transition-ms в ОДНОМ
+     месте гасит СРАЗУ все места, что на него ссылаются (универсальный
+     * ниже, .screen, .board-wrap, .btn/.grid-tile) — перечислять их
+     здесь ещё раз не нужно. */
+  :root { --transition-ms: 0s; }
+}

@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Сортировка: Цвет и Форма</title>
+  <!-- ТЗ №19, часть 2 (починка кеш-бастинга — находка ТЗ №16: ?v= не
+       двигался с 2026-07-27, хотя main.js/i18n.js/style.css/retention.js
+       менялись многократно; platform.js/board.js не были версионированы
+       вовсе, ни разу). Эталон — автоштамповка build.py нонограмм (ТЗ №13
+       того трека, tools/stamp_build.py): номер там читается из отдельного
+       build_number.txt и пишется в отдельный сгенерированный build.js.
+
+       Color Sort уже несёт СВОЙ работающий аналог того же назначения —
+       yandex_build_number.txt/vk_build_number.txt (плашка BUILD, задача 14)
+       — заводить ВТОРОЙ параллельный счётчик специально под ?v= было бы
+       дублированием одной и той же сущности «номер этой конкретной
+       сборки» двумя источниками истины. Отступление от эталона: вместо
+       отдельного build_number.txt берём УЖЕ СУЩЕСТВУЮЩИЙ counter
+       (_compute_yandex_build/_compute_vk_build, build.py) — та же
+       гарантия («число двигается автоматикой, не памятью исполнителя»),
+       без второго счётчика.
+
+       Каждый тег ниже несёт ПЛЕЙСХОЛДЕР `?v=BUILD` — build.py заменяет
+       его РЕАЛЬНЫМ номером сборки ТОЛЬКО в копии, летящей в архив/папку
+       (тот же приём точечной замены байт, что у плейсхолдера плашки
+       BUILD в platform.js/vk_platform.js — исходник на диске остаётся с
+       плейсхолдером). Замена — на КАЖДОЙ сборке, для КАЖДОГО тега, и
+       ПАДАЕТ, если цель не найдена ровно один раз (_stamp_cache_bust,
+       build.py) — тихая неподстановка была ровно тем дефектом, который
+       просуществовал месяц. -->
+  <link rel="stylesheet" href="style.css?v=47">
+  <!-- SDK Яндекс Игр: подключается ДО инициализации (п. журнала 2026-06-21) -->
+  <script src="vk-bridge.min.js?v=47"></script>
+</head>
+<body>
+
+  <!-- Экран загрузки -->
+  <div id="screen-loading" class="screen active">
+    <div class="loading-box">
+      <div class="loading-title" data-i18n="title">Сортировка: Цвет и Форма</div>
+      <div class="loading-dots"><span></span><span></span><span></span></div>
+    </div>
+  </div>
+
+  <!-- Главное меню -->
+  <div id="screen-menu" class="screen">
+    <div class="menu-box">
+      <h1 class="game-title" data-i18n="title">Сортировка: Цвет и Форма</h1>
+      <!-- Серия входов (ТЗ №14 этап 2, retention.js) — видна ПОСТОЯННО
+           на главном экране, не hidden (см. renderRetentionStreakLine). -->
+      <p id="retention-streak-line" class="retention-line"></p>
+      <!-- ТЗ №22, C1: цель дня — близкая цель на сегодня (main.js renderDailyGoal). -->
+      <p id="daily-goal-line" class="retention-line daily-goal-line"></p>
+      <!-- Энергия (ТЗ №15, этап 1) — видна и здесь, и на игровом экране
+           (п.1.4). Общий шаблон .energy-indicator рендерится ОДНОЙ
+           функцией (renderEnergyIndicator, main.js) через querySelectorAll
+           по классам .energy-bar-fill/.energy-value-text/.energy-next-text
+           — одинаковая разметка везде, где нужен индикатор (меню, игра,
+           стена энергии), без дублирования кода на каждый экран. -->
+      <div class="energy-indicator">
+        <span class="energy-label" data-i18n="energyLabel">Энергия</span>
+        <div class="energy-bar"><div class="energy-bar-fill"></div></div>
+        <span class="energy-value-text"></span>
+        <span class="energy-next-text"></span>
+      </div>
+      <!-- ТЗ №14, этап 3, п.3.1: одно доминирующее действие — «Играть»
+           крупная акцентная кнопка (.btn-play-hero, ТОЛЬКО здесь — не
+           трогаем .btn-primary глобально, им же несут кнопки магазина/
+           оверлеев победы), «Уровни»/«Магазин» — вторичные мелкие
+           кнопки под ней (.btn-menu-secondary). Только вёрстка/стили,
+           логика переходов не тронута. -->
+      <button id="btn-play" class="btn btn-primary btn-play-hero" data-i18n="play">Играть</button>
+      <button id="btn-levels" class="btn btn-menu-secondary" data-i18n="levels">Уровни</button>
+      <!-- Гейт видимости — Platform.SHOP_SUPPORTED (main.js, typeof-
+           проверка): на ВК-сборке (build.py vk, отдельное ТЗ) поля нет
+           у vk_platform.js — кнопка остаётся hidden, магазина там нет
+           вовсе, не просто «недоступно». -->
+      <button id="btn-shop" class="btn btn-menu-secondary hidden" data-i18n="shop">Магазин</button>
+      <!-- ТЗ №17: «Оформление» — выбор уже принадлежащих тем. В отличие
+           от «Магазина» кнопка видна на ОБЕИХ площадках и НЕ гейтится
+           SHOP_SUPPORTED: выбирать всегда есть из чего (стандартная тема
+           принадлежит всем), а на ВК это единственное место, где вообще
+           видна тема за серию входов. -->
+      <button id="btn-oformlenie" class="btn btn-menu-secondary" data-i18n="oformlenie">Оформление</button>
+      <button id="btn-sound" class="btn btn-icon" aria-label="sound">♪</button>
+    </div>
+  </div>
+
+  <!-- Магазин (ТЗ №2): база (бесплатная тёплая тема) + 3 покупаемые
+       цветовые темы, одна структура данных (main.js SHOP_THEMES) —
+       renderShop() строит карточки из массива, разметка не хардкодит
+       ни одну тему по отдельности. Карточка — тот же силуэт мини-колбы
+       (.shop-vial-preview/.shop-vial-el), что был у одиночной карточки
+       в меню раньше. -->
+  <div id="screen-shop" class="screen">
+    <header class="game-header">
+      <button id="btn-shop-back" class="btn btn-icon">←</button>
+      <div class="level-indicator" data-i18n="shop">Магазин</div>
+      <span class="btn btn-icon spacer" aria-hidden="true"></span>
+    </header>
+    <div id="shop-wrap" class="shop-wrap">
+      <div id="shop-list" class="shop-list"></div>
+    </div>
+  </div>
+
+  <!-- Оформление (ТЗ №17, решение основателя Р-Э4): экран ВЫБОРА, не
+       покупки. Карточки строятся renderOformlenie() СТРОГО из списка
+       принадлежащих тем (ownedThemeIds() в main.js) — другого источника
+       карточек у экрана нет ни физически, ни по коду, поэтому состояние
+       «видно оформление, которое нельзя получить» здесь невыразимо, а
+       не запрещено договорённостью. Разметка пустая: ни одна тема тут
+       не захардкожена. -->
+  <div id="screen-oformlenie" class="screen">
+    <header class="game-header">
+      <button id="btn-oformlenie-back" class="btn btn-icon">←</button>
+      <div class="level-indicator" data-i18n="oformlenie">Оформление</div>
+      <span class="btn btn-icon spacer" aria-hidden="true"></span>
+    </header>
+    <div class="picker-wrap">
+      <div id="oformlenie-list" class="picker-list"></div>
+      <!-- Подсказка по состоянию владения (текст выбирает
+           oformlenieHintKey в main.js). Чисел/знаменателей не несёт. -->
+      <p id="oformlenie-hint" class="picker-hint"></p>
+    </div>
+  </div>
+
+  <!-- Экран сетки уровней: прогресс + прыжок на любой уже открытый -->
+  <div id="screen-grid" class="screen">
+    <!-- ТЗ №15, этап 1: раздатчик уровней (ТЗ №14 этап 2) здесь БОЛЬШЕ
+         НЕТ — прогрессия снова idx<=maxUnlocked, без независимого
+         «ожидания» уровней (п.1.1). Шапка вернулась к простой
+         однострочной разметке. Энергия сюда НЕ дублируется — она уже
+         на игровом экране и в меню, сетка уровней ей не гейтится. -->
+    <header class="game-header">
+      <button id="btn-grid-back" class="btn btn-icon">←</button>
+      <div class="level-indicator" data-i18n="levels">Уровни</div>
+      <span class="btn btn-icon spacer" aria-hidden="true"></span>
+    </header>
+    <div id="grid-wrap" class="grid-wrap">
+      <div id="level-grid" class="level-grid"></div>
+    </div>
+  </div>
+
+  <!-- Игровой экран (заглушка Фазы 0, наполняется в Фазе 1-2) -->
+  <div id="screen-game" class="screen">
+    <!-- ТЗ №15, этап 1: энергия видна и здесь (п.1.4) — шапка стала
+         двухрядной (.game-header-stacked, тот же приём, что у сетки
+         уровней в ТЗ №14 этап 3 — высоту меряет syncHeaderSpace() сама,
+         board-wrap подстраивается через --header-h). -->
+    <header class="game-header game-header-stacked">
+      <div class="game-header-row">
+        <button id="btn-back" class="btn btn-icon">←</button>
+        <div id="level-indicator" class="level-indicator"></div>
+        <button id="btn-sound-game" class="btn btn-icon" aria-label="sound">♪</button>
+      </div>
+      <div class="energy-indicator energy-indicator-compact">
+        <div class="energy-bar"><div class="energy-bar-fill"></div></div>
+        <span class="energy-value-text"></span>
+        <span class="energy-next-text"></span>
+      </div>
+    </header>
+    <main id="board-wrap" class="board-wrap">
+      <canvas id="board-canvas"></canvas>
+    </main>
+    <!-- ТЗ №22, B1: слой частиц (fx.js) — над полем, под оверлеями (порядок в DOM). -->
+    <canvas id="fx-canvas" class="fx-canvas"></canvas>
+    <button id="btn-undo" class="btn btn-icon undo-btn hidden" aria-label="undo">↺</button>
+    <!-- ТЗ №22, A3: рестарт уровня — бесплатный, второй тап подтверждает (R-09). -->
+    <button id="btn-restart" class="btn btn-icon restart-btn hidden" aria-label="restart"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M19 12a7 7 0 1 1-2.05-4.95" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><path d="M19.5 3.5v5h-5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    <div class="hint-wrap">
+      <button id="btn-hint" class="btn btn-icon hint-btn" aria-label="hint">
+        ?
+        <span class="hint-ad-badge" aria-hidden="true">▶</span>
+        <!-- Бейдж остатка бесплатных подсказок (ТЗ №14 этап 3, п.3.2 —
+             перенос решения нонограмм ТЗ №03 модуля): скрыт при нуле,
+             число без знаменателя, pointer-events:none (тап — кнопке),
+             см. renderHintBonusBadge в main.js. -->
+        <span id="hint-bonus-badge" class="hint-bonus-badge hidden" aria-hidden="true"></span>
+      </button>
+      <div class="hint-ad-label" data-i18n="hintAd">Подсказка за рекламу</div>
+    </div>
+    <div id="hint-toast" class="hint-toast hidden" data-i18n="noMoves">Нет доступных ходов</div>
+    <!-- Индикатор ожидания rewarded-показа (баг основателя 2026-09-06,
+         мобильный ВК): showRewarded() может молчать до REWARD_AD_TIMEOUT_MS
+         (адаптер, до 40с) прежде чем выдать награду бесплатным путём —
+         без этого индикатора нажатие выглядело «мёртвой кнопкой», игрок
+         не понимал, идёт показ или клик не сработал. main.js показывает
+         ПЕРЕД Platform.showRewarded() (только на самом rewarded-пути, не
+         на бесплатных ветках — бонус/дневной лимит), прячет ВНУТРИ
+         обёртки над onResume (единственная точка, куда доходят ВСЕ
+         исходы обоих адаптеров — реальный показ, таймаут-фолбэк И
+         «закрыл рекламу без просмотра» на Яндексе, см.
+         vk_platform.js/platform.js). -->
+    <div id="hint-loading-toast" class="hint-toast hidden" data-i18n="hintAdLoading">Загрузка рекламы…</div>
+
+    <!-- Оверлей победы (за уровень). Полоса прогресса главы (п.1 фазы 3
+         «хук экрана победы») и увеличенная кнопка «Дальше» (п.2) —
+         решение основателя. Времени уровня здесь НЕТ (п.4, обратимо) —
+         таймер только в финале, антистресс-тон жанра; статистика уже
+         есть на экране главы и в финале. -->
+    <div id="win-overlay" class="win-overlay hidden">
+      <div class="win-box">
+        <div class="win-title" data-i18n="win">Уровень пройден!</div>
+        <div class="win-chapter-progress">
+          <div class="progress-track"><div class="progress-fill" id="win-progress-fill"></div></div>
+          <div class="progress-label" id="win-progress-label"></div>
+        </div>
+        <!-- ТЗ №22, C1: прогресс цели дня — точки заполняются на глазах. -->
+        <div id="win-daily" class="win-daily">
+          <div class="daily-pips" id="win-daily-pips"><span></span><span></span><span></span></div>
+          <div class="win-daily-label" id="win-daily-label"></div>
+        </div>
+        <button id="btn-next" class="btn btn-primary btn-next-big" data-i18n="next">Дальше</button>
+      </div>
+    </div>
+
+    <!-- Оверлей завершения кампании (после последнего уровня) -->
+    <div id="campaign-overlay" class="win-overlay hidden">
+      <div class="win-box campaign-box">
+        <div class="win-title" data-i18n="campaignWinTitle">Поздравляем! Вы прошли все уровни</div>
+        <div class="campaign-note" data-i18n="campaignWinNote">Следите за обновлениями — скоро добавим новые</div>
+        <div class="campaign-stats">
+          <div class="stat">
+            <span class="stat-value" id="stat-total"></span>
+            <span class="stat-label" data-i18n="statTotal">Всего</span>
+          </div>
+          <div class="stat">
+            <span class="stat-value" id="stat-average"></span>
+            <span class="stat-label" data-i18n="statAverage">В среднем</span>
+          </div>
+          <div class="stat">
+            <span class="stat-value" id="stat-fastest"></span>
+            <span class="stat-label" data-i18n="statFastest">Быстрее всего</span>
+          </div>
+          <div class="stat">
+            <span class="stat-value" id="stat-slowest"></span>
+            <span class="stat-label" data-i18n="statSlowest">Дольше всего</span>
+          </div>
+        </div>
+        <button id="btn-campaign-menu" class="btn btn-primary" data-i18n="campaignMenu">В меню</button>
+      </div>
+    </div>
+
+    <!-- Оверлей завершения главы (каждые 12 уровней, легче финального:
+         короче конфетти, без фанфары, компактнее карточка) -->
+    <div id="chapter-overlay" class="win-overlay chapter-overlay hidden">
+      <div class="win-box chapter-box">
+        <div class="win-title chapter-title" id="chapter-title"></div>
+        <div class="campaign-stats">
+          <div class="stat">
+            <span class="stat-value" id="chapter-stat-total"></span>
+            <span class="stat-label" data-i18n="statTotal">Всего</span>
+          </div>
+          <div class="stat">
+            <span class="stat-value" id="chapter-stat-average"></span>
+            <span class="stat-label" data-i18n="statAverage">В среднем</span>
+          </div>
+          <div class="stat">
+            <span class="stat-value" id="chapter-stat-fastest"></span>
+            <span class="stat-label" data-i18n="statFastest">Быстрее всего</span>
+          </div>
+          <div class="stat">
+            <span class="stat-value" id="chapter-stat-slowest"></span>
+            <span class="stat-label" data-i18n="statSlowest">Дольше всего</span>
+          </div>
+        </div>
+        <button id="btn-chapter-next" class="btn btn-primary" data-i18n="next">Дальше</button>
+      </div>
+    </div>
+
+    <canvas id="confetti-canvas" class="confetti-canvas"></canvas>
+  </div>
+
+  <!-- Стена энергии (ТЗ №15, этап 1, п.1.1/1.4/1.6): показывается ВМЕСТО
+       старта нового (ещё не пройденного) уровня, когда энергия на нуле
+       (main.js requestStartLevel). Объясняет себя сама — сколько ждать
+       и что даёт реклама, без общего числа уровней кампании. Рестарт/
+       повтор уже пройденного уровня энергию не тратит и стену не
+       показывает (см. canStartLevel). -->
+  <div id="screen-energy-wall" class="screen">
+    <header class="game-header">
+      <button id="btn-energy-wall-back" class="btn btn-icon">←</button>
+      <div class="level-indicator" data-i18n="energyWallTitle">Нет энергии</div>
+      <span class="btn btn-icon spacer" aria-hidden="true"></span>
+    </header>
+    <div class="energy-wall-box">
+      <div class="energy-wall-icon" aria-hidden="true">⚡</div>
+      <div class="energy-indicator">
+        <span class="energy-label" data-i18n="energyLabel">Энергия</span>
+        <div class="energy-bar"><div class="energy-bar-fill"></div></div>
+        <span class="energy-value-text"></span>
+      </div>
+      <div class="energy-wall-text" id="energy-wall-text"></div>
+      <!-- БЕЗ data-i18n: текст несёт {n} (порция) — applyStrings()
+           подставила бы сырую строку с плейсхолдером, main.js
+           (renderEnergyWall) выставляет textContent сам при каждом
+           показе стены, ПОСЛЕ подстановки числа. -->
+      <button id="btn-energy-wall-ad" class="btn btn-primary">Смотреть рекламу за +6 энергии</button>
+    </div>
+  </div>
+
+  <!-- Плашка номера билда (задача 14, перенесено из feature/vk-resubmit,
+       свой аналог для Яндекс-адаптера): неинтерактивная
+       (pointer-events:none, не ловит клики), низкая непрозрачность,
+       левый нижний угол с учётом safe-area (style.css). Текст задаёт
+       main.js ТОЛЬКО если Platform.BUILD — реальная строка (typeof-гейт),
+       которую build.py подставляет вместо плейсхолдера-заглушки в
+       platform.js только в собранный архив (файл на диске не трогается).
+       Для промо-скриншота: добавь ?nobuild=1 к адресу страницы перед
+       съёмкой — main.js прочитает параметр и не покажет плашку вовсе. -->
+  <div id="build-badge" class="build-badge hidden" aria-hidden="true"></div>
+
+  <!-- Отклик модуля удержания (ТЗ №14 этап 2, retention.js) — «тихих
+       улучшений не бывает»: любая реальная выдача раздатчика/rewarded/
+       награда серии видна тостом, поверх ЛЮБОГО активного экрана
+       (position:fixed, не привязан к конкретному .screen). -->
+  <div id="retention-reward-toast" class="retention-toast" hidden></div>
+
+  <script src="i18n.js?v=47"></script>
+  <script src="vk_platform.js?v=47"></script>
+  <script src="levels.js?v=47"></script>
+  <script src="board.js?v=47"></script>
+  <script src="sound.js?v=47"></script>
+  <script src="confetti.js?v=47"></script>
+  <script src="fx.js?v=47"></script>
+  <script src="stats.js?v=47"></script>
+  <script src="game.js?v=47"></script>
+  <!-- Модуль удержания (ТЗ №14 этап 2, перенесён с нонограмм) — грузится
+       СТРОГО перед main.js: main.js читает глобал Retention при
+       разборе (RETENTION_CONFIG). Обе площадки (в отличие от нонограмм,
+       где модуль был только на ВК) — общий index.html/белый список. -->
+  <script src="retention.js?v=47"></script>
+  <script src="main.js?v=47"></script>
+</body>
+</html>

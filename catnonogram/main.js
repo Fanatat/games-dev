@@ -965,14 +965,23 @@ document.addEventListener('DOMContentLoaded', function () {
      для миграции на лестницу, его состояние пишется в сейв как раньше. */
   var CHAPTER_UNLOCK_NEED = 7;
 
+  // Глава «достигнута» без проверки предыдущей: открыта за рекламу или уже
+  // начата (игрок из прежней схемы (таймер) мог решать в ней, не набрав 7
+  // в предыдущей) — такая глава не запирается обратно.
+  function isChapterReached(ch) {
+    return !!_chaptersUnlocked[ch.key] || countCompletedInChapter(ch) > 0;
+  }
+
   function isChapterOpen(chIdx) {
     var ch = CHAPTERS[chIdx];
     if (!ch) return false;
     if (chIdx === 0) return true;
-    if (_chaptersUnlocked[ch.key]) return true;
-    // Уже начатая глава не запирается обратно — игрок из прежней схемы
-    // (таймер) мог решать в ней, не набрав 7 в предыдущей.
-    if (countCompletedInChapter(ch) > 0) return true;
+    // Открыта любая следующая глава — открыты и все предыдущие (замечание
+    // основателя 25.09: у игрока прежней схемы глава 4 висела запертой
+    // между открытыми 3 и 7, а 5–6 были скрыты вовсе).
+    for (var j = chIdx; j < CHAPTERS.length; j++) {
+      if (isChapterReached(CHAPTERS[j])) return true;
+    }
     return countCompletedInChapter(CHAPTERS[chIdx - 1]) >= CHAPTER_UNLOCK_NEED;
   }
 
@@ -1395,7 +1404,7 @@ document.addEventListener('DOMContentLoaded', function () {
   // тем же способом, что buildSilhouette (Задача G), но без juice-анимации
   // «проявления» — там она смысловая (победа ЭТОГО уровня), здесь просто
   // маленькая метка «эта картинка пройдена».
-  function paintSilhouetteStatic(canvas, level, maxPx) {
+  function paintSilhouetteStatic(canvas, level, maxPx, noGap) {
     var W = level.width, H = level.height;
     var CELL = Math.max(1, Math.min(48, Math.floor((maxPx || 260) / Math.max(W, H))));
     canvas.width  = W * CELL;
@@ -1411,7 +1420,10 @@ document.addEventListener('DOMContentLoaded', function () {
     // зазор был всегда по 1px с каждой стороны: при CELL=2 (картинки 10×10–
     // 13×13 в миниатюре) ширина клетки выходила 0 и миниатюра рисовалась
     // пустой — с главы 2 почти все пройденные картинки были пустыми клетками.
-    var gap = CELL >= 6 ? 1 : 0;
+    // Миниатюры альбома (noGap) — всегда сплошные: иначе при масштабе
+    // экрана 125%+ картинки 5×5 (клетка ≥6) выходили «в точку», а 6×6 и
+    // крупнее в той же главе — сплошными (замечание основателя 25.09).
+    var gap = (!noGap && CELL >= 6) ? 1 : 0;
     for (var r = 0; r < H; r++) {
       for (var c = 0; c < W; c++) {
         if (level.solution[r][c]) ctx.fillRect(c * CELL + gap, r * CELL + gap, CELL - 2 * gap, CELL - 2 * gap);
@@ -1430,7 +1442,7 @@ document.addEventListener('DOMContentLoaded', function () {
       btn.appendChild(canvas);
       // Разрешение под плотность экрана: миниатюра ~28 CSS-px, на телефоне
       // с dpr 3 канвас в 26px растягивался бы в 3 раза и мылился.
-      paintSilhouetteStatic(canvas, LEVELS[levelIndex], Math.round(28 * Math.min(3, window.devicePixelRatio || 1)));
+      paintSilhouetteStatic(canvas, LEVELS[levelIndex], Math.round(28 * Math.min(3, window.devicePixelRatio || 1)), true);
       btn.addEventListener('click', function () { showGame(levelIndex); });
     } else {
       var num = document.createElement('span');

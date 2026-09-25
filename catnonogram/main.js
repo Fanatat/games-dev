@@ -732,6 +732,30 @@ document.addEventListener('DOMContentLoaded', function () {
     if (Platform.track) Platform.track(name, params);
   }
 
+  // ТЗ №54: вибрация идёт за тем же переключателем, что и звук — один
+  // понятный игроку тумблер «тихо».
+  function haptic(kind) {
+    if (!_muted && Platform.haptic) Platform.haptic(kind);
+  }
+
+  function onLineClosedFx() {
+    Sound.lineClosed();
+    haptic('light');
+  }
+
+  // ТЗ №54: прогресс победы записывается сразу, а экран победы — после
+  // финальной волны по полю (Nonogram.playWinWave), иначе оверлей её
+  // закрывает. «Назад» в эти доли секунды отменяет только показ.
+  var WIN_REVEAL_DELAY_MS = 650;
+  var _winRevealTimer = null;
+  function scheduleWinReveal(fn) {
+    cancelWinReveal();
+    _winRevealTimer = setTimeout(function () { _winRevealTimer = null; fn(); }, WIN_REVEAL_DELAY_MS);
+  }
+  function cancelWinReveal() {
+    if (_winRevealTimer) { clearTimeout(_winRevealTimer); _winRevealTimer = null; }
+  }
+
   // 💡 подсказки / 🎨 стиль / 🎁 пазлы (п.2.3). Приоритет иконки при
   // комбинированной награде (день 7: стиль ЕЩЁ не куплен И пазлы разом) —
   // стиль заметнее пазлов, пазлы заметнее подсказок.
@@ -985,6 +1009,10 @@ document.addEventListener('DOMContentLoaded', function () {
   // времени для вытеснения самых старых. Если доска опустела (игрок сам
   // всё стёр) и старая запись была — убираем её.
   function persistBoardState(levelIndex) {
+    // Решённое поле — не черновик: onWin уже стёр его из сейва. Без этой
+    // проверки сворачивание ВК при открытом экране победы (или «Назад» до
+    // его показа) записывало решённую доску обратно в boardStates.
+    if (Nonogram.isWon()) return;
     var board = Nonogram.getBoardState();
     if (boardHasMarks(board)) {
       _boardStates[levelIndex] = Save.encodeBoard(board, Date.now());
@@ -1741,6 +1769,7 @@ document.addEventListener('DOMContentLoaded', function () {
   // Пишет доску daily в сейв, только если на ней есть хоть одна отметка —
   // тот же приём, что и persistBoardState (фикс призрачных записей).
   function persistDailyBoard() {
+    if (Nonogram.isWon()) return; // см. persistBoardState
     var board = Nonogram.getBoardState();
     if (boardHasMarks(board)) {
       _dailyBoard     = Save.encodeBoard(board); // единственная daily-доска — без seq, вытеснение тут не нужно
@@ -1805,6 +1834,7 @@ document.addEventListener('DOMContentLoaded', function () {
     if (!level) { showMenu(); return; }
 
     _currentLevel = -1;   // обычное сохранение доски (по levelIndex) сюда не относится
+    cancelWinReveal();
     _inDailyGame  = true;
     trackEvent('daily_shown');
     if (Platform.gameplayStart) Platform.gameplayStart();
@@ -1838,7 +1868,7 @@ document.addEventListener('DOMContentLoaded', function () {
       document.getElementById('puzzle-container'),
       function () { onDailyWin(level); },
       function ()  { Sound.tick(); scheduleDailySave(); onBoardMove(); },
-      function ()  { Sound.lineClosed(); }
+      onLineClosedFx
     );
 
     // Прогресс восстанавливаем, только если он от СЕГОДНЯШНЕГО дня
@@ -1852,6 +1882,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     document.getElementById('btn-back').onclick = function () {
+      cancelWinReveal();
       if (Platform.gameplayStop) Platform.gameplayStop();
       flushDailySave();
       _currentLevel = -1;
@@ -1865,6 +1896,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
   function onDailyWin(level) {
     Sound.win();
+    haptic('success');
+    hideRetentionToast();
     document.getElementById('btn-hint').disabled = true;
     document.getElementById('btn-check').disabled = true;
     stopNudgeTimer();
@@ -1877,22 +1910,24 @@ document.addEventListener('DOMContentLoaded', function () {
     _dailyBoard     = null;   // пазл дня пройден — прогресс-черновик больше не нужен
     _dailyBoardDate = '';
     saveProgress();
-
-    buildSilhouette(level);
-    document.getElementById('win-theme-label').textContent = I18N.t(level.theme);
-    hideRetentionToast(); // ТЗ №51а: снять тост «почти собрал» ДО показа оверлея победы
-    document.getElementById('win-overlay').hidden = false;
-    launchConfetti();
-    if (renderWinTomorrow()) trackEvent('teaser_shown');
     trackEvent('daily_done', { sec: Math.round((Date.now() - _levelStartedAt) / 1000), hints: _hintsUsedThisLevel });
-    updateShareButton(level, I18N.t('storyDaily').replace('{date}', storyDailyDateLabel()), -1);
 
-    document.getElementById('btn-next-level').textContent = I18N.t('backToMenu');
-    document.getElementById('btn-next-level').onclick = function () {
-      _currentLevel = -1;
-      _inDailyGame  = false;
-      maybeShowInterstitial(showMenu);
-    };
+    scheduleWinReveal(function () {
+      buildSilhouette(level);
+      document.getElementById('win-theme-label').textContent = I18N.t(level.theme);
+      hideRetentionToast(); // ТЗ №51а: снять тост «почти собрал» ДО показа оверлея победы
+      document.getElementById('win-overlay').hidden = false;
+      launchConfetti();
+      if (renderWinTomorrow()) trackEvent('teaser_shown');
+      updateShareButton(level, I18N.t('storyDaily').replace('{date}', storyDailyDateLabel()), -1);
+
+      document.getElementById('btn-next-level').textContent = I18N.t('backToMenu');
+      document.getElementById('btn-next-level').onclick = function () {
+        _currentLevel = -1;
+        _inDailyGame  = false;
+        maybeShowInterstitial(showMenu);
+      };
+    });
   }
 
   /* ---- Экран игры ---- */
@@ -1912,6 +1947,7 @@ document.addEventListener('DOMContentLoaded', function () {
       return;
     }
 
+    cancelWinReveal();
     _currentLevel   = levelIndex;
     _lastLevelIndex = levelIndex;  // всегда обновляем для «Продолжить»
     _inDailyGame    = false;
@@ -1966,7 +2002,7 @@ document.addEventListener('DOMContentLoaded', function () {
       document.getElementById('puzzle-container'),
       function () { onWin(level, levelIndex); },
       function ()  { Sound.tick(); scheduleBoardSave(levelIndex); onBoardMove(); },
-      function ()  { Sound.lineClosed(); }
+      onLineClosedFx
     );
 
     if (_boardStates[levelIndex]) {
@@ -1976,6 +2012,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     document.getElementById('btn-back').onclick = function () {
+      cancelWinReveal();
       if (Platform.gameplayStop) Platform.gameplayStop();
       flushBoardSave(levelIndex);
       _currentLevel = -1;
@@ -1990,6 +2027,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
   function onWin(level, levelIndex) {
     Sound.win();
+    haptic('success');
+    hideRetentionToast();
     document.getElementById('btn-hint').disabled = true;
     document.getElementById('btn-check').disabled = true;
     stopNudgeTimer();
@@ -2035,7 +2074,17 @@ document.addEventListener('DOMContentLoaded', function () {
       updateCheckButton();
     }
     saveProgress();
+    trackEvent('puzzle_done', {
+      index: levelIndex,
+      sec:   Math.round((Date.now() - _levelStartedAt) / 1000),
+      hints: _hintsUsedThisLevel,
+    });
+    if (chapterJustCompleted) trackEvent('chapter_done', { ch: chapter.key });
 
+    scheduleWinReveal(function () { revealWin(level, levelIndex, chapter, posInChapter, nextIndex, completedCount, chapterJustCompleted); });
+  }
+
+  function revealWin(level, levelIndex, chapter, posInChapter, nextIndex, completedCount, chapterJustCompleted) {
     buildSilhouette(level);
     document.getElementById('win-theme-label').textContent = I18N.t(level.theme);
     if (chapter) {
@@ -2050,11 +2099,6 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('win-overlay').hidden = false;
     launchConfetti();
     if (renderWinTomorrow()) trackEvent('teaser_shown');
-    trackEvent('puzzle_done', {
-      index: levelIndex,
-      sec:   Math.round((Date.now() - _levelStartedAt) / 1000),
-      hints: _hintsUsedThisLevel,
-    });
     updateShareButton(
       level,
       chapter ? I18N.t('storyChapter').replace('{name}', I18N.t(chapter.nameKey)) : '',
@@ -2098,7 +2142,6 @@ document.addEventListener('DOMContentLoaded', function () {
     // ТУДА ЖЕ (goNext) — interstitial-гейт (maybeShowInterstitial) не
     // меняется и не вызывается дважды за одну победу.
     if (chapterJustCompleted) {
-      trackEvent('chapter_done', { ch: chapter.key });
       var finalLevel = LEVELS[chapter.indices[chapter.indices.length - 1]];
       paintSilhouetteStatic(document.getElementById('chapter-done-canvas'), finalLevel, 180);
       document.getElementById('chapter-done-title').textContent =

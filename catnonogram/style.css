@@ -748,10 +748,55 @@ html, body {
   75%      { transform: translateX(6px); }
 }
 
+/* ТЗ №54: закрытая линия — волна от подсказки к краю поля; финал
+   картинки — диагональная волна по всему полю. Подсветка — отдельным
+   слоем ::before цвета темы (::after занят крестиком), без color-mix —
+   его нет в старых WebView Android. */
+.grid-cell { position: relative; }
+.grid-cell::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--accent);
+  opacity: 0;
+  pointer-events: none;
+}
+.grid-cell.is-line-flash::before {
+  animation: cell-glow 360ms ease-out var(--flash-d, 0ms) both;
+}
+.grid-cell.is-line-flash.is-filled {
+  animation: cell-pop 300ms ease-out var(--flash-d, 0ms) both;
+}
+.grid-cell.is-win-wave::before {
+  animation: cell-glow 520ms ease-out var(--wave-d, 0ms) both;
+}
+.grid-cell.is-win-wave.is-filled {
+  animation: cell-pop-big 460ms cubic-bezier(.3, 1.6, .5, 1) var(--wave-d, 0ms) both;
+}
+@keyframes cell-glow {
+  0%   { opacity: 0; }
+  35%  { opacity: 0.38; }
+  100% { opacity: 0; }
+}
+@keyframes cell-pop {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(0.8); }
+  100% { transform: scale(1); }
+}
+@keyframes cell-pop-big {
+  0%   { transform: scale(1); }
+  45%  { transform: scale(1.14); }
+  100% { transform: scale(1); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .grid-cell.is-filled,
   .grid-cell.is-cross,
-  .grid-cell.is-shake {
+  .grid-cell.is-shake,
+  .grid-cell.is-line-flash.is-filled,
+  .grid-cell.is-win-wave.is-filled,
+  .grid-cell.is-line-flash::before,
+  .grid-cell.is-win-wave::before {
     animation: none;
   }
   .row-clue.is-closed span,

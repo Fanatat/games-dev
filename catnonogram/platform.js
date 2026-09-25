@@ -731,6 +731,26 @@ window.Platform = (function () {
   // этом файле). vkBridge.supports-гард — единственная защита от вызова
   // на клиентах, где метода нет; при неверной схеме полей площадка молча
   // отклонит событие (аналитика необязательна, игру не ломает).
+  // ТЗ №54: тактильный отклик. kind: 'light' (линия закрыта) | 'success'
+  // (картинка собрана). Методы — из таблицы VK Bridge в docs/ студии
+  // («Документация к играм на VK»). Где моста/метода нет (веб-версия ВК в
+  // браузере) — navigator.vibrate на Android; iOS-Safari его не знает, молча.
+  function haptic(kind) {
+    try {
+      if (available && hasBridge() && typeof vkBridge.supports === 'function') {
+        if (kind === 'success' && vkBridge.supports('VKWebAppTapticNotificationOccurred')) {
+          vkBridge.send('VKWebAppTapticNotificationOccurred', { type: 'success' }).catch(function () {});
+          return;
+        }
+        if (kind !== 'success' && vkBridge.supports('VKWebAppTapticImpactOccurred')) {
+          vkBridge.send('VKWebAppTapticImpactOccurred', { style: 'light' }).catch(function () {});
+          return;
+        }
+      }
+      if (navigator.vibrate) navigator.vibrate(kind === 'success' ? [30, 60, 30] : 12);
+    } catch (e) { /* вибрация необязательна */ }
+  }
+
   function track(name, params) {
     if (!available || !hasBridge() || typeof vkBridge.supports !== 'function') return;
     try {
@@ -773,6 +793,7 @@ window.Platform = (function () {
     gameplayStart: gameplayStart,
     gameplayStop: gameplayStop,
     track: track,
+    haptic: haptic,
     paymentsAvailable: false,
     SAVE_SIZE_GUARD_BYTES: VK_SAVE_SIZE_GUARD_BYTES,
   };

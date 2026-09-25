@@ -381,9 +381,19 @@ window.Platform = (function () {
     try { return JSON.stringify(v); } catch (e) { return String(v); }
   }
 
+  // 2026-09-25, решение основателя: на ПК-версии ВК баннера сбоку НЕТ —
+  // не запрашиваем его вовсе (и резерв места справа не ставим). Мобильный
+  // нижний баннер — как был. Код десктопного показа ниже оставлен на
+  // случай возврата: снять этот флаг.
+  var DESKTOP_BANNER_ENABLED = false;
+
   function showBannerAd(isRetry) {
     if (!available || _bannerClosedByUser) return;
     var desktop = isDesktopPlatform();
+    if (desktop && !DESKTOP_BANNER_ENABLED) {
+      if (window.debugLog) window.debugLog('showBannerAd: ПК — баннер выключен (решение основателя 25.09)');
+      return;
+    }
     var beforeSize = desktop ? window.innerWidth : window.innerHeight;
     var params = desktop
       ? { layout_type: 'overlay', banner_align: 'right', orientation: 'vertical' } // Шаг A (ТЗ №53: overlay, документированный набор)

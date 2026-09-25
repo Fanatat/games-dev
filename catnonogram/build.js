@@ -1,1 +1,1 @@
-window.BUILD_VERSION = "v59 · 7770128 · 2026-09-25";
+window.BUILD_VERSION = "v60 · 5ffe41e · 2026-09-25";

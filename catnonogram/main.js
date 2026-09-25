@@ -142,6 +142,9 @@ document.addEventListener('DOMContentLoaded', function () {
   // ТЗ №50: главы, за которые уже выдана награда (открытка + подсказки) —
   // { ch01: true, … }, см. save.js emptySave()/migrate().
   var _postcards       = {};
+  // 2026-09-25: главы, открытые досрочно за рекламу — { ch05: true, … }
+  // (см. isChapterOpen, save.js emptySave()).
+  var _chaptersUnlocked = {};
 
   // ТЗ №49: лестница 7 дней (ladder.js). _ladderState — поля как в сейве
   // (save.js emptySave: ladderDay/ladderLastDay/ladderSeries/
@@ -352,6 +355,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
       _maxReachedPos = migrated.maxReachedIndex;
       _postcards       = migrated.postcards;
+      _chaptersUnlocked = migrated.chaptersUnlocked;
       _bonusHints      = migrated.bonusHints;
       updateHintBadge(); // возвращающийся игрок мог накопить баланс ДО этой сессии
       updateCheckButton();
@@ -360,8 +364,6 @@ document.addEventListener('DOMContentLoaded', function () {
         _retentionState = Retention.isValidEncoded(migrated.retention)
           ? Retention.decodeState(migrated.retention)
           : Retention.initState(_maxReachedPos, _nowRet, RETENTION_CONFIG);
-        // Раздатчик мог накопить такты, пока игра не запускалась.
-        _retentionState = Retention.applyDripTick(_retentionState, _nowRet, RETENTION_CONFIG);
         // День засчитывается фактом входа (п.2.3), не прохождением уровня —
         // зовём один раз на старте сессии, до первого показа экранов.
         var _entryResult = Retention.onEnter(_retentionState, Retention.dayKeyFromDate(Platform.now()), RETENTION_CONFIG);
@@ -458,6 +460,7 @@ document.addEventListener('DOMContentLoaded', function () {
       maxReachedIndex: _maxReachedPos,
       posLock:         true, // ТЗ №50: с этой сборки maxReachedIndex — всегда позиция
       postcards:       _postcards,
+      chaptersUnlocked: _chaptersUnlocked,
       bonusHints:      _bonusHints,
       retention:       (typeof Retention !== 'undefined' && _retentionState)
                           ? Retention.encodeState(_retentionState) : null,
@@ -555,79 +558,6 @@ document.addEventListener('DOMContentLoaded', function () {
     _rewardedGateOpen = true;
   }
 
-  // Продвигает раздатчик на текущий момент; при реальной выдаче — сохраняет
-  // и показывает отклик (п.2.4: тихих улучшений не бывает). Дёшево вызывать
-  // часто (showMenu/showChapters) — если тактов не набежало, no-op.
-  function retentionTick() {
-    if (typeof Retention === 'undefined' || !_retentionState) return;
-    var before = _retentionState.dripOpened;
-    _retentionState = Retention.applyDripTick(_retentionState, Platform.now().getTime(), RETENTION_CONFIG);
-    if (_retentionState.dripOpened > before) {
-      saveProgress();
-      var granted = _retentionState.dripOpened - before;
-      showRetentionToast(granted === 1
-        ? I18N.t('retentionRewardDrip')
-        : I18N.t('retentionRewardDrip') + ' (' + granted + ')');
-    }
-  }
-
-  // Строка раздатчика (экран категорий) — ТЗ №07 фаза 1 / ТЗ №08 фаза 2.
-  // Продаёт изобилие, время — обещание сверху, не главное сообщение. Порция
-  // теперь честно озвучивается числом (ТЗ №08: «1 пазл в 6ч» ощущался как
-  // дефицит — молчать о порции больше не вариант). Запрет: без общего числа
-  // уровней и без числа закрытых, только «сколько ждёт» и точное время
-  // (ТЗ №01, требование остаётся в силе).
-  function renderRetentionDripLine() {
-    if (!_retentionState) return;
-    var el = document.getElementById(RETENTION_CONFIG.domSlots.dripLine);
-    if (!el) return;
-    var waiting = Retention.openUnfinishedCount(_retentionState, RETENTION_CONFIG);
-    var nextAt  = Retention.nextUnlockAtMs(_retentionState, RETENTION_CONFIG);
-    var portion = RETENTION_CONFIG.dripPerTick;
-    var text;
-    // ТЗ №12: «waiting > 0» проверяем ПЕРВЫМ. nextAt==null значит только
-    // «накопитель такта полон, время такта стоит» — это НЕ то же самое,
-    // что «ждать нечего»: rewarded специально бьёт накопитель выше потолка
-    // (grantDrip, комментарий в retention.js), и именно тогда nextAt всегда
-    // null. Старый порядок проверок в этом случае прятал число «Пазлы
-    // ждут: N» за généric «играйте!» сразу после честно выданной награды —
-    // с экрана игрока пропадала ЕДИНСТВЕННАЯ строка, подтверждающая, что
-    // ролик что-то дал (доклад основателя, «счётчик исчез с экрана»).
-    if (waiting > 0) {
-      var line1 = I18N.t('retentionWaitingLine').replace('{n}', waiting);
-      if (nextAt == null) {
-        // Потолок такта пройден (обычно — ролик) — нечего анонсировать
-        // временем, но число ждущих пазлов всё равно значимо и видимо.
-        // ТЗ №21: пометка «на потолке» — ТОЛЬКО в этом состоянии (это и
-        // есть условие «раздатчик реально на потолке», см. отчёт Фазы 0).
-        // Не «максимум» в буквальном смысле — rewarded (grantDrip) не
-        // ограничен accumulatorCap и может увеличить это же число дальше
-        // прямо в этом состоянии; текст суффикса подобран так, чтобы не
-        // обещать неподвижность там, где её нет.
-        text = line1 + I18N.t('retentionAtCapSuffix');
-      } else {
-        var line2 = I18N.t('retentionNextAt')
-          .replace('{n}', portion)
-          .replace('{time}', _formatClock(new Date(nextAt)));
-        text = line1 + ' · ' + line2;
-      }
-    } else if (nextAt == null) {
-      // waiting===0 и накопитель полон одновременно на практике не
-      // достижимо (backlog>=cap>0 уже входит в waiting), но не полагаемся
-      // на это молча — безопасный дефолт вместо пустой строки.
-      text = I18N.t('retentionFull');
-    } else {
-      var word = I18N.pluralRu(portion, [I18N.t('puzzleWordOne'), I18N.t('puzzleWordFew'), I18N.t('puzzleWordMany')]);
-      var verb = I18N.pluralRu(portion, [I18N.t('puzzleArriveVerbOne'), I18N.t('puzzleArriveVerbMany'), I18N.t('puzzleArriveVerbMany')]);
-      text = I18N.t('retentionEmptyLine')
-        .replace('{n}', portion)
-        .replace('{word}', word)
-        .replace('{verb}', verb)
-        .replace('{time}', _formatClock(new Date(nextAt)));
-    }
-    el.textContent = text;
-  }
-
   // Яндекс 4.5.1 (усиление 2026-09-06, прямая просьба основателя после
   // первого текстового фикса маркера): текста «Смотреть рекламу» мало —
   // нужен ещё и значок, читаемый как «реклама» с первого взгляда, отдельно
@@ -641,63 +571,6 @@ document.addEventListener('DOMContentLoaded', function () {
       '<rect x="0.5" y="2.5" width="15" height="11" rx="2.5"/>' +
       '<path d="M6.4 5.6v4.8l4.6-2.4z"/>' +
       '</svg>';
-  }
-
-  // Кнопка «Открыть ещё +N» (экран категорий) — ТЗ №09, фаза 3. Отдельный
-  // кран от такта раздатчика (см. Retention.grantDrip — не ограничен
-  // потолком накопителя, только концом кампании). Без кулдауна и гейтов
-  // частоты — rewarded показывается КАЖДЫЙ клик (стандарт 26.07: кулдауны
-  // только для непрошеной рекламы). Подпись не обещает ролик — только
-  // результат.
-  function renderRewardedButton() {
-    if (!_retentionState) return;
-    var btn = document.getElementById(RETENTION_CONFIG.domSlots.rewardedBtn);
-    if (!btn) return;
-    var fullyOpen = Retention.isCampaignFullyUnlocked(_retentionState, RETENTION_CONFIG);
-    // Простота > хитрые условия (ТЗ №09 п.3): видна всегда, пока есть что
-    // открывать — не завязана на то, доигран ли стартовый запас.
-    btn.hidden = fullyOpen;
-    if (fullyOpen) return;
-    // innerHTML вместо textContent (только здесь) — значок из adIconHtml() +
-    // локализованная строка I18N.t(), обе части фиксированы разработчиком,
-    // не вводом игрока, инъекции неоткуда взяться.
-    var label = I18N.t('retentionRewardedBtn').replace('{n}', RETENTION_CONFIG.dripPerTick);
-    btn.innerHTML = '<span class="rv-btn-inner">' + adIconHtml() + '<span>' + label + '</span></span>';
-  }
-
-  function onRewardedButtonClick() {
-    window.debugLog('click: #retention-rewarded-btn');
-    if (!_rewardedGateOpen) {
-      window.debugLog('click: #retention-rewarded-btn проигнорирован — предыдущий запрос ещё в полёте');
-      return;
-    }
-    Sound.resumeContext();
-    // Реклама недоступна (adblock/нет филла) -> Platform.showRewarded зовёт
-    // onReward сразу же, бесплатно (см. adapters/vk_bridge.js) — кнопка не
-    // прячется и не блокируется на время показа (п.190, шрам Color Sort).
-    // lockRewardedGate() ниже НЕ трогает кнопку — только внутренний флаг
-    // (см. комментарий у неё), п.190 этим не затрагивается вовсе.
-    // showAdLoadingOverlay/hide — отдельный явный слой поверх, не трогает
-    // саму кнопку (см. комментарий у showAdLoadingOverlay()).
-    showAdLoadingOverlay();
-    lockRewardedGate();
-    if (Platform.gameplayStop) Platform.gameplayStop(); // ТЗ №49, п.5: перед rewarded
-    Platform.showRewarded(function onReward() {
-      var before = _retentionState.dripOpened;
-      _retentionState = Retention.grantDrip(_retentionState, RETENTION_CONFIG, RETENTION_CONFIG.dripPerTick);
-      var granted = _retentionState.dripOpened - before;
-      if (granted > 0) {
-        saveProgress();
-        showRetentionToast(granted === 1
-          ? I18N.t('retentionRewardDrip')
-          : I18N.t('retentionRewardDrip') + ' (' + granted + ')');
-      }
-    }, function onClose() {
-      unlockRewardedGate();
-      hideAdLoadingOverlay();
-      renderRetentionDripLine();
-      renderRewardedButton();
-    });
   }
 
   // ТЗ №49: #retention-streak-line больше не показывается (заменена
@@ -756,17 +629,15 @@ document.addEventListener('DOMContentLoaded', function () {
     if (_winRevealTimer) { clearTimeout(_winRevealTimer); _winRevealTimer = null; }
   }
 
-  // 💡 подсказки / 🎨 стиль / 🎁 пазлы (п.2.3). Приоритет иконки при
-  // комбинированной награде (день 7: стиль ЕЩЁ не куплен И пазлы разом) —
-  // стиль заметнее пазлов, пазлы заметнее подсказок.
+  // 💡 подсказки / 🎨 стиль (п.2.3). День 7 (стиль ЕЩЁ не куплен И
+  // подсказки разом) — стиль заметнее подсказок.
   function ladderRewardIcon(reward) {
     if (reward.style) return '🎨';
-    if (reward.drip > 0) return '🎁';
     return '💡';
   }
 
   // Текст «Сегодня: {r}»/«Завтра: {r}» — день 7 может нести СРАЗУ стиль
-  // (если не куплен) И пазлы (см. ladder.js LADDER[6]); ТЗ не описывает
+  // (если не куплен) И подсказки (см. ladder.js LADDER[6]); ТЗ не описывает
   // отдельную комбинированную формулировку — склеиваем части через " + ",
   // не теряя ни одной награды дня в тексте карточки.
   function ladderRewardText(reward) {
@@ -778,22 +649,15 @@ document.addEventListener('DOMContentLoaded', function () {
       var word = I18N.pluralRu(reward.hints, [I18N.t('rewardHintsOne'), I18N.t('rewardHintsFew'), I18N.t('rewardHintsMany')]);
       parts.push('+' + reward.hints + ' ' + word);
     }
-    if (reward.drip > 0) {
-      parts.push(I18N.t('rewardDrip').replace('{n}', reward.drip));
-    }
     return parts.join(' + ');
   }
 
   // Тост при «Забрать» — переиспользует существующие ключи
-  // retentionRewardHints/retentionRewardStyle + новый retentionRewardDripN
-  // (ТЗ №49, п.2.3). Приоритет при комбинированной награде дня 7: стиль >
-  // пазлы > подсказки — тот же порядок, что и у значка (ladderRewardIcon).
+  // retentionRewardHints/retentionRewardStyle (ТЗ №49, п.2.3). Приоритет при
+  // комбинированной награде дня 7: стиль > подсказки — тот же порядок, что и
+  // у значка (ladderRewardIcon).
   function ladderToastText(reward) {
     if (reward.style) return I18N.t('retentionRewardStyle');
-    if (reward.drip > 0) {
-      var dripWord = I18N.pluralRu(reward.drip, [I18N.t('puzzleWordOne'), I18N.t('puzzleWordFew'), I18N.t('puzzleWordMany')]);
-      return I18N.t('retentionRewardDripN').replace('{n}', reward.drip).replace('{word}', dripWord);
-    }
     if (reward.hints > 0) return retentionRewardHintsText(reward.hints);
     return '';
   }
@@ -850,9 +714,6 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     if (reward.style && !_cosmeticsOwned[reward.style]) {
       _cosmeticsOwned[reward.style] = true;
-    }
-    if (reward.drip > 0 && typeof Retention !== 'undefined' && _retentionState) {
-      _retentionState = Retention.grantDrip(_retentionState, RETENTION_CONFIG, reward.drip);
     }
     var toastText = ladderToastText(reward);
     if (toastText) showRetentionToast(toastText);
@@ -1093,6 +954,34 @@ document.addEventListener('DOMContentLoaded', function () {
     return n;
   }
 
+  /* ---- Замок глав (2026-09-25, решение основателя) ----
+     Глава открывается ПРОГРЕССОМ: решено CHAPTER_UNLOCK_NEED картинок
+     предыдущей главы — или досрочно за рекламу (_chaptersUnlocked).
+     В открытой главе доступны сразу все 10 картинок. Таймер раздатчика
+     (retention.js, «+6 каждые 6 часов», ТЗ №08) главы больше не открывает:
+     он открывал картинки по порядку глав независимо от игры — игрок,
+     решивший 5 картинок, через сутки видел открытыми 3,5 главы.
+     retention.js по-прежнему подключён — считает серию входов (streakLen)
+     для миграции на лестницу, его состояние пишется в сейв как раньше. */
+  var CHAPTER_UNLOCK_NEED = 7;
+
+  function isChapterOpen(chIdx) {
+    var ch = CHAPTERS[chIdx];
+    if (!ch) return false;
+    if (chIdx === 0) return true;
+    if (_chaptersUnlocked[ch.key]) return true;
+    // Уже начатая глава не запирается обратно — игрок из прежней схемы
+    // (таймер) мог решать в ней, не набрав 7 в предыдущей.
+    if (countCompletedInChapter(ch) > 0) return true;
+    return countCompletedInChapter(CHAPTERS[chIdx - 1]) >= CHAPTER_UNLOCK_NEED;
+  }
+
+  function isLevelIndexOpen(levelIndex) {
+    if (_completedLevels[levelIndex]) return true;
+    var ch = chapterOfIndex(levelIndex);
+    return !ch || isChapterOpen(CHAPTERS.indexOf(ch));
+  }
+
   /* ---- Навигация ---- */
 
   function showScreen(id) {
@@ -1107,7 +996,6 @@ document.addEventListener('DOMContentLoaded', function () {
   function showMenu() {
     showScreen('menu');
     trackEvent('menu_shown');
-    retentionTick();
     if (typeof Retention !== 'undefined') renderRetentionStreakLine();
     renderSeriesLine();
     maybeShowLadderCard();
@@ -1290,11 +1178,15 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // «Примерить до покупки» — временная смена темы, не трогает _activeCosmetic
     // и не сохраняется; сбрасывается при выходе с экрана (см. btn-back-shop).
-    var previewBtn = document.createElement('button');
-    previewBtn.className = 'btn btn-secondary';
-    previewBtn.textContent = I18N.t('shopPreview');
-    previewBtn.onclick = function () { applyThemeClass(cos.themeClass); };
-    actions.appendChild(previewBtn);
+    // 2026-09-25, замечание основателя: у того, что уже есть, «Примерить»
+    // не нужна — сразу «Применить»; у недоступного — только «Примерить».
+    if (!owned) {
+      var previewBtn = document.createElement('button');
+      previewBtn.className = 'btn btn-secondary';
+      previewBtn.textContent = I18N.t('shopPreview');
+      previewBtn.onclick = function () { applyThemeClass(cos.themeClass); };
+      actions.appendChild(previewBtn);
+    }
 
     var mainBtn = document.createElement('button');
     mainBtn.className = 'btn btn-primary';
@@ -1302,20 +1194,26 @@ document.addEventListener('DOMContentLoaded', function () {
     if (owned) {
       statusEl.textContent = cos.free ? I18N.t('shopDefault')
         : (cos.streakReward ? I18N.t('shopStreakReward') : I18N.t('shopOwned'));
-      mainBtn.textContent  = I18N.t(applied ? 'shopRemove' : 'shopApply');
-      mainBtn.disabled = false;
-      mainBtn.onclick = function () {
-        _activeCosmetic = applied ? '' : cos.id;
-        applyCosmetic(_activeCosmetic);
-        saveProgress();
-        showShop(); // перерисовать метки кнопок под новое состояние
-      };
+      // Применённая гамма — неактивная отметка, а не «Выключить»: вернуться к
+      // другой гамме можно её же кнопкой «Применить» (база всегда в списке),
+      // отдельная кнопка отмены дублировала бы это действие.
+      mainBtn.textContent = I18N.t(applied ? 'shopApplied' : 'shopApply');
+      mainBtn.disabled = applied;
+      if (!applied) {
+        mainBtn.onclick = function () {
+          _activeCosmetic = cos.id;
+          applyCosmetic(_activeCosmetic);
+          saveProgress();
+          showShop(); // перерисовать метки кнопок под новое состояние
+        };
+      }
     } else if (cos.streakReward) {
       // ТЗ №01, п.2.3: НЕ товар — покупке не подлежит ни при каком catalogMap,
-      // выдаётся только Retention.grantStyle() за 3-й день серии входов.
+      // выдаётся только за серию входов (лестница). Условие получения уже
+      // написано в статусе под названием — отдельная неактивная кнопка с тем
+      // же текстом была дублем (замечание основателя 2026-09-25).
       statusEl.textContent = I18N.t('shopStreakLocked');
-      mainBtn.textContent  = I18N.t('shopStreakLocked');
-      mainBtn.disabled = true;
+      mainBtn = null;
     } else if (!catalogMap) {
       // Каталог ещё не пришёл — не крашим, просто ждём (см. showShop).
       statusEl.textContent = I18N.t('shopLoading');
@@ -1375,7 +1273,7 @@ document.addEventListener('DOMContentLoaded', function () {
       }
     }
 
-    actions.appendChild(mainBtn);
+    if (mainBtn) actions.appendChild(mainBtn);
     row.appendChild(swatch);
     row.appendChild(body);
     row.appendChild(actions);
@@ -1433,52 +1331,60 @@ document.addEventListener('DOMContentLoaded', function () {
 
   /* ---- Экран глав («Альбом», ТЗ №50) ---- */
 
-  // Первый уровень главы, который одновременно ОТКРЫТ замком (по позиции)
-  // и не пройден. null, если такого нет (глава либо вся пройдена, либо вся
-  // заперта раздатчиком) — ТЗ №01, перенесено на главы ТЗ №50.
+  // Первый непройденный уровень главы, если глава открыта; null — глава
+  // заперта (или вся пройдена).
   function firstOpenUnfinishedInChapter(ch) {
+    if (!isChapterOpen(CHAPTERS.indexOf(ch))) return null;
     for (var i = 0; i < ch.indices.length; i++) {
-      var idx = ch.indices[i];
-      if (!_completedLevels[idx] && Retention.isLevelOpen(ChaptersMap.indexToPos(idx), _retentionState, RETENTION_CONFIG)) return idx;
+      if (!_completedLevels[ch.indices[i]]) return ch.indices[i];
     }
     return null;
   }
 
-  function showThumbLockedToast() {
-    showRetentionToast(I18N.t('thumbLockedToast'));
+  // Строка запертой главы: «Решите ещё {n} {word} в главе {k}» — ровно то,
+  // что её откроет (раньше «Откроется через N пазлов» означало «таймер
+  // выдаст ещё N», а читалось как «решите N»).
+  function chapterLockedLineText(chIdx) {
+    var prev = CHAPTERS[chIdx - 1];
+    var n = Math.max(1, CHAPTER_UNLOCK_NEED - countCompletedInChapter(prev));
+    var word = I18N.pluralRu(n, [I18N.t('pictureWordOne'), I18N.t('pictureWordFew'), I18N.t('pictureWordMany')]);
+    return I18N.t('chapterLocked')
+      .replace('{n}', n)
+      .replace('{word}', word)
+      .replace('{k}', chIdx);
   }
 
-  // Строка замка запертой главы: «Откроется через {n} {word} · +{n} в
-  // {time} · или за ролик» — та же формула дистанции, что была у категорий
-  // (ТЗ №09 фаза 4), но по ПОЗИЦИИ первой картинки главы, не по индексу.
-  function chapterLockedLineText(ch) {
-    var firstPos = ChaptersMap.indexToPos(ch.indices[0]);
-    var n = Math.max(1, firstPos - Retention.dripBoundary(_retentionState, RETENTION_CONFIG));
-    var word = I18N.pluralRu(n, [I18N.t('puzzleWordOne'), I18N.t('puzzleWordFew'), I18N.t('puzzleWordMany')]);
-    var parts = [I18N.t('chapterLocked').replace('{n}', n).replace('{word}', word)];
-    var nextAt = Retention.nextUnlockAtMs(_retentionState, RETENTION_CONFIG);
-    if (nextAt != null) {
-      parts.push(I18N.t('chapterLockedDrip')
-        .replace('{n}', RETENTION_CONFIG.dripPerTick)
-        .replace('{time}', _formatClock(new Date(nextAt))));
+  // Кнопка «Открыть главу сейчас» за rewarded — прямо на карточке запертой
+  // главы (замечание основателя 2026-09-25: надпись обещала рекламу, а тап
+  // по главе ролик не запускал). Та же обвязка, что у подсказки за рекламу:
+  // оверлей загрузки + гейт от повторного клика; кнопка не дизейблится
+  // (п.190, шрам Color Sort — см. lockRewardedGate).
+  function onChapterUnlockAdClick(ch) {
+    window.debugLog('click: .chapter-unlock-btn ' + ch.key);
+    if (!_rewardedGateOpen) {
+      window.debugLog('click: .chapter-unlock-btn проигнорирован — предыдущий запрос ещё в полёте');
+      return;
     }
-    // При полностью раскрытой кампании rewarded-кнопки уже нет (renderRewardedButton) —
-    // упоминать ролик в строке замка тогда было бы враньём.
-    if (!Retention.isCampaignFullyUnlocked(_retentionState, RETENTION_CONFIG)) {
-      parts.push(I18N.t('chapterLockedAd'));
-    }
-    return parts.join(' · ');
-  }
-
-  // Клик по запертой главе — прокрутка к rewarded-кнопке (если она видна)
-  // или тост с той же формулой замка.
-  function onLockedChapterClick() {
-    var btn = document.getElementById(RETENTION_CONFIG.domSlots.rewardedBtn);
-    if (btn && !btn.hidden) {
-      btn.scrollIntoView({ block: 'center', behavior: _reduceMotion() ? 'auto' : 'smooth' });
-    } else {
-      showRetentionToast(I18N.t('thumbLockedToast'));
-    }
+    Sound.resumeContext();
+    showAdLoadingOverlay();
+    lockRewardedGate();
+    if (Platform.gameplayStop) Platform.gameplayStop();
+    var granted = false;
+    Platform.showRewarded(function onReward() {
+      if (_chaptersUnlocked[ch.key]) return;
+      _chaptersUnlocked[ch.key] = true;
+      granted = true;
+      saveProgress();
+      trackEvent('chapter_unlock_ad', { chapter: ch.key });
+    }, function onClose() {
+      unlockRewardedGate();
+      hideAdLoadingOverlay();
+      if (!document.getElementById('chapters').classList.contains('is-active')) return;
+      showChapters();
+      if (granted) {
+        showRetentionToast(I18N.t('chapterUnlockedToast').replace('{name}', I18N.t(ch.nameKey)));
+      }
+    });
   }
 
   function _reduceMotion() {
@@ -1501,14 +1407,19 @@ document.addEventListener('DOMContentLoaded', function () {
     ctx.fillStyle = bg;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = ink;
+    // Зазор между клетками — только когда клетка достаточно крупная. Раньше
+    // зазор был всегда по 1px с каждой стороны: при CELL=2 (картинки 10×10–
+    // 13×13 в миниатюре) ширина клетки выходила 0 и миниатюра рисовалась
+    // пустой — с главы 2 почти все пройденные картинки были пустыми клетками.
+    var gap = CELL >= 6 ? 1 : 0;
     for (var r = 0; r < H; r++) {
       for (var c = 0; c < W; c++) {
-        if (level.solution[r][c]) ctx.fillRect(c * CELL + 1, r * CELL + 1, CELL - 2, CELL - 2);
+        if (level.solution[r][c]) ctx.fillRect(c * CELL + gap, r * CELL + gap, CELL - 2 * gap, CELL - 2 * gap);
       }
     }
   }
 
-  // Одна миниатюра ряда главы — kind: 'done' | 'open' | 'locked'.
+  // Одна миниатюра ряда главы — kind: 'done' | 'open'.
   function buildThumb(levelIndex, numberInChapter, kind) {
     var btn = document.createElement('button');
     btn.type = 'button';
@@ -1517,47 +1428,22 @@ document.addEventListener('DOMContentLoaded', function () {
       var canvas = document.createElement('canvas');
       canvas.className = 'thumb-canvas';
       btn.appendChild(canvas);
-      paintSilhouetteStatic(canvas, LEVELS[levelIndex], 26);
+      // Разрешение под плотность экрана: миниатюра ~28 CSS-px, на телефоне
+      // с dpr 3 канвас в 26px растягивался бы в 3 раза и мылился.
+      paintSilhouetteStatic(canvas, LEVELS[levelIndex], Math.round(28 * Math.min(3, window.devicePixelRatio || 1)));
       btn.addEventListener('click', function () { showGame(levelIndex); });
-    } else if (kind === 'open') {
+    } else {
       var num = document.createElement('span');
       num.className = 'thumb-num';
       num.textContent = String(numberInChapter);
       btn.appendChild(num);
       btn.addEventListener('click', function () { showGame(levelIndex); });
-    } else {
-      var dot = document.createElement('span');
-      dot.className = 'thumb-num thumb-dot';
-      dot.textContent = '·';
-      btn.appendChild(dot);
-      btn.addEventListener('click', showThumbLockedToast);
     }
     return btn;
   }
 
   function showChapters() {
-    retentionTick();
     showScreen('chapters');
-    if (typeof Retention !== 'undefined') {
-      // ТЗ №49, п.4 («Первые 60 секунд»): у совсем нового игрока (<8
-      // пройдено) с щедрым запасом ещё непройденных открытых уровней (>3)
-      // строка раздатчика и кнопка rewarded прячутся — рано продавать
-      // «изобилие» тому, кто ещё не исчерпал стартовый запас; как только
-      // одно из условий перестаёт выполняться — обе снова видны как раньше.
-      var doneCount = Object.keys(_completedLevels).length;
-      var hideRetentionUpsell = doneCount < 8 &&
-        Retention.openUnfinishedCount(_retentionState, RETENTION_CONFIG) > 3;
-      var dripEl = document.getElementById(RETENTION_CONFIG.domSlots.dripLine);
-      if (hideRetentionUpsell) {
-        if (dripEl) dripEl.hidden = true;
-        document.getElementById(RETENTION_CONFIG.domSlots.rewardedBtn).hidden = true;
-      } else {
-        if (dripEl) dripEl.hidden = false;
-        renderRetentionDripLine();
-        renderRewardedButton();
-      }
-      document.getElementById(RETENTION_CONFIG.domSlots.rewardedBtn).onclick = onRewardedButtonClick;
-    }
 
     var list = document.getElementById('chapter-list');
     list.innerHTML = '';
@@ -1572,10 +1458,8 @@ document.addEventListener('DOMContentLoaded', function () {
       var total = ch.indices.length;
       var allDone = (done === total);
 
-      // ТЗ №01/№50: глава «заперта», если в ней есть непройденное, но
-      // ничего из непройденного пока не открыто раздатчиком (по позиции).
-      var openTarget = (typeof Retention !== 'undefined') ? firstOpenUnfinishedInChapter(ch) : firstUnfinishedInChapter(ch);
-      var locked = (typeof Retention !== 'undefined') && !allDone && openTarget === null;
+      var locked = !isChapterOpen(chIdx);
+      var openTarget = firstOpenUnfinishedInChapter(ch);
 
       if (locked) {
         if (firstLockedShown) {
@@ -1619,11 +1503,21 @@ document.addEventListener('DOMContentLoaded', function () {
       card.appendChild(head);
 
       if (locked) {
-        head.addEventListener('click', onLockedChapterClick);
         var lockLine = document.createElement('p');
         lockLine.className = 'chapter-locked-line';
-        lockLine.textContent = chapterLockedLineText(ch);
+        lockLine.textContent = chapterLockedLineText(chIdx);
         card.appendChild(lockLine);
+        // Тап по заголовку и кнопка делают одно и то же: основатель тапал
+        // именно по карточке, ожидая ролик.
+        var unlockBtn = document.createElement('button');
+        unlockBtn.type = 'button';
+        unlockBtn.className = 'btn btn-secondary retention-rewarded-btn chapter-unlock-btn';
+        // innerHTML — значок из adIconHtml() + локализованная строка, обе
+        // части фиксированы разработчиком, ввода игрока здесь нет.
+        unlockBtn.innerHTML = '<span class="rv-btn-inner">' + adIconHtml() + '<span>' + I18N.t('chapterUnlockAdBtn') + '</span></span>';
+        unlockBtn.addEventListener('click', function () { onChapterUnlockAdClick(ch); });
+        head.addEventListener('click', function () { onChapterUnlockAdClick(ch); });
+        card.appendChild(unlockBtn);
       } else {
         head.addEventListener('click', function () {
           var startIdx = allDone ? firstUnfinishedInChapter(ch) : openTarget;
@@ -1636,12 +1530,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
         var thumbs = document.createElement('div');
         thumbs.className = 'chapter-thumbs';
+        // Глава открыта — открыты все её картинки (запертых миниатюр внутри
+        // открытой главы при замке по главам не бывает).
         ch.indices.forEach(function (idx, i) {
-          var kind;
-          if (_completedLevels[idx]) kind = 'done';
-          else if (typeof Retention === 'undefined' || Retention.isLevelOpen(ChaptersMap.indexToPos(idx), _retentionState, RETENTION_CONFIG)) kind = 'open';
-          else kind = 'locked';
-          thumbs.appendChild(buildThumb(idx, i + 1, kind));
+          thumbs.appendChild(buildThumb(idx, i + 1, _completedLevels[idx] ? 'done' : 'open'));
         });
         card.appendChild(thumbs);
       }
@@ -1936,13 +1828,10 @@ document.addEventListener('DOMContentLoaded', function () {
     var level = LEVELS[levelIndex];
     if (!level) { showChapters(); return; }
 
-    // ТЗ №01/№50: замок — авторитетная проверка именно здесь (не только в
-    // клик-хендлерах экрана глав), потому что «Продолжить»/следующий
-    // уровень после победы могут целиться в ещё не открытую раздатчиком
-    // позицию (следующая картинка главы не обязана быть уже разблокирована).
-    // Замок работает по ПОЗИЦИЯМ — levelIndex переводится в позицию на
-    // границе с retention.js (см. RETENTION_CONFIG.callbacks выше).
-    if (typeof Retention !== 'undefined' && !Retention.isLevelOpen(ChaptersMap.indexToPos(levelIndex), _retentionState, RETENTION_CONFIG)) {
+    // Замок — авторитетная проверка именно здесь (не только в клик-
+    // хендлерах экрана глав): «Продолжить»/следующий уровень после победы
+    // могут целиться в картинку ещё запертой главы.
+    if (!isLevelIndexOpen(levelIndex)) {
       showChapters();
       return;
     }
@@ -2036,8 +1925,13 @@ document.addEventListener('DOMContentLoaded', function () {
 
     if (_saveTimer) { clearTimeout(_saveTimer); _saveTimer = null; }
     delete _boardStates[levelIndex];
+    // Открыла ли эта победа следующую главу (7-я картинка текущей) — для
+    // тоста поверх экрана победы, чтобы открытие главы не было тихим.
+    var winChIdx = CHAPTERS.indexOf(chapterOfIndex(levelIndex));
+    var nextChWasOpen = winChIdx >= 0 && isChapterOpen(winChIdx + 1);
     _completedLevels[levelIndex] = true;
     var completedCount = Object.keys(_completedLevels).length;
+    var unlockedChapter = (winChIdx >= 0 && !nextChWasOpen && isChapterOpen(winChIdx + 1)) ? CHAPTERS[winChIdx + 1] : null;
 
     // ТЗ №50: следующая позиция главы; если глава закончена — первая
     // открытая непройденная позиция СЛЕДУЮЩЕЙ главы (правило ТЗ №49 «после
@@ -2051,10 +1945,8 @@ document.addEventListener('DOMContentLoaded', function () {
     } else if (chapter) {
       var nextChapter = CHAPTERS[CHAPTERS.indexOf(chapter) + 1];
       if (nextChapter) {
-        var openNext = (typeof Retention !== 'undefined')
-          ? firstOpenUnfinishedInChapter(nextChapter)
-          : firstUnfinishedInChapter(nextChapter);
-        if (openNext !== null && openNext !== undefined) nextIndex = openNext;
+        var openNext = firstOpenUnfinishedInChapter(nextChapter);
+        if (openNext !== null) nextIndex = openNext;
       }
     }
 
@@ -2081,7 +1973,12 @@ document.addEventListener('DOMContentLoaded', function () {
     });
     if (chapterJustCompleted) trackEvent('chapter_done', { ch: chapter.key });
 
-    scheduleWinReveal(function () { revealWin(level, levelIndex, chapter, posInChapter, nextIndex, completedCount, chapterJustCompleted); });
+    scheduleWinReveal(function () {
+      revealWin(level, levelIndex, chapter, posInChapter, nextIndex, completedCount, chapterJustCompleted);
+      if (unlockedChapter) {
+        showRetentionToast(I18N.t('chapterUnlockedToast').replace('{name}', I18N.t(unlockedChapter.nameKey)));
+      }
+    });
   }
 
   function revealWin(level, levelIndex, chapter, posInChapter, nextIndex, completedCount, chapterJustCompleted) {

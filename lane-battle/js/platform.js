@@ -394,24 +394,38 @@ const PLATFORM = (() => {
   // ShowNativeAdsRequest/CheckNativeAdsRequest): при нехватке rewarded-роликов
   // площадка подставляет interstitial вместо отказа.
   const VK_REWARD_PARAMS = { ad_format: 'reward', use_waterfall: true };
-  const VK_AD_TIMEOUT_MS = 40000;
+  // Баг 25.09.2026 (скрин основателя, дважды подряд): показ rewarded был
+  // обёрнут в таймаут 40с — загрузка + ролик + финальная карточка ВК
+  // дольше, игра объявляла «реклама недоступна» ПОВЕРХ идущего ролика, а
+  // поздний ответ ВК «досмотрено» выбрасывался — награда терялась. VK
+  // отвечает на ShowNativeAds только после закрытия рекламы, поэтому ответ
+  // ждём сколько угодно. Предохранитель ниже — только от немого моста:
+  // через 3 мин снимает паузу игры/звука, но ответ ВК по-прежнему ждёт.
+  const VK_AD_HANG_GUARD_MS = 180000;
   function showVkRewarded() {
     return new Promise((resolve) => {
       if (!vkBridge) { resolve(false); return; }
       pauseHook();
-      withTimeout(vkBridge.send('VKWebAppShowNativeAds', VK_REWARD_PARAMS), VK_AD_TIMEOUT_MS)
-        .then((res) => { resumeHook(); resolve(!!(res && res.result)); })
-        .catch(() => { resumeHook(); resolve(false); });
+      let resumed = false;
+      const resumeOnce = () => { if (!resumed) { resumed = true; resumeHook(); } };
+      const guard = setTimeout(resumeOnce, VK_AD_HANG_GUARD_MS);
+      const finish = (rewarded) => { clearTimeout(guard); resumeOnce(); resolve(rewarded); };
+      vkBridge.send('VKWebAppShowNativeAds', VK_REWARD_PARAMS)
+        .then((res) => finish(!!(res && res.result)))
+        .catch(() => finish(false));
     });
   }
 
   // ---- межуровневая реклама (VK/Яндекс; на CrazyGames midgame отключён
   // решением основателя, локально — no-op) --------------------------------
   const INTERSTITIAL_TIMEOUT_MS = 15000;
+  // Тот же баг 25.09: таймаут 15с запускал следующую миссию прямо под ещё
+  // идущей рекламой. Здесь ответ ВК ждём до предохранителя — дальше игра
+  // обязана продолжиться в любом исходе (ГДД, межуровневая по «Далее»).
   function showVkInterstitial() {
     if (!vkBridge) return Promise.resolve(false);
     pauseHook();
-    return withTimeout(vkBridge.send('VKWebAppShowNativeAds', { ad_format: 'interstitial' }), INTERSTITIAL_TIMEOUT_MS)
+    return withTimeout(vkBridge.send('VKWebAppShowNativeAds', { ad_format: 'interstitial' }), VK_AD_HANG_GUARD_MS)
       .then((res) => !!(res && res.result))
       .catch(() => false)
       .then((shown) => { resumeHook(); return shown; });

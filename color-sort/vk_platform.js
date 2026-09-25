@@ -154,7 +154,7 @@ const Platform = (() => {
      раньше на ВК этого поля не было вовсе (undefined, не строка),
      плашка молчала всегда независимо от сборки; main.js трогать не
      нужно, правка живёт ТОЛЬКО здесь и в build.py. */
-  const BUILD = 'b51-35da64a-20260924';
+  const BUILD = 'b52-9c81d28-20260925';
 
   /* ---------- Единая точка времени (ТЗ №18) ----------
      Симметрично platform.js (Яндекс) — см. комментарий там же. Оба
@@ -259,88 +259,7 @@ const Platform = (() => {
     // Кнопка подсказки НЕ прячется здесь: VKWebAppCheckNativeAds
     // ненадёжен для превентивной проверки (см. журнал наверху, п.1) —
     // доступность рекламы обрабатывается реактивно, в showRewarded().
-    try { showDesktopBanner(); } catch (e) { console.warn('[vk_platform] баннер:', e); }
     return true;
-  }
-
-  /* ---------- Баннер на ПК (ТЗ №24, R-13 — решение основателя) ----------
-     Только десктопный сайт ВК (vk_platform=desktop_*). Дока:
-     dev.vk.com/ru/bridge/VKWebAppShowBannerAd и
-     dev.vk.com/ru/games/monetization/ad/banners (сверено 2026-09-24).
-
-     Место под баннер отдаёт ПЛОЩАДКА (layout_type:'resize' — «экран игры
-     станет меньше на размер баннера»), игра себя не сдвигает и отступов
-     не добавляет. Сборка b50 брала overlay/right/vertical и ужимала body
-     сама: по доке это карточка в правом нижнем углу поверх игры, и живой
-     заход основателя показал сдвинутую игру и карточку, а не колонку во
-     всю высоту (тот же итог, что у Нонограмм, ТЗ №10–11).
-
-     Водопад, первый успешный шаг побеждает:
-       1. resize + orientation:'vertical' — вертикальный баннер, под
-          который площадка ужимает окно. В доке этот набор показан для
-          горизонтального телефона («баннер справа»); для ПК живьём не
-          подтверждён — Нонограммы (ТЗ №53) на resize баннера не
-          получили. Решает живой заход.
-       2. banner_location:'bottom' — документированная для ПК полоса во
-          всю ширину снизу (тоже resize).
-     Отказ обоих — баннера нет, игра как была.
-
-     Диагностика: дословный ответ Bridge и сдвиг окна пишутся в консоль,
-     а с #banner в адресе (vk.com/appN#banner) — ещё и в плашку сборки. */
-  const BANNER_STEPS = [
-    { name: 'resize-vertical', params: { banner_location: 'bottom', layout_type: 'resize', orientation: 'vertical' } },
-    { name: 'bottom', params: { banner_location: 'bottom' } },
-  ];
-  const BANNER_SETTLE_MS = 600;
-
-  function isDesktopWeb() {
-    try {
-      return /^desktop/.test(new URLSearchParams(location.search).get('vk_platform') || '');
-    } catch (e) { return false; }
-  }
-
-  function setBannerStatus(text) {
-    console.log('[vk_platform] баннер:', text);
-    try {
-      if (!/banner/.test(location.hash)) return;
-      const badge = document.getElementById('build-badge');
-      if (!badge) return;
-      badge.textContent = BUILD + ' · ' + text;
-      badge.classList.remove('hidden');
-    } catch (e) { /* диагностика не должна ломать игру */ }
-  }
-
-  function describeBanner(step, info, before) {
-    const dw = before.w - window.innerWidth;
-    const dh = before.h - window.innerHeight;
-    return step.name + ' ' + (info.layout_type || '?') + ' ' +
-      info.banner_width + '×' + info.banner_height + ' окно −' + dw + '×−' + dh;
-  }
-
-  function showDesktopBanner() {
-    if (!isDesktopWeb()) return;
-    if (typeof vkBridge.subscribe === 'function') vkBridge.subscribe((e) => {
-      const type = e && e.detail && e.detail.type;
-      if (type === 'VKWebAppBannerAdUpdated' || type === 'VKWebAppBannerAdClosedByUser') {
-        console.log('[vk_platform] баннер, событие', type, JSON.stringify(e.detail.data));
-      }
-    });
-    tryBannerStep(0);
-  }
-
-  function tryBannerStep(i) {
-    const step = BANNER_STEPS[i];
-    if (!step) { setBannerStatus('нет баннера'); return; }
-    const before = { w: window.innerWidth, h: window.innerHeight };
-    withTimeout(vkBridge.send('VKWebAppShowBannerAd', step.params), INTERSTITIAL_TIMEOUT_MS).then((info) => {
-      console.log('[vk_platform] баннер ' + step.name + ', ответ:', JSON.stringify(info));
-      if (!info || info.result === false) { tryBannerStep(i + 1); return; }
-      // Площадка ужимает окно не мгновенно — сдвиг меряем после паузы.
-      setTimeout(() => setBannerStatus(describeBanner(step, info, before)), BANNER_SETTLE_MS);
-    }).catch((e) => {
-      console.warn('[vk_platform] баннер ' + step.name + ' отклонён:', e);
-      tryBannerStep(i + 1);
-    });
   }
 
   /* ---------- Game Ready ----------

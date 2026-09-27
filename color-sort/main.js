@@ -1356,9 +1356,11 @@
     _pendingProceedAfterEnergy = proceedFn;
     renderEnergyWall();
     show('energyWall');
+    track('energy_wall', { level: idx + 1 });
   }
 
   function onEnergyWallAdClick() {
+    track('rewarded_click', { place: 'energy' });
     Platform.showRewarded(
       // Результат — внутри onRewarded, не в onResume (см. комментарий
       // у onRetentionRewardedClick-эквивалента ТЗ №14 этап 3: адаптеры
@@ -1383,7 +1385,10 @@
         if (granted > 0) showRetentionToast(t('energyToastGain').replace('{n}', granted));
       },
       pauseGame,
-      resumeGame
+      (outcome) => {
+        resumeGame();
+        track('rewarded_result', { place: 'energy', result: outcome || 'unknown' });
+      }
     );
   }
   const btnEnergyWallAd = document.getElementById('btn-energy-wall-ad');
@@ -1664,6 +1669,18 @@
     if (tutorial) { tutorial = null; Board.setTutorial(-1); }
   }
 
+  /* ---------- Аналитика (ТЗ №25) ----------
+     Только наблюдение: ни одно событие не меняет поведение игры.
+     typeof-гейт — модуль может отсутствовать (тестовые стенды). */
+  function track(name, params) {
+    if (typeof Analytics !== 'undefined') Analytics.event(name, params);
+  }
+  let analyticsNewPlayer = false;  // сейва не было на старте этого запуска
+  let firstMoveTracked = false;    // first_move — один раз за запуск
+  let levelStartedAt = 0;          // performance.now() входа на уровень
+  let levelMoves = 0;
+  let levelUndos = 0;
+
   // Вызывается из loadLevel: обучение — только новичку на уровне 1
   // (N-17: онбординг через сами уровни), на уровне 2 (впервые форма) —
   // лишь если игрок замер.
@@ -1702,6 +1719,15 @@
       haptic('invalid');
     },
     onPour({ toIdx, targetLen, element, collected }) {
+      levelMoves++;
+      if (!firstMoveTracked) {
+        firstMoveTracked = true;
+        track('first_move', {
+          level: state.levelIndex + 1,
+          sec: Math.round((performance.now() - levelStartedAt) / 1000),
+          new_player: analyticsNewPlayer,
+        });
+      }
       stopTutorial();
       clearAttention();
       disarmRestart();
@@ -1722,6 +1748,7 @@
       haptic(collected ? 'lock' : 'pour');
     },
     onUndo() {
+      levelUndos++;
       clearAttention();
       armStuckTimer();
     },
@@ -1743,6 +1770,7 @@
   }
 
   function restartLevel() {
+    track('level_restart', { level: state.levelIndex + 1 });
     disarmRestart();
     Board.clearHint();
     boardWrap.classList.add('board-fade');
@@ -1869,6 +1897,7 @@
     debugLog('[hint] иду в Platform.showRewarded()');
     rewardedInFlight = true;
     showHintLoadingToast();
+    track('rewarded_click', { place: 'hint' });
     Platform.showRewarded(
       () => { debugLog('[hint] onRewarded вызван — подсвечиваю ход'); Board.showHint(hint.from, hint.to); }, // награда получена — подсвечиваем ход
       pauseGame,
@@ -1877,7 +1906,10 @@
       // просмотра» на Яндексе, где onRewarded вообще не вызывается) —
       // rewardedInFlight сбрасывается ЗДЕСЬ ЖЕ (не в onRewarded), той
       // же логикой, что и hideHintLoadingToast чуть выше по коду.
-      () => { rewardedInFlight = false; hideHintLoadingToast(); resumeGame(); }
+      (outcome) => {
+        rewardedInFlight = false; hideHintLoadingToast(); resumeGame();
+        track('rewarded_result', { place: 'hint', result: outcome || 'unknown' });
+      }
     );
   });
 
@@ -1897,6 +1929,7 @@
     // момент победы — до этого таймер нигде не показывается игроку.
     const seconds = Stats.finishLevel();
     const finishedIdx = state.levelIndex; // 0-индексный, только что пройденный
+    track('level_win', { level: finishedIdx + 1, sec: seconds, moves: levelMoves, undos: levelUndos });
     // ТЗ №15, п.1.2: списание строго одно — новый, ЕЩЁ НЕ пройденный
     // уровень завершён. Флаг снят ДО перезаписи levelTimes[finishedIdx]
     // ниже — иначе к моменту проверки уровень уже выглядел бы «пройден»
@@ -1951,6 +1984,7 @@
     const daily = registerDailyWin();
     renderWinDaily(daily);
     if (daily.rewarded) renderHintBonusBadge();
+    if (daily.rewarded) track('daily_goal_done');
 
     persist(); // переживает закрытие вкладки отсюда же
     // ТЗ №22, B2: учёт победы выше — сразу; оверлей — после волны колб
@@ -1997,6 +2031,10 @@
     Stats.startLevel(idx);
     if (typeof Fx !== 'undefined') Fx.clear();
     onLevelStarted(idx);
+    levelStartedAt = performance.now();
+    levelMoves = 0;
+    levelUndos = 0;
+    track('level_start', { level: idx + 1 });
   }
 
   function formatTime(totalSeconds) {
@@ -2127,7 +2165,10 @@
       if (shouldShowInterstitialNow()) {
         Platform.showInterstitial(
           () => { advDiagMarkAdOpen(); pauseGame(); }, // onOpen: сюда SDK приходит первым — момент фактического открытия рекламы
-          () => { resumeGame(); proceedToLevel(); },   // onClose/onError (см. platform.js) — единая точка продолжения
+          (wasShown) => {                              // onClose/onError (см. platform.js) — единая точка продолжения
+            resumeGame(); proceedToLevel();
+            if (wasShown) track('interstitial_shown', { level: nextIdx });
+          },
           advDiagMarkCall                              // ТЗ №1 задача C: наша часть задержки, измеримо и без SDK
         );
       } else {
@@ -2190,6 +2231,9 @@
   }
   btnPlay.addEventListener('click', playGame);
   btnBack.addEventListener('click', () => {
+    if (screens.game.classList.contains('active') && !Game.isSolved()) {
+      track('level_quit', { level: state.levelIndex + 1, sec: Stats.peekSeconds() });
+    }
     Stats.stop(); // ушли с уровня без победы — незавершённый отрезок не считаем
     goToMenu();
   });
@@ -2348,8 +2392,13 @@
     if (_retentionState.dripOpened > beforeTick) persist();
     // День засчитывается фактом входа (не прохождением уровня) — один
     // раз на старте сессии.
+    const stateBeforeEnter = _retentionState;
     const entryResult = Retention.onEnter(_retentionState, Retention.dayKeyFromDate(new Date()), RETENTION_CONFIG);
     _retentionState = entryResult.state;
+    // Новый календарный день входа (onEnter в тот же день — no-op, тот же объект).
+    if (entryResult.state !== stateBeforeEnter) {
+      track('return_day', { streak_day: entryResult.state.streakLen, reward: entryResult.reward || 'none' });
+    }
     if (entryResult.reward === 'hints') RETENTION_CONFIG.callbacks.grantHints(RETENTION_CONFIG.hintsRewardCount);
     else if (entryResult.reward === 'style') RETENTION_CONFIG.callbacks.grantStyle();
     // Бейдж — ЕЩЁ РАЗ безусловно (не только внутри grantHints выше):
@@ -2462,6 +2511,9 @@
     updateShopButtonVisibility();
     renderOformlenie(); // ТЗ №17: состав экрана известен уже на старте
 
+    analyticsNewPlayer = isBrandNewPlayer;
+    track('game_loaded', { load_ms: Math.round(performance.now()), new_player: isBrandNewPlayer });
+
     goToMenu();
     // ТЗ №22, A1: настоящий новичок (сейва не было) — сразу на уровень 1,
     // без меню: первое действие в первые секунды (N-26), а энергия и
@@ -2470,6 +2522,9 @@
 
     // Game Ready — когда игра реально готова к взаимодействию (п.1.19.2)
     Platform.gameReady();
+
+    // ТЗ №25: скрипт Метрики — строго после gameReady, старт не тормозит.
+    if (typeof Analytics !== 'undefined') Analytics.start(Platform.BUILD);
 
     // Магазин — сеть (getCatalog/getPurchases), не блокируем им Game
     // Ready/меню; UI обновится асинхронно, когда каталог придёт.

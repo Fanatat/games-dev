@@ -154,7 +154,7 @@ const Platform = (() => {
      раньше на ВК этого поля не было вовсе (undefined, не строка),
      плашка молчала всегда независимо от сборки; main.js трогать не
      нужно, правка живёт ТОЛЬКО здесь и в build.py. */
-  const BUILD = 'b52-9c81d28-20260925';
+  const BUILD = 'b53-65bfd8d-20260927';
 
   /* ---------- Единая точка времени (ТЗ №18) ----------
      Симметрично platform.js (Яндекс) — см. комментарий там же. Оба
@@ -385,7 +385,7 @@ const Platform = (() => {
       console.warn('[vk_platform] dev: rewarded → награда выдана');
       if (dbg) dbg('[rewarded] ready=false (dev-режим/нет моста) — награда сразу');
       if (onRewarded) onRewarded();
-      if (onResume) onResume();
+      if (onResume) onResume('dev');
       return;
     }
     if (onPause) onPause();
@@ -401,12 +401,13 @@ const Platform = (() => {
     const waitProgressTimer = dbg ? setInterval(() => {
       dbg(`[rewarded] жду ответа моста: ${Math.round((performance.now() - sendStartedAt) / 1000)}с/${REWARD_AD_TIMEOUT_MS / 1000}с`);
     }, 10000) : null;
-    const finish = (grantReward, reason) => {
+    // outcome — исход для аналитики (ТЗ №25): 'shown' | 'error' | 'timeout'.
+    const finish = (grantReward, reason, outcome) => {
       if (settled) return;
       settled = true;
       if (waitProgressTimer) clearInterval(waitProgressTimer);
       // Видимый эффект — строго после onResume(), как в platform.js.
-      if (onResume) onResume();
+      if (onResume) onResume(outcome);
       console.log('[vk_platform] rewarded завершён:', reason, '| награда:', grantReward);
       if (dbg) dbg('[rewarded] finish: ' + reason + ' | награда=' + grantReward);
       if (grantReward && onRewarded) {
@@ -441,7 +442,7 @@ const Platform = (() => {
       vkBridge.send('VKWebAppShowNativeAds', { ad_format: 'reward', useWaterfall: true }),
       REWARD_AD_TIMEOUT_MS
     )
-      .then(() => finish(true, 'ролик закрыт (resolve)'))
+      .then(() => finish(true, 'ролик закрыт (resolve)', 'shown'))
       .catch((e) => {
         // Различаем «площадка не ответила за N секунд» (НАШ withTimeout —
         // единственный источник Error с message 'timeout' в этой цепочке)
@@ -456,7 +457,7 @@ const Platform = (() => {
             : '[rewarded] мост явно отказал: ' + JSON.stringify(e));
         }
         console.warn('[vk_platform] rewarded недоступна/зависла — выдаём подсказку бесплатно:', e);
-        finish(true, isOwnTimeout ? 'таймаут — выдано бесплатно' : 'явный отказ моста — выдано бесплатно');
+        finish(true, isOwnTimeout ? 'таймаут — выдано бесплатно' : 'явный отказ моста — выдано бесплатно', isOwnTimeout ? 'timeout' : 'error');
       });
   }
 

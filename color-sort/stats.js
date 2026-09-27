@@ -81,5 +81,12 @@ const Stats = (() => {
     currentLevel = -1;
   }
 
-  return { startLevel, pause, resume, onInput, finishLevel, stop };
+  /* Секунды текущего уровня без остановки счёта — только для аналитики
+     ухода с уровня (ТЗ №25): main.js читает их перед stop(). */
+  function peekSeconds() {
+    const running = runStart !== null ? now() - runStart : 0;
+    return Math.round((accumulatedMs + running) / 1000);
+  }
+
+  return { startLevel, pause, resume, onInput, finishLevel, stop, peekSeconds };
 })();

@@ -9,6 +9,8 @@
    простоя); onFound(word, cells) — вторым аргументом клетки слова (для
    частиц). demoPath/stopDemo — «призрачный палец» по пути слова вместо
    модального туториала.
+   b25: handlers.onBackStep(n) — игрок провёл назад и снял последнюю
+   букву пути (для аналитики: undos в level_win).
    ============================================================ */
 
 window.Board = (function () {
@@ -194,7 +196,11 @@ window.Board = (function () {
     if (path.length === 0) { addCell(cell); return; }
     if (path.length >= 2) {
       var prev = path[path.length - 2];
-      if (prev.r === r && prev.c === c) { path.pop().el.classList.remove('active'); return; }
+      if (prev.r === r && prev.c === c) {
+        path.pop().el.classList.remove('active');
+        if (handlers.onBackStep) handlers.onBackStep(path.length);   // b25: откат буквы — счёт undos
+        return;
+      }
     }
     if (inPath(r, c) !== -1) return;
     var tail = path[path.length - 1];

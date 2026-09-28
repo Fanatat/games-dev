@@ -73,6 +73,128 @@
   var hintWord = null;   // текущее целевое слово для revealHint (= chain[chainPos])
 
   /* ============================================================
+     АНАЛИТИКА (b25, analytics.js). Только наблюдение: ни одно событие
+     не меняет поведение игры, track() не бросает и ничего не ждёт.
+     typeof-гейты — модуля (и performance) может не быть: песочницы
+     тестов грузят main.js без analytics.js.
+     Трактовки целей:
+       ход (moves, first_move) — отпущенная попытка слова из 2+ букв:
+         найдено / верное не по очереди / неверное. Тап по одной букве
+         ходом не считается;
+       undos — снятые движением назад буквы пути (board.js onBackStep);
+       sec — активные секунды на уровне с level_start: без времени
+         скрытой вкладки и показа ролика;
+       level_quit — «‹ Назад» с уровня, который ещё не выигран.
+     ============================================================ */
+  function track(name, params) {
+    try {
+      if (typeof Analytics !== 'undefined' && Analytics && typeof Analytics.event === 'function') {
+        Analytics.event(name, params);
+      }
+    } catch (e) { /* аналитика не роняет игру */ }
+  }
+  function monoNow() {
+    return (typeof performance !== 'undefined' && performance && typeof performance.now === 'function')
+      ? performance.now() : Date.now();
+  }
+  var launchNewPlayer = false; // сейва не было на старте ЭТОГО запуска (isNewPlayer гаснет по «Забрать»)
+  var firstMoveSent = false;   // first_move — один раз за запуск
+  // Сейв ещё не пришёл (Platform.load() не ответил), а игрок уже ходит
+  // («Играть» доступна сразу после Game Ready): new_player пока неизвестен.
+  // first_move ждёт здесь и уходит сразу после game_loaded; sec — как в
+  // момент хода. level_start ждать не нужно: new_player в нём нет.
+  var saveLoaded = false;
+  var pendingFirstMove = null;
+  var levelActive = false;     // уровень открыт и не выигран — уход с него = level_quit
+  var levelMoves = 0;
+  var levelUndos = 0;
+  // Часы уровня: идут, пока уровень открыт, вкладка видна и не идёт ролик.
+  var lvClock = { acc: 0, since: 0, on: false, hidden: false, ad: false };
+  function lvClockRunning() { return lvClock.on && !lvClock.hidden && !lvClock.ad; }
+  function lvClockSet(key, val) {
+    var t = monoNow();
+    if (lvClockRunning()) lvClock.acc += t - lvClock.since;
+    lvClock[key] = val;
+    if (lvClockRunning()) lvClock.since = t;
+  }
+  function lvClockRestart() {
+    lvClockSet('on', false);
+    lvClock.acc = 0;
+    lvClockSet('on', true);
+  }
+  function lvClockSec() {
+    var ms = lvClock.acc + (lvClockRunning() ? monoNow() - lvClock.since : 0);
+    return Math.max(0, Math.round(ms / 1000));
+  }
+  try {
+    if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+      lvClock.hidden = document.hidden === true;
+      document.addEventListener('visibilitychange', function () { lvClockSet('hidden', document.hidden === true); });
+    }
+  } catch (e) { /* часы аналитики не роняют игру */ }
+
+  function countMove() {
+    levelMoves++;
+    if (firstMoveSent) return;
+    firstMoveSent = true;
+    var p = { level: currentIndex + 1, sec: lvClockSec() };
+    if (!saveLoaded) { pendingFirstMove = p; return; }   // уйдёт после game_loaded
+    p.new_player = launchNewPlayer;
+    track('first_move', p);
+  }
+
+  /* Rewarded с аналитикой и защитой от двойного клика (b25, п.6 ТЗ).
+     Пока ролик идёт, повторный клик игнорируется: раньше два быстрых
+     клика запускали два показа и две награды. Награда и итог — не
+     больше одного раза на клик, даже если площадка ответит дважды.
+     result: reward | closed | error (таймаут, отказ, нет SDK → error). */
+  var rewardedBusy = false;
+  function showRewardedTracked(place, onReward) {
+    if (rewardedBusy) {
+      console.log('[ad] rewarded уже идёт — повторный клик (' + place + ') проигнорирован');
+      return;
+    }
+    rewardedBusy = true;
+    track('rewarded_click', { place: place });
+    var resulted = false;
+    var rewarded = false;
+    function finish(outcome) {
+      if (resulted) return;
+      resulted = true;
+      rewardedBusy = false;
+      track('rewarded_result', {
+        place: place,
+        result: (outcome === 'reward' || outcome === 'closed') ? outcome : 'error',
+      });
+    }
+    try {
+      Platform.showRewarded(
+        function () {                          // onRewarded — награда строго один раз
+          if (rewarded) return;
+          rewarded = true;
+          onReward();
+        },
+        function () { Sound.suspend(); lvClockSet('ad', true); },           // onPause
+        function (outcome) { Sound.resume(); lvClockSet('ad', false); finish(outcome); }  // onResume
+      );
+    } catch (e) {
+      rewardedBusy = false;
+      throw e;
+    }
+  }
+
+  // Код награды дня для return_day: 'hints_2', 'energy_5', 'energy_10_gold_1'.
+  function dailyRewardCode(day) {
+    var rw = DAILY_REWARDS[day];
+    if (!rw) return 'none';
+    var parts = [];
+    if (rw.hints)  parts.push('hints_' + rw.hints);
+    if (rw.energy) parts.push('energy_' + rw.energy);
+    if (rw.gold)   parts.push('gold_' + rw.gold);
+    return parts.length ? parts.join('_') : 'none';
+  }
+
+  /* ============================================================
      МОДУЛЬ УДЕРЖАНИЯ (ЭТАП 3). Система КОПИРУЕТСЯ из Color Sort, не
      изобретается: retention.js взят побайтовой копией, здесь — только
      конфиг и точки применения. Числа — решение основателя (Р-СЛ10),
@@ -261,6 +383,10 @@
     // в той же единственной точке, иначе любой persist() стёр бы их.
     var st = encodeStars();
     if (st) fullState.st = st;
+    // b25: звук (кнопка ♪ и громкости) — ключ au, тоже здесь и тоже только
+    // при отличии от умолчаний: сейв игрока, не трогавшего звук, не растёт.
+    var au = encodeAudioPrefs();
+    if (au) fullState.au = au;
     if (retentionState && typeof Retention !== 'undefined') {
       fullState.r = Retention.encodeState(retentionState);
       fullState.bh = bonusHints;
@@ -527,6 +653,7 @@
     var day = dailyPending;
     var rw = DAILY_REWARDS[day] || {};
     dailyPending = 0;
+    snd('reward');   // b25
     if (rw.energy) grantEnergyBonus(rw.energy, day);
     if (rw.hints)  grantBonusHints(rw.hints, day);
     if (rw.gold) {
@@ -683,7 +810,7 @@
   function onWallAdClick() {
     if (wallAdsToday() >= WALL_ADS_PER_DAY) { renderWallAd(); return; }
     Sound.resumeContext();
-    Platform.showRewarded(
+    showRewardedTracked('energy',
       // Награда — ТОЛЬКО в onRewarded (стандарт контракта). Адаптеры
       // зовут onResume раньше onRewarded, поэтому рендер здесь, не там.
       function () {
@@ -696,11 +823,12 @@
         persistProgress();
         renderEnergy();
         renderWallAd();
-        if (granted > 0) showRetentionToast(I18N.fill('energyToastGain', { n: granted }));
+        if (granted > 0) {
+          showRetentionToast(I18N.fill('energyToastGain', { n: granted }));
+          snd('reward');   // b25: адаптер уже позвал onResume — звук разрешён
+        }
         continuePendingIfPossible();
-      },
-      function () { Sound.suspend(); },
-      function () { Sound.resume(); }
+      }
     );
   }
 
@@ -832,6 +960,7 @@
     pendingOpenIndex = index;
     console.log('[retention] стена: запас 0, уровень ' + (index + 1) +
       ' ещё не пройден — старт отложен до пополнения');
+    track('energy_wall', { level: index + 1 });   // b25: своя цель — упёрся в стену запаса
     showWall();
   }
 
@@ -944,6 +1073,13 @@
         ' дн., награда дня уже забрана — карточки нет');
     }
     if (granted > 0 || streakChanged || !hasModuleFields) persistProgress();
+    // b25: раз за запуск, после расчёта серии. streak_day — день серии
+    // подряд (как календарь: серия модуля + calOffset, без круга по 7),
+    // reward — награда, которую карточка дня предлагает сейчас, или none.
+    track('return_day', {
+      streak_day: Math.max(1, retentionState.streakLen + calOffset),
+      reward: dailyPending > 0 ? dailyRewardCode(dailyPending) : 'none',
+    });
 
     renderEnergy();
     renderDailyLine();
@@ -1053,6 +1189,90 @@
   }
   function snd(name, arg) {
     if (typeof Sound[name] === 'function') Sound[name](arg);
+  }
+
+  /* b25: настройки звука в сейве — ключ au = [выключен 0/1, общая %,
+     звуки поля %, интерфейс %], где громкость по умолчанию — null, а
+     null в хвосте не пишется: выключенный звук — [1], тихий интерфейс —
+     [0,null,null,50]. Ключ пишется в persist() только при отличии от
+     умолчаний sound.js (Sound.defaults) — и умолчания можно менять, не
+     трогая сейвы. Читается ДО bootRetention — тот сам пишет сейв, и
+     запись без au стёрла бы игроку выключенный звук. Сейвы до b25 поля
+     не знают — звук включён, как и было. Громкость не из 0..100 (мусор,
+     чужой формат) — по умолчанию, не «прижатая» к краю.
+     Переключение ♪ пишется не сразу, а через AUDIO_SAVE_DELAY_MS: серия
+     нажатий — одна запись (лимит хранилища ВК 100 записей / 5 мин);
+     при сворачивании/уходе со страницы отложенная запись уходит сразу
+     (flushAudioSave), иначе последнее нажатие терялось бы. */
+  var AUDIO_BUSES = ['master', 'sfx', 'ui'];
+  var AUDIO_SAVE_DELAY_MS = 800;
+  var audioLoaded = false;    // сейв прочитан — настройки звука можно писать
+  var audioTouched = false;   // игрок менял звук в этой сессии
+  var audioSaveTimer = null;
+
+  function encodeAudioPrefs() {
+    var p = typeof Sound.getPrefs === 'function' ? Sound.getPrefs() : null;
+    var d = typeof Sound.defaults === 'function' ? Sound.defaults() : null;
+    if (!p || !d) return soundOn ? null : [1];
+    var au = [soundOn ? 0 : 1];
+    AUDIO_BUSES.forEach(function (k) {
+      var v = typeof p[k] === 'number' ? Math.round(p[k] * 100) : null;
+      au.push(v === null || v === Math.round(d[k] * 100) ? null : v);
+    });
+    while (au.length > 1 && au[au.length - 1] === null) au.pop();
+    return (au.length > 1 || !soundOn) ? au : null;
+  }
+
+  function restoreAudioPrefs(data) {
+    var au = data && Array.isArray(data.au) ? data.au : null;
+    audioLoaded = true;
+    if (au) {
+      var p = { muted: au[0] === 1 };
+      AUDIO_BUSES.forEach(function (k, i) {
+        var v = au[i + 1];
+        // null (по умолчанию), нет в хвосте или мусор — Sound.setPrefs
+        // ставит громкость по умолчанию.
+        p[k] = (typeof v === 'number' && isFinite(v) && v >= 0 && v <= 100) ? v / 100 : null;
+      });
+      // ♪ нажата раньше, чем пришёл сейв: её выбор новее сохранённого.
+      if (audioTouched) p.muted = !soundOn;
+      soundOn = !p.muted;
+      renderSound();
+      if (typeof Sound.setPrefs === 'function') Sound.setPrefs(p);
+      else Sound.setMuted(p.muted);
+      console.log('[sound] из сейва: звук ' + (soundOn ? 'включён' : 'выключен'));
+    }
+    if (audioTouched) scheduleAudioSave();
+  }
+
+  function scheduleAudioSave() {
+    if (audioSaveTimer) clearTimeout(audioSaveTimer);
+    audioSaveTimer = setTimeout(function () {
+      audioSaveTimer = null;
+      persistProgress();
+    }, AUDIO_SAVE_DELAY_MS);
+  }
+
+  // Отложенная запись звука — сейчас (страница уходит в фон или
+  // закрывается: таймер может уже не сработать). Остальные записи игры
+  // идут сразу, им это не нужно.
+  function flushAudioSave() {
+    if (!audioSaveTimer) return;
+    clearTimeout(audioSaveTimer);
+    audioSaveTimer = null;
+    persistProgress();
+  }
+  if (typeof document.addEventListener === 'function') {
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden) flushAudioSave();
+    });
+  }
+  if (typeof window.addEventListener === 'function') window.addEventListener('pagehide', flushAudioSave);
+
+  // Звук поменяли (♪ или громкость) — запомнить; до загрузки сейва не пишем.
+  function audioPrefsChanged() {
+    audioTouched = true;
+    if (audioLoaded) scheduleAudioSave();
   }
   function centerOf(el) {
     if (!el || typeof el.getBoundingClientRect !== 'function') return null;
@@ -1229,6 +1449,12 @@
     if (!level) return;
     var isLast = !Levels.get(index + 1);
     currentIndex = index;
+    // b25: каждый вход на уровень (и рестарт, и повтор пройденного).
+    levelActive = true;
+    levelMoves = 0;
+    levelUndos = 0;
+    lvClockRestart();
+    track('level_start', { level: index + 1 });
     // Знаменатель (общее число уровней) игроку НЕ показываем нигде во
     // внутриигровом UI (железный стандарт студии) — только «Уровень N».
     // Сетка выбора уровня — исключение, там числа это навигация, не обещание конца.
@@ -1270,6 +1496,7 @@
         resetIdle();
       },
       onTouch: function () { resetIdle(); },
+      onBackStep: function () { levelUndos++; },   // b25: откат буквы движением назад
       // Принять слово только если оно следующее в цепочке.
       // Если у уровня нет поля chain — принимаем любое (обратная совместимость).
       isAccepted: function (word) {
@@ -1281,6 +1508,7 @@
         if (n < total) Sound.found();   // на последнем слове сыграет win
       },
       onFound: function (word, cells) {
+        countMove();   // b25
         // b24: комбо — слово в пределах COMBO_WINDOW_MS от предыдущего.
         var nowMs = Date.now();
         combo = (lastFindAt > 0 && nowMs - lastFindAt <= COMBO_WINDOW_MS) ? combo + 1 : 1;
@@ -1320,6 +1548,13 @@
         clearIdle();
         // b24: первое прохождение последнего уровня главы — награда главы.
         var chapterDone = !wasCompleted && ((currentIndex + 1) % CHAPTER_SIZE === 0);
+        // b25: победа — часы уровня стоп; chapter_done — своя цель:
+        // первое прохождение главы (повтор не считается).
+        levelActive = false;
+        var winSec = lvClockSec();
+        lvClockSet('on', false);
+        track('level_win', { level: currentIndex + 1, sec: winSec, moves: levelMoves, undos: levelUndos });
+        if (chapterDone) track('chapter_done', { chapter: Math.floor(currentIndex / CHAPTER_SIZE) + 1 });
         if (retentionState && typeof Retention !== 'undefined') {
           if (!wasCompleted) {
             var beforeSpend = retentionState.dripOpened;
@@ -1377,6 +1612,7 @@
         }, 450);
       },
       onWrong: function () {
+        countMove();   // b25
         Sound.wrong();
         feel('error');
         // b24: адаптивная помощь — три промаха подряд, и первая буква нужного слова пульсирует.
@@ -1388,6 +1624,8 @@
         }
       },
       onOutOfOrder: function () {
+        countMove();   // b25
+        snd('order');   // b25: слово верное, но не по порядку — мягкий «тук-тук»
         feel('light');
         // Подсветить первую клетку нужного слова.
         if (level.chain && chainPos < level.chain.length) {
@@ -1497,6 +1735,9 @@
       if (i > maxUnlocked) {
         tile.classList.add('locked');
         tile.innerHTML = LOCK_SVG;
+        // b25: закрытый уровень не нажимается — и не щёлкает (с клавиатуры
+        // кнопка всё ещё получает click).
+        tile.dataset.sfx = 'none';
       } else {
         tile.textContent = i + 1;
         // b24: звёзды уровня под номером (пройденные уровни).
@@ -1518,6 +1759,7 @@
   function start() {
     Board.init();
     Sound.init();
+    if (typeof Sound.onChange === 'function') Sound.onChange(audioPrefsChanged);   // b25: громкости
     if (typeof FX !== 'undefined' && typeof FX.init === 'function') FX.init();   // b24: слой частиц
     Platform.init().then(function () {
       // Язык: берём из платформы (или браузера в dev) и проставляем строки.
@@ -1537,25 +1779,51 @@
 
       // Game Ready — ровно сейчас: меню отрисовано и интерактивно.
       Platform.gameReady();
+      var loadMs = Math.round(monoNow());   // b25: от начала загрузки страницы до Game Ready
 
       // Стики-баннер (задача Б): гарантированная рекламная поверхность,
       // не зависящая от гейта interstitial/rewarded. No-op на площадках
       // без поддержки — метод обязан существовать в контракте у всех.
       Platform.showBanner(function (insetPx) { setBannerInset(insetPx); });   // b23: полоса под баннер
 
+      // b25: скрипт Метрики — строго ПОСЛЕ Game Ready, асинхронно.
+      try {
+        if (typeof Analytics !== 'undefined' && Analytics && typeof Analytics.start === 'function') {
+          Analytics.start(window.BUILD || 'dev');
+        }
+      } catch (e) { /* аналитика не роняет игру */ }
+
       // Прогресс грузим параллельно, чтобы не задерживать Game Ready.
       Platform.load().then(function (data) {
         if (data && typeof data.level === 'number' && data.level > 0 && Levels.get(data.level)) {
           savedIndex = data.level;
-          maxUnlocked = Math.max(data.max || 0, data.level || 0);
-          setMenuProgress(true);
         }
+        // b25: открытые уровни читаем НЕЗАВИСИМО от level. Сейв с level:0
+        // пишут открытие 1-го уровня (повтор из сетки, ↻) и конец игры;
+        // раньше max в этом случае не читался, и следующая же запись
+        // навсегда затирала прогресс до max:0 (плейтест F03).
+        if (data) {
+          var savedMax = Math.max(Number(data.max) || 0, Number(data.level) || 0);
+          if (savedMax > 0) maxUnlocked = Math.max(maxUnlocked, Math.min(Math.floor(savedMax), Levels.count()));
+        }
+        setMenuProgress(savedIndex != null && savedIndex > 0);
         // Загружаем рекорды; старые сохранения без поля records не ломают игру.
         if (data && data.records && typeof data.records.levels === 'object') {
           records = { levels: data.records.levels, total: data.records.total || 0 };
         }
         levelStars = decodeStars(data && data.st);   // b24: у сейва b23 поля нет — пусто
         isNewPlayer = !data;
+        // b25: для аналитики «новый» = сейва нет. Живой SDK Яндекса отдаёт
+        // новому игроку пустой объект {} — это тоже «сейва нет».
+        launchNewPlayer = !data || (typeof data === 'object' && Object.keys(data).length === 0);
+        track('game_loaded', { load_ms: loadMs, new_player: launchNewPlayer });   // b25
+        saveLoaded = true;
+        if (pendingFirstMove) {   // первый ход был раньше сейва — new_player теперь известен
+          pendingFirstMove.new_player = launchNewPlayer;
+          track('first_move', pendingFirstMove);
+          pendingFirstMove = null;
+        }
+        restoreAudioPrefs(data);   // b25: до bootRetention — см. restoreAudioPrefs
         // Модуль удержания поднимаем ПОСЛЕ прогресса: миграция читает
         // maxUnlocked, а строки видимого слоя — уже готовые рекорды.
         bootRetention(data);
@@ -1583,6 +1851,11 @@
   }
 
   btnBack.addEventListener('click', function () {
+    if (levelActive) {   // b25: ушёл с невыигранного уровня
+      levelActive = false;
+      track('level_quit', { level: currentIndex + 1, sec: lvClockSec() });
+    }
+    lvClockSet('on', false);
     clearIdle();
     Board.clear();
     goToMenu();
@@ -1599,6 +1872,7 @@
   if (btnRestartLevel) btnRestartLevel.addEventListener('click', function () {
     // Намеренно МИМО requestOpenLevel: рестарт текущего уровня бесплатен
     // (ЭТАП 3, п.1), игрок уже внутри него, а списание идёт за завершение.
+    track('level_restart', { level: currentIndex + 1 });   // b25: следом openLevel даст level_start
     openLevel(currentIndex);
   });
 
@@ -1657,9 +1931,10 @@
     // Их двигает только onResume(wasShown === true) — см. ниже, п.1.3.
     // Межуровневая реклама в логичной паузе (п.4.4); пауза/возобновление
     // звука на время показа (п.4.7).
+    var adAfterLevel = currentIndex + 1;   // b25: номер только что пройденного уровня
     Platform.showInterstitial(
       function () { Sound.suspend(); },  // onPause
-      function (wasShown) {              // onResume
+      function (wasShown, outcome) {     // onResume
         Sound.resume();
         // ЭТАП 2, п.1.3: platform.js прокидывает сюда флаг «реклама
         // реально показана». Раньше параметр не принимался вовсе —
@@ -1674,6 +1949,10 @@
         if (wasShown === true) {
           levelsSinceAd = 0;
           lastAdShownAt = Date.now();
+          // b25: цель — только реальный показ. ВК на resolve с result === false
+          // (outcome 'not_shown') кулдаун двигает как раньше (b24), но
+          // показом это не считается.
+          if (outcome !== 'not_shown') track('interstitial_shown', { level: adAfterLevel });
         } else {
           console.warn('[ad] interstitial не показан (wasShown=' + wasShown +
             ') — кулдаун и счётчик гейта не сдвинуты, попробуем на следующем переходе');
@@ -1699,6 +1978,7 @@
       persistProgress();
       updateHintLabel();
       Board.revealWord(hintWord);
+      snd('hint');   // b25
       return;
     }
     /* ЭТАП 3: бесплатные подсказки из серии входов тратятся ПЕРВЫМИ —
@@ -1714,17 +1994,18 @@
       renderHintBadge();
       updateHintLabel();
       Board.revealHint(hintWord);
+      snd('hint');
       return;
     }
     if (!Platform.isRewardedAvailable()) {
       hintsUsed++;
       Board.revealHint(hintWord);
+      snd('hint');
       return;
     }
-    Platform.showRewarded(
-      function () { hintsUsed++; Board.revealHint(hintWord); }, // onRewarded — chain[chainPos]
-      function () { Sound.suspend(); },                  // onPause
-      function () { Sound.resume(); }                    // onResume
+    // b25: через showRewardedTracked — цели rewarded_* и защита от двойного клика.
+    showRewardedTracked('hint',
+      function () { hintsUsed++; Board.revealHint(hintWord); snd('hint'); } // onRewarded — chain[chainPos]
     );
   });
 
@@ -1760,9 +2041,26 @@
     renderSound();
     Sound.resumeContext();
     Sound.setMuted(!soundOn);
+    // b25: у ♪ data-sfx="none" — общий «tap» прозвучал бы до включения.
+    if (soundOn) snd('tap');
+    audioPrefsChanged();
   }
   btnSound.addEventListener('click', toggleSound);
   if (btnSoundGame) btnSoundGame.addEventListener('click', toggleSound);
+
+  // b25: щелчок любой кнопки — тихий «tap» (шина ui). Кнопки со своим
+  // звуком помечены data-sfx="none": ♪ (звучит после включения),
+  // подсказка (hint), «Забрать» (reward). Клетки поля — div, сюда не
+  // попадают. Фаза перехвата: «?» у запаса гасит всплытие, а щёлкнуть
+  // должна; AudioContext к этому моменту уже создан на mousedown/pointerup.
+  if (typeof document.addEventListener === 'function') {
+    document.addEventListener('click', function (e) {
+      var t = e && e.target;
+      var btn = t && typeof t.closest === 'function' ? t.closest('button') : null;
+      if (!btn || btn.disabled || btn.getAttribute('data-sfx') === 'none') return;
+      snd('tap');
+    }, true);
+  }
 
   // Подстраховка против контекстного меню по лонгтапу (п.1.6.1.8).
   document.addEventListener('contextmenu', function (e) { e.preventDefault(); });

@@ -40,11 +40,15 @@
      load()                    → VKWebAppStorageGet {keys:[KEY]} → keys[0].value;
                                  dev-режим (!ready) → localStorage[slovohod_dev_save_vk]
      showInterstitial          → VKWebAppShowNativeAds {ad_format:'interstitial'}
-                                 + watchdog 40000мс, onResume(wasShown)
+                                 + watchdog 40000мс, onResume(wasShown, outcome)
+                                 (b25: outcome 'not_shown' при result === false —
+                                 кулдаун как при показе, цели аналитики нет)
      showRewarded              → VKWebAppShowNativeAds {ad_format:'reward'}
                                  result.result === true → досмотрено, награда;
                                  result !== true → показан, но не досмотрен → БЕЗ награды;
-                                 reject/таймаут → награда БЕСПЛАТНО (ЭТАП 2, п.1.1)
+                                 reject/таймаут → награда БЕСПЛАТНО (ЭТАП 2, п.1.1).
+                                 onResume(outcome) — исход для аналитики (b25):
+                                 'reward' | 'closed' | 'error' | 'timeout' | 'dev'
      showBanner(onInset)        → VKWebAppShowBannerAd {banner_location:'bottom', layout_type:'resize'};
                                   onInset(px) — сколько баннер перекрывает снизу (0 при resize).
                                   ПК (vk_platform=desktop_*) — баннер не запрашивается.
@@ -108,6 +112,15 @@ window.Platform = (() => {
     return typeof vkBridge !== 'undefined';
   }
 
+  /* Query фрейма — снимок при загрузке адаптера (b25). analytics.js
+     после Game Ready убирает из адреса параметры запуска ВК (sign, vk_*),
+     чтобы их не прочитал tag.js Метрики. getLang() и isDesktop() читают
+     этот снимок, а не живой location.search, — от порядка вызовов
+     относительно Analytics.start() они не зависят. */
+  const LAUNCH_SEARCH = (() => {
+    try { return String(location.search || ''); } catch (_) { return ''; }
+  })();
+
   let ready = false;
   let rewardedAvailable = false;
 
@@ -166,10 +179,11 @@ window.Platform = (() => {
   function gameReady() {}
 
   /* ---------- Язык ----------
-     VK передаёт vk_language в URL синхронно — не нужен async. */
+     VK передаёт vk_language в URL синхронно — не нужен async (снимок
+     адреса — LAUNCH_SEARCH). */
   function getLang() {
     try {
-      const p = new URLSearchParams(location.search);
+      const p = new URLSearchParams(LAUNCH_SEARCH);
       const l = p.get('vk_language');
       if (l) return l.slice(0, 2);
     } catch (_) {}
@@ -247,10 +261,16 @@ window.Platform = (() => {
   /* ---------- Реклама ----------
      VK Bridge: Promise резолвится ПОСЛЕ закрытия рекламы.
      onPause → send → onResume → если result.result=true → onRewarded. */
+  /* b25: onResume(wasShown, outcome). wasShown — как в b24: любой resolve
+     моста = показ (двигает кулдаун и гейт в main.js, это монетизация —
+     не менять). outcome — только для аналитики: 'shown' (resolve без
+     явного отказа), 'not_shown' (resolve с result === false — по доке ВК
+     «Ошибка при показе»), 'error' (reject), 'timeout', 'dev' (SDK нет).
+     Цель interstitial_shown main.js не шлёт при 'not_shown'. */
   function showInterstitial(onPause, onResume) {
     if (!ready) {
       console.warn('[platform] dev: interstitial пропущен');
-      if (onResume) onResume(false);
+      if (onResume) onResume(false, 'dev');
       return;
     }
     if (onPause) onPause();
@@ -258,22 +278,28 @@ window.Platform = (() => {
     // Единая точка выхода: settle-once. Опоздавший ответ моста ПОСЛЕ
     // сработавшего таймаута не снимет паузу второй раз и не сдвинет
     // кулдаун гейта в main.js повторно.
-    const finish = (wasShown, reason) => {
+    const finish = (wasShown, reason, outcome) => {
       if (settled) return;
       settled = true;
       console.log('[platform] interstitial завершён:', reason, '| показан:', wasShown);
-      if (onResume) onResume(wasShown);
+      if (onResume) onResume(wasShown, outcome);
     };
     withTimeout(
       vkBridge.send('VKWebAppShowNativeAds', { ad_format: 'interstitial' }),
       AD_HANG_TIMEOUT_MS,
     )
-      .then(() => finish(true, 'реклама закрыта (resolve)'))
+      .then((res) => {
+        if (res && res.result === false) {
+          finish(true, 'мост ответил result=false (кулдаун как при показе, цели нет)', 'not_shown');
+        } else {
+          finish(true, 'реклама закрыта (resolve)', 'shown');
+        }
+      })
       .catch((e) => {
         console.warn('[platform] interstitial недоступен/завис:', e);
         // wasShown=false — показ НЕ состоялся: main.js не двигает
         // кулдаун и счётчик гейта (см. ЭТАП 2, п.1.3).
-        finish(false, 'ошибка/таймаут');
+        finish(false, 'ошибка/таймаут', (e && e.message === 'timeout') ? 'timeout' : 'error');
       });
   }
 
@@ -287,20 +313,24 @@ window.Platform = (() => {
      Кнопка при этом не прячется, подпись ролик не обещает (main.js).
      Предпроверка isRewardedAvailable() остаётся первым эшелоном —
      здесь runtime-фолбэк на ФАКТИЧЕСКИЙ сбой показа. */
+  /* b25: onResume(outcome) несёт исход показа для аналитики — 'reward'
+     (досмотрен), 'closed' (показан, не досмотрен), 'error' (отказ
+     моста), 'timeout' (мост не ответил), 'dev' (SDK нет). На выдачу
+     награды исход не влияет: правило выше не меняется. */
   function showRewarded(onRewarded, onPause, onResume) {
     if (!ready) {
       console.warn('[platform] dev: rewarded → награда выдана');
       if (onRewarded) onRewarded();
-      if (onResume) onResume();
+      if (onResume) onResume('dev');
       return;
     }
     if (onPause) onPause();
     let settled = false;
-    const finish = (grantReward, reason) => {
+    const finish = (grantReward, reason, outcome) => {
       if (settled) return;
       settled = true;
       // Видимый эффект — строго после onResume(), как в platform.js.
-      if (onResume) onResume();
+      if (onResume) onResume(outcome);
       console.log('[platform] rewarded завершён:', reason, '| награда:', grantReward);
       if (grantReward && onRewarded) onRewarded();
     };
@@ -310,14 +340,15 @@ window.Platform = (() => {
     )
       .then((res) => {
         if (res && res.result === true) {
-          finish(true, 'ролик досмотрен (result=true)');
+          finish(true, 'ролик досмотрен (result=true)', 'reward');
         } else {
-          finish(false, 'ролик показан, но не досмотрен (result!=true) — награды нет');
+          finish(false, 'ролик показан, но не досмотрен (result!=true) — награды нет', 'closed');
         }
       })
       .catch((e) => {
         console.warn('[platform] rewarded недоступна/зависла — выдаём подсказку бесплатно:', e);
-        finish(true, 'ошибка/таймаут — выдано бесплатно');
+        finish(true, 'ошибка/таймаут — выдано бесплатно',
+          (e && e.message === 'timeout') ? 'timeout' : 'error');
       });
   }
 
@@ -359,7 +390,7 @@ window.Platform = (() => {
      (b26/b28, адблок выключен) — ветку убрали целиком. */
   function isDesktop() {
     try {
-      const p = new URLSearchParams(location.search).get('vk_platform') || '';
+      const p = new URLSearchParams(LAUNCH_SEARCH).get('vk_platform') || '';
       return p.indexOf('desktop_') === 0;   // desktop_web, desktop_web_messenger, desktop_app_messenger
     } catch (_) { return false; }
   }

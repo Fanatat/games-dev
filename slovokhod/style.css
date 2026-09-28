@@ -855,6 +855,11 @@ html, body {
   box-shadow: 0 4px 12px rgba(43,39,35,0.3);
   pointer-events: none;
   opacity: 0;
+  /* Позиция (--gx/--gy, ставит board.js) и сжатие «нажатия» (--gs) — в ОДНОМ
+     transform: scale после translate жмёт палец вокруг его центра. Отдельное
+     свойство scale применялось бы поверх transform и сжимало бы вместе с
+     пальцем и сдвиг от угла поля — палец уезжал мимо клетки (F09, b25). */
+  transform: translate(var(--gx, 0px), var(--gy, 0px)) scale(var(--gs, 1));
 }
 .ghost-finger.show { opacity: 1; }
 
@@ -921,9 +926,9 @@ html, body {
   }
   .cell.found-wave { animation: found-wave 400ms cubic-bezier(0.3, 1.5, 0.5, 1) both; }
 
-  .ghost-finger { transition: opacity 250ms ease, scale 150ms ease; }
-  .ghost-finger.moving { transition: opacity 250ms ease, scale 150ms ease, transform 300ms ease-in-out; }
-  .ghost-finger.press { scale: 0.82; }
+  .ghost-finger { transition: opacity 250ms ease; }
+  .ghost-finger.moving { transition: opacity 250ms ease, transform 300ms ease-in-out; }
+  .ghost-finger.press { --gs: 0.82; }
   .cell.ghost { transition: background-color 0.2s ease, border-color 0.2s ease; }
 
   @keyframes float-up {

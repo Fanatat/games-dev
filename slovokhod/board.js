@@ -373,6 +373,11 @@ window.Board = (function () {
       return { x: a.left - b.left + a.width / 2, y: a.top - b.top + a.height / 2 };
     }
     function later(fn, ms) { d.timers.push(setTimeout(fn, ms)); }
+    // Только позиция; сжатие «нажатия» — класс press (--gs в style.css).
+    function place(p) {
+      finger.style.setProperty('--gx', p.x + 'px');
+      finger.style.setProperty('--gy', p.y + 'px');
+    }
     var STEP = 360;
     function cycle() {
       if (demo !== d) return;
@@ -380,15 +385,14 @@ window.Board = (function () {
       for (var c = 0; c < cells.length; c++) cells[c].classList.remove('ghost');
       var p0 = centerOf(cells[0]);
       finger.classList.remove('moving');
-      finger.style.transform = 'translate(' + p0.x + 'px,' + p0.y + 'px)';
+      place(p0);
       finger.classList.remove('press');
       finger.classList.add('show');
       later(function () { finger.classList.add('press', 'moving'); cells[0].classList.add('ghost'); }, 350);
       for (var s = 1; s < cells.length; s++) {
         (function (idx) {
           later(function () {
-            var p = centerOf(cells[idx]);
-            finger.style.transform = 'translate(' + p.x + 'px,' + p.y + 'px)';
+            place(centerOf(cells[idx]));
             later(function () { cells[idx].classList.add('ghost'); }, STEP * 0.6);
           }, 350 + idx * STEP);
         })(s);

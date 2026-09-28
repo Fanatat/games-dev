@@ -117,6 +117,7 @@ const Game = (() => {
       if (isCollected(level.vials[idx])) return; // залочена — уже собрана, из неё не льём
       selectedIndex = idx;
       Board.setSelected(idx);
+      Sound.playSelect(); // ТЗ №26: тихий «тик» — самое частое действие
       emit('onSelect', { index: idx });
       return;
     }

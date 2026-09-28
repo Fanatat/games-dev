@@ -903,6 +903,7 @@
     if (result.ok && result.data) {
       if (!state.ownedThemes.includes(id)) state.ownedThemes.push(id);
       selectTheme(id); // купленная тема сразу становится применённой + сейв + перерисовка
+      Sound.playReward(); // ТЗ №26
       return;
     }
     btn.disabled = false;
@@ -1359,8 +1360,31 @@
     track('energy_wall', { level: idx + 1 });
   }
 
+  /* Защита от двойного тапа (доработка ТЗ №25, 27.09): реклама идёт
+     секунду-другую, и второй тап по кнопке в это время запускал ВТОРОЙ
+     показ — две пары rewarded_click/rewarded_result и двойную энергию
+     (10/10 вместо 6/10, ВК и Яндекс, есть и на бою b52). Тот же приём,
+     что rewardedInFlight у подсказки: флаг ставится до showRewarded и
+     сбрасывается в onResume — единственной точке, куда доходят ВСЕ
+     исходы обоих адаптеров. Выдача энергии не менялась. */
+  let energyAdInFlight = false;
+
   function onEnergyWallAdClick() {
+    if (energyAdInFlight) return;
+    energyAdInFlight = true;
     track('rewarded_click', { place: 'energy' });
+    try {
+      showEnergyRewarded();
+    } catch (e) {
+      energyAdInFlight = false; // синхронный сбой адаптера не должен навсегда заблокировать кнопку
+      // Адаптер мог успеть вызвать onPause, а onResume уже не придёт —
+      // снимаем паузу сами. Без паузы это пустой вызов (ТЗ №26).
+      resumeGame();
+      throw e;
+    }
+  }
+
+  function showEnergyRewarded() {
     Platform.showRewarded(
       // Результат — внутри onRewarded, не в onResume (см. комментарий
       // у onRetentionRewardedClick-эквивалента ТЗ №14 этап 3: адаптеры
@@ -1373,6 +1397,9 @@
         renderEnergyIndicator();
         renderEnergyWall();
         if (granted > 0) persist();
+        // ТЗ №26: звук награды — здесь, у выдачи: onResume приходит раньше
+        // (оба адаптера), а его исход 'shown' награду не означает.
+        if (granted > 0) Sound.playReward();
         // Автопродолжение — ДО тоста: тост определяет позицию (шапка
         // экрана игры выше шапки стены — below-header) по ТЕКУЩЕМУ
         // активному экрану в момент показа, поэтому обязан идти ПОСЛЕ
@@ -1386,6 +1413,7 @@
       },
       pauseGame,
       (outcome) => {
+        energyAdInFlight = false;
         resumeGame();
         track('rewarded_result', { place: 'energy', result: outcome || 'unknown' });
       }
@@ -1417,9 +1445,10 @@
      привязываемся к конкретным обработчикам, ничего не пропустим).
      Слушатель на document ловит клик уже ПОСЛЕ обработчика самой
      кнопки (порядок всплытия) — toggleSound успевает обновить
-     Sound.setMuted до того, как здесь решится, играть ли звук. */
+     Sound.setMuted до того, как здесь решится, играть ли звук.
+     ТЗ №26: плитка уровня в сетке — тоже кнопка, щёлкает так же. */
   document.addEventListener('click', (e) => {
-    if (e.target.closest('.btn')) Sound.playClick();
+    if (e.target.closest('.btn, .grid-tile')) Sound.playClick();
   });
 
   /* ---------- Резерв под шапку ----------
@@ -1570,12 +1599,15 @@
      (visibilitychange, ниже). В этой игре геймплей ходовой (не
      реалтайм), «пауза геймплея» по факту сводится к паузе звука —
      ничего само по себе не продолжает идти, пока вкладка скрыта. */
+  // ТЗ №26: у звука пауза по причинам — 'ad' здесь, 'hidden' у
+  // visibilitychange ниже. Вкладка, вернувшаяся во время рекламы, звук
+  // не будит; таймер (Stats) ведёт себя как раньше.
   function pauseGame() {
-    Sound.suspend();
+    Sound.suspend('ad');
     Stats.pause();
   }
   function resumeGame() {
-    Sound.resume();
+    Sound.resume('ad');
     Stats.resume();
   }
 
@@ -1899,7 +1931,7 @@
     showHintLoadingToast();
     track('rewarded_click', { place: 'hint' });
     Platform.showRewarded(
-      () => { debugLog('[hint] onRewarded вызван — подсвечиваю ход'); Board.showHint(hint.from, hint.to); }, // награда получена — подсвечиваем ход
+      () => { debugLog('[hint] onRewarded вызван — подсвечиваю ход'); Board.showHint(hint.from, hint.to); Sound.playReward(); }, // награда получена — подсвечиваем ход (ТЗ №26: и звук награды)
       pauseGame,
       // onResume — единственная точка, куда доходят ВСЕ исходы обоих
       // адаптеров (реальный показ, таймаут-фолбэк, И «закрыл без
@@ -1985,6 +2017,7 @@
     renderWinDaily(daily);
     if (daily.rewarded) renderHintBonusBadge();
     if (daily.rewarded) track('daily_goal_done');
+    if (daily.rewarded) Sound.playDailyGoal(1.7); // ТЗ №26: после аккорда победы, по часам аудио
 
     persist(); // переживает закрытие вкладки отсюда же
     // ТЗ №22, B2: учёт победы выше — сразу; оверлей — после волны колб
@@ -2088,6 +2121,9 @@
     chapterStatFastestEl.textContent = formatTime(stats.fastest);
     chapterStatSlowestEl.textContent = formatTime(stats.slowest);
     chapterOverlay.classList.remove('hidden');
+    // ТЗ №26: джингл цели дня (+1,7 с от победы) при быстром «Дальше»
+    // лёг бы на аккорд главы — снимаем его, аккорд главного события важнее.
+    Sound.cancel('daily_goal');
     Sound.playChapterWin(); // задача 9: чуть богаче обычного playWin, короче playFanfare
     Confetti.burst({ count: 18, durationMs: 1200 }); // короче и реже финальных — глава легче
   }
@@ -2100,6 +2136,7 @@
     statFastestEl.textContent = formatTime(stats.fastest);
     statSlowestEl.textContent = formatTime(stats.slowest);
     campaignOverlay.classList.remove('hidden');
+    Sound.cancel('daily_goal'); // как у главы: джингл не ложится на фанфары
     Sound.playFanfare();
     Confetti.burst();
   }
@@ -2249,9 +2286,11 @@
   /* ---------- Пауза при сворачивании (п.1.3) ---------- */
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
-      pauseGame();
+      Sound.suspend('hidden');
+      Stats.pause();
     } else {
-      resumeGame();
+      Sound.resume('hidden');
+      Stats.resume();
     }
   });
 
@@ -2273,6 +2312,7 @@
     if (state.maxUnlocked >= LEVELS.length) state.maxUnlocked = LEVELS.length - 1;
     if (typeof state.rewardedCount !== 'number' || state.rewardedCount < 0) state.rewardedCount = 0;
     if (typeof state.rewardedDay !== 'string') state.rewardedDay = '';
+    if (typeof state.muted !== 'boolean') state.muted = false; // ТЗ №26: битое поле — звук включён
 
     // Миграция магазина (ТЗ №2, Фаза 3 п.4): старый сейв нёс одиночное
     // themeOwned:boolean (только «морская», единственная покупка на тот
@@ -2432,6 +2472,7 @@
         if (themeAvailableHere(state.selectedTheme)) applyTheme(state.selectedTheme); // ТЗ №17, см. гейт в boot()
         renderShop();
         renderOformlenie(); // ТЗ №17: поздно приехавший сейв меняет состав владения
+        applyMuteIcon(); // ТЗ №26: сохранённое «звук выключен» — как при обычном старте (boot)
       }
       // Гейт — ДО bootRetention(): grantHints/grantStyle внутри неё сами
       // зовут persist() (ТЗ №14, этап 3, добор), с закрытым гейтом эта

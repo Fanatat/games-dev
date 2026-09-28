@@ -154,7 +154,7 @@ const Platform = (() => {
      раньше на ВК этого поля не было вовсе (undefined, не строка),
      плашка молчала всегда независимо от сборки; main.js трогать не
      нужно, правка живёт ТОЛЬКО здесь и в build.py. */
-  const BUILD = 'b53-65bfd8d-20260927';
+  const BUILD = 'b54-664dbe0-20260927';
 
   /* ---------- Единая точка времени (ТЗ №18) ----------
      Симметрично platform.js (Яндекс) — см. комментарий там же. Оба
@@ -357,7 +357,7 @@ const Platform = (() => {
     }
     if (onPause) onPause();
     withTimeout(
-      vkBridge.send('VKWebAppShowNativeAds', { ad_format: 'interstitial' }),
+      sendAd({ ad_format: 'interstitial' }),
       INTERSTITIAL_TIMEOUT_MS
     )
       .then(() => { if (onResume) onResume(true); })
@@ -365,6 +365,19 @@ const Platform = (() => {
         console.error('[vk_platform] interstitial:', e);
         if (onResume) onResume(false);
       });
+  }
+
+  /* Показ рекламы. Синхронный throw моста (ТЗ №26, ревью: onPause уже
+     вызван, а onResume не пришёл бы никогда — звук стоял бы до
+     перезагрузки) превращаем в отказ Promise: дальше он идёт штатным
+     .catch() — onResume, а у rewarded ещё и бесплатная награда. send
+     зовём сразу, в том же такте: клиенту ВК может быть нужен жест. */
+  function sendAd(params) {
+    try {
+      return vkBridge.send('VKWebAppShowNativeAds', params);
+    } catch (e) {
+      return Promise.reject(e);
+    }
   }
 
   /* Награда — при штатном .then() (ролик реально досмотрен) И при
@@ -439,7 +452,7 @@ const Platform = (() => {
       // показа на реальном мобильном ВК-клиенте это НЕ доказывает — от
       // пустого мостового Promise (см. журнал наверху) страхует
       // ТОЛЬКО таймаут-предохранитель ниже.
-      vkBridge.send('VKWebAppShowNativeAds', { ad_format: 'reward', useWaterfall: true }),
+      sendAd({ ad_format: 'reward', useWaterfall: true }),
       REWARD_AD_TIMEOUT_MS
     )
       .then(() => finish(true, 'ролик закрыт (resolve)', 'shown'))

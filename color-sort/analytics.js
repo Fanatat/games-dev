@@ -56,8 +56,12 @@ const Analytics = (() => {
     try { window.ym.apply(null, arguments); } catch (e) { /* аналитика не роняет игру */ }
   }
 
+  // Параметры цели вложены под её имя: {level_win: {level: 3, …}}.
+  // Метрика складывает параметры reachGoal в «Параметры визитов», и плоские
+  // ключи level/sec разных целей (старт, победа, выход) там слились бы в
+  // одну ветку (доработка 27.09). Цель без параметров уходит как есть.
   function send(name, params) {
-    if (params) ym(COUNTER_ID, 'reachGoal', name, params);
+    if (params) ym(COUNTER_ID, 'reachGoal', name, { [name]: params });
     else ym(COUNTER_ID, 'reachGoal', name);
   }
 

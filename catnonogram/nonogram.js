@@ -785,6 +785,11 @@ window.Nonogram = (function () {
     _viewport.style.cssText = 'will-change:transform;display:inline-flex;';
     _viewport.appendChild(puzzle);
 
+    // ТЗ №59 (Н-18): нулевые линии совпадают с решением с самого начала —
+    // их «0» гаснут сразу, а не после первого касания линии. Тихо (без
+    // звука и вспышки закрытия) и до вставки в DOM — без анимации угасания.
+    refreshAllClueFade();
+
     container.innerHTML = '';
     container.appendChild(_viewport);
 
@@ -877,8 +882,15 @@ window.Nonogram = (function () {
 
   /* ----------------------------------------------------------
      ТЗ №51 — «Проверить»: чистые запросы состояния поля.
-     Крестики на клетках решения (0) ошибкой не считаются — игрок
-     сам увидит, что линия не гаснет, штрафовать нечего.
+     findErrors — лишняя закраска (клетка вне картинки). Крестик на
+     клетке вне картинки — верный, ошибкой не бывает.
+     ТЗ №58 (решение основателя 28.09, находка аудита Н-01): крестик на
+     клетке КАРТИНКИ — тоже ошибка, её снимает «Проверить»
+     (findWrongCrosses). Чаще всего такой крестик ставит сама игра:
+     лишняя закраска запускает авто-крестики по текущей доске, а снятие
+     закраски их не убирает. Чей крестик — игры или игрока — игра не
+     помнит, поэтому снимаются все такие. Тост «лишняя клетка»
+     (hasErrors) по-прежнему только про закраску — так он и звучит.
   ---------------------------------------------------------- */
   function findErrors() {
     if (!_level) return [];
@@ -896,6 +908,22 @@ window.Nonogram = (function () {
     return findErrors().length > 0;
   }
 
+  function findWrongCrosses() {
+    if (!_level) return [];
+    var H = _level.height, W = _level.width, sol = _level.solution;
+    var crosses = [];
+    for (var r = 0; r < H; r++) {
+      for (var c = 0; c < W; c++) {
+        if (_boardState[r][c] === 2 && sol[r][c] === 1) crosses.push({ r: r, c: c });
+      }
+    }
+    return crosses;
+  }
+
+  function hasWrongCrosses() {
+    return findWrongCrosses().length > 0;
+  }
+
   function remainingCells() {
     if (!_level) return 0;
     var H = _level.height, W = _level.width, sol = _level.solution;
@@ -908,23 +936,37 @@ window.Nonogram = (function () {
     return n;
   }
 
-  // Исправляет все ошибочные клетки (лишняя закраска → крестик), возвращает
-  // число исправленных. Победу проверяем так же, как в applyHint — снятие
+  // Исправляет все ошибочные клетки: лишняя закраска → крестик, крестик на
+  // клетке картинки → пустая (ТЗ №58); возвращает число исправленных клеток.
+  // Сначала правится вся доска, потом авто-крестики: иначе они считались бы
+  // по линии, где ещё стоит неисправленная ошибка, и снова легли бы на
+  // клетки картинки. На исправленной доске все отметки верны, решение —
+  // одна из допустимых раскладок линии, поэтому авто-крестик на картинку
+  // уже не встанет. Победу проверяем так же, как в applyHint — снятие
   // ошибок само по себе победу не даёт (решение всё ещё неполное), но
   // симметрия с applyHint дешевле специального случая.
   function revealErrors() {
     var errors = findErrors();
-    for (var i = 0; i < errors.length; i++) {
-      var r = errors[i].r, c = errors[i].c;
+    var crosses = findWrongCrosses();
+    var i, r, c;
+    for (i = 0; i < crosses.length; i++) {
+      r = crosses[i].r; c = crosses[i].c;
+      shakeCell(r, c);
+      _boardState[r][c] = 0;
+      renderCell(r, c);
+    }
+    for (i = 0; i < errors.length; i++) {
+      r = errors[i].r; c = errors[i].c;
       shakeCell(r, c);
       _boardState[r][c] = 2;
       renderCell(r, c);
-      autoFillCrosses(r, c);
-      updateClueFade(r, c);
     }
-    if (errors.length && _onMove) _onMove('reveal');
+    for (i = 0; i < errors.length; i++) autoFillCrosses(errors[i].r, errors[i].c);
+    var fixed = errors.concat(crosses);
+    for (i = 0; i < fixed.length; i++) updateClueFade(fixed[i].r, fixed[i].c);
+    if (fixed.length && _onMove) _onMove('reveal');
     if (checkWin(_boardState, _level.solution)) markWon();
-    return errors.length;
+    return fixed.length;
   }
 
   function setPaused(v) { _paused = !!v; }
@@ -970,6 +1012,8 @@ window.Nonogram = (function () {
     resetZoom:     resetZoom,
     findErrors:      findErrors,
     hasErrors:       hasErrors,
+    findWrongCrosses: findWrongCrosses,
+    hasWrongCrosses: hasWrongCrosses,
     remainingCells:  remainingCells,
     revealErrors:    revealErrors,
   };

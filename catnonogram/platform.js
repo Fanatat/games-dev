@@ -64,6 +64,16 @@ function vkPruneWriteLog(writeLog, nowMs) {
   return writeLog.slice(i);
 }
 
+// ТЗ №59 (Н-02): страница уже скрыта (ВК свёрнут) — запись уходит сразу,
+// без дебаунса: main.js кладёт свежий черновик своим обработчиком
+// visibilitychange ПОСЛЕ того, как адаптер уже отправил старый буфер, и
+// 10-секундный таймер оставлял последние ходы только в памяти — ВК мог
+// выгрузить страницу раньше. Тот же мягкий тормоз: с порога торможения
+// (≥700 записей за час) — обычный отложенный путь. Чистая функция.
+function vkShouldSendNow(pageHidden, writeCountLastHour) {
+  return !!pageHidden && writeCountLastHour < VK_SOFT_BRAKE_THRESHOLD;
+}
+
 // Сколько миллисекунд ждать перед следующей отправкой, исходя из числа
 // реальных записей за последний скользящий час. До порога — базовый
 // дебаунс; после — линейный рост до потолка на подходе к лимиту.
@@ -195,8 +205,12 @@ window.Platform = (function () {
       return Promise.resolve();
     }
     _pendingState = fullState;
+    _writeLog = vkPruneWriteLog(_writeLog, Date.now());
+    if (vkShouldSendNow(document.visibilityState === 'hidden', _writeLog.length)) {
+      vkFlushNow();
+      return Promise.resolve();
+    }
     if (!_flushTimer) {
-      _writeLog = vkPruneWriteLog(_writeLog, Date.now());
       var delay = vkComputeDebounceDelay(_writeLog.length);
       _flushTimer = setTimeout(vkFlushPending, delay);
     }
@@ -828,6 +842,7 @@ window.Platform = (function () {
 if (typeof module === 'object' && module.exports) {
   module.exports = {
     computeDebounceDelay: vkComputeDebounceDelay,
+    shouldSendNow:        vkShouldSendNow,
     pruneWriteLog:        vkPruneWriteLog,
     SAVE_DEBOUNCE_MS:     VK_SAVE_DEBOUNCE_MS,
     WRITE_LIMIT_PER_HOUR: VK_WRITE_LIMIT_PER_HOUR,

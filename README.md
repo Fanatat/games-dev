@@ -1,13 +1,34 @@
-# games-dev
+# Тестовый стенд браузерных игр
 
-Тестовые сборки игр студии для проверки перед выкатом. GitHub Pages, по папке на игру:
+Здесь можно попробовать пять сборок перед публикацией на площадках.
+[Открыть каталог](https://fanatat.github.io/games-dev/).
 
-| Игра | Тестовая ссылка | Прод-репозиторий |
-|---|---|---|
-| Словоход | https://fanatat.github.io/games-dev/slovokhod/ | Fanatat/slovokhod-vk |
-| Кот и японские кроссворды | https://fanatat.github.io/games-dev/catnonogram/ | Fanatat/catnonogram-vk |
-| Color Sort | https://fanatat.github.io/games-dev/color-sort/ | Fanatat/Color_Sort-Vk |
-| Lane Battler | https://fanatat.github.io/games-dev/lane-battle/ | Fanatat/lane-battle-vk |
-| Royal Solitaire | https://fanatat.github.io/games-dev/royal-solitaire/ | Fanatat/Royal_solitaire |
+| Игра | Тестовая сборка | Репозиторий игры | Снимок Git на 28.09.2026 |
+|---|---|---|---|
+| Словоход | [Открыть](https://fanatat.github.io/games-dev/slovokhod/) | [Код](https://github.com/Fanatat/slovokhod-vk) | `9f73050` |
+| Кот и японские кроссворды | [Открыть](https://fanatat.github.io/games-dev/catnonogram/) | [Код](https://github.com/Fanatat/catnonogram-vk) | `9f73050` |
+| Сортировка: Цвет и Форма | [Открыть](https://fanatat.github.io/games-dev/color-sort/) | [Код](https://github.com/Fanatat/Color_Sort-Vk) | `9f73050` |
+| Две крепости (Lane Battler) | [Открыть](https://fanatat.github.io/games-dev/lane-battle/) | [Код](https://github.com/Fanatat/lane-battle-vk) | `9f73050` |
+| Королевская Косынка (Royal Solitaire) | [Открыть](https://fanatat.github.io/games-dev/royal-solitaire/) | [Код](https://github.com/Fanatat/Royal_solitaire) | `9f73050` |
 
-Обновление тест-сборки — замена папки игры целиком. Прод отсюда не публикуется.
+Идентификатор обозначает проверенный снимок репозитория, а не номер релиза игры.
+Тестовая версия может отличаться от релизной контентом, звуком, сохранениями и
+интеграциями площадок. Наличие страницы не подтверждает публикацию в каталоге VK,
+Яндекс Игр или CrazyGames. Обновление тестовой сборки — замена папки игры целиком.
+
+## Локально
+
+```bash
+git clone https://github.com/Fanatat/games-dev.git
+cd games-dev
+python3 -m http.server 8000 --bind 127.0.0.1
+```
+
+Откройте http://localhost:8000/. Реклама, покупки и облачные сохранения требуют
+соответствующей площадки.
+
+## Сообщить об ошибке
+
+Напишите [@fanatat](https://t.me/fanatat): название игры, полный адрес страницы,
+устройство и браузер, шаги, ожидаемый результат и фактическое поведение.
+Добавьте снимок экрана и идентификатор сборки, если он показан в игре.

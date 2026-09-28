@@ -165,6 +165,18 @@ document.addEventListener('DOMContentLoaded', function () {
   var _levelStartedAt     = 0;
   var _hintsUsedThisLevel = 0;
 
+  // ТЗ №57: событийная аналитика (Яндекс Метрика, analytics.js). _aLevel —
+  // текущий вход на картинку { label, startedAt, won, quitSent } (кампания
+  // или пазл дня), null вне уровня. _aNewPlayer — 1, если на этом запуске
+  // у игрока не было сейва, 0 — сейв был, -1 — сейв не прочитался (сбой или
+  // таймаут площадки: новый это игрок или нет — неизвестно). _aReadyAt —
+  // момент gameReady (game_loaded), от него считается first_move.sec. Всё
+  // только в памяти, в сейв не пишется.
+  var _aLevel         = null;
+  var _aNewPlayer     = 0;
+  var _aReadyAt       = 0;
+  var _aFirstMoveSent = false;
+
   // ТЗ №51: кнопка «Проверить» + мягкие тосты. Всё в памяти сессии,
   // НЕ в сейве — бесплатная проверка/тосты «сгорают» при перезагрузке
   // страницы, это осознанно (постановка: «в памяти сессии, не в сейве»).
@@ -285,6 +297,27 @@ document.addEventListener('DOMContentLoaded', function () {
     btn.addEventListener('click', toggleSound);
   });
 
+  // ТЗ №55: звук интерфейса — один делегированный слушатель на все кнопки
+  // вместо звука в каждом обработчике. data-sfx="back" — «назад»/отмена,
+  // "toggle" — переключатели, "none" — у кнопки свой игровой звук
+  // (подсказка, проверка, «Забрать», «Да» очистки, реклама главы).
+  // Кнопку запоминаем на погружении (до её обработчика, который может её
+  // задизейблить), звук — на всплытии: тумблер звука успевает включить
+  // звук и слышен только при включении.
+  var _uiSfxEl = null;
+  document.addEventListener('click', function (e) {
+    var el = e.target && e.target.closest ? e.target.closest('button, [data-sfx]') : null;
+    _uiSfxEl = (el && !el.disabled) ? el : null;
+  }, true);
+  document.addEventListener('click', function () {
+    var el = _uiSfxEl;
+    _uiSfxEl = null;
+    if (!el) return;
+    var kind = el.getAttribute('data-sfx');
+    if (kind === 'none') return;
+    Sound.play(kind === 'back' ? 'uiBack' : (kind === 'toggle' ? 'uiToggle' : 'uiTap'));
+  });
+
   // Тумблер режима — вешаем один раз
   var modeBtns = document.querySelectorAll('.mode-btn');
   modeBtns.forEach(function (btn) {
@@ -328,6 +361,8 @@ document.addEventListener('DOMContentLoaded', function () {
     if (Platform.showBannerAd) Platform.showBannerAd();
 
     Platform.load().then(function (data) {
+      _aNewPlayer = (Platform.loadFailed && Platform.loadFailed()) ? -1
+        : (!data || typeof data !== 'object' || Object.keys(data).length === 0) ? 1 : 0;
       // Миграция/нормализация сейва живёт в save.js — main.js только раскладывает
       // результат по переменным состояния (см. migrate() для деталей формата v1).
       var migrated = Save.migrate(data, LEVELS.length);
@@ -426,6 +461,9 @@ document.addEventListener('DOMContentLoaded', function () {
       updateSoundBtns();
       showMenu();
       Platform.ready();
+      // ТЗ №57: скрипт Метрики — строго ПОСЛЕ gameReady площадки; события
+      // до его загрузки ждут в очереди analytics.js.
+      goalGameStart(_ladderAdvance);
       refreshCosmeticOwnership();
 
       // Сейв пишется целиком со всеми полями (правило студии) — сразу фиксируем
@@ -438,6 +476,20 @@ document.addEventListener('DOMContentLoaded', function () {
         if (_currentLevel >= 0) flushBoardSave(_currentLevel);
         if (_inDailyGame)       flushDailySave();
       });
+      // ТЗ №57: игра свёрнута или закрыта посреди картинки — тоже «уход с
+      // уровня без победы» (how: 'hide'; свернул и вернулся — тоже 'hide',
+      // см. goalLevelQuit). Сворачивание — цель уходит при первом hidden,
+      // пока страница жива. Закрытие — pagehide (при закрытии вкладки он
+      // приходит раньше hidden): запрос, начатый в этот момент, переживает
+      // страницу — tag.js шлёт цели sendBeacon'ом, а где sendBeacon у него
+      // выключен (Android WebView) — fetch'ем, которому metrika.html ставит
+      // keepalive. Проверено настоящим закрытием вкладки
+      // (tools/acceptance_analytics.js). Ролик рекламы тоже может свернуть
+      // окно игры — это не уход.
+      document.addEventListener('visibilitychange', function () {
+        if (document.visibilityState === 'hidden' && _rewardedGateOpen) goalLevelQuit(true, 'hide');
+      });
+      window.addEventListener('pagehide', function () { goalLevelQuit(true, 'hide'); });
     });
   });
 
@@ -605,6 +657,115 @@ document.addEventListener('DOMContentLoaded', function () {
     if (Platform.track) Platform.track(name, params);
   }
 
+  /* ---- ТЗ №57: цели Яндекс Метрики (analytics.js) ----
+     Отдельно от trackEvent (тот — кастомные события кабинета ВК). Номер
+     уровня — позиция картинки в порядке глав с 1 (1..130, порядок, в
+     котором игрок их проходит), пазл дня — level: 'daily'. */
+
+  function goal(name, params) {
+    if (typeof Analytics !== 'undefined') Analytics.event(name, params);
+  }
+
+  // K-09: параметры целей тоже считаются под защитой — сбой аналитики
+  // (например, main.js новее закешированного nonogram.js без getMoves) не
+  // должен прервать ход игрока (колбэк хода зовёт goalFirstMove) или победу.
+  function movesNow() {
+    try { return (typeof Nonogram.getMoves === 'function') ? Nonogram.getMoves() : 0; }
+    catch (e) { return 0; }
+  }
+
+  // Раз за запуск, сразу после Platform.ready(): старт Метрики, game_loaded
+  // и return_day — серия уже посчитана (Ladder.advance в цепочке загрузки,
+  // его результат передаётся сюда: переменная живёт только там); reward —
+  // что лестница выдаёт сегодня, если день открылся именно этим запуском.
+  // Каждый шаг под своим try: блок стоит в цепочке загрузки, и сбой здесь
+  // не должен ни оборвать остаток запуска (сохранение, подписки на
+  // сворачивание), ни потерять соседнюю цель.
+  function goalGameStart(ladderAdvance) {
+    try { if (typeof Analytics !== 'undefined') Analytics.start(); } catch (e) { /* аналитика не ломает запуск */ }
+    _aReadyAt = Date.now();
+    try {
+      goal('game_loaded', {
+        load_ms: (window.performance && performance.now) ? Math.round(performance.now()) : 0,
+        new_player: _aNewPlayer,
+      });
+    } catch (e) { /* аналитика не ломает запуск */ }
+    try {
+      goal('return_day', {
+        streak_day: _ladderState.series,
+        reward: (ladderAdvance && ladderAdvance.opened)
+          ? ladderRewardKey(Ladder.rewardFor(_ladderState.day, _cosmeticsOwned)) : 'none',
+      });
+    } catch (e) { /* аналитика не ломает запуск */ }
+  }
+
+  function levelLabel(levelIndex) {
+    var pos = (typeof ChaptersMap !== 'undefined') ? ChaptersMap.indexToPos(levelIndex) : undefined;
+    return (typeof pos === 'number') ? pos + 1 : levelIndex + 1;
+  }
+
+  function goalLevelSec() {
+    return _aLevel ? Math.round((Date.now() - _aLevel.startedAt) / 1000) : 0;
+  }
+
+  function goalLevelEnter(label) {
+    goalLevelQuit(false, 'back'); // прошлый вход без победы и без «Назад» — тоже уход
+    _aLevel = { label: label, startedAt: Date.now(), won: false, quitSent: false };
+    goal('level_start', { level: label });
+  }
+
+  // how — как ушёл: 'back' — внутри игры («Назад», вход на другую
+  // картинку), 'hide' — игру свернули или закрыли посреди картинки (в
+  // т.ч. свернули на минуту и вернулись: в момент сворачивания не знать,
+  // вернётся ли игрок). Одна цель на вход: вернулся после 'hide' и нажал
+  // «Назад» — второго level_quit не будет. Поэтому level_quit — не отток:
+  // отток по картинке = level_start − level_win. keep=true ('hide'): вход
+  // не закрываем — игрок может вернуться (из фона или bfcache) и дорешать,
+  // его level_win дойдёт.
+  function goalLevelQuit(keep, how) {
+    if (_aLevel && !_aLevel.won && !_aLevel.quitSent) {
+      _aLevel.quitSent = true;
+      goal('level_quit', { level: _aLevel.label, sec: goalLevelSec(), how: how });
+    }
+    if (!keep) _aLevel = null;
+  }
+
+  // undos: в игре нет отмены хода — всегда 0 (параметр из ТЗ, для единой
+  // схемы целей по студии).
+  function goalLevelWin() {
+    if (!_aLevel || _aLevel.won) return;
+    _aLevel.won = true;
+    goal('level_win', { level: _aLevel.label, sec: goalLevelSec(), moves: movesNow(), undos: 0 });
+  }
+
+  // Первый ход игрока за запуск — штрих по полю (подсказка/«Проверить» не
+  // ход); sec — от готовности игры (game_loaded), не от входа на уровень:
+  // сколько игрок шёл от загрузки до первого действия.
+  function goalFirstMove() {
+    if (_aFirstMoveSent || !_aLevel || movesNow() < 1) return;
+    _aFirstMoveSent = true;
+    goal('first_move', {
+      level: _aLevel.label,
+      sec: _aReadyAt ? Math.round((Date.now() - _aReadyAt) / 1000) : 0,
+      new_player: _aNewPlayer,
+    });
+  }
+
+  // outcome — второй аргумент onClose адаптера ('reward' | 'closed' | 'error').
+  function goalRewardedResult(place, wasRewarded, outcome) {
+    var result = (outcome === 'reward' || outcome === 'closed' || outcome === 'error')
+      ? outcome : (wasRewarded ? 'reward' : 'closed');
+    goal('rewarded_result', { place: place, result: result });
+  }
+
+  function ladderRewardKey(reward) {
+    if (!reward) return 'none';
+    var parts = [];
+    if (reward.style) parts.push('style');
+    if (reward.hints > 0) parts.push('hints_' + reward.hints);
+    return parts.length ? parts.join('_') : 'none';
+  }
+
   // ТЗ №54: вибрация идёт за тем же переключателем, что и звук — один
   // понятный игроку тумблер «тихо».
   function haptic(kind) {
@@ -627,6 +788,10 @@ document.addEventListener('DOMContentLoaded', function () {
   }
   function cancelWinReveal() {
     if (_winRevealTimer) { clearTimeout(_winRevealTimer); _winRevealTimer = null; }
+    // ТЗ №55: открытка главы и «глава открыта» ждут конца мелодии победы
+    // (queueAfter) — ушёл игрок раньше, они не должны прозвучать на
+    // следующем экране или после рекламы. Уже звучащие доигрывают.
+    Sound.cancelPending(['chapterDone', 'chapterUnlocked']);
   }
 
   // 💡 подсказки / 🎨 стиль (п.2.3). День 7 (стиль ЕЩЁ не куплен И
@@ -717,6 +882,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     var toastText = ladderToastText(reward);
     if (toastText) showRetentionToast(toastText);
+    Sound.play('reward');
 
     _ladderState.claimedDay = _todayKey();
     _ladderPending = false;
@@ -910,7 +1076,8 @@ document.addEventListener('DOMContentLoaded', function () {
   var _levelsSinceInterstitial    = 0;
   var _lastInterstitialAt         = 0;
 
-  function maybeShowInterstitial(onDone) {
+  // level — номер пройденной картинки для interstitial_shown (ТЗ №57).
+  function maybeShowInterstitial(onDone, level) {
     _levelsSinceInterstitial++;
     var due = _levelsSinceInterstitial >= INTERSTITIAL_LEVEL_INTERVAL &&
       (Date.now() - _lastInterstitialAt) >= INTERSTITIAL_COOLDOWN_MS;
@@ -922,7 +1089,8 @@ document.addEventListener('DOMContentLoaded', function () {
     Sound.suspend();
     Nonogram.setPaused(true);
     if (Platform.gameplayStop) Platform.gameplayStop(); // ТЗ №49, п.5: перед interstitial
-    Platform.showInterstitial(function () {
+    Platform.showInterstitial(function (shown) {
+      if (shown) goal('interstitial_shown', { level: level });
       Nonogram.setPaused(false);
       Sound.resume();
       onDone();
@@ -1277,6 +1445,7 @@ document.addEventListener('DOMContentLoaded', function () {
             applyCosmetic(_activeCosmetic);
             saveProgress();
             showShop();
+            Sound.play('reward');
           });
         };
       }
@@ -1375,23 +1544,33 @@ document.addEventListener('DOMContentLoaded', function () {
       return;
     }
     Sound.resumeContext();
+    // ТЗ №55: звук на время ролика — на паузе, как у подсказки за рекламу
+    // (до ТЗ №55 здесь паузы не было).
+    Sound.suspend();
     showAdLoadingOverlay();
     lockRewardedGate();
     if (Platform.gameplayStop) Platform.gameplayStop();
     var granted = false;
+    goal('rewarded_click', { place: 'chapter' });
     Platform.showRewarded(function onReward() {
       if (_chaptersUnlocked[ch.key]) return;
       _chaptersUnlocked[ch.key] = true;
       granted = true;
       saveProgress();
       trackEvent('chapter_unlock_ad', { chapter: ch.key });
-    }, function onClose() {
+    }, function onClose(wasRewarded, outcome) {
+      goalRewardedResult('chapter', wasRewarded, outcome);
+      // ad_error — ролика не было (сбой/таймаут площадки), глава выдана
+      // бесплатно по стандарту студии: в доле «открыли рекламой» не считать.
+      if (granted) goal('chapter_open', { chapter: CHAPTERS.indexOf(ch) + 1, via: outcome === 'error' ? 'ad_error' : 'ad' });
       unlockRewardedGate();
       hideAdLoadingOverlay();
+      Sound.resume();
       if (!document.getElementById('chapters').classList.contains('is-active')) return;
       showChapters();
       if (granted) {
         showRetentionToast(I18N.t('chapterUnlockedToast').replace('{name}', I18N.t(ch.nameKey)));
+        Sound.play('chapterUnlocked');
       }
     });
   }
@@ -1527,6 +1706,8 @@ document.addEventListener('DOMContentLoaded', function () {
         // innerHTML — значок из adIconHtml() + локализованная строка, обе
         // части фиксированы разработчиком, ввода игрока здесь нет.
         unlockBtn.innerHTML = '<span class="rv-btn-inner">' + adIconHtml() + '<span>' + I18N.t('chapterUnlockAdBtn') + '</span></span>';
+        unlockBtn.setAttribute('data-sfx', 'none'); // дальше — ролик, не тап
+        head.setAttribute('data-sfx', 'none');
         unlockBtn.addEventListener('click', function () { onChapterUnlockAdClick(ch); });
         head.addEventListener('click', function () { onChapterUnlockAdClick(ch); });
         card.appendChild(unlockBtn);
@@ -1708,6 +1889,8 @@ document.addEventListener('DOMContentLoaded', function () {
   function onClearBoardConfirmed() {
     document.getElementById('clear-confirm-overlay').hidden = true;
     Nonogram.clearBoard();
+    Sound.play('clearBoard');
+    if (_aLevel) goal('level_restart', { level: _aLevel.label });
     // ТЗ №51: очистка убирает все ошибки — таймер простоя/непрерывной
     // ошибки должен начаться заново, иначе следующая ошибка унаследует
     // старую метку времени и тост «лишняя клетка» может сработать сразу.
@@ -1744,6 +1927,7 @@ document.addEventListener('DOMContentLoaded', function () {
     if (Platform.gameplayStart) Platform.gameplayStart();
     _levelStartedAt     = Date.now();
     _hintsUsedThisLevel = 0;
+    goalLevelEnter('daily');
     document.getElementById('win-overlay').hidden = true;
     document.getElementById('chapter-done-overlay').hidden = true;
     document.getElementById('win-chapter-line').hidden = true;
@@ -1771,7 +1955,7 @@ document.addEventListener('DOMContentLoaded', function () {
       level,
       document.getElementById('puzzle-container'),
       function () { onDailyWin(level); },
-      function ()  { Sound.tick(); scheduleDailySave(); onBoardMove(); },
+      function (kind) { Sound.cell(kind); scheduleDailySave(); onBoardMove(); goalFirstMove(); },
       onLineClosedFx
     );
 
@@ -1786,6 +1970,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     document.getElementById('btn-back').onclick = function () {
+      goalLevelQuit(false, 'back');
       cancelWinReveal();
       if (Platform.gameplayStop) Platform.gameplayStop();
       flushDailySave();
@@ -1799,6 +1984,7 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   function onDailyWin(level) {
+    goalLevelWin();
     Sound.win();
     haptic('success');
     hideRetentionToast();
@@ -1829,7 +2015,7 @@ document.addEventListener('DOMContentLoaded', function () {
       document.getElementById('btn-next-level').onclick = function () {
         _currentLevel = -1;
         _inDailyGame  = false;
-        maybeShowInterstitial(showMenu);
+        maybeShowInterstitial(showMenu, 'daily');
       };
     });
   }
@@ -1862,6 +2048,7 @@ document.addEventListener('DOMContentLoaded', function () {
     if (Platform.gameplayStart) Platform.gameplayStart();
     _levelStartedAt     = Date.now();
     _hintsUsedThisLevel = 0;
+    goalLevelEnter(levelLabel(levelIndex));
 
     document.getElementById('win-overlay').hidden = true;
     document.getElementById('chapter-done-overlay').hidden = true;
@@ -1902,7 +2089,7 @@ document.addEventListener('DOMContentLoaded', function () {
       level,
       document.getElementById('puzzle-container'),
       function () { onWin(level, levelIndex); },
-      function ()  { Sound.tick(); scheduleBoardSave(levelIndex); onBoardMove(); },
+      function (kind) { Sound.cell(kind); scheduleBoardSave(levelIndex); onBoardMove(); goalFirstMove(); },
       onLineClosedFx
     );
 
@@ -1913,6 +2100,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     document.getElementById('btn-back').onclick = function () {
+      goalLevelQuit(false, 'back');
       cancelWinReveal();
       if (Platform.gameplayStop) Platform.gameplayStop();
       flushBoardSave(levelIndex);
@@ -1927,6 +2115,7 @@ document.addEventListener('DOMContentLoaded', function () {
   /* ---- Победа ---- */
 
   function onWin(level, levelIndex) {
+    goalLevelWin();
     Sound.win();
     haptic('success');
     hideRetentionToast();
@@ -1984,11 +2173,14 @@ document.addEventListener('DOMContentLoaded', function () {
       hints: _hintsUsedThisLevel,
     });
     if (chapterJustCompleted) trackEvent('chapter_done', { ch: chapter.key });
+    // ТЗ №57, своя цель: стена главы пройдена прогрессом (7 из 10).
+    if (unlockedChapter) goal('chapter_open', { chapter: CHAPTERS.indexOf(unlockedChapter) + 1, via: 'progress' });
 
     scheduleWinReveal(function () {
       revealWin(level, levelIndex, chapter, posInChapter, nextIndex, completedCount, chapterJustCompleted);
       if (unlockedChapter) {
         showRetentionToast(I18N.t('chapterUnlockedToast').replace('{name}', I18N.t(unlockedChapter.nameKey)));
+        if (!chapterJustCompleted) Sound.play('chapterUnlocked'); // ждёт конца мелодии победы
       }
     });
   }
@@ -2034,13 +2226,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function goNext() {
       _currentLevel = -1;
+      cancelWinReveal(); // джингл главы в очереди — снять ДО рекламы
       maybeShowInterstitial(function () {
         if (nextIndex >= 0) {
           showGame(nextIndex);
         } else {
           showChapters();
         }
-      });
+      }, levelLabel(levelIndex));
     }
 
     document.getElementById('btn-next-level').textContent = I18N.t('next');
@@ -2057,6 +2250,7 @@ document.addEventListener('DOMContentLoaded', function () {
         I18N.t('chapterDoneTitle').replace('{name}', I18N.t(chapter.nameKey));
       document.getElementById('chapter-done-reward').textContent = I18N.t('chapterDoneReward');
       document.getElementById('chapter-done-overlay').hidden = false;
+      Sound.play('chapterDone'); // ждёт конца мелодии победы (queueAfter)
       document.getElementById('btn-chapter-done-next').onclick = function () {
         document.getElementById('chapter-done-overlay').hidden = true;
         goNext();
@@ -2106,9 +2300,11 @@ document.addEventListener('DOMContentLoaded', function () {
     showAdLoadingOverlay();
     lockRewardedGate();
     if (Platform.gameplayStop) Platform.gameplayStop(); // ТЗ №49, п.5: перед rewarded
+    goal('rewarded_click', { place: 'hint' });
     Platform.showRewarded(
       function () { pendingHint = hint; },
-      function () {
+      function (wasRewarded, outcome) {
+        goalRewardedResult('hint', wasRewarded, outcome);
         unlockRewardedGate();
         hideAdLoadingOverlay();
         Nonogram.setPaused(false);
@@ -2171,6 +2367,7 @@ document.addEventListener('DOMContentLoaded', function () {
     // дабл-клик-предохранитель (2с), симметричный формулировке ТЗ.
     if (!Nonogram.hasErrors()) {
       showRetentionToast(I18N.t('checkNoErrors'));
+      Sound.play('checkClean');
       trackEvent('check_used', { mode: 'free', fixed: 0 });
       var noErrBtn = document.getElementById('btn-check');
       if (noErrBtn) {
@@ -2214,9 +2411,11 @@ document.addEventListener('DOMContentLoaded', function () {
     showAdLoadingOverlay();
     lockRewardedGate();
     if (Platform.gameplayStop) Platform.gameplayStop();
+    goal('rewarded_click', { place: 'check' });
     Platform.showRewarded(
       function () { pendingCheck = true; },
-      function () {
+      function (wasRewarded, outcome) {
+        goalRewardedResult('check', wasRewarded, outcome);
         unlockRewardedGate();
         hideAdLoadingOverlay();
         Nonogram.setPaused(false);

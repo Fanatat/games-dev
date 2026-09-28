@@ -13,11 +13,19 @@ window.Nonogram = (function () {
   var _dragValue  = 1;       // значение, которое ставит 'set' в этом штрихе (1 или 2)
   var _lastCell   = null;
   var _onWin      = null;
-  var _onMove     = null;    // колбэк main.js для дебаунс-сейва
+  var _onMove     = null;    // колбэк main.js для дебаунс-сейва и звука;
+                             // аргумент — что случилось: 'fill' | 'cross' |
+                             // 'erase' | 'auto' | 'hint' | 'reveal'
   var _onLineClosed = null;  // колбэк main.js (Задача H: звук «ряд закрыт»)
   var _won        = false;
   var _paused     = false;   // true во время рекламы — блокирует ввод
   var _strokeSnapshot = null; // снимок доски в начале штриха для отмены при pinch
+  // ТЗ №57: счётчик ходов игрока для аналитики (level_win.moves). Ход —
+  // один штрих (тап или протяжка), изменивший хотя бы одну клетку; подсказки,
+  // «Проверить», авто-крестики и восстановление черновика ходами не считаются.
+  // Сброс в render(). На игру не влияет — только читается через getMoves().
+  var _moves = 0;
+  var _strokeCounted = false; // текущий штрих уже засчитан ходом
 
   // ТЗ №54: DOM-кэш поля — renderCell/подсказки зовутся на каждый ход и
   // каждый авто-крестик, querySelector по атрибутам на 15×15 — лишняя работа.
@@ -458,6 +466,14 @@ window.Nonogram = (function () {
     return { r: r, c: c };
   }
 
+  // ТЗ №57: засчитать текущий штрих ходом — один раз на штрих, ДО _onMove,
+  // чтобы main.js в колбэке хода уже видел getMoves() >= 1 (first_move).
+  function countStroke() {
+    if (_strokeCounted) return;
+    _strokeCounted = true;
+    _moves++;
+  }
+
   // Возвращает true, если изменение затронуло состояние закраски (1).
   function applyToCell(r, c) {
     var prev = _boardState[r][c];
@@ -465,14 +481,16 @@ window.Nonogram = (function () {
       if (prev === 0) {
         _boardState[r][c] = _dragValue;
         renderCell(r, c);
-        if (_onMove) _onMove();
+        countStroke();
+        if (_onMove) _onMove(_dragValue === 1 ? 'fill' : 'cross');
         return _dragValue === 1;
       }
     } else {
       if (prev !== 0) {
         _boardState[r][c] = 0;
         renderCell(r, c);
-        if (_onMove) _onMove();
+        countStroke();
+        if (_onMove) _onMove('erase');
         return prev === 1;
       }
     }
@@ -497,6 +515,8 @@ window.Nonogram = (function () {
       }
     }
     _strokeSnapshot = null;
+    // ТЗ №57: откатанный штрих (второй палец — pinch) ходом не был.
+    if (_strokeCounted) { _strokeCounted = false; _moves--; }
     refreshAllClueFade();
   }
 
@@ -582,7 +602,7 @@ window.Nonogram = (function () {
         }
         if (alwaysEmpty) { setCell(i); changed = true; }
       }
-      if (changed && _onMove) _onMove();
+      if (changed && _onMove) _onMove('auto');
     }
 
     processLine(
@@ -620,6 +640,7 @@ window.Nonogram = (function () {
     _dragAction = (_boardState[cell.r][cell.c] === 0) ? 'set' : 'clear';
     _isDragging = true;
     _lastCell   = { r: cell.r, c: cell.c };
+    _strokeCounted = false;
     beginStroke();
 
     var changed = applyToCell(cell.r, cell.c);
@@ -675,6 +696,7 @@ window.Nonogram = (function () {
     _mode   = 1;
     _isDragging = false; _dragAction = null; _dragValue = 1; _lastCell = null;
     _strokeSnapshot = null;
+    _moves = 0; _strokeCounted = false;
     _scale = 1; _tx = 0; _ty = 0; _pinch = null; _pinchActive = false;
     _dragPointerId = null; _panning = false;
 
@@ -818,7 +840,7 @@ window.Nonogram = (function () {
       _boardState[hint.r][hint.c] = 1;
       renderCell(hint.r, hint.c);
     }
-    if (_onMove) _onMove();
+    if (_onMove) _onMove('hint');
     autoFillCrosses(hint.r, hint.c);
     updateClueFade(hint.r, hint.c);
     if (checkWin(_boardState, _level.solution)) markWon();
@@ -900,13 +922,16 @@ window.Nonogram = (function () {
       autoFillCrosses(r, c);
       updateClueFade(r, c);
     }
-    if (errors.length && _onMove) _onMove();
+    if (errors.length && _onMove) _onMove('reveal');
     if (checkWin(_boardState, _level.solution)) markWon();
     return errors.length;
   }
 
   function setPaused(v) { _paused = !!v; }
   function isWon() { return _won; }
+
+  // ТЗ №57: ходы игрока с последнего render() (см. _moves).
+  function getMoves() { return _moves; }
 
   function getBoardState() {
     // Возвращает плоский снимок для сохранения: [[0,1,2,...],...]
@@ -939,6 +964,7 @@ window.Nonogram = (function () {
     clearBoard:    clearBoard,
     setPaused:     setPaused,
     isWon:         isWon,
+    getMoves:      getMoves,
     getBoardState: getBoardState,
     restoreBoard:  restoreBoard,
     resetZoom:     resetZoom,

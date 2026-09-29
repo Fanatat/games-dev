@@ -331,7 +331,9 @@ const ECONOMY = {
 const HERO = {
   hp: 220,
   moveSpeed: 150,
-  meleeRange: 40,
+  // r16 (решение основателя 29.09): дальность обычного удара 40 → 55 (центр героя →
+  // центр цели, только вперёд); прокачка «Длинное лезвие» — SHOP.gearLongBlade.ranges.
+  meleeRange: 55,
   meleeDmg: 16,
   meleeInterval: 0.5,
   specialRange: 110,
@@ -795,7 +797,7 @@ const SHOP = {
   // бесплатного изменения правила. Основатель ожидал ступенчатую покупку,
   // как остальное снаряжение героя (меч/щит/броня) — три уровня, не одна
   // покупка: +10% за уровень, суммарно +30% на III.
-  gearLongBlade: { get name() { return I18N.t('shopname.gearLongBlade'); }, costs: [12, 22, 38], rangeMultPerTier: 0.1 },
+  gearLongBlade: { get name() { return I18N.t('shopname.gearLongBlade'); }, costs: [12, 22, 38], ranges: [60, 64, 68] }, // r16: дальность удара по уровням I–III (старт — HERO.meleeRange = 55)
   // cosmeticDay/cosmeticNight: .name нигде не читается (см. timeOfDayRow()
   // в game.js — там свои литералы 'День'/'Ночь', ключи shop.timeDay/
   // shop.timeNight) — оставлены как есть, переводить нечего.
@@ -850,6 +852,12 @@ const SHOP = {
   // Раунд 10: кулдаун снижен с 20 до 15с по правке основателя.
   heroAbilityCry: { get name() { return I18N.t('shopname.heroAbilityCry'); }, cost: 30, dmgMult: 1.3, speedMult: 1.25, duration: 5, cooldown: 15 },
 };
+
+// Дальность обычного удара героя (ед. арены) на уровне «Длинного лезвия» tier 0–3.
+function heroMeleeRangeAt(tier) {
+  const t = Math.max(0, Math.min(SHOP.gearLongBlade.ranges.length, tier | 0));
+  return t === 0 ? HERO.meleeRange : SHOP.gearLongBlade.ranges[t - 1];
+}
 
 // Реестр тем оформления интерфейса (утренняя правка основателя) — вся
 // разметка (панели, кнопки, HUD, паузы, итоги) уже красится через CSS

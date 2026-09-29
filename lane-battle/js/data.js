@@ -219,6 +219,20 @@ const UNIT_TYPES = {
 
 const UNIT_ORDER = ['infantry', 'spear', 'archer', 'heavy'];
 
+// r16 (правка основателя 29.09: «урон проходит, только если дальность попала в
+// центр юнита; модельки заходят друг на друга»): у каждого бойца есть тело —
+// полуширина хитбокса в ед. арены (heightMult юнита масштабирует её). Ближний
+// удар героя, ближний бой юнитов и спец-удар считают дистанцию до КРАЯ тела
+// цели, а не до её центра; герой не подходит к врагу ближе суммы радиусов.
+// Стрелы/снаряды по-прежнему летят в центр цели.
+const BODY_R = { melee: 18, spear: 18, heavy: 22, ranged: 14, rider: 20, breaker: 20, hero: 18 };
+function bodyRadius(ref) {
+  if (!ref) return 0;
+  if (ref.kind === 'hero') return BODY_R.hero;
+  const t = UNIT_TYPES[ref.typeId];
+  return t ? (BODY_R[t.role] || 18) * (t.heightMult || 1) : 0;
+}
+
 // Спецюниты врага (раунд 5) — не в UNIT_ORDER: игрок их купить не может,
 // только вражеская база спавнит их сама (бафы по HP% и рэндом-ростер).
 const ENEMY_SPECIAL_TYPES = {
@@ -844,7 +858,7 @@ const SHOP = {
   // (идея основателя + предложения агента, см. КОНЦЕПТ_ГДД.md/ПЛАН.md).
   trap2: { get name() { return I18N.t('shopname.trap2'); }, cost: 22, dmg: 14, range: 20, cooldown: 2, requiresChapter: 2 },
   towerC: { get name() { return I18N.t('shopname.towerC'); }, cost: 35, dmg: 9, range: 170, atkInterval: 1.3, requiresChapter: 3 },
-  startGoldBoost: { get name() { return I18N.t('shopname.startGoldBoost'); }, cost: 18, amount: 20, requiresChapter: 4 },
+  startGoldBoost: { get name() { return I18N.t('shopname.startGoldBoost'); }, cost: 18, amount: 100, requiresChapter: 4 },
   buybackDiscount: { get name() { return I18N.t('shopname.buybackDiscount'); }, cost: 20, discount: 15, requiresChapter: 5 },
   // Раунд 9 — новая способность героя (выбор агента, см. КОНЦЕПТ_ГДД.md,
   // «Допущения»): бафф своим юнитам на поле, хоткей K (освободился после

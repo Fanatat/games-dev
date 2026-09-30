@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<!--
+  Страница игры (шаблон WebGL "PROJECT:Game", его ставит BuildScript).
+  Canvas всегда на всё окно: на телефоне портрет, на ПК и в iframe 16:9
+  камера показывает больше поля по бокам (CLAUDE.md, инварианты). Своей
+  кнопки fullscreen, подвала и логотипов нет, Esc не перехватывается.
+  Названий площадок и внешних ссылок на странице нет; в билде под
+  площадку BuildScript подставляет её скрипты на место platform-head
+  (tools/platform/), и страница ждёт window.game7PlatformReady, если
+  скрипт его создал.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Game7 (Horde)</title>
+    <!-- platform-head -->
+    <style>
+      html, body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #1b1420;
+        overscroll-behavior: none;
+      }
+      #unity-canvas {
+        position: fixed;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        display: block;
+        background: #1b1420;
+        outline: none;
+        touch-action: none;
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-tap-highlight-color: transparent;
+      }
+      #unity-loading-bar {
+        position: fixed;
+        left: 50%;
+        top: 50%;
+        width: min(60vw, 320px);
+        height: 10px;
+        transform: translate(-50%, -50%);
+        border-radius: 5px;
+        background: rgba(255, 255, 255, 0.15);
+        overflow: hidden;
+        display: none;
+      }
+      #unity-progress-bar-full {
+        width: 0%;
+        height: 100%;
+        background: #ff9a2e;
+        transition: width 0.2s;
+      }
+      #unity-warning {
+        position: fixed;
+        left: 50%;
+        top: 12px;
+        transform: translateX(-50%);
+        max-width: 90vw;
+        font: 14px sans-serif;
+        color: #fff;
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="unity-canvas" tabindex="-1"></canvas>
+    <div id="unity-loading-bar"><div id="unity-progress-bar-full"></div></div>
+    <div id="unity-warning"></div>
+    <script>
+      var canvas = document.querySelector("#unity-canvas");
+      var warning = document.querySelector("#unity-warning");
+
+      // С showBanner загрузчик Unity шлёт свои ошибки только сюда, мимо
+      // консоли: без console.error smoke-тест не увидел бы, что игра не
+      // запустилась.
+      function unityShowBanner(msg, type) {
+        if (type == "error") console.error(msg);
+        var div = document.createElement("div");
+        div.textContent = msg;
+        div.style.padding = "8px 12px";
+        div.style.borderRadius = "6px";
+        div.style.background = type == "error" ? "#b3261e" : "#6b5a1e";
+        warning.appendChild(div);
+        warning.style.display = "block";
+        if (type != "error") {
+          setTimeout(function () {
+            warning.removeChild(div);
+            warning.style.display = warning.children.length ? "block" : "none";
+          }, 5000);
+        }
+      }
+
+      // Долгое нажатие на телефоне не открывает меню браузера поверх игры.
+      canvas.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+
+      var buildUrl = "Build";
+      var loaderUrl = buildUrl + "/dev-20260930-p6.loader.js";
+      var config = {
+        arguments: [],
+        dataUrl: buildUrl + "/dev-20260930-p6.data.unityweb",
+        frameworkUrl: buildUrl + "/dev-20260930-p6.framework.js.unityweb",
+        codeUrl: buildUrl + "/dev-20260930-p6.wasm.unityweb",
+        streamingAssetsUrl: "StreamingAssets",
+        companyName: "DefaultCompany",
+        productName: "unity",
+        productVersion: "1.0",
+        showBanner: unityShowBanner,
+        // Экраны с плотностью 3 рисовали бы в 9 раз больше пикселей, чем
+        // с плотностью 1: потолок 2 держит 60 FPS на среднем телефоне.
+        devicePixelRatio: Math.min(window.devicePixelRatio || 1, 2),
+      };
+
+      var loadingBar = document.querySelector("#unity-loading-bar");
+      var progressFull = document.querySelector("#unity-progress-bar-full");
+      loadingBar.style.display = "block";
+
+      var script = document.createElement("script");
+      script.src = loaderUrl;
+      script.onload = function () {
+        // Скрипт площадки (SDK) успевает подготовиться до старта игры: язык,
+        // звук и сейв нужны ей с первого кадра. Промис не отклоняется.
+        var platformReady = window.game7PlatformReady || Promise.resolve();
+        platformReady.then(function () {
+          return createUnityInstance(canvas, config, function (progress) {
+            progressFull.style.width = 100 * progress + "%";
+          });
+        }).then(function (instance) {
+          window.unityInstance = instance; // знак для smoke и playtest: игра запустилась
+          loadingBar.style.display = "none";
+          canvas.focus();
+        }).catch(function (message) {
+          unityShowBanner(String(message), "error");
+        });
+      };
+      document.body.appendChild(script);
+    </script>
+  </body>
+</html>

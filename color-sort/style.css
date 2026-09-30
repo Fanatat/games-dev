@@ -917,6 +917,54 @@ body {
   white-space: nowrap;
 }
 
+/* ---------- Игровой экран в альбоме (ТЗ №27) ----------
+   Низкое окно (телефон боком, узкая вкладка ПК): в портретной вёрстке
+   шапка в два ряда (~100px) и резерв под кнопки внизу (90px) съедали
+   почти всю высоту — доска получалась 24-40px на колбу при 300+px
+   свободной ширины по бокам. Здесь:
+     - шапка в ОДНУ строку: назад | уровень | энергия | звук
+       (.game-header-row раскрывается через display:contents, порядок —
+       order; авто-поля у крайних кнопок центрируют середину);
+     - кнопки отмены/рестарта — столбцом в левой колонке, подсказка — в
+       правой; колонки резервируются боковыми отступами доски, а нижний
+       резерв почти снят;
+     - подпись «Подсказка за рекламу» переносится в 2-3 строки, чтобы
+       колонка осталась узкой (значок ▶ и подпись — требование п.4.5.1,
+       убирать нельзя);
+     - боковые отступы учитывают вырез экрана (safe-area).
+   Порог по высоте, а не по ширине: планшет и ПК в альбоме (высота > 560)
+   остаются на обычной вёрстке — там места хватает. */
+@media (orientation: landscape) and (max-height: 560px) {
+  #screen-game .game-header.game-header-stacked {
+    flex-direction: row;
+    align-items: center;
+    gap: 14px;
+    padding: 6px calc(env(safe-area-inset-right, 0px) + 14px) 6px calc(env(safe-area-inset-left, 0px) + 14px);
+  }
+  #screen-game .game-header-row { display: contents; }
+  #screen-game .game-header .btn-icon { width: 44px; height: 44px; }
+  #screen-game #btn-back { order: 0; margin-right: auto; }
+  #screen-game .level-indicator { order: 1; }
+  #screen-game .energy-indicator-compact { order: 2; }
+  #screen-game #btn-sound-game { order: 3; margin-left: auto; }
+
+  #screen-game .board-wrap {
+    padding: calc(var(--header-h) + 6px) calc(env(safe-area-inset-right, 0px) + 88px) 10px calc(env(safe-area-inset-left, 0px) + 88px);
+  }
+  #screen-game .undo-btn { left: calc(env(safe-area-inset-left, 0px) + 14px); bottom: 14px; }
+  #screen-game .restart-btn { left: calc(env(safe-area-inset-left, 0px) + 14px); bottom: 70px; }
+  #screen-game .hint-wrap { right: calc(env(safe-area-inset-right, 0px) + 14px); bottom: 14px; }
+  #screen-game .hint-ad-label {
+    font-size: 0.62rem;
+    line-height: 1.15;
+    white-space: normal;
+    text-align: center;
+    max-width: 68px;
+    padding: 2px 5px;
+  }
+  #screen-game .hint-toast { bottom: 12px; }
+}
+
 /* ---------- Оверлей победы ---------- */
 .win-overlay {
   position: absolute;

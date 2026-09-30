@@ -128,6 +128,8 @@ const Board = (() => {
     vialAnims = {};
     tutorialIndex = -1;
     if (animRafId) { cancelAnimationFrame(animRafId); animRafId = null; }
+    lastLayout = null; // раскладка прошлого уровня (другое число колб) больше не годится
+    vialRects = [];
     resize();
   }
 
@@ -135,23 +137,11 @@ const Board = (() => {
   // основателя): раньше canvas всегда занимал ВЕСЬ board-wrap
   // (CSS width/height:100%), из-за чего подложка поля была заметно
   // крупнее реального содержимого (ratioH до 2.93× на уровне с одним
-  // рядом). Теперь resize() сначала «сухим» проходом (без ctx-вызовов)
-  // меряет bbox содержимого на ПОЛНОЙ доступной площади, затем ужимает
-  // сам <canvas> CSS-размером (inline style) под содержимое + отступ —
-  // .board-wrap уже flex/center, ужавшийся canvas центрируется сам.
-  function measureContentBox(cssW, cssH, vialCount) {
-    const layout = computeLayout(cssW, cssH, vialCount);
-    const { cols, rows, vw, GAP, ROW_GAP, vh } = layout;
-    const contentH = rows * vh + (rows - 1) * ROW_GAP;
-    let contentW = 0;
-    let remaining = vialCount;
-    for (let r = 0; r < rows; r++) {
-      const colsInRow = Math.min(cols, remaining);
-      contentW = Math.max(contentW, colsInRow * vw + (colsInRow - 1) * GAP);
-      remaining -= colsInRow;
-    }
-    return { layout, contentW, contentH };
-  }
+  // рядом). Теперь resize() считает раскладку на ПОЛНОЙ доступной
+  // площади и ужимает сам <canvas> CSS-размером (inline style) под
+  // содержимое + отступ — .board-wrap уже flex/center, ужавшийся canvas
+  // центрируется сам. (ТЗ №27: отдельный «сухой» проход measureContentBox
+  // убран — computeLayout сам отдаёт contentW/contentH.)
 
   // БАГ (см. docs/reports/BUG_board_canvas_width_padding_mismatch.md,
   // ТЗ №10 задача A): `* { box-sizing: border-box }` (style.css) значит
@@ -176,6 +166,13 @@ const Board = (() => {
   // отступ), а не во всей площади канвы (задача A, ТЗ №10).
   let PAD = 18;
 
+  // Телефон в портрете: окно выше, чем шире, и меньшая сторона < 600 css-px.
+  // В iframe площадки innerWidth/innerHeight — размер самого фрейма.
+  function isPhonePortrait() {
+    const w = window.innerWidth, h = window.innerHeight;
+    return h > w && Math.min(w, h) < PHONE_MAX_SIDE;
+  }
+
   function resize() {
     if (!canvas || !level) return;
     // Меряем РОДИТЕЛЯ (board-wrap), не сам canvas: после первого сжатия
@@ -198,13 +195,21 @@ const Board = (() => {
     // резервируется КАК БЮДЖЕТ до раскладки (PAD хранится в модульной
     // переменной, draw() читает то же значение) — колонки/ряды заполняют
     // урезанный бюджет, а не полный холст, отступ выживает на обеих осях.
-    const probe = computeLayout(availW, availH, level.vials.length);
+    const opts = { multiRow: isPhonePortrait() };
+    const probe = computeLayout(availW, availH, level.vials.length, opts);
     PAD = Math.max(18, probe.vw * 0.22); // тот же отступ, что был у варианта 1 в отчёте ТЗ №8
-    const { contentW, contentH } = measureContentBox(
-      Math.max(1, availW - PAD * 2), Math.max(1, availH - PAD * 2), level.vials.length
+    // ТЗ №27: итоговая раскладка считается ЗДЕСЬ ОДИН РАЗ и запоминается
+    // (lastLayout) — draw() её только читает. Раньше draw() считал заново
+    // на уже ужатом холсте; когда решение «один ряд или два» зависит от
+    // пропорций бюджета, два расчёта могли разойтись (холст ужат под
+    // один вариант, а нарисован другой). Один расчёт — расхождению
+    // неоткуда взяться.
+    const layout = computeLayout(
+      Math.max(1, availW - PAD * 2), Math.max(1, availH - PAD * 2), level.vials.length, opts
     );
-    const cssW = Math.min(availW, contentW + PAD * 2);
-    const cssH = Math.min(availH, contentH + PAD * 2);
+    lastLayout = layout;
+    const cssW = Math.min(availW, layout.contentW + PAD * 2);
+    const cssH = Math.min(availH, layout.contentH + PAD * 2);
     canvas.style.width = cssW + 'px';
     canvas.style.height = cssH + 'px';
     // Мягкий край — скругление (статичное, style.css #board-canvas) +
@@ -258,56 +263,96 @@ const Board = (() => {
   }
   const VH_PER_VW = vhFromVw(1);
 
-  /* ---------- Раскладка колб по доступной площади ---------- */
-  function computeLayout(cssW, cssH, vialCount) {
-    const GAP = 16;
-    const ROW_GAP = 28;
-    const MIN_VW = 52;
-    const MAX_VW = 130;
+  /* ---------- Раскладка колб по доступной площади (ТЗ №27) ----------
+     Правила (решение основателя 2026-09-30):
+       - ряды делятся ПОРОВНУ, лишняя колба уходит в верхний ряд
+         (5 -> 3+2, 6 -> 3+3, 7 -> 4+3, 8 -> 4+4); ряды центруются, при
+         одинаковом шаге колбы нижнего ряда встают между верхними;
+       - телефон в портрете (окно выше, чем шире, и меньшая сторона
+         < 600 css-px) и 5+ колб -> минимум два ряда: узкий экран никогда
+         не даёт «5 в ряд + 1 внизу». Признак берётся от ОКНА, а не от
+         свободной области поля: шапка и кнопки на низком телефоне (SE)
+         съедают столько высоты, что область поля почти квадратная;
+       - альбом, планшет и ПК -> один ряд, если колбы в нём не мельче 85%
+         от лучшего варианта; иначе больше рядов (8 колб на планшете
+         в портрете лучше 4+4, чем полоска мелких).
+     Раньше cols перебирался от vialCount вниз и брался ПЕРВЫЙ, где колба
+     не уже 52px — отсюда 5+1 на 6 колбах и «полоска» из 8 колб мелкими
+     колбами в альбоме (скрин основателя 2026-09-30).
 
-    /* Отказ Яндекса (лэндскейп-обрезание, скрин основателя 2026-09-06):
-       раньше cols выбирался ТОЛЬКО по ширине (шёл от vialCount вниз,
-       пока не пройдёт MIN_VW), rows считался ОТ УЖЕ выбранного cols, и
-       heightVW для этих rows просто клэмпился жёстким полом
-       (Math.max(24, vw)) — на коротком широком вьюпорте (лэндскейп,
-       мало высоты) это давало cols, комфортный по ширине, но с rows,
-       для которых реально влезающий vw был МЕНЬШЕ пола. Пол переезжал
-       наверх, раскладка требовала больше высоты, чем есть в наличии, и
-       canvas молча обрезал нижнюю часть последнего ряда колб по своей
-       границе — колбы физически не видны и не берутся тапом.
+     Зазоры пропорциональны ширине колбы (а не фиксированные 16/28px), так
+     размер колбы решается в замкнутой форме — без перебора:
+       по ширине:  vw = W / (cols + (cols-1)*GAP_K)
+       по высоте:  vw = H*FILL_H / (rows*VH_PER_VW + (rows-1)*ROW_GAP_K)
+     Отступ вокруг (PAD) и подложка — как раньше, см. resize().
 
-       Перебираем ВСЕ варианты числа колонок (а не только шедший от
-       vialCount вниз по ширине) и берём тот, что даёт максимальный
-       итоговый vw = min(по ширине, по высоте) — гарантирует, что
-       выбранная раскладка ДЕЙСТВИТЕЛЬНО влезает по обеим осям
-       одновременно, а не только по той, что учитывал старый цикл. */
-    let best = null;
-    for (let cols = vialCount; cols >= 1; cols--) {
-      const rows = Math.ceil(vialCount / cols);
-      const widthVW = (cssW - GAP * (cols - 1)) / cols;
-      // Не даём колбам теряться в пустой высокой области: вписываем их
-      // так, чтобы сетка занимала бОльшую часть доступной высоты, а не
-      // только ширины (важно на высоких узких телефонных экранах).
-      const availH = cssH * 0.92 - (rows - 1) * ROW_GAP;
-      const heightVW = (availH / rows) / VH_PER_VW;
-      const vw = Math.min(widthVW, heightVW, MAX_VW);
-      if (!best || vw > best.vw) best = { cols, rows, vw };
-      // Нашли конфигурацию с комфортным запасом сразу по обеим осям —
-      // дальше уменьшать cols смысла нет, это только сокращает rows'ную
-      // heightVW без выигрыша (ширина только этим и была не по этому
-      // ограничена).
-      if (vw >= MIN_VW) break;
-    }
+     Отказ Яндекса (лэндскейп-обрезание, скрин основателя 2026-09-06): когда
+     число колонок выбиралось по ширине, а высота клэмпилась жёстким полом,
+     раскладка требовала больше высоты, чем есть, и canvas молча обрезал
+     нижний ряд — колбы не видны и не берутся тапом. Инвариант: колба
+     каждого варианта числа рядов = min(по ширине, по высоте, MAX_VW), то
+     есть влезает по ОБЕИМ осям сразу; выбираем только среди таких вариантов.
+     Исключение одно — пол MIN_VW_FLOOR на нереально узком окне. */
+  const GAP_K = 0.28;            // зазор между колбами в ряду, в долях ширины колбы
+  const ROW_GAP_K = 0.5;         // зазор между рядами, в долях ширины колбы
+  const MAX_VW = 130;
+  const MIN_VW_FLOOR = 24;       // не даём схлопнуться до нуля на совсем узких экранах
+  const FILL_H = 0.96;           // какую долю бюджета по высоте разрешено занять
+  const PHONE_MAX_SIDE = 600;    // меньшая сторона окна меньше — «телефон» (граница sw600dp)
+  const ONE_ROW_KEEP = 0.85;     // меньше рядов предпочтительно, пока колба не мельче этой доли лучшего
 
-    const { cols, rows } = best;
-    let vw = Math.max(24, best.vw); // не даём схлопнуться до нуля на совсем узких экранах
+  // Раскладка n колб по rows рядам: поровну, лишние — в верхние ряды.
+  function splitRows(n, rows) {
+    const base = Math.floor(n / rows);
+    const extra = n % rows;
+    const counts = [];
+    for (let i = 0; i < rows; i++) counts.push(base + (i < extra ? 1 : 0));
+    return counts;
+  }
 
+  function fitRows(W, H, n, rows) {
+    const rowCounts = splitRows(n, rows);
+    const cols = rowCounts[0];
+    const byW = W / (cols + (cols - 1) * GAP_K);
+    const byH = (H * FILL_H) / (rows * VH_PER_VW + (rows - 1) * ROW_GAP_K);
+    return { rows, rowCounts, cols, vw: Math.min(byW, byH, MAX_VW) };
+  }
+
+  // opts.multiRow — телефон в портрете: 5+ колб раскладываются минимум в
+  // два ряда (решает resize() по размеру окна, см. isPhonePortrait()).
+  function computeLayout(cssW, cssH, vialCount, opts) {
+    const n = Math.max(1, Math.floor(vialCount) || 1);
+    const W = Math.max(1, cssW);
+    const H = Math.max(1, cssH);
+
+    // Сколько рядов вообще имеет смысл рассматривать: до 4 колб — один,
+    // до 10 — два, дальше — до трёх (уровней больше 8 колб пока нет,
+    // правило общее на будущее).
+    const maxRows = n <= 4 ? 1 : (n <= 10 ? 2 : 3);
+    const fits = [];
+    for (let rows = 1; rows <= maxRows; rows++) fits.push(fitRows(W, H, n, rows));
+
+    const multiRow = !!(opts && opts.multiRow) && n >= 5;
+    const minRows = multiRow ? Math.min(2, maxRows) : 1;
+    const allowed = fits.filter(f => f.rows >= minRows);
+    const bestVw = Math.max(...allowed.map(f => f.vw));
+    const chosen = allowed.find(f => f.vw >= ONE_ROW_KEEP * bestVw);
+
+    const vw = Math.max(MIN_VW_FLOOR, chosen.vw);
     const vh = vhFromVw(vw);
     const elSize = vw * 0.74;
     const elGap = elSize * 0.12;
     const tubeBottomMargin = elSize * 0.22;
+    const GAP = vw * GAP_K;
+    const ROW_GAP = vw * ROW_GAP_K;
+    const contentW = chosen.cols * vw + (chosen.cols - 1) * GAP;
+    const contentH = chosen.rows * vh + (chosen.rows - 1) * ROW_GAP;
 
-    return { cols, rows, vw, vh, GAP, ROW_GAP, elSize, elGap, tubeBottomMargin };
+    return {
+      vialCount: n, rows: chosen.rows, rowCounts: chosen.rowCounts, cols: chosen.cols,
+      vw, vh, GAP, ROW_GAP, elSize, elGap, tubeBottomMargin,
+      contentW, contentH, bestVw, multiRow, budgetW: W, budgetH: H
+    };
   }
 
   // Габариты последнего кадра (ТЗ №8, задача B): холст (весь #board-canvas)
@@ -321,22 +366,22 @@ const Board = (() => {
     if (!level) return;
 
     const vials = level.vials;
-    // Тот же бюджет (cssW/cssH минус PAD), что и при замере в resize() —
-    // раскладка не имеет права заново растянуться на весь холст (задача A,
-    // ТЗ №10, см. комментарий у PAD/resize()).
-    const layout = computeLayout(Math.max(1, cssW - PAD * 2), Math.max(1, cssH - PAD * 2), vials.length);
-    lastLayout = layout;
-    const { cols, rows, vw, vh, GAP, ROW_GAP } = layout;
+    // ТЗ №27: раскладку считает resize() (один раз), здесь она только
+    // читается. Число колб в ней обязано совпадать с уровнем: если resize()
+    // не отработал (нулевая площадь) после смены уровня, рисовать по
+    // раскладке ПРЕДЫДУЩЕГО уровня нельзя — лучше пустой кадр.
+    const layout = lastLayout;
+    if (!layout || layout.vialCount !== vials.length) return;
+    const { rows, rowCounts, vw, vh, GAP, ROW_GAP } = layout;
 
-    const gridH = rows * vh + (rows - 1) * ROW_GAP;
+    const gridH = layout.contentH;
     let y = (cssH - gridH) / 2;
     let maxRowW = 0;
 
     vialRects = [];
     let vialIndex = 0;
     for (let r = 0; r < rows; r++) {
-      const remaining = vials.length - vialIndex;
-      const colsInRow = Math.min(cols, remaining);
+      const colsInRow = rowCounts[r];
       const rowW = colsInRow * vw + (colsInRow - 1) * GAP;
       maxRowW = Math.max(maxRowW, rowW);
       let x = (cssW - rowW) / 2;
@@ -616,13 +661,21 @@ const Board = (() => {
     const y = clientY - rect.top;
     const pad = 8; // прощаем неточный тап рядом с колбой
     const { vw, vh } = lastLayout;
+    // Зоны тапа соседних колб (с pad) могут перекрываться на тесных
+    // раскладках — берём колбу, чей центр ближе к точке, а не первую
+    // попавшуюся по порядку (ТЗ №27).
+    let hit = -1;
+    let hitDist = Infinity;
     for (let i = 0; i < vialRects.length; i++) {
       const r = vialRects[i];
       if (x >= r.x - pad && x <= r.x + vw + pad && y >= r.y - pad && y <= r.y + vh + pad) {
-        return i;
+        const dx = x - (r.x + vw / 2);
+        const dy = y - (r.y + vh / 2);
+        const d = dx * dx + dy * dy;
+        if (d < hitDist) { hitDist = d; hit = i; }
       }
     }
-    return -1;
+    return hit;
   }
 
   /* ---------- Подсветка выбранной колбы-источника ---------- */
@@ -749,11 +802,23 @@ const Board = (() => {
     return lastDiagMetrics;
   }
 
+  // ТЗ №27: снимок фактической раскладки — для приёмки (tests/
+  // board_layout_matrix.py) и диагностики; не пересчитывает ничего.
+  function getLayoutSnapshot() {
+    if (!lastLayout) return null;
+    const L = lastLayout;
+    return {
+      vialCount: L.vialCount, rows: L.rows, rowCounts: L.rowCounts.slice(),
+      vw: L.vw, vh: L.vh, gap: L.GAP, rowGap: L.ROW_GAP, bestVw: L.bestVw, multiRow: L.multiRow,
+      budgetW: L.budgetW, budgetH: L.budgetH, pad: PAD
+    };
+  }
+
   return {
     init, setLevel, resize, redraw,
     hitTest, setSelected, shake, animatePour, showHint, clearHint,
     popVial, waveVials, setTutorial, getVialClientRect,
-    getDiagMetrics,
+    getDiagMetrics, getLayoutSnapshot,
     // computeLayout — диагностический экспорт (перенесено с
     // fix/vk-remove-shop при сведении в main): координаты клика для
     // Playwright-приёмки берутся из того, что реально нарисовано

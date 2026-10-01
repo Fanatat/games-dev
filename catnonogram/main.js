@@ -641,15 +641,21 @@ document.addEventListener('DOMContentLoaded', function () {
     _rewardedGateOpen = true;
   }
 
-  // Бонус «за рекламу» (решение основателя 2026-10-01: rewarded → полноэкранная
-  // реклама). ЕДИНСТВЕННЫЙ путь к бонусу за рекламу — подсказка, «Проверить»,
-  // открыть главу идут через него. Бонус выдаётся (onShown) ТОЛЬКО если
-  // Platform.showBonusAd подтвердил показ. adblock, ошибка, отказ SDK, пауза
-  // между показами, таймаут, игра вне площадки — бонуса нет, игроку тост
-  // adNotShown (в т.ч. «Отключите блокировщик рекламы»), счётчики не
-  // меняются. Пути «рекламы нет → бесплатно» нет нигде.
+  // Бонус «за рекламу» (решение основателя 2026-10-01, раунд 2: реклама за
+  // вознаграждение, rewarded; interstitial по кнопке правилами площадок не
+  // предусмотрен — он отключён флагом BONUS_AD_FORMAT в адаптерах).
+  // ЕДИНСТВЕННЫЙ путь к бонусу за рекламу — подсказка, «Проверить», открыть
+  // главу идут через него. Бонус выдаётся (onShown) ТОЛЬКО если
+  // Platform.showBonusAd подтвердил просмотр. adblock, ошибка, отказ SDK,
+  // таймаут, игра вне площадки — бонуса нет, игроку тост adNotShown (в т.ч.
+  // «Отключите блокировщик рекламы»), счётчики не меняются. Пути «рекламы
+  // нет → бесплатно» нет нигде.
+  // За ОДИН просмотр — HINTS_PER_AD подсказок (раунд 2, чтобы игроки
+  // смотрели рекламу реже); одна тратится сразу, остальные — в баланс.
   // opts.pauseBoard — ставить поле на паузу; onShown() — выдать бонус
   // (после снятия паузы/звука); onDone(shown) — по желанию, после всего.
+  var HINTS_PER_AD = 5;
+
   function runBonusAd(place, opts, onShown, onDone) {
     if (opts.pauseBoard) {
       if (_currentLevel >= 0) flushBoardSave(_currentLevel);
@@ -666,7 +672,8 @@ document.addEventListener('DOMContentLoaded', function () {
       // Имена целей Метрики прежние (rewarded_*) — ряд не рвём; result:
       // reward = показано и бонус выдан, closed = площадка отказала
       // (adblock/пауза/нет объявления), error = нет моста/сбой/таймаут.
-      goalRewardedResult(place, shown, shown ? 'reward' : (reason === 'refused' ? 'closed' : 'error'));
+      goalRewardedResult(place, shown, shown ? 'reward' : (reason === 'refused' ? 'closed' : 'error'),
+        shown && opts.hints ? opts.hints : 0);
       unlockRewardedGate();
       hideAdLoadingOverlay();
       if (opts.pauseBoard) Nonogram.setPaused(false);
@@ -826,10 +833,13 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   // outcome — второй аргумент onClose адаптера ('reward' | 'closed' | 'error').
-  function goalRewardedResult(place, wasRewarded, outcome) {
+  // hints — сколько подсказок выдано за этот просмотр (только hint/check, 0 — не добавляется).
+  function goalRewardedResult(place, wasRewarded, outcome, hints) {
     var result = (outcome === 'reward' || outcome === 'closed' || outcome === 'error')
       ? outcome : (wasRewarded ? 'reward' : 'closed');
-    goal('rewarded_result', { place: place, result: result });
+    var params = { place: place, result: result };
+    if (hints > 0) params.hints = hints;
+    goal('rewarded_result', params);
   }
 
   function ladderRewardKey(reward) {
@@ -2488,7 +2498,13 @@ document.addEventListener('DOMContentLoaded', function () {
       return;
     }
 
-    runBonusAd('hint', { pauseBoard: true }, function () {
+    runBonusAd('hint', { pauseBoard: true, hints: HINTS_PER_AD }, function () {
+      // 5 за просмотр: одна применяется сейчас, остальные — в баланс.
+      _bonusHints += HINTS_PER_AD - 1;
+      updateHintBadge();
+      updateCheckButton();
+      saveProgress();
+      showRetentionToast(I18N.t('adHintsGranted').replace('{n}', HINTS_PER_AD));
       Nonogram.applyHint(hint);
       _hintsUsedThisLevel++;
       if (!Nonogram.findHint()) {
@@ -2583,7 +2599,11 @@ document.addEventListener('DOMContentLoaded', function () {
     // 4. Иначе — тот же путь, что и подсказка за рекламу (переиспользуем
     // те же обёртки: showAdLoadingOverlay/lockRewardedGate/идемпотентность
     // через onReward->onClose, см. onHintClick выше).
-    runBonusAd('check', { pauseBoard: true }, function () {
+    runBonusAd('check', { pauseBoard: true, hints: HINTS_PER_AD }, function () {
+      // 5 за просмотр: одна уходит на эту проверку, остальные — в баланс.
+      _bonusHints += HINTS_PER_AD - 1;
+      updateHintBadge();
+      saveProgress();
       var fixedAd = Nonogram.revealErrors();
       showRetentionToast(I18N.t('checkFixed').replace('{n}', fixedAd));
       trackEvent('check_used', { mode: 'ad', fixed: fixedAd });

@@ -525,17 +525,21 @@ window.Platform = (function () {
     });
   }
 
-  // Бонус «за рекламу» (подсказка, «Проверить», открыть главу) — с 2026-10-01
-  // (решение основателя) это полноэкранная реклама между экранами
-  // (interstitial), а не rewarded: показов больше при том же доходе за 1000.
+  // Бонус «за рекламу» (подсказка, «Проверить», открыть главу). Раунд 2
+  // (решение основателя 2026-10-01): РЕКЛАМА ЗА ВОЗНАГРАЖДЕНИЕ (rewarded) —
+  // правила ВК/Яндекса не дают показывать interstitial по кнопке игрока
+  // (ВК: interstitial «только в момент перехода между экранами»). Раунд 1
+  // (interstitial) отключён флагом BONUS_AD_FORMAT, путь сохранён.
   // onResult(shown, reason) зовётся ровно один раз. shown === true ТОЛЬКО
-  // если площадка подтвердила показ (result:true). Любой другой исход —
-  // нет моста/не VK-окружение, adblock, отказ, пустой результат, таймаут —
-  // shown === false и бонус НЕ выдаётся: «ошибка = бесплатно» (прежний
-  // студийный стандарт п.190) отменён решением основателя 2026-10-01.
-  // reason: 'shown' | 'unavailable' | 'busy' | 'refused' (result:false) |
+  // если площадка подтвердила показ/просмотр (result:true). Любой другой
+  // исход — нет моста/не VK-окружение, adblock, отказ, пустой результат,
+  // таймаут — shown === false и бонус НЕ выдаётся: прежнее «ошибка =
+  // бесплатно» (студийный стандарт п.190) отменено 2026-10-01 и не
+  // возвращается.
+  // reason: 'shown' | 'unavailable' | 'refused' (result:false) |
   // 'error' (мост ответил ошибкой — в т.ч. adblock) | 'timeout'.
-  var BONUS_AD_TIMEOUT_MS = 30000; // реклама до 5 с; запас на загрузку, молчащий мост бонус не даёт
+  var BONUS_AD_FORMAT = 'reward';  // 'reward' | 'interstitial'
+  var BONUS_AD_TIMEOUT_MS = 40000; // ролик до 30 с + загрузка; молчащий мост бонус не даёт
   var _bonusAdInFlight = false;
   function showBonusAd(onResult) {
     var finished = false;
@@ -553,10 +557,21 @@ window.Platform = (function () {
     }
     _bonusAdInFlight = true;
     vkFlushNow(); // событие «перед рекламой» — не ждём дебаунса
-    withTimeout(vkBridge.send('VKWebAppShowNativeAds', { ad_format: 'interstitial' }), BONUS_AD_TIMEOUT_MS)
+    // useWaterfall:true — задокументированный параметр ИМЕННО для 'reward':
+    // если настоящего rewarded-ролика нет, площадка подставит interstitial
+    // вместо отказа (больше реальных показов). Подтверждение — тот же
+    // result:true; без показа result не true.
+    var params = BONUS_AD_FORMAT === 'reward'
+      ? { ad_format: 'reward', useWaterfall: true }
+      : { ad_format: 'interstitial' };
+    withTimeout(vkBridge.send('VKWebAppShowNativeAds', params), BONUS_AD_TIMEOUT_MS)
       .then(function (res) {
         var ok = !!res && res.result === true;
+        // Выдача обязана пережить немедленное закрытие/перезагрузку сразу
+        // после ролика (ТЗ №12) — saveProgress() внутри onResult лишь ставит
+        // запись в очередь дебаунса; флаш делает ВЫЗЫВАЮЩИЙ после выдачи.
         done(ok, ok ? 'shown' : 'refused');
+        if (ok) vkFlushNow();
       })
       .catch(function (e) {
         var silent = e instanceof Error && e.message === 'timeout';

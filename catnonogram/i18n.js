@@ -8,6 +8,7 @@ window.I18N = (function () {
     ru: {
       loading:   'Загрузка…',
       adLoading: 'Загрузка рекламы…',
+      adNotShown: 'Отключите блокировщик рекламы, чтобы получить бонус. Реклама не показалась — бонус не засчитан',
       gameTitle: 'Кот и японские кроссворды',
       gameSub:   'японский кроссворд',
       play:      'Играть',
@@ -239,6 +240,7 @@ window.I18N = (function () {
     en: {
       loading:   'Loading…',
       adLoading: 'Loading ad…',
+      adNotShown: 'Turn off your ad blocker to get the bonus. The ad did not play — no bonus was given',
       gameTitle: 'Picture Cross',
       gameSub:   'japanese crossword',
       play:      'Play',

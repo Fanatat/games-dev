@@ -1854,7 +1854,8 @@
      30 показов/сутки — рекомендация доки ВК, защита от накрутки.
      Сутки — КАЛЕНДАРНЫЕ по локальному времени устройства (не UTC и не
      скользящее окно 24ч) — простая, предсказуемая для игрока модель. */
-  const REWARDED_DAILY_LIMIT = 30;
+  const REWARDED_DAILY_LIMIT = 30; // просмотров в сутки (рекомендация ВК); за просмотр — HINTS_PER_AD подсказок, лимит считает просмотры, не подсказки
+  const HINTS_PER_AD = 5;
   function todayKey() {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -1936,7 +1937,14 @@
         // Счёт суточного лимита — только за реально показанную рекламу.
         checkRewardedDailyReset();
         state.rewardedCount++;
+        // Раунд 2 ТЗ ads_rework: один просмотр = HINTS_PER_AD подсказок. Одна
+        // подсвечивается сразу, остальные падают в тот же баланс bonusHints,
+        // что и награды серии/цели дня (тратятся первыми, рекламу не зовут).
+        state.bonusHints += HINTS_PER_AD - 1;
         persist();
+        renderHintBonusBadge();
+        showHintToast('hintAdGranted', 2200);
+        hintToast.textContent = hintToast.textContent.replace('{n}', HINTS_PER_AD);
         Board.showHint(hint.from, hint.to); Sound.playReward(); // награда получена — подсвечиваем ход (ТЗ №26: и звук награды)
       },
       pauseGame,
@@ -1947,7 +1955,7 @@
       // же логикой, что и hideHintLoadingToast чуть выше по коду.
       (outcome) => {
         rewardedInFlight = false; hideHintLoadingToast(); resumeGame();
-        track('rewarded_result', { place: 'hint', result: outcome || 'unknown' });
+        track('rewarded_result', { place: 'hint', result: outcome || 'unknown', hints: outcome === 'shown' || outcome === 'dev' ? HINTS_PER_AD : 0 });
         // Реклама не показана (adblock, нет объявления, сбой, SDK нет) —
         // бонуса нет, говорим игроку почему (ТЗ ads_rework, правило 3).
         if (isAdFailureOutcome(outcome)) showHintToast('hintAdUnavailable', 4500);

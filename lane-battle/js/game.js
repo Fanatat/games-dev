@@ -3432,6 +3432,10 @@ function renderResultAdRow(earnedDiamonds, isChapterFinal) {
             showLoudNotice(I18N.t('result.adCooldownNotice'));
             setTimeout(() => { if (btn.isConnected) { btn.disabled = false; setLabel(); } }, AD_COOLDOWN_LOCK_MS);
             btn.textContent = plainLabel(I18N.t('result.adLoading'));
+          } else if (res && res.reason === 'closed') {
+            // ролик открылся, игрок закрыл без награды — бонуса нет, ругаться не за что
+            btn.disabled = false;
+            setLabel();
           } else {
             btn.disabled = false;
             setLabel();

@@ -382,18 +382,26 @@ const PLATFORM = (() => {
       }, 2200);
     });
   }
-  function showYandexRewarded() {
+  // Итог — {shown, reason}: shown ТОЛЬКО после onRewarded. reason при неудаче:
+  // 'blocked' (onError / нет SDK / исключение / молчание SDK до открытия —
+  // adblock, сбой) и 'closed' (ролик открылся, игрок закрыл без награды —
+  // уведомления не нужно).
+  function showYandexRewardedResult() {
     return new Promise((resolve) => {
-      if (!ysdk || !ysdk.adv) { resolve(false); return; }
-      let rewarded = false;
-      ysdk.adv.showRewardedVideo({
-        callbacks: {
-          onOpen: () => { pauseHook(); },
-          onRewarded: () => { rewarded = true; },
-          onClose: () => { resumeHook(); resolve(rewarded); },
-          onError: () => { resumeHook(); resolve(false); },
-        },
-      });
+      if (!ysdk || !ysdk.adv) { resolve({ shown: false, reason: 'blocked' }); return; }
+      let rewarded = false, opened = false, settled = false;
+      const finish = (shown, reason) => { if (settled) return; settled = true; clearTimeout(guard); resumeHook(); resolve({ shown, reason }); };
+      const guard = setTimeout(() => { if (!opened) finish(false, 'blocked'); }, INTERSTITIAL_TIMEOUT_MS * 4);
+      try {
+        ysdk.adv.showRewardedVideo({
+          callbacks: {
+            onOpen: () => { opened = true; pauseHook(); },
+            onRewarded: () => { rewarded = true; },
+            onClose: () => { rewarded ? finish(true, 'ok') : finish(false, opened ? 'closed' : 'blocked'); },
+            onError: () => { finish(false, 'blocked'); },
+          },
+        });
+      } catch (e) { finish(false, 'blocked'); }
     });
   }
   // use_waterfall — официальное поле vk-bridge (snake_case, см. типы пакета
@@ -463,8 +471,12 @@ const PLATFORM = (() => {
     });
   }
   function showYandexInterstitial() { return showYandexFullscreen().then((r) => r.shown); }
-  function bonusAdFormat() { return kind === 'yandex' ? 'interstitial' : 'rewarded'; }
-  // По семантике совпадает с showYandexRewarded()/showVkRewarded() выше —
+  // Раунд 2 (решение основателя 01.10.2026): interstitial за бонус ОТМЕНЁН —
+  // правила ВК/Яндекса не дают показывать его по кнопке. Rewarded везде;
+  // interstitial-путь Яндекса сохранён, но выключен флагом.
+  const BONUS_AD_INTERSTITIAL_YANDEX = false;
+  function bonusAdFormat() { return kind === 'yandex' && BONUS_AD_INTERSTITIAL_YANDEX ? 'interstitial' : 'rewarded'; }
+  // По семантике совпадает с showYandexRewardedResult()/showVkRewarded() выше —
   // та же кнопка "реклама"+награда, та же опциональность, пауза на весь
   // запрос до adFinished ИЛИ adError (ТЗ_CRAZYGAMES_ИНТЕГРАЦИЯ.md, п.3).
   // Midgame — НЕ реализуется (решение основателя, см. КОНЦЕПТ_ГДД.md).
@@ -708,26 +720,21 @@ const PLATFORM = (() => {
       if (active) window.CrazyGames.SDK.game.gameplayStart();
       else window.CrazyGames.SDK.game.gameplayStop();
     },
-    // Формат рекламы за бонус («Смотреть рекламу → бонус»), решение основателя
-    // 01.10.2026 (rewarded → interstitial), правило 5 ТЗ: проверено по правилам.
-    //  • Яндекс — 'interstitial' (adv.showFullscreenAdv): прямого запрета нет,
-    //    «реклама показывается только в логических паузах», экран итога —
-    //    пауза, кнопка подписана «Смотреть рекламу».
-    //  • ВК — 'rewarded': док. «Реклама в играх» разрешает interstitial
-    //    «только в момент перехода от одного экрана приложения к другому»;
-    //    кнопка на экране итога — не переход экрана. Вопрос основателю.
-    //  • CrazyGames — 'rewarded': midgame отключён решением 17.09.
+    // Формат рекламы за бонус («Смотреть рекламу → бонус»): rewarded на всех
+    // площадках (раунд 2, решение основателя 01.10.2026: правила ВК/Яндекса не
+    // дают показывать interstitial по кнопке; ВК: interstitial «только в момент
+    // перехода от одного экрана к другому»). Interstitial Яндекса — под флагом
+    // BONUS_AD_INTERSTITIAL_YANDEX (выключен).
     bonusAdFormat,
     // Бонус за рекламу: Promise<{shown, reason}>, не бросает. shown === true
-    // ТОЛЬКО если SDK площадки подтвердил показ (Яндекс: onClose wasShown /
-    // onRewarded; ВК: result; CG: adFinished). reason при shown=false:
+    // ТОЛЬКО если SDK площадки подтвердил показ (Яндекс: onRewarded; ВК: result; CG: adFinished). reason при shown=false:
     // 'blocked' (adblock/ошибка/нет SDK) | 'cooldown' (пауза/нет объявления).
     // Бесплатной ветки нет: без SDK (kind 'none': adblock убил sdk.js, чужой
     // домен, стенд вне iframe ВК) бонус не выдаётся. Заглушка showTestAd —
     // только для локальной разработки (DEV_ADS: localhost/127.0.0.1/file:).
     showBonusAd() {
       let p;
-      if (kind === 'yandex') p = bonusAdFormat() === 'interstitial' ? showYandexFullscreen() : showYandexRewarded().then((ok) => ({ shown: ok, reason: ok ? 'ok' : 'blocked' }));
+      if (kind === 'yandex') p = bonusAdFormat() === 'interstitial' ? showYandexFullscreen() : showYandexRewardedResult();
       else if (kind === 'vk') p = showVkRewarded().then((ok) => ({ shown: ok, reason: ok ? 'ok' : 'blocked' }));
       else if (kind === 'crazygames') p = showCrazyGamesRewarded().then((ok) => ({ shown: ok, reason: ok ? 'ok' : 'blocked' }));
       else if (DEV_ADS) p = showTestAd().then((ok) => ({ shown: ok, reason: ok ? 'ok' : 'blocked' }));

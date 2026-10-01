@@ -522,6 +522,7 @@
 
   var LV_FORMS = ['новый уровень', 'новых уровня', 'новых уровней'];
   var HINT_FORMS = ['подсказка', 'подсказки', 'подсказок'];
+  var AD_HINTS_REWARD = 5;     // b27: подсказок за один просмотр rewarded (решение основателя 01.10)
   var DAY_FORMS = ['день', 'дня', 'дней'];
 
   /* Индикатор запаса: ОДНА функция обновляет ВСЕ инстансы разом (меню,
@@ -2022,9 +2023,18 @@
     // b26: ветки «реклама недоступна → подсказка бесплатно» больше нет (ТЗ 01.10):
     // реклама пробуется всегда, подсказка — только если она показана.
     // b25: через showBonusAd — цели rewarded_* и защита от двойного клика.
-    showBonusAd('hint',
-      function () { hintsUsed++; Board.revealHint(hintWord); snd('hint'); } // onRewarded — chain[chainPos]
-    );
+    // b27 (раунд 2, 01.10): за ОДИН просмотр — AD_HINTS_REWARD подсказок: одна
+    // открывается сразу, остальные падают в баланс bonusHints (тратятся без рекламы).
+    showBonusAd('hint', function () {   // onRewarded — chain[chainPos]
+      bonusHints += AD_HINTS_REWARD - 1;
+      hintsUsed++;
+      persistProgress();
+      renderHintBadge();
+      updateHintLabel();
+      Board.revealHint(hintWord);
+      snd('hint');
+      showRetentionToast(I18N.fill('dailyHints', { n: AD_HINTS_REWARD, hint: I18N.plural(AD_HINTS_REWARD, HINT_FORMS) }), 2600);
+    });
   });
 
   // b19: «Забрать» награду дня — первый жест сессии, заодно разрешает звук.

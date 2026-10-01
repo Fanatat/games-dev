@@ -154,7 +154,7 @@ const Platform = (() => {
      раньше на ВК этого поля не было вовсе (undefined, не строка),
      плашка молчала всегда независимо от сборки; main.js трогать не
      нужно, правка живёт ТОЛЬКО здесь и в build.py. */
-  const BUILD = 'b55-a2d1079-20260930';
+  const BUILD = 'b58-d17837b-20261001';
 
   /* ---------- Единая точка времени (ТЗ №18) ----------
      Симметрично platform.js (Яндекс) — см. комментарий там же. Оба
@@ -259,7 +259,112 @@ const Platform = (() => {
     // Кнопка подсказки НЕ прячется здесь: VKWebAppCheckNativeAds
     // ненадёжен для превентивной проверки (см. журнал наверху, п.1) —
     // доступность рекламы обрабатывается реактивно, в showRewarded().
+    try { armMobileBanner(); } catch (e) { console.warn('[vk_platform] баннер:', e); }
     return true;
+  }
+
+  /* ---------- Баннер снизу на телефоне в вертикали (ТЗ ads_rework
+     2026-10-01, п.1 и правило 6) ----------
+     Только мобильные клиенты ВК (vk_platform=mobile_*), только портрет:
+     VKWebAppShowBannerAd {banner_location:'bottom'} (dev.vk.com, сверено
+     по docs/площадки/vk/Баннерная реклама для VK.txt: «в нижней или
+     верхней части экрана, не перекрывая игровой процесс»). В альбоме и на
+     ПК баннер не показываем (ПК — решение основателя 2026-09-25, см.
+     CHANGELOG ТЗ №24) и прячем при повороте. Правило 7: не до первого
+     действия игрока — запуск по первому pointerdown.
+     Место под баннер резервирует ЛИБО площадка, ЛИБО игра (урок b50/b51):
+     если после показа окно само стало ниже — свой отступ не ставим, иначе
+     ставим --vk-banner-reserve-bottom = banner_height (body.bottom,
+     style.css) + safe-area. Закрыл игрок крестиком — до следующего запуска
+     не переоткрываем. Ошибка/нет рекламы — баннера нет, игра как была. */
+  const BANNER_FALLBACK_HEIGHT_PX = 60; // если высота не пришла в ответе
+  const BANNER_SELF_RESIZE_PX = 30;     // порог «площадка сама ужала окно»
+  const BANNER_SETTLE_MS = 600;
+  let bannerWanted = false;     // портрет + мобильный + после первого тапа
+  let bannerOn = false;
+  let bannerClosedByUser = false;
+  let bannerReservePx = 0;
+  let platformResizedForBanner = false;
+  let bannerBusy = false;
+
+  function isMobileWeb() {
+    try {
+      return /^mobile/.test(new URLSearchParams(location.search).get('vk_platform') || '');
+    } catch (e) { return false; }
+  }
+  function isPortrait() {
+    return window.matchMedia ? window.matchMedia('(orientation: portrait)').matches : window.innerHeight >= window.innerWidth;
+  }
+
+  function setBannerReserve(px) {
+    const next = Math.max(0, Math.round(px) || 0);
+    if (next === bannerReservePx) return;
+    bannerReservePx = next;
+    document.documentElement.style.setProperty('--vk-banner-reserve-bottom', next + 'px');
+    // Поле и частицы меряют себя по resize окна — высота body сменилась
+    // без него, поэтому сообщаем сами.
+    window.dispatchEvent(new Event('resize'));
+  }
+
+  function applyBannerInfo(info) {
+    if (platformResizedForBanner) return;
+    if (!info || info.result === false) { setBannerReserve(0); return; }
+    const h = Number(info.banner_height);
+    setBannerReserve(h > 0 ? h : BANNER_FALLBACK_HEIGHT_PX);
+  }
+
+  function syncBanner() {
+    if (bannerBusy) return;
+    const want = bannerWanted && !bannerClosedByUser && isPortrait();
+    if (want === bannerOn) return;
+    bannerBusy = true;
+    if (want) {
+      const heightBefore = window.innerHeight;
+      withTimeout(vkBridge.send('VKWebAppShowBannerAd', { banner_location: 'bottom' }), INTERSTITIAL_TIMEOUT_MS)
+        .then((info) => {
+          console.log('[vk_platform] баннер показан:', JSON.stringify(info));
+          if (info && info.result === false) return;
+          bannerOn = true;
+          applyBannerInfo(info);
+          setTimeout(() => {
+            if (heightBefore - window.innerHeight >= BANNER_SELF_RESIZE_PX) {
+              platformResizedForBanner = true;
+              setBannerReserve(0);
+              console.log('[vk_platform] баннер: площадка сама ужала окно, свой отступ снят');
+            }
+          }, BANNER_SETTLE_MS);
+        })
+        .catch((e) => { console.warn('[vk_platform] баннер недоступен:', e); })
+        .then(() => { bannerBusy = false; syncBanner(); });
+    } else {
+      withTimeout(vkBridge.send('VKWebAppHideBannerAd', {}), INTERSTITIAL_TIMEOUT_MS)
+        .catch((e) => { console.warn('[vk_platform] баннер: скрыть не удалось:', e); })
+        .then(() => {
+          bannerOn = false;
+          platformResizedForBanner = false;
+          setBannerReserve(0);
+          bannerBusy = false;
+          syncBanner();
+        });
+    }
+  }
+
+  function armMobileBanner() {
+    if (!isMobileWeb()) return;
+    if (typeof vkBridge.subscribe === 'function') vkBridge.subscribe((e) => {
+      const type = e && e.detail && e.detail.type;
+      if (type === 'VKWebAppBannerAdUpdated') applyBannerInfo(e.detail.data);
+      if (type === 'VKWebAppBannerAdClosedByUser') { bannerClosedByUser = true; bannerOn = false; setBannerReserve(0); }
+    });
+    const onFirstAction = () => {
+      document.removeEventListener('pointerdown', onFirstAction, true);
+      bannerWanted = true;
+      syncBanner();
+    };
+    document.addEventListener('pointerdown', onFirstAction, true);
+    const rotate = () => syncBanner();
+    window.addEventListener('orientationchange', rotate);
+    window.addEventListener('resize', rotate);
   }
 
   /* ---------- Game Ready ----------
@@ -380,14 +485,22 @@ const Platform = (() => {
     }
   }
 
-  /* Награда — при штатном .then() (ролик реально досмотрен) И при
-     .catch()/таймауте (реклама не показалась, ошибка, или мост
-     потерял сообщение о закрытии — известная нестабильность на части
-     мобильных клиентов, см. журнал наверху). По студийному стандарту
-     недоступная реклама выдаёт награду бесплатно — тупика для игрока
-     здесь нет ни в одном исходе. finish() — единая точка выхода,
-     settled защищает от двойного вызова (штатный ответ ПОСЛЕ того,
-     как уже сработал таймаут-предохранитель). */
+  /* Награда — ТОЛЬКО если мост вернул {result:true} (реклама реально
+     показана; ТЗ ads_rework 2026-10-01, правила 1–2). Отказ моста
+     (adblock/нет рекламы), {result:false}, пустой ответ, зависший мост
+     (таймаут-предохранитель) и отсутствие моста — награды НЕТ: исход
+     уходит в onResume(outcome), main.js показывает игроку уведомление.
+     Раньше (студийный стандарт «недоступная реклама не тупик») все эти
+     исходы выдавали награду бесплатно — это и была дыра «adblock →
+     подсказки бесконечно». outcome: 'shown' | 'error' | 'timeout' |
+     'unavailable' (нет моста) | 'dev' (только DEV_FREE_REWARD из
+     dev_flags.js, которого нет в сборках площадок и стенда). finish() —
+     единая точка выхода, settled защищает от двойного вызова (штатный
+     ответ ПОСЛЕ того, как уже сработал таймаут-предохранитель). */
+  function devFreeReward() {
+    return typeof DEV_FREE_REWARD !== 'undefined' && DEV_FREE_REWARD === true;
+  }
+
   function showRewarded(onRewarded, onPause, onResume) {
     // Debug-оверлей (?debug=1, main.js) — см. журнал наверху, п. основателя
     // 2026-09-06. typeof-гейт: main.js объявляет window.__debugLog ТОЛЬКО
@@ -395,10 +508,15 @@ const Platform = (() => {
     const dbg = (typeof window !== 'undefined' && window.__debugLog) || null;
     if (dbg) dbg('[rewarded] клик получен, ready=' + ready);
     if (!ready) {
-      console.warn('[vk_platform] dev: rewarded → награда выдана');
-      if (dbg) dbg('[rewarded] ready=false (dev-режим/нет моста) — награда сразу');
-      if (onRewarded) onRewarded();
-      if (onResume) onResume('dev');
+      if (devFreeReward()) {
+        console.warn('[vk_platform] dev: rewarded → награда выдана (DEV_FREE_REWARD)');
+        if (onResume) onResume('dev');
+        if (onRewarded) onRewarded();
+        return;
+      }
+      console.warn('[vk_platform] rewarded: моста нет — награды нет');
+      if (dbg) dbg('[rewarded] ready=false (нет моста) — награды нет');
+      if (onResume) onResume('unavailable');
       return;
     }
     if (onPause) onPause();
@@ -455,7 +573,12 @@ const Platform = (() => {
       sendAd({ ad_format: 'reward', useWaterfall: true }),
       REWARD_AD_TIMEOUT_MS
     )
-      .then(() => finish(true, 'ролик закрыт (resolve)', 'shown'))
+      .then((data) => {
+        // Контракт ВК: {result:true} — реклама показана, {result:false} —
+        // «ошибка при показе». Любой другой ответ — не доказательство показа.
+        if (data && data.result === true) finish(true, 'ролик закрыт (result:true)', 'shown');
+        else finish(false, 'мост ответил без result:true — награды нет: ' + JSON.stringify(data), 'error');
+      })
       .catch((e) => {
         // Различаем «площадка не ответила за N секунд» (НАШ withTimeout —
         // единственный источник Error с message 'timeout' в этой цепочке)
@@ -469,8 +592,8 @@ const Platform = (() => {
             ? `[rewarded] мост НЕ ОТВЕТИЛ за ${REWARD_AD_TIMEOUT_MS}мс — сработал таймаут-предохранитель`
             : '[rewarded] мост явно отказал: ' + JSON.stringify(e));
         }
-        console.warn('[vk_platform] rewarded недоступна/зависла — выдаём подсказку бесплатно:', e);
-        finish(true, isOwnTimeout ? 'таймаут — выдано бесплатно' : 'явный отказ моста — выдано бесплатно', isOwnTimeout ? 'timeout' : 'error');
+        console.warn('[vk_platform] rewarded недоступна/зависла — награды нет:', e);
+        finish(false, isOwnTimeout ? 'таймаут — награды нет' : 'явный отказ моста — награды нет', isOwnTimeout ? 'timeout' : 'error');
       });
   }
 

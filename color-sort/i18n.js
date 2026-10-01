@@ -14,6 +14,11 @@ const I18N = {
     noMoves: 'Нет доступных ходов',
     hintAd: 'Подсказка за рекламу',
     hintAdLoading: 'Загрузка рекламы…',
+    // ТЗ ads_rework: реклама не показана (adblock, нет объявления, сбой) —
+    // бонуса нет. Текст мягкий: от «нет объявления» adblock не отличить.
+    hintAdUnavailable: 'Реклама недоступна. Отключите блокировщик рекламы, чтобы получить подсказку',
+    energyAdUnavailable: 'Реклама недоступна. Отключите блокировщик рекламы, чтобы получить энергию',
+    hintDailyLimit: 'На сегодня подсказки за рекламу закончились — приходите завтра',
     campaignWinTitle: 'Поздравляем! Вы прошли все уровни',
     campaignWinNote: 'Следите за обновлениями — скоро добавим новые',
     campaignMenu: 'В меню',
@@ -91,6 +96,9 @@ const I18N = {
     noMoves: 'No moves available',
     hintAd: 'Hint for an ad',
     hintAdLoading: 'Loading ad…',
+    hintAdUnavailable: 'Ad unavailable. Turn off your ad blocker to get a hint',
+    energyAdUnavailable: 'Ad unavailable. Turn off your ad blocker to get energy',
+    hintDailyLimit: 'No more ad hints for today — come back tomorrow',
     campaignWinTitle: "Congratulations! You've completed all levels",
     campaignWinNote: 'Stay tuned — new levels are on the way',
     campaignMenu: 'To menu',

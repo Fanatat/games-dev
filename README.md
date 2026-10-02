@@ -11,11 +11,11 @@
 | Две крепости (Lane Battler) | [Открыть](https://fanatat.github.io/games-dev/lane-battle/) | [Код](https://github.com/Fanatat/lane-battle-vk) | `9f73050` |
 | Королевская Косынка (Royal Solitaire) | [Открыть](https://fanatat.github.io/games-dev/royal-solitaire/) | [Код](https://github.com/Fanatat/Royal_solitaire) | `9f73050` |
 | Game7 (Horde), зомби-экшен на Unity WebGL | [Открыть](https://fanatat.github.io/games-dev/game7-horde/) | закрытый репозиторий | `953e638`, снимок от 30.09.2026 |
-| Police Runner, 3D-раннер на Godot 4 | [Открыть](https://fanatat.github.io/games-dev/police-runner/) | закрытый репозиторий | `8a8480a`, этап 1, 02.10.2026 |
+| Police Runner, 3D-раннер на Godot 4 | [Открыть](https://fanatat.github.io/games-dev/police-runner/) | закрытый репозиторий | `baa566e`, этап 1 (b2), 02.10.2026 |
 
 Идентификатор обозначает проверенный снимок репозитория, а не номер релиза игры.
 Game7 собрана как dev-сборка Unity WebGL (Gzip, с запасной распаковкой в JS — Pages не отдаёт `Content-Encoding`): показывает счётчик FPS, первая загрузка около 17 МБ.
-Police Runner — Web-экспорт Godot 4.7 без потоков: движку нужен HTTPS (по http с другого устройства не запускается), `index.wasm` около 40 МБ без сжатия. Debug-панель — F1 или 5 касаний в правый верхний угол.
+Police Runner — Web-экспорт Godot 4.7 без потоков: движку нужен HTTPS (по http с другого устройства не запускается), `index.wasm` около 40 МБ без сжатия. Debug-панель — F1 или 5 касаний в левый верхний угол.
 Тестовая версия может отличаться от релизной контентом, звуком, сохранениями и
 интеграциями площадок. Наличие страницы не подтверждает публикацию в каталоге VK,
 Яндекс Игр или CrazyGames. Обновление тестовой сборки — замена папки игры целиком.

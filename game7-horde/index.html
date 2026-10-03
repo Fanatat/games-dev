@@ -7,13 +7,14 @@
   Названий площадок и внешних ссылок на странице нет; в билде под
   площадку BuildScript подставляет её скрипты на место platform-head
   (tools/platform/), и страница ждёт window.game7PlatformReady, если
-  скрипт его создал.
+  скрипт его создал. Заголовок вкладки — название игры из game.json в
+  корне репозитория: BuildScript подставляет его на место game-title.
 -->
 <html lang="en">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Game7 (Horde)</title>
+    <title>game7</title>
     <!-- platform-head -->
     <style>
       html, body {
@@ -100,12 +101,12 @@
       canvas.addEventListener("contextmenu", function (e) { e.preventDefault(); });
 
       var buildUrl = "Build";
-      var loaderUrl = buildUrl + "/dev-20261002-234106.loader.js";
+      var loaderUrl = buildUrl + "/dev-20261003-032319.loader.js";
       var config = {
         arguments: [],
-        dataUrl: buildUrl + "/dev-20261002-234106.data.unityweb",
-        frameworkUrl: buildUrl + "/dev-20261002-234106.framework.js.unityweb",
-        codeUrl: buildUrl + "/dev-20261002-234106.wasm.unityweb",
+        dataUrl: buildUrl + "/dev-20261003-032319.data.unityweb",
+        frameworkUrl: buildUrl + "/dev-20261003-032319.framework.js.unityweb",
+        codeUrl: buildUrl + "/dev-20261003-032319.wasm.unityweb",
         streamingAssetsUrl: "StreamingAssets",
         companyName: "DefaultCompany",
         productName: "unity",

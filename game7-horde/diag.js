@@ -38,7 +38,7 @@
       var shaders = gl.getAttachedShaders(program) || [];
       for (var i = 0; i < shaders.length; i++) {
         var src = gl.getShaderSource(shaders[i]) || "";
-        if (src.indexOf("_CrowdData") >= 0) {
+        if ((src.indexOf("_CrowdInst") >= 0 || src.indexOf("_CrowdData") >= 0)) {
           var rigid = src.indexOf("_BoneTex") < 0 ? "rigid" : "skin";
           var pass = src.indexOf("_CrowdSHAr") >= 0 ? "forward" : src.indexOf("_ShadowBias") >= 0 ? "shadow" : "outline/depth";
           return "crowd-" + rigid + "-" + pass;
@@ -77,7 +77,7 @@
       if (!this.getShaderParameter(sh, this.COMPILE_STATUS)) {
         var src = this.getShaderSource(sh) || "";
         add("c" + src.length, "SHADER FAIL: " + (this.getShaderInfoLog(sh) || "").slice(0, 300) +
-          (src.indexOf("_CrowdData") >= 0 ? " [crowd]" : ""));
+          ((src.indexOf("_CrowdInst") >= 0 || src.indexOf("_CrowdData") >= 0) ? " [crowd]" : ""));
       }
     };
     var link = proto.linkProgram;

@@ -19,6 +19,9 @@ const I18N = {
     // бонуса нет. Текст мягкий: от «нет объявления» adblock не отличить.
     hintAdUnavailable: 'Реклама недоступна. Отключите блокировщик рекламы, чтобы получить подсказки',
     energyAdUnavailable: 'Реклама недоступна. Отключите блокировщик рекламы, чтобы получить энергию',
+    // 05.10: в приложении ВК блокировщика не бывает — без совета про него.
+    hintAdFailApp: 'Реклама не показалась — подсказки не начислены. Попробуйте ещё раз чуть позже',
+    energyAdFailApp: 'Реклама не показалась — энергия не начислена. Попробуйте ещё раз чуть позже',
     hintDailyLimit: 'На сегодня подсказки за рекламу закончились — приходите завтра',
     campaignWinTitle: 'Поздравляем! Вы прошли все уровни',
     campaignWinNote: 'Следите за обновлениями — скоро добавим новые',
@@ -100,6 +103,8 @@ const I18N = {
     hintAdLoading: 'Loading ad…',
     hintAdUnavailable: 'Ad unavailable. Turn off your ad blocker to get hints',
     energyAdUnavailable: 'Ad unavailable. Turn off your ad blocker to get energy',
+    hintAdFailApp: 'The ad did not play — no hints were given. Please try again a bit later',
+    energyAdFailApp: 'The ad did not play — no energy was given. Please try again a bit later',
     hintDailyLimit: 'No more ad hints for today — come back tomorrow',
     campaignWinTitle: "Congratulations! You've completed all levels",
     campaignWinNote: 'Stay tuned — new levels are on the way',

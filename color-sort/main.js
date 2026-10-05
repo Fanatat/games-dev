@@ -1206,11 +1206,25 @@
     },
   }) : null;
 
+  /* 05.10 (жалоба основателя: в приложении ВК на телефоне реклама «не
+     показывается — отключите блокировщик», хотя его нет): уведомление о
+     неудачной рекламе несёт второй строкой код ответа ВК (diag.text из
+     vk_platform.js) — на телефоне консоли нет, а по коду видно, кто
+     отказал и почему. Строка без данных игрока. */
+  function appendToastCode(el, sub) {
+    if (!sub) return;
+    const code = document.createElement('span');
+    code.className = 'toast-code';
+    code.textContent = sub;
+    el.appendChild(code);
+  }
+
   let _retentionToastTimer = null;
-  function showRetentionToast(text) {
+  function showRetentionToast(text, sub) {
     const el = document.getElementById('retention-reward-toast');
     if (!el) return;
     el.textContent = text;
+    appendToastCode(el, sub);
     el.hidden = false;
     // ТЗ №15: игровой экран несёт двухрядную шапку (.game-header-stacked)
     // — фиксированный top тоста перекрывал бы её (найдено кадром
@@ -1227,7 +1241,7 @@
     _retentionToastTimer = setTimeout(() => {
       el.classList.remove('is-visible');
       setTimeout(() => { el.hidden = true; }, prefersReducedMotion() ? 0 : BOARD_FADE_MS);
-    }, 3200);
+    }, sub ? 6000 : 3200);   // с кодом — дольше: его успеть прочесть/снять
   }
 
   // Продвигает накопитель энергии на текущий момент — дёшево вызывать
@@ -1481,11 +1495,12 @@
         if (granted > 0) showRetentionToast(t('energyToastGain').replace('{n}', granted));
       },
       pauseGame,
-      (outcome) => {
+      // diag — только у ВК и только при неудаче (vk_platform.js, adDiag).
+      (outcome, diag) => {
         energyAdInFlight = false;
         resumeGame();
-        track('rewarded_result', { place: 'energy', result: outcome || 'unknown' });
-        if (isAdFailureOutcome(outcome)) showRetentionToast(t('energyAdUnavailable'));
+        track('rewarded_result', rewardedResultParams({ place: 'energy', result: outcome || 'unknown' }, diag));
+        if (isAdFailureOutcome(outcome)) showRetentionToast(t(adFailKey('energy', diag)), diag && diag.text);
       }
     );
   }
@@ -1716,8 +1731,9 @@
   /* ---------- Rewarded-подсказка ---------- */
   // ТЗ №22: тост общий для нескольких сообщений — текст выставляется
   // при каждом показе (data-i18n держит только значение по умолчанию).
-  function showHintToast(key = 'noMoves', ms = 1800) {
+  function showHintToast(key = 'noMoves', ms = 1800, sub = '') {
     hintToast.textContent = t(key);
+    appendToastCode(hintToast, sub);   // 05.10: код ответа ВК второй строкой
     hintToast.classList.remove('hidden');
     clearTimeout(showHintToast._t);
     showHintToast._t = setTimeout(() => hintToast.classList.add('hidden'), ms);
@@ -1958,6 +1974,20 @@
     return outcome === 'error' || outcome === 'timeout' || outcome === 'unavailable';
   }
 
+  /* 05.10: в приложении ВК (vk_platform=mobile_android/iphone/ipad, diag.app)
+     блокировщика не бывает — совет «отключите блокировщик» там ложный и
+     уводит игрока не туда. Там — нейтральный текст, в браузере — прежний. */
+  function adFailKey(place, diag) {
+    if (place === 'energy') return diag && diag.app ? 'energyAdFailApp' : 'energyAdUnavailable';
+    return diag && diag.app ? 'hintAdFailApp' : 'hintAdUnavailable';
+  }
+  // rewarded_result.err — ключ ответа ВК ('error:client_error:20', 'timeout',
+  // 'no_result', 'unavailable'): без текста причины и данных игрока.
+  function rewardedResultParams(params, diag) {
+    if (diag && diag.key) params.err = diag.key;
+    return params;
+  }
+
   let hintBusyRetries = 0;
   btnHint.addEventListener('click', () => {
     debugLog('[hint] клик по кнопке подсказки');
@@ -2046,13 +2076,15 @@
       // просмотра» на Яндексе, где onRewarded вообще не вызывается) —
       // rewardedInFlight сбрасывается ЗДЕСЬ ЖЕ (не в onRewarded), той
       // же логикой, что и hideHintLoadingToast чуть выше по коду.
-      (outcome) => {
+      // diag — только у ВК и только при неудаче (vk_platform.js, adDiag).
+      (outcome, diag) => {
         adOutcome = outcome || 'unknown';
         rewardedInFlight = false; hideHintLoadingToast(); resumeGame();
-        track('rewarded_result', { place: 'hint', result: outcome || 'unknown', hints: outcome === 'shown' || outcome === 'dev' ? HINTS_PER_AD : 0 });
+        track('rewarded_result', rewardedResultParams({ place: 'hint', result: outcome || 'unknown', hints: outcome === 'shown' || outcome === 'dev' ? HINTS_PER_AD : 0 }, diag));
+        if (diag) debugLog('[hint] реклама не показана — ' + diag.text);
         // Реклама не показана (adblock, нет объявления, сбой, SDK нет) —
         // бонуса нет, говорим игроку почему (ТЗ ads_rework, правило 3).
-        if (isAdFailureOutcome(outcome)) showHintToast('hintAdUnavailable', 4500);
+        if (isAdFailureOutcome(outcome)) showHintToast(adFailKey('hint', diag), diag ? 6000 : 4500, diag && diag.text);
       }
     );
   });

@@ -925,6 +925,29 @@ body {
   box-shadow: 3px 3px 0 var(--shadow);
   white-space: nowrap;
 }
+/* 05.10: длинные уведомления не вылезают за экран. Замер на телефоне
+   390px: «Реклама недоступна. Отключите блокировщик…» — 578px в одну
+   строку, левый край −94px, текст обрезан с обеих сторон. Ширина по
+   тексту (короткие тосты — как раньше, в одну строку), но не шире экрана
+   минус 12px с каждой стороны; длинный текст переносится. */
+.hint-toast,
+.retention-toast {
+  width: max-content;
+  max-width: calc(100vw - 24px);
+  white-space: normal;
+  text-align: center;
+}
+/* 05.10: код ответа ВК второй строкой под уведомлением о неудачной
+   рекламе (main.js appendToastCode) — мелко и бледно, переносится. */
+.hint-toast .toast-code,
+.retention-toast .toast-code {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.7rem;
+  opacity: 0.7;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
 
 /* ---------- Игровой экран в альбоме (ТЗ №27) ----------
    Низкое окно (телефон боком, узкая вкладка ПК): в портретной вёрстке

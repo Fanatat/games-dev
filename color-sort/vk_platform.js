@@ -154,7 +154,7 @@ const Platform = (() => {
      раньше на ВК этого поля не было вовсе (undefined, не строка),
      плашка молчала всегда независимо от сборки; main.js трогать не
      нужно, правка живёт ТОЛЬКО здесь и в build.py. */
-  const BUILD = 'b65-082345e-20261005';
+  const BUILD = 'b66-f8422ad-20261005';
 
   /* ---------- Единая точка времени (ТЗ №18) ----------
      Симметрично platform.js (Яндекс) — см. комментарий там же. Оба
@@ -229,6 +229,7 @@ const Platform = (() => {
       await withTimeout(vkBridge.send('VKWebAppInit'), INIT_TIMEOUT_MS);
       ready = true;
       console.log('[vk_platform] VK Bridge инициализирован');
+      fetchClientVersion();   // 05.10: версия приложения ВК — в диагностику показа
     } catch (e) {
       console.error('[vk_platform] VKWebAppInit не ответил/ошибка:', e);
       return false;
@@ -258,11 +259,25 @@ const Platform = (() => {
      формата. Ничего не ждёт и ни на что не влияет (кнопка видна всегда,
      награда — только по result:true при показе). Ответ «материалов нет»/
      ошибка/молчание — повтор через PRELOAD_RETRY_MS, не больше
-     PRELOAD_RETRIES раз подряд. */
+     PRELOAD_RETRIES раз подряд.
+
+     05.10 (жалоба основателя: в приложении ВК на телефоне реклама за
+     подсказку «грузится — отключите блокировщик», баннер при этом
+     работает; как в game1 b56): проверки идут СТРОГО ПО ОДНОЙ и не во
+     время показа. Раньше reward и interstitial уходили одновременно, а
+     после показа проверка шла, пока мог висеть повтор. У Android-клиента
+     ВК известна потеря ответов на одинаковые параллельные запросы
+     (VKCOM/vk-bridge#615) и «повторный CheckNativeAds так и висит» (#201).
+     Мост промолчал — следующая проверка не раньше PRELOAD_RETRY_MS, чтобы
+     не множить зависшие запросы. */
   const PRELOAD_TIMEOUT_MS = 8000;
   const PRELOAD_RETRY_MS = 30000;
   const PRELOAD_RETRIES = 5;
-  const preloadState = {};   // формат → { busy, tries, timer }
+  const preloadState = {};   // формат → { queued, tries, timer, last }
+  const checkQueue = [];     // форматы в очереди на CheckNativeAds
+  let checkBusy = false;     // CheckNativeAds в полёте
+  let checkHold = null;      // пауза очереди после молчания моста
+  let showsInFlight = 0;     // ShowNativeAds в полёте — проверки ждут
   function bgTimer(fn, ms) {
     const t = setTimeout(fn, ms);
     if (t && typeof t.unref === 'function') t.unref();   // Node-тесты не должны висеть на повторе
@@ -270,31 +285,124 @@ const Platform = (() => {
   }
   function preloadAds(fmt) {
     if (!ready || typeof vkBridge === 'undefined') return;
-    const st = preloadState[fmt] || (preloadState[fmt] = { busy: false, tries: 0, timer: null });
-    if (st.busy) return;
+    const st = preloadState[fmt] || (preloadState[fmt] = { queued: false, tries: 0, timer: null, last: '' });
     if (st.timer) { clearTimeout(st.timer); st.timer = null; }
-    st.busy = true;
+    if (st.queued) return;
+    st.queued = true;
+    checkQueue.push(fmt);
+    pumpChecks();
+  }
+  function pumpChecks() {
+    if (checkBusy || checkHold || showsInFlight > 0 || !checkQueue.length) return;
+    const fmt = checkQueue.shift();
+    const st = preloadState[fmt];
+    st.queued = false;
+    checkBusy = true;
     let done = false;
-    const end = (okNow, why) => {
+    const end = (okNow, why, last) => {
       if (done) return;
       done = true;
       clearTimeout(guard);
-      st.busy = false;
-      if (okNow) { st.tries = 0; return; }
-      if (st.tries >= PRELOAD_RETRIES) {
+      checkBusy = false;
+      st.last = last;   // для диагностики показа (adDiag)
+      if (okNow) {
+        st.tries = 0;
+      } else if (st.tries >= PRELOAD_RETRIES) {
         console.warn('[vk_platform] предзагрузка ' + fmt + ': ' + why + ' — повторы исчерпаны, ролик загрузится при показе');
-        return;
+      } else {
+        st.tries++;
+        st.timer = bgTimer(() => { st.timer = null; preloadAds(fmt); }, PRELOAD_RETRY_MS);
       }
-      st.tries++;
-      st.timer = bgTimer(() => { st.timer = null; preloadAds(fmt); }, PRELOAD_RETRY_MS);
+      if (last === 'silent') {
+        checkHold = bgTimer(() => { checkHold = null; pumpChecks(); }, PRELOAD_RETRY_MS);
+      } else {
+        pumpChecks();
+      }
     };
-    const guard = bgTimer(() => end(false, 'мост молчит'), PRELOAD_TIMEOUT_MS);
+    const guard = bgTimer(() => end(false, 'мост молчит', 'silent'), PRELOAD_TIMEOUT_MS);
     let p;
     try { p = vkBridge.send('VKWebAppCheckNativeAds', { ad_format: fmt }); } catch (e) { p = Promise.reject(e); }
     Promise.resolve(p).then(
-      (res) => end(!!(res && res.result === true), 'материалов пока нет'),
-      () => end(false, 'ошибка')
+      (res) => { const ok = !!(res && res.result === true); end(ok, 'материалов пока нет', ok ? 'ok' : 'empty'); },
+      (e) => { console.warn('[vk_platform] предзагрузка ' + fmt + ' — ошибка моста:', e); end(false, 'ошибка', 'err' + bridgeErr(e).short); }
     );
+  }
+  /* Показ занимает канал — проверки ждут ответа моста о показе. Сторож
+     показа (REWARD_AD_TIMEOUT_MS) канал НЕ освобождает: на телефоне ролик
+     с финальным экраном идёт дольше 40 с (game1 b53), и проверка ушла бы
+     поверх идущего показа. Мост не ответил совсем — канал освободится
+     через SHOW_HOLD_MAX_MS. Возвращает release(): срабатывает ровно один раз. */
+  const SHOW_HOLD_MAX_MS = 120000;
+  function holdChecksForShow() {
+    showsInFlight++;
+    let held = true;
+    const release = () => {
+      if (!held) return;
+      held = false;
+      clearTimeout(fallback);
+      showsInFlight--;
+      pumpChecks();
+    };
+    const fallback = bgTimer(release, SHOW_HOLD_MAX_MS);
+    return release;
+  }
+
+  /* ---------- Диагностика показа рекламы (05.10) ----------
+     Жалоба основателя: в мобильном приложении ВК реклама за подсказку
+     «грузится, потом — отключите блокировщик», хотя блокировщика нет.
+     Игроку и в Метрику уходило только слово 'error' — настоящий ответ
+     моста (error_type / error_code / error_reason) видела лишь консоль, а
+     на телефоне её не открыть. Теперь каждый неудачный показ несёт diag:
+     что именно ответил мост, через сколько, чем кончилась предзагрузка и
+     какая версия приложения ВК. main.js выводит короткую строку кода в
+     уведомлении и шлёт ключ в rewarded_result.err. Формат — общий с
+     game1 b56 и game2 v67. */
+  let clientVer = '';   // 'android 8.12' — VKWebAppGetClientVersion, фоном после init
+  function fetchClientVersion() {
+    let p;
+    try { p = vkBridge.send('VKWebAppGetClientVersion'); } catch (_) { return; }
+    Promise.resolve(p).then((r) => {
+      if (r && (r.platform || r.version)) clientVer = String(r.platform || '?') + ' ' + String(r.version || '?');
+    }, () => {});
+  }
+  function launchPlatform() {
+    try { return new URLSearchParams(location.search).get('vk_platform') || ''; } catch (_) { return ''; }
+  }
+  /* Отказ моста ВК: { error_type, error_data: { error_code, error_reason } };
+     error_reason бывает строкой или объектом { error_msg }. */
+  function bridgeErr(e) {
+    let type = '', code = '', reason = '';
+    if (e && typeof e === 'object') {
+      if (e instanceof Error) reason = e.message;
+      type = e.error_type ? String(e.error_type) : '';
+      const d = (e.error_data && typeof e.error_data === 'object') ? e.error_data : e;
+      if (d.error_code != null) code = String(d.error_code);
+      let r = d.error_reason != null ? d.error_reason : (d.error_description || d.error_msg || '');
+      if (r && typeof r === 'object') r = r.error_msg || r.error_description || JSON.stringify(r);
+      if (r) reason = String(r);
+    } else if (e != null) {
+      reason = String(e);
+    }
+    reason = reason.replace(/\s+/g, ' ').trim().slice(0, 48);
+    const short = (type ? ':' + type : '') + (code ? ':' + code : '');
+    return { type, code, reason, short };
+  }
+  /* res: 'error' | 'no_result' (ответ без result:true) | 'timeout' |
+     'unavailable' (моста нет). startedAt — Date.now() при отправке показа. */
+  function adDiag(fmt, startedAt, res, err) {
+    const sec = startedAt ? Math.round((Date.now() - startedAt) / 100) / 10 : 0;
+    const pre = (preloadState[fmt] && preloadState[fmt].last) || 'none';
+    const be = res === 'error' ? bridgeErr(err) : { type: '', code: '', reason: '', short: '' };
+    // key — для Метрики: короткий и стабильный ('error:client_error:1', 'timeout', 'no_result')
+    const key = res === 'error' ? 'error' + be.short : res;
+    const what = res === 'error'
+      ? ['ВК', be.type, be.code, be.reason ? '«' + be.reason + '»' : ''].filter(Boolean).join(' ')
+      : (res === 'timeout' ? 'ВК молчит' : (res === 'no_result' ? 'ВК: result ≠ true' : 'нет моста ВК'));
+    const plat = launchPlatform();
+    const text = [what, startedAt ? sec + ' с' : '', ready ? 'пред. ' + pre : '', clientVer || plat].filter(Boolean).join(' · ');
+    // app — нативное приложение ВК (не браузер): блокировщика там не бывает
+    const app = /^(mobile_(android|iphone|ipad)|android_|iphone_|ipad_)/.test(plat);
+    return { fmt, res, type: be.type, code: be.code, reason: be.reason, sec, pre, cv: clientVer, app, key, text };
   }
 
   /* ---------- Баннер снизу на телефоне в вертикали (ТЗ ads_rework
@@ -511,16 +619,18 @@ const Platform = (() => {
       return;
     }
     if (onPause) onPause();
-    withTimeout(
-      sendAd({ ad_format: 'interstitial' }),
-      INTERSTITIAL_TIMEOUT_MS
-    )
+    const releaseChecks = holdChecksForShow();   // 05.10: проверки ждут ответа о показе
+    const shown = sendAd({ ad_format: 'interstitial' });
+    // Следующий ролик — заранее, когда мост ответил про этот (не по сторожу:
+    // показ мог ещё идти).
+    const afterShow = () => { releaseChecks(); preloadAds('interstitial'); };
+    Promise.resolve(shown).then(afterShow, afterShow);
+    withTimeout(shown, INTERSTITIAL_TIMEOUT_MS)
       .then(() => { if (onResume) onResume(true); })
       .catch((e) => {
         console.error('[vk_platform] interstitial:', e);
         if (onResume) onResume(false);
-      })
-      .then(() => preloadAds('interstitial'));   // следующий ролик — заранее
+      });
   }
 
   /* Показ рекламы. Синхронный throw моста (ТЗ №26, ревью: onPause уже
@@ -567,12 +677,14 @@ const Platform = (() => {
       }
       console.warn('[vk_platform] rewarded: моста нет — награды нет');
       if (dbg) dbg('[rewarded] ready=false (нет моста) — награды нет');
-      if (onResume) onResume('unavailable');
+      if (onResume) onResume('unavailable', adDiag('reward', 0, 'unavailable'));
       return;
     }
     if (onPause) onPause();
     let settled = false;
     const sendStartedAt = performance.now();
+    const startedAt = Date.now();   // 05.10: секунды до ответа — в diag
+    const releaseChecks = holdChecksForShow();   // 05.10: проверки ждут ответа о показе
     // Строка раз в 10с, пока ждём мост (баг основателя 2026-09-07: живой
     // лог с Android показал тишину >10с и, самое важное, что основатель
     // ЗАКРЫЛ игру раньше срабатывания 40-секундного предохранителя —
@@ -607,34 +719,34 @@ const Platform = (() => {
         onRewarded();
       });
     };
-    const finish = (grantReward, reason, outcome) => {
+    // 05.10: onResume(outcome, diag) — diag только у исходов без показа (adDiag).
+    const finish = (grantReward, reason, outcome, diag) => {
       if (settled) return;
       settled = true;
       if (waitProgressTimer) clearInterval(waitProgressTimer);
+      if (diag) console.warn('[vk_platform] rewarded не показана: ' + diag.text);
       // Видимый эффект — строго после onResume(), как в platform.js.
-      if (onResume) onResume(outcome);
+      if (onResume) onResume(outcome, diag);
       console.log('[vk_platform] rewarded завершён:', reason, '| награда:', grantReward);
-      if (dbg) dbg('[rewarded] finish: ' + reason + ' | награда=' + grantReward);
+      if (dbg) dbg('[rewarded] finish: ' + reason + ' | награда=' + grantReward + (diag ? ' | ' + diag.text : ''));
       if (grantReward) grantNow();
     };
-    if (dbg) dbg('[rewarded] отправляю VKWebAppShowNativeAds(ad_format=reward, useWaterfall=true) в мост');
-    // useWaterfall (баг основателя 2026-09-06, п.2: rewarded молчит на
-    // мобильном ВК, PC/Яндекс ок): официальный параметр контракта —
-    // разрешает площадке подставить interstitial-инвентарь, когда
-    // настоящего rewarded-ролика нет в наличии, вместо немедленного
-    // отказа/тишины (у ВК исторически заметно уже rewarded-инвентарь,
-    // чем interstitial/баннерного — VKCOM/vk-bridge#243, тот же класс
-    // жалобы). МИТИГАЦИЯ СИМПТОМА, не подтверждённая причина: живого
-    // показа на реальном мобильном ВК-клиенте это НЕ доказывает — от
-    // пустого мостового Promise (см. журнал наверху) страхует
-    // ТОЛЬКО таймаут-предохранитель ниже.
-    const adPromise = sendAd({ ad_format: 'reward', useWaterfall: true });
-    // Следующий ролик — заранее, когда мост ответил про этот (как в game1).
-    Promise.resolve(adPromise).then(() => preloadAds('reward'), () => preloadAds('reward'));
+    if (dbg) dbg('[rewarded] отправляю VKWebAppShowNativeAds(ad_format=reward) в мост');
+    // useWaterfall убран 05.10. Его добавили 2026-09-06 «митигацией
+    // симптома» (rewarded молчит на мобильном ВК) — но мост ВК такого
+    // ключа не читает: у VKWebAppShowNativeAds параметр называется
+    // use_waterfall (snake_case) и по умолчанию уже true (@vkontakte/
+    // vk-bridge 3.0.2, packages/core/src/types/data.ts). Запрос — только
+    // ad_format, как в game1.
+    const adPromise = sendAd({ ad_format: 'reward' });
+    // Следующий ролик — заранее, когда мост ответил про этот (как в game1);
+    // до ответа проверки стоят (holdChecksForShow).
+    const afterShow = () => { releaseChecks(); preloadAds('reward'); };
+    Promise.resolve(adPromise).then(afterShow, afterShow);
     const timeoutTimer = setTimeout(() => {
       if (dbg) dbg(`[rewarded] мост НЕ ОТВЕТИЛ за ${REWARD_AD_TIMEOUT_MS}мс — сработал таймаут-предохранитель`);
       console.warn('[vk_platform] rewarded зависла — награды пока нет, ждём позднего ответа:', REWARD_AD_TIMEOUT_MS);
-      finish(false, 'таймаут — награды нет', 'timeout');
+      finish(false, 'таймаут — награды нет', 'timeout', adDiag('reward', startedAt, 'timeout'));
     }, REWARD_AD_TIMEOUT_MS);
     adPromise.then(
       (data) => {
@@ -651,7 +763,8 @@ const Platform = (() => {
             finish(true, 'ролик закрыт (result:true)', 'shown');
           }
         } else {
-          finish(false, 'мост ответил без result:true — награды нет: ' + JSON.stringify(data), 'error');
+          finish(false, 'мост ответил без result:true — награды нет: ' + JSON.stringify(data), 'error',
+            adDiag('reward', startedAt, 'no_result'));
         }
       },
       (e) => {
@@ -660,7 +773,7 @@ const Platform = (() => {
         // error_data}; таймаут теперь — наш отдельный таймер выше.
         if (dbg) dbg('[rewarded] мост явно отказал: ' + JSON.stringify(e));
         console.warn('[vk_platform] rewarded недоступна — награды нет:', e);
-        finish(false, 'явный отказ моста — награды нет', 'error');
+        finish(false, 'явный отказ моста — награды нет', 'error', adDiag('reward', startedAt, 'error', e));
       }
     );
   }

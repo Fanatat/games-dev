@@ -1,6 +1,6 @@
 # Тестовый стенд браузерных игр
 
-Здесь можно попробовать семь сборок перед публикацией на площадках.
+Здесь можно попробовать восемь сборок перед публикацией на площадках.
 [Открыть каталог](https://fanatat.github.io/games-dev/).
 
 | Игра | Тестовая сборка | Репозиторий игры | Снимок Git на 28.09.2026 |
@@ -9,6 +9,7 @@
 | Кот и японские кроссворды | [Открыть](https://fanatat.github.io/games-dev/catnonogram/) | [Код](https://github.com/Fanatat/catnonogram-vk) | `9f73050` |
 | Сортировка: Цвет и Форма | [Открыть](https://fanatat.github.io/games-dev/color-sort/) | [Код](https://github.com/Fanatat/Color_Sort-Vk) | `9f73050` |
 | Две крепости (Lane Battler) | [Открыть](https://fanatat.github.io/games-dev/lane-battle/) | [Код](https://github.com/Fanatat/lane-battle-vk) | `9f73050` |
+| Последний конвой (прототип форка «Двух крепостей») | [Открыть](https://fanatat.github.io/games-dev/last-convoy/) | ветка `fork1-last-convoy` локальная, не опубликована | `c28784b`, прототип от 05.10.2026 |
 | Королевская Косынка (Royal Solitaire) | [Открыть](https://fanatat.github.io/games-dev/royal-solitaire/) | [Код](https://github.com/Fanatat/Royal_solitaire) | `9f73050` |
 | Game7 (Horde), зомби-экшен на Unity WebGL | [Открыть](https://fanatat.github.io/games-dev/game7-horde/) | закрытый репозиторий | `953e638`, снимок от 30.09.2026 |
 | Police Runner, 3D-раннер на Godot 4 | [Открыть](https://fanatat.github.io/games-dev/police-runner/) | закрытый репозиторий | `a8e6244`, этап 2 (b3), 02.10.2026 |

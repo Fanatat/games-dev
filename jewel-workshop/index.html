@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Мастерская украшений</title>
+  <meta name="ws-build" content="w11-478c9b9-20261005">
+  <!-- Форк game3 «Мастерская украшений» (прототип). Отдельная точка входа:
+       main.js/retention.js/analytics.js/платформенные адаптеры game3 НЕ
+       подключены — ни реклама, ни энергия, ни магазин, ни сейвы исходной
+       игры. Поле рисует board.js, звуки — sound.js, правила — workshop_rules.js. -->
+  <link rel="stylesheet" href="style.css?v=11">
+  <link rel="stylesheet" href="workshop.css?v=11">
+</head>
+<body>
+
+  <!-- Меню -->
+  <div id="screen-menu" class="screen active">
+    <div class="menu-box ws-menu-box">
+      <h1 class="game-title">Мастерская украшений</h1>
+      <p class="ws-menu-sub">Прототип · 3 уровня</p>
+      <p class="ws-rules">Разложите бусины по ёмкостям — по четыре одинаковых (цвет и форма).
+        Собрали четыре — отдайте заказ: ёмкость освободится. Нужно выполнить любые два из трёх заказов.</p>
+      <button id="btn-play" class="btn btn-primary btn-play-hero">Играть</button>
+      <div class="ws-level-pick" id="ws-level-pick"></div>
+      <button id="btn-sound" class="btn btn-icon" aria-label="Звук">♪</button>
+    </div>
+  </div>
+
+  <!-- Игра -->
+  <div id="screen-workshop" class="screen">
+    <div class="ws-root">
+      <header class="ws-header">
+        <button id="btn-back" class="btn btn-icon" aria-label="В меню">←</button>
+        <div id="ws-level-title" class="ws-level-title"></div>
+        <button id="btn-sound-game" class="btn btn-icon" aria-label="Звук">♪</button>
+      </header>
+
+      <section class="ws-orders-panel" aria-label="Заказы">
+        <div class="ws-counter" id="ws-counter" aria-live="polite">Заказы: 0/2</div>
+        <div class="ws-orders" id="ws-orders"></div>
+      </section>
+
+      <div class="ws-caption" id="ws-caption"></div>
+
+      <main id="board-wrap" class="ws-board-wrap">
+        <canvas id="board-canvas"></canvas>
+      </main>
+
+      <footer class="ws-actions">
+        <div class="ws-actions-row">
+          <button id="btn-undo" class="btn btn-icon ws-small hidden" aria-label="Отменить ход">↺</button>
+          <button id="btn-restart" class="btn btn-icon ws-small hidden" aria-label="Начать заново"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M19 12a7 7 0 1 1-2.05-4.95" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><path d="M19.5 3.5v5h-5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          <button id="btn-deliver" class="btn btn-primary ws-deliver is-idle">Отдать заказ</button>
+          <button id="btn-hint" class="btn btn-icon ws-small" aria-label="Подсказка">?</button>
+        </div>
+        <div class="ws-note">После выдачи предыдущие ходы отменить нельзя</div>
+      </footer>
+    </div>
+
+    <canvas id="fx-canvas" class="fx-canvas"></canvas>
+    <canvas id="jewel-canvas" class="ws-jewel-canvas"></canvas>
+    <div id="hint-toast" class="hint-toast ws-toast hidden"></div>
+
+    <!-- Победа: показывается ровно один раз за прохождение уровня -->
+    <div id="win-overlay" class="win-overlay hidden">
+      <div class="win-box">
+        <div class="win-title" id="ws-win-title">Заказы выполнены!</div>
+        <div class="ws-win-text" id="ws-win-text"></div>
+        <button id="btn-next" class="btn btn-primary btn-next-big">Дальше</button>
+        <button id="btn-again" class="btn btn-menu-secondary">Пройти ещё раз</button>
+      </div>
+    </div>
+    <canvas id="confetti-canvas" class="confetti-canvas"></canvas>
+  </div>
+
+  <script src="board.js?v=11"></script>
+  <script src="sfx_data.js?v=11"></script>
+  <script src="sound.js?v=11"></script>
+  <script src="confetti.js?v=11"></script>
+  <script src="fx.js?v=11"></script>
+  <script src="workshop_rules.js?v=11"></script>
+  <script src="workshop_levels.js?v=11"></script>
+  <script src="workshop.js?v=11"></script>
+</body>
+</html>

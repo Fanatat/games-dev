@@ -154,7 +154,7 @@ const Platform = (() => {
      раньше на ВК этого поля не было вовсе (undefined, не строка),
      плашка молчала всегда независимо от сборки; main.js трогать не
      нужно, правка живёт ТОЛЬКО здесь и в build.py. */
-  const BUILD = 'b60-622531d-20261001';
+  const BUILD = 'b62-32caf11-20261005';
 
   /* ---------- Единая точка времени (ТЗ №18) ----------
      Симметрично platform.js (Яндекс) — см. комментарий там же. Оба
@@ -286,6 +286,14 @@ const Platform = (() => {
   let bannerReservePx = 0;
   let platformResizedForBanner = false;
   let bannerBusy = false;
+  /* Аудит 2026-10-05, F05: отказ показа не должен порождать цепочку
+     повторов без задержки. После отказа/result:false/таймаута повторный
+     показ запрещён, пока игрок не повернёт устройство (смена ориентации —
+     явное событие жизненного цикла) и не более BANNER_MAX_FAILURES раз за
+     сессию. Resize сам по себе (его шлёт и setBannerReserve) не снимает блок. */
+  const BANNER_MAX_FAILURES = 3;
+  let bannerFailures = 0;
+  let bannerShowBlocked = false;
 
   function isMobileWeb() {
     try {
@@ -313,9 +321,17 @@ const Platform = (() => {
     setBannerReserve(h > 0 ? h : BANNER_FALLBACK_HEIGHT_PX);
   }
 
+  function bannerShowFailed() {
+    bannerFailures++;
+    bannerShowBlocked = true;
+  }
+
   function syncBanner() {
     if (bannerBusy) return;
-    const want = bannerWanted && !bannerClosedByUser && isPortrait();
+    // Повернули в альбом — блок снимается: следующий портрет — новая попытка.
+    if (!isPortrait() && bannerFailures < BANNER_MAX_FAILURES) bannerShowBlocked = false;
+    const want = bannerWanted && !bannerClosedByUser && isPortrait()
+      && !(bannerShowBlocked || bannerFailures >= BANNER_MAX_FAILURES);
     if (want === bannerOn) return;
     bannerBusy = true;
     if (want) {
@@ -323,7 +339,7 @@ const Platform = (() => {
       withTimeout(vkBridge.send('VKWebAppShowBannerAd', { banner_location: 'bottom' }), INTERSTITIAL_TIMEOUT_MS)
         .then((info) => {
           console.log('[vk_platform] баннер показан:', JSON.stringify(info));
-          if (info && info.result === false) return;
+          if (info && info.result === false) { bannerShowFailed(); return; }
           bannerOn = true;
           applyBannerInfo(info);
           setTimeout(() => {
@@ -334,7 +350,7 @@ const Platform = (() => {
             }
           }, BANNER_SETTLE_MS);
         })
-        .catch((e) => { console.warn('[vk_platform] баннер недоступен:', e); })
+        .catch((e) => { bannerShowFailed(); console.warn('[vk_platform] баннер недоступен:', e); })
         .then(() => { bannerBusy = false; syncBanner(); });
     } else {
       withTimeout(vkBridge.send('VKWebAppHideBannerAd', {}), INTERSTITIAL_TIMEOUT_MS)
@@ -533,6 +549,29 @@ const Platform = (() => {
       dbg(`[rewarded] жду ответа моста: ${Math.round((performance.now() - sendStartedAt) / 1000)}с/${REWARD_AD_TIMEOUT_MS / 1000}с`);
     }, 10000) : null;
     // outcome — исход для аналитики (ТЗ №25): 'shown' | 'error' | 'timeout'.
+    // Аудит 2026-10-05, F04: сторож (таймаут) снимает зависшую паузу, но НЕ
+    // отнимает право на награду: если мост всё же вернёт {result:true} позже,
+    // награда выдаётся — ровно один раз (rewardGranted), без второго onResume.
+    let rewardGranted = false;
+    const grantNow = () => {
+      if (rewardGranted) return;
+      rewardGranted = true;
+      if (!onRewarded) return;
+      // На мобильном ВК onRewarded() (внутри — Board.showHint(), общий
+      // код) не должен стартовать, пока экран ещё реально перекрыт
+      // рекламным оверлеем — см. журнал наверху. Ждём подтверждённой
+      // видимости, форсируем пересчёт лэйаута на случай смены
+      // размеров вьюпорта за время рекламы, и только потом отдаём
+      // награду вызывающей стороне. Два лога раздельно (решение vs.
+      // фактический показ) — на живом устройстве через remote-debug
+      // будет видно, если когда-нибудь разъедутся снова.
+      const waitStartedAt = performance.now();
+      waitVisibleAndSettled().then(() => {
+        if (typeof Board !== 'undefined' && Board.resize) Board.resize();
+        console.log('[vk_platform] rewarded: экран подтверждён видимым через', Math.round(performance.now() - waitStartedAt), 'мс — показываем подсказку');
+        onRewarded();
+      });
+    };
     const finish = (grantReward, reason, outcome) => {
       if (settled) return;
       settled = true;
@@ -541,60 +580,52 @@ const Platform = (() => {
       if (onResume) onResume(outcome);
       console.log('[vk_platform] rewarded завершён:', reason, '| награда:', grantReward);
       if (dbg) dbg('[rewarded] finish: ' + reason + ' | награда=' + grantReward);
-      if (grantReward && onRewarded) {
-        // На мобильном ВК onRewarded() (внутри — Board.showHint(), общий
-        // код) не должен стартовать, пока экран ещё реально перекрыт
-        // рекламным оверлеем — см. журнал наверху. Ждём подтверждённой
-        // видимости, форсируем пересчёт лэйаута на случай смены
-        // размеров вьюпорта за время рекламы, и только потом отдаём
-        // награду вызывающей стороне. Два лога раздельно (решение vs.
-        // фактический показ) — на живом устройстве через remote-debug
-        // будет видно, если когда-нибудь разъедутся снова.
-        const waitStartedAt = performance.now();
-        waitVisibleAndSettled().then(() => {
-          if (typeof Board !== 'undefined' && Board.resize) Board.resize();
-          console.log('[vk_platform] rewarded: экран подтверждён видимым через', Math.round(performance.now() - waitStartedAt), 'мс — показываем подсказку');
-          onRewarded();
-        });
-      }
+      if (grantReward) grantNow();
     };
     if (dbg) dbg('[rewarded] отправляю VKWebAppShowNativeAds(ad_format=reward, useWaterfall=true) в мост');
-    withTimeout(
-      // useWaterfall (баг основателя 2026-09-06, п.2: rewarded молчит на
-      // мобильном ВК, PC/Яндекс ок): официальный параметр контракта —
-      // разрешает площадке подставить interstitial-инвентарь, когда
-      // настоящего rewarded-ролика нет в наличии, вместо немедленного
-      // отказа/тишины (у ВК исторически заметно уже rewarded-инвентарь,
-      // чем interstitial/баннерного — VKCOM/vk-bridge#243, тот же класс
-      // жалобы). МИТИГАЦИЯ СИМПТОМА, не подтверждённая причина: живого
-      // показа на реальном мобильном ВК-клиенте это НЕ доказывает — от
-      // пустого мостового Promise (см. журнал наверху) страхует
-      // ТОЛЬКО таймаут-предохранитель ниже.
-      sendAd({ ad_format: 'reward', useWaterfall: true }),
-      REWARD_AD_TIMEOUT_MS
-    )
-      .then((data) => {
+    // useWaterfall (баг основателя 2026-09-06, п.2: rewarded молчит на
+    // мобильном ВК, PC/Яндекс ок): официальный параметр контракта —
+    // разрешает площадке подставить interstitial-инвентарь, когда
+    // настоящего rewarded-ролика нет в наличии, вместо немедленного
+    // отказа/тишины (у ВК исторически заметно уже rewarded-инвентарь,
+    // чем interstitial/баннерного — VKCOM/vk-bridge#243, тот же класс
+    // жалобы). МИТИГАЦИЯ СИМПТОМА, не подтверждённая причина: живого
+    // показа на реальном мобильном ВК-клиенте это НЕ доказывает — от
+    // пустого мостового Promise (см. журнал наверху) страхует
+    // ТОЛЬКО таймаут-предохранитель ниже.
+    const adPromise = sendAd({ ad_format: 'reward', useWaterfall: true });
+    const timeoutTimer = setTimeout(() => {
+      if (dbg) dbg(`[rewarded] мост НЕ ОТВЕТИЛ за ${REWARD_AD_TIMEOUT_MS}мс — сработал таймаут-предохранитель`);
+      console.warn('[vk_platform] rewarded зависла — награды пока нет, ждём позднего ответа:', REWARD_AD_TIMEOUT_MS);
+      finish(false, 'таймаут — награды нет', 'timeout');
+    }, REWARD_AD_TIMEOUT_MS);
+    adPromise.then(
+      (data) => {
+        clearTimeout(timeoutTimer);
         // Контракт ВК: {result:true} — реклама показана, {result:false} —
         // «ошибка при показе». Любой другой ответ — не доказательство показа.
-        if (data && data.result === true) finish(true, 'ролик закрыт (result:true)', 'shown');
-        else finish(false, 'мост ответил без result:true — награды нет: ' + JSON.stringify(data), 'error');
-      })
-      .catch((e) => {
-        // Различаем «площадка не ответила за N секунд» (НАШ withTimeout —
-        // единственный источник Error с message 'timeout' в этой цепочке)
-        // от «мост явно отказал» (родной reject vk-bridge — обычный
-        // объект вида {error_type, error_data}, без .message) — вопрос,
-        // который с телефона раньше нечем было различить (нет
-        // chrome://inspect), теперь виден прямо на экране через ?debug=1.
-        const isOwnTimeout = e && e.message === 'timeout';
-        if (dbg) {
-          dbg(isOwnTimeout
-            ? `[rewarded] мост НЕ ОТВЕТИЛ за ${REWARD_AD_TIMEOUT_MS}мс — сработал таймаут-предохранитель`
-            : '[rewarded] мост явно отказал: ' + JSON.stringify(e));
+        if (data && data.result === true) {
+          if (settled) {
+            // Поздний успех после сторожа: пауза уже снята, награду выдаём.
+            console.log('[vk_platform] rewarded: поздний result:true после таймаута — выдаём награду один раз');
+            if (dbg) dbg('[rewarded] поздний result:true — награда выдана');
+            grantNow();
+          } else {
+            finish(true, 'ролик закрыт (result:true)', 'shown');
+          }
+        } else {
+          finish(false, 'мост ответил без result:true — награды нет: ' + JSON.stringify(data), 'error');
         }
-        console.warn('[vk_platform] rewarded недоступна/зависла — награды нет:', e);
-        finish(false, isOwnTimeout ? 'таймаут — награды нет' : 'явный отказ моста — награды нет', isOwnTimeout ? 'timeout' : 'error');
-      });
+      },
+      (e) => {
+        clearTimeout(timeoutTimer);
+        // Родной reject vk-bridge — обычный объект вида {error_type,
+        // error_data}; таймаут теперь — наш отдельный таймер выше.
+        if (dbg) dbg('[rewarded] мост явно отказал: ' + JSON.stringify(e));
+        console.warn('[vk_platform] rewarded недоступна — награды нет:', e);
+        finish(false, 'явный отказ моста — награды нет', 'error');
+      }
+    );
   }
 
   return { init, gameReady, getLang, save, load, showInterstitial, showRewarded, SHOP_SUPPORTED, SAVE_SIZE_GUARD_BYTES, BUILD, now, haptic };

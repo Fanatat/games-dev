@@ -296,7 +296,52 @@
         console.error(`[save] СЕЙВ ПРЕВЫСИЛ БЮДЖЕТ СТОРОЖА: ${sizeBytes} байт > ${Platform.SAVE_SIZE_GUARD_BYTES} — площадка может отклонить/обрезать запись. При фиксированной схеме (156 уровней максимум) это означает баг, не органический рост данных — чинить причину, не добавлять эвикцию задним числом.`);
       }
     }
-    Platform.save(payload);
+    enqueueSave(payload);
+  }
+
+  /* Аудит 2026-10-05, R01: записи сейва раньше уходили независимо друг от
+     друга, результат игнорировался — завершения могли переставиться (старый
+     снимок ложился поверх нового), отказ не повторялся. Теперь одна запись
+     «в полёте»; всё, что накопилось за это время, схлопывается в ПОСЛЕДНИЙ
+     снимок и уходит следом. Отказ (ok:false) — повтор с растущей паузой, пока
+     не появится более свежий снимок или не исчерпаны попытки. */
+  const SAVE_RETRY_DELAYS_MS = [2000, 5000, 15000];
+  let saveInFlight = false;
+  let saveQueued = null;      // самый свежий снимок, ждущий очереди
+  let saveRetryTimer = null;
+  let saveFailures = 0;
+  function enqueueSave(payload) {
+    saveQueued = payload;
+    if (saveInFlight) return;
+    if (saveRetryTimer) { clearTimeout(saveRetryTimer); saveRetryTimer = null; }
+    pumpSave();
+  }
+  function pumpSave() {
+    if (saveInFlight || !saveQueued) return;
+    const payload = saveQueued;
+    saveQueued = null;
+    saveInFlight = true;
+    let pending;
+    try {
+      pending = Promise.resolve(Platform.save(payload));
+    } catch (e) {
+      pending = Promise.resolve({ ok: false, error: e });
+    }
+    pending.then((res) => res, (e) => ({ ok: false, error: e })).then((res) => {
+      saveInFlight = false;
+      if (res && res.ok === false) {
+        saveFailures++;
+        console.error('[save] запись не удалась (' + saveFailures + ')', res.error);
+        if (!saveQueued) saveQueued = payload; // свежего снимка нет — повторяем этот
+        if (saveFailures <= SAVE_RETRY_DELAYS_MS.length) {
+          saveRetryTimer = setTimeout(() => { saveRetryTimer = null; pumpSave(); },
+            SAVE_RETRY_DELAYS_MS[saveFailures - 1]);
+        }
+        return;
+      }
+      saveFailures = 0;
+      pumpSave();
+    });
   }
 
   const buildBadgeEl = document.getElementById('build-badge');
@@ -317,10 +362,29 @@
     buildBadgeEl.classList.remove('hidden');
   }
 
+  /* Аудит 2026-10-05, F02: opacity:0 + pointer-events:none прячут экран
+     только визуально — кнопки неактивных экранов оставались в клавиатурном
+     фокусе (Tab → Enter на невидимой кнопке). Неактивный экран получает
+     inert (нет фокуса, нет кликов, нет в дереве доступности). */
+  function syncScreensInert() {
+    Object.values(screens).forEach((s) => {
+      const active = s.classList.contains('active');
+      s.inert = !active;
+      if (active) s.removeAttribute('aria-hidden'); else s.setAttribute('aria-hidden', 'true');
+    });
+  }
   function show(name) {
     Object.values(screens).forEach(s => s.classList.remove('active'));
     screens[name].classList.add('active');
+    syncScreensInert();
+    // Фокус остался в только что погашенном экране — inert уже снял его,
+    // но явно уводим на документ, чтобы следующий Tab начинался с нового.
+    if (document.activeElement && document.activeElement !== document.body && document.activeElement.blur
+        && !screens[name].contains(document.activeElement)) {
+      document.activeElement.blur();
+    }
   }
+  syncScreensInert();
 
   /* ТЗ №10, задача E: анимации уважают системную настройку — CSS уже
      гасит сами переходы (@media (prefers-reduced-motion:reduce) в
@@ -893,6 +957,9 @@
      следующем старте (reconcileOwnership). */
   async function buyTheme(id, product, btn) {
     if (shopBuyInFlight) return;
+    // Аудит F02: покупка — только с активного экрана магазина (клавиатурный
+    // Enter на невидимой кнопке сюда не пускаем, даже если фокус как-то попал).
+    if (!screens.shop.classList.contains('active')) return;
     shopBuyInFlight = true;
     btn.disabled = true;
     delete shopBuyError[id];
@@ -1408,7 +1475,9 @@
         // below-header, пока стена ещё была активна).
         const proceed = _pendingProceedAfterEnergy;
         _pendingProceedAfterEnergy = null;
-        if (proceed && _retentionState.dripOpened > 0) proceed();
+        // F04: поздняя награда (после таймаута адаптера) могла прийти, когда
+        // игрок уже ушёл со стены — автозапуск уровня тогда был бы неожиданным.
+        if (proceed && screens.energyWall.classList.contains('active') && _retentionState.dripOpened > 0) proceed();
         if (granted > 0) showRetentionToast(t('energyToastGain').replace('{n}', granted));
       },
       pauseGame,
@@ -1605,11 +1674,11 @@
   // не будит; таймер (Stats) ведёт себя как раньше.
   function pauseGame() {
     Sound.suspend('ad');
-    Stats.pause();
+    Stats.pause('ad');
   }
   function resumeGame() {
     Sound.resume('ad');
-    Stats.resume();
+    Stats.resume('ad');
   }
 
   /* ---------- Interstitial между уровнями: двойной кулдаун ----------
@@ -1713,6 +1782,13 @@
   let levelStartedAt = 0;          // performance.now() входа на уровень
   let levelMoves = 0;
   let levelUndos = 0;
+  /* Аудит 2026-10-05, F03: какой уровень реально лежит на поле. state.
+     levelIndex может смениться «снизу» (поздний ответ load()), поэтому победа
+     относится к уровню активной игровой сессии, а не к изменяемому индексу.
+     levelSession растёт на каждой загрузке уровня — по нему отличаем «та же
+     позиция» от «уже другой уровень» (поздние награды, F04/F10). */
+  let activeLevelIdx = -1;
+  let levelSession = 0;
 
   // Вызывается из loadLevel: обучение — только новичку на уровне 1
   // (N-17: онбординг через сами уровни), на уровне 2 (впервые форма) —
@@ -1882,6 +1958,11 @@
      той же единственной точке, куда доходят ВСЕ исходы обоих
      адаптеров (см. комментарий у showHintLoadingToast). */
   let rewardedInFlight = false;
+  // Отпечаток позиции на поле: сессия уровня + число ходов/отмен. Меняется на
+  // любой ход, отмену, рестарт и смену уровня.
+  function hintPositionKey() {
+    return levelSession + ':' + levelMoves + ':' + levelUndos;
+  }
 
   // ТЗ ads_rework: исходы адаптера, при которых бонуса нет по вине рекламы
   // (не «закрыл сам» — тот молчаливый осознанный отказ).
@@ -1891,6 +1972,12 @@
 
   btnHint.addEventListener('click', () => {
     debugLog('[hint] клик по кнопке подсказки');
+    // Аудит F10: во время анимации перелива модель ещё хранит СТАРУЮ позицию —
+    // подсказка (и списание бонуса) относились бы к уже устаревшему ходу.
+    if (Game.isBusy()) {
+      debugLog('[hint] идёт перелив — игнорирую клик');
+      return;
+    }
     if (rewardedInFlight) {
       debugLog('[hint] запрос уже в полёте — игнорирую повторный клик');
       return;
@@ -1929,6 +2016,10 @@
     }
     debugLog('[hint] иду в Platform.showRewarded()');
     rewardedInFlight = true;
+    // Позиция на момент запроса: награда может прийти поздно (после таймаута
+    // адаптера) — тогда поле уже могло измениться или смениться уровень.
+    const hintPosition = hintPositionKey();
+    let adOutcome = null;
     showHintLoadingToast();
     track('rewarded_click', { place: 'hint' });
     Platform.showRewarded(
@@ -1940,12 +2031,19 @@
         // Раунд 2 ТЗ ads_rework: один просмотр = HINTS_PER_AD подсказок. Одна
         // подсвечивается сразу, остальные падают в тот же баланс bonusHints,
         // что и награды серии/цели дня (тратятся первыми, рекламу не зовут).
-        state.bonusHints += HINTS_PER_AD - 1;
+        // Аудит F04/F10: если позиция с момента запроса изменилась (поздний
+        // ответ рекламы), старый ход не рисуем — все подсказки уходят в баланс.
+        const samePosition = hintPositionKey() === hintPosition && screens.game.classList.contains('active');
+        state.bonusHints += samePosition ? HINTS_PER_AD - 1 : HINTS_PER_AD;
         persist();
         renderHintBonusBadge();
         showHintToast('hintAdGranted', 2200);
         hintToast.textContent = hintToast.textContent.replace('{n}', HINTS_PER_AD);
-        Board.showHint(hint.from, hint.to); Sound.playReward(); // награда получена — подсвечиваем ход (ТЗ №26: и звук награды)
+        if (samePosition) Board.showHint(hint.from, hint.to); // награда получена — подсвечиваем ход
+        Sound.playReward(); // ТЗ №26: звук награды
+        // Поздний успех после сторожа адаптера: onResume уже записал 0 подсказок
+        // (timeout) — фактическую выдачу фиксируем отдельным событием.
+        if (adOutcome && adOutcome !== 'shown' && adOutcome !== 'dev') track('rewarded_result', { place: 'hint', result: 'late', hints: HINTS_PER_AD });
       },
       pauseGame,
       // onResume — единственная точка, куда доходят ВСЕ исходы обоих
@@ -1954,6 +2052,7 @@
       // rewardedInFlight сбрасывается ЗДЕСЬ ЖЕ (не в onRewarded), той
       // же логикой, что и hideHintLoadingToast чуть выше по коду.
       (outcome) => {
+        adOutcome = outcome || 'unknown';
         rewardedInFlight = false; hideHintLoadingToast(); resumeGame();
         track('rewarded_result', { place: 'hint', result: outcome || 'unknown', hints: outcome === 'shown' || outcome === 'dev' ? HINTS_PER_AD : 0 });
         // Реклама не показана (adblock, нет объявления, сбой, SDK нет) —
@@ -1978,7 +2077,7 @@
     // Активное время уровня (Вариант Б, stats.js) фиксируется РОВНО в
     // момент победы — до этого таймер нигде не показывается игроку.
     const seconds = Stats.finishLevel();
-    const finishedIdx = state.levelIndex; // 0-индексный, только что пройденный
+    const finishedIdx = activeLevelIdx >= 0 ? activeLevelIdx : state.levelIndex; // 0-индексный, только что пройденный (уровень активной сессии, F03)
     track('level_win', { level: finishedIdx + 1, sec: seconds, moves: levelMoves, undos: levelUndos });
     // ТЗ №15, п.1.2: списание строго одно — новый, ЕЩЁ НЕ пройденный
     // уровень завершён. Флаг снят ДО перезаписи levelTimes[finishedIdx]
@@ -2023,7 +2122,10 @@
        остаётся на ТОЛЬКО ЧТО пройденном (собранном) уровне до самого
        клика «Дальше»; фактическая смена данных — в loadLevel(), внутри
        goToNextLevel(), с видимым fade-переходом (см. ниже). */
-    if (!isChapterEnd && !isCampaignEnd) {
+    // Аудит F09: граница главы тоже продвигает «Продолжить» сразу — иначе
+    // закрытие игры до «Дальше» оставляло продолжение на пройденном уровне 12,
+    // а 13-й недоступным. Финал кампании остаётся на последнем уровне.
+    if (!isCampaignEnd) {
       state.levelIndex = nextIdx;
       state.maxUnlocked = Math.max(state.maxUnlocked, nextIdx);
     }
@@ -2071,6 +2173,8 @@
   }
 
   function loadLevel(idx) {
+    activeLevelIdx = idx;
+    levelSession++;
     state.levelIndex = idx;
     state.maxUnlocked = Math.max(state.maxUnlocked, idx);
     const level = cloneLevel(LEVELS[idx]);
@@ -2260,14 +2364,18 @@
       return;
     }
     if (transition.isChapterEnd) {
+      chapterNextIdx = transition.nextIdx;
       showChapterCompleteOverlay(transition.chapterNum);
       return;
     }
     goToNextLevel(transition.nextIdx);
   });
 
+  // F09: levelIndex к этому моменту уже продвинут (showWinOverlay) — следующий
+  // уровень берём из решения, принятого в момент победы, а не пересчитываем.
+  let chapterNextIdx = -1;
   btnChapterNext.addEventListener('click', () => {
-    goToNextLevel(state.levelIndex + 1);
+    goToNextLevel(chapterNextIdx >= 0 ? chapterNextIdx : state.levelIndex);
   });
 
   /* ---------- Кнопки меню ----------
@@ -2305,10 +2413,10 @@
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
       Sound.suspend('hidden');
-      Stats.pause();
+      Stats.pause('hidden');
     } else {
       Sound.resume('hidden');
-      Stats.resume();
+      Stats.resume('hidden');
     }
   });
 
@@ -2320,15 +2428,21 @@
     // Граничный случай: сейв битый/уровней стало меньше, чем в сейве
     // (или игрок прошёл все уровни — levelIndex остаётся на последнем,
     // это НЕ выходит за границы массива) — подстраховка от краша.
-    if (state.levelIndex < 0 || state.levelIndex >= LEVELS.length) {
+    // Аудит F07: индексы — только целые в границах (levelIndex:0.5 проходил
+    // проверку диапазона и ронял запуск уровня на LEVELS[0.5].vials).
+    if (!Number.isInteger(state.levelIndex) || state.levelIndex < 0 || state.levelIndex >= LEVELS.length) {
       state.levelIndex = 0;
     }
     if (!Array.isArray(state.levelTimes)) state.levelTimes = [];
-    if (typeof state.maxUnlocked !== 'number' || state.maxUnlocked < state.levelIndex) {
+    // Время уровня — конечное неотрицательное число; всё остальное — «не пройден».
+    state.levelTimes = state.levelTimes.slice(0, LEVELS.length).map(
+      v => (typeof v === 'number' && Number.isFinite(v) && v >= 0) ? v : null
+    );
+    if (!Number.isInteger(state.maxUnlocked) || state.maxUnlocked < state.levelIndex) {
       state.maxUnlocked = state.levelIndex; // сейв старее этого поля — считаем открытым хотя бы то, что уже пройдено
     }
     if (state.maxUnlocked >= LEVELS.length) state.maxUnlocked = LEVELS.length - 1;
-    if (typeof state.rewardedCount !== 'number' || state.rewardedCount < 0) state.rewardedCount = 0;
+    if (!Number.isInteger(state.rewardedCount) || state.rewardedCount < 0) state.rewardedCount = 0;
     if (typeof state.rewardedDay !== 'string') state.rewardedDay = '';
     if (typeof state.muted !== 'boolean') state.muted = false; // ТЗ №26: битое поле — звук включён
 
@@ -2359,7 +2473,7 @@
     // тема, ещё не отражённая в ownedThemes, ложно считалась бы невалидной
     // и откатывалась на 'default' прямо здесь, до первого reconcile.
     if (!Array.isArray(state.giftedThemes)) state.giftedThemes = [];
-    if (typeof state.bonusHints !== 'number' || state.bonusHints < 0) state.bonusHints = 0;
+    if (!Number.isInteger(state.bonusHints) || state.bonusHints < 0) state.bonusHints = 0;
 
     const validSelected = state.selectedTheme === 'default' || isThemeOwned(state.selectedTheme);
     if (typeof state.selectedTheme !== 'string' || !validSelected) {
@@ -2384,7 +2498,7 @@
 
     // ТЗ №22, C1: миграция цели дня — поля появились в этом ТЗ.
     if (typeof state.dailyDay !== 'string') state.dailyDay = '';
-    if (typeof state.dailyWins !== 'number' || state.dailyWins < 0) state.dailyWins = 0;
+    if (!Number.isInteger(state.dailyWins) || state.dailyWins < 0) state.dailyWins = 0;
     if (typeof state.dailyDone !== 'boolean') state.dailyDone = false;
     if (typeof state.onboardingSeen !== 'boolean') state.onboardingSeen = false;
     checkDailyGoalReset();
@@ -2410,6 +2524,7 @@
     // отдельный источник времени: этот ТЗ серию не правит, только
     // докладывает о её поведении в сценариях перевода часов (см. отчёт).
     const nowMs = Platform.now();
+    let retentionDirty = false;
     const hadValidRetention = Retention.isValidEncoded(state.retention);
     _retentionState = hadValidRetention
       ? Retention.decodeState(state.retention)
@@ -2427,11 +2542,9 @@
     // это подтверждено тестом (см. tests/), не считается самоочевидным.
     if (isBrandNew && !hadValidRetention && RETENTION_CONFIG.gateMode === 'energy') {
       _retentionState = { ..._retentionState, dripOpened: _retentionState.dripOpened + 40 };
-      // Сразу persist() — та же дисциплина, что у grantHints/наград
-      // серии (см. комментарий ниже про beforeTick): награда обязана
-      // пережить закрытие вкладки сразу после boot(), не полагаться на
-      // то, что персист случится позже по другому событию.
-      persist();
+      // Запись — одна, в конце функции (аудит F08: бонус, тик и вход в серию
+      // — один снимок, а не три параллельных сохранения).
+      retentionDirty = true;
     }
     // ТЗ №18 (сценарий A, найдено при проверке — не новая механика):
     // тик, применённый ЗДЕСЬ (энергия, набежавшая, пока игра была
@@ -2447,7 +2560,7 @@
     // обязана сопровождать реальную выдачу, а не просто рендер.
     const beforeTick = _retentionState.dripOpened;
     _retentionState = Retention.applyDripTick(_retentionState, nowMs, RETENTION_CONFIG);
-    if (_retentionState.dripOpened > beforeTick) persist();
+    if (_retentionState.dripOpened > beforeTick) retentionDirty = true;
     // День засчитывается фактом входа (не прохождением уровня) — один
     // раз на старте сессии.
     const stateBeforeEnter = _retentionState;
@@ -2457,8 +2570,13 @@
     if (entryResult.state !== stateBeforeEnter) {
       track('return_day', { streak_day: entryResult.state.streakLen, reward: entryResult.reward || 'none' });
     }
-    if (entryResult.reward === 'hints') RETENTION_CONFIG.callbacks.grantHints(RETENTION_CONFIG.hintsRewardCount);
-    else if (entryResult.reward === 'style') RETENTION_CONFIG.callbacks.grantStyle();
+    // Аудит F08: вход (первый день, день без награды, сброс после пропуска)
+    // тоже обязан сохраниться — иначе он жил только в памяти сессии.
+    if (entryResult.state !== stateBeforeEnter) retentionDirty = true;
+    // grantHints/grantStyle сами зовут persist() — он уже несёт весь снимок.
+    if (entryResult.reward === 'hints') { RETENTION_CONFIG.callbacks.grantHints(RETENTION_CONFIG.hintsRewardCount); retentionDirty = false; }
+    else if (entryResult.reward === 'style') { RETENTION_CONFIG.callbacks.grantStyle(); retentionDirty = false; }
+    if (retentionDirty) persist();
     // Бейдж — ЕЩЁ РАЗ безусловно (не только внутри grantHints выше):
     // восстановленный из сейва баланс с ПРОШЛОЙ сессии тоже обязан
     // сразу отражаться, не только свежевыданная награда этой сессии.
@@ -2485,7 +2603,16 @@
         return;
       }
       if (result.data && typeof result.data.levelIndex === 'number') {
+        // F03: пока шёл ретрай, игрок мог играть на дефолтах и что-то пройти —
+        // локальные победы и разблокировку не теряем при слиянии.
+        const localTimes = Array.isArray(state.levelTimes) ? state.levelTimes.slice() : [];
+        const localMax = state.maxUnlocked;
         Object.assign(state, result.data);
+        if (!Array.isArray(state.levelTimes)) state.levelTimes = [];
+        localTimes.forEach((v, i) => {
+          if (typeof v === 'number' && typeof state.levelTimes[i] !== 'number') state.levelTimes[i] = v;
+        });
+        if (typeof localMax === 'number' && localMax > state.maxUnlocked) state.maxUnlocked = localMax;
         normalizeState();
         if (themeAvailableHere(state.selectedTheme)) applyTheme(state.selectedTheme); // ТЗ №17, см. гейт в boot()
         renderShop();

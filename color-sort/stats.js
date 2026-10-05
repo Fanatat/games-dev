@@ -17,6 +17,9 @@ const Stats = (() => {
   let accumulatedMs = 0;
   let runStart = null;   // timestamp начала текущего «активного» отрезка, null если не идёт
   let idleTimer = null;
+  /* Аудит 2026-10-05, F11: причины паузы ('ad', 'hidden') накладываются —
+     счёт возобновляется, только когда сняты ВСЕ (как у Sound.suspend/resume). */
+  const pauseReasons = new Set();
 
   function now() { return performance.now(); }
 
@@ -39,17 +42,23 @@ const Stats = (() => {
     flush();
     currentLevel = idx;
     accumulatedMs = 0;
-    runStart = now();
-    armIdle();
+    if (pauseReasons.size === 0) {
+      runStart = now();
+      armIdle();
+    }
   }
 
   /* Пауза геймплея (реклама, сворачивание вкладки — main.js pauseGame). */
-  function pause() {
+  function pause(reason) {
+    pauseReasons.add(reason || 'default');
     flush();
     clearIdle();
   }
-  /* Возврат из паузы — резюмируем, только если уровень реально загружен. */
-  function resume() {
+  /* Возврат из паузы — резюмируем, только если уровень реально загружен и
+     не осталось других причин паузы. */
+  function resume(reason) {
+    pauseReasons.delete(reason || 'default');
+    if (pauseReasons.size > 0) return;
     if (currentLevel === -1 || runStart !== null) return;
     runStart = now();
     armIdle();
@@ -58,7 +67,7 @@ const Stats = (() => {
   /* Любой тап по игровому экрану — если счёт стоял из-за простоя,
      возобновляем; в любом случае переставляем таймер простоя. */
   function onInput() {
-    if (currentLevel === -1) return;
+    if (currentLevel === -1 || pauseReasons.size > 0) return;
     if (runStart === null) runStart = now();
     armIdle();
   }

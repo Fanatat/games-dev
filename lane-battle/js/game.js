@@ -3432,6 +3432,16 @@ function bumpResultReward(add, forMatch) {
 }
 function renderResultAdRow(earnedDiamonds, isChapterFinal) {
   const resultMatch = match; // аудит A08: награда привязана к бою, после которого показан ряд
+  // Аудит A09, решение основателя 05.10: бонус главы ОДНОРАЗОВЫЙ — но только
+  // если он реально получен (реклама показана). Не взял в первый раз — предложим
+  // при следующем прохождении финала главы; взял — больше не предлагаем.
+  const chapterId = resultMatch && resultMatch.mission ? resultMatch.mission.chapterId : 0;
+  if (progress.chapterBonusClaimed && progress.chapterBonusClaimed[chapterId]) isChapterFinal = false;
+  const claimChapterBonus = () => {
+    if (!chapterId) return;
+    progress.chapterBonusClaimed = progress.chapterBonusClaimed || {};
+    progress.chapterBonusClaimed[chapterId] = true;
+  };
   DOM.resultAdRow.innerHTML = '';
   const showMissionAd = earnedDiamonds > 0;
   DOM.resultAdRow.classList.toggle('hidden', !showMissionAd && !isChapterFinal);
@@ -3535,6 +3545,7 @@ function renderResultAdRow(earnedDiamonds, isChapterFinal) {
         : `x${SHOP.adMissionMultiplier}: ${earnedDiamonds} → ${doubled}`;
     DOM.resultAdRow.appendChild(makeAdButton(doubleLabel, bonus, () => {
       shopEarn(progress, bonus);
+      if (chapterBonus > 0) claimChapterBonus();
       DOM.shopCurrencyText.textContent = Math.floor(progress.shopCurrency);
       bumpResultReward(bonus, resultMatch);
     }, '<span class="diamond-dot"></span>'));
@@ -3542,6 +3553,7 @@ function renderResultAdRow(earnedDiamonds, isChapterFinal) {
   if (isChapterFinal && !showMissionAd) { // r15 И18: только если нет x2 — иначе бонус главы уже в ней
     DOM.resultAdRow.appendChild(makeAdButton(I18N.t('result.adBonusLabel'), SHOP.adChapterBonus, () => {
       shopEarn(progress, SHOP.adChapterBonus);
+      claimChapterBonus();
       DOM.shopCurrencyText.textContent = Math.floor(progress.shopCurrency);
       bumpResultReward(SHOP.adChapterBonus, resultMatch);
     }));

@@ -49,6 +49,8 @@ function defaultProgress() {
     // (HP своей крепости на победе), сливается поэлементным max, см.
     // mergeProgress; туториал миссии 1 показан (js/tutorial.js).
     missionStars: {},
+    // Аудит A09: получен ли разовый рекламный бонус главы { [chapterId]: true }
+    chapterBonusClaimed: {},
     tutorialDone: false,
     // r15 И10: разовый тост «эпоха сбрасывается каждую битву» (js/tutorial.js).
     // Булев флаг — при облачном слиянии ИЛИ (показан на любом устройстве —
@@ -172,6 +174,12 @@ function sanitizeSaveData(raw) {
         }
       }
       out[k] = m;
+    } else if (k === 'chapterBonusClaimed') {
+      const c = {};
+      if (v && typeof v === 'object' && !Array.isArray(v)) {
+        for (const id of Object.keys(v)) { const n = Number(id); if (Number.isInteger(n) && n >= 1 && n <= 20 && v[id] === true) c[n] = true; }
+      }
+      out[k] = c;
     } else if (k === 'playlist') {
       const pl = sanitizePlaylist(v);
       if (pl) out[k] = pl;
@@ -449,6 +457,7 @@ function mergeProgress(localData, cloudData) {
   for (const k of keys) {
     if (k === 'stamps' || k === 'shopLedger') continue;
     if (k === 'missionStars') { merged[k] = mergeMaxMap(L[k], C[k]); continue; } // раунд 15 (И4)
+    if (k === 'chapterBonusClaimed') { merged[k] = Object.assign({}, C[k], L[k]); continue; } // А09: полученный бонус не «разполучается»
     const hasLocal = Object.prototype.hasOwnProperty.call(L, k);
     const hasCloud = Object.prototype.hasOwnProperty.call(C, k);
     if (hasLocal && hasCloud) {

@@ -115,8 +115,8 @@ MUSIC.setMusicMuted(!!progress.musicMuted);
 // (Яндекс, требования к игре, п.4.7) — см. frame() ниже и adPlaying.
 let adPlaying = false;
 PLATFORM.setPauseHooks(
-  () => { adPlaying = true; MUSIC.pauseForAd(); SFX.suspend(); },
-  () => { adPlaying = false; if (!pageHidden) { MUSIC.resumeAfterAd(); SFX.resume(); } }
+  () => { adPlaying = true; releaseAllInput(); MUSIC.pauseForAd(); SFX.suspend(); },
+  () => { adPlaying = false; releaseAllInput(); if (!pageHidden) { MUSIC.resumeAfterAd(); SFX.resume(); } }
 );
 // Модерация (2026-09-14, замечания 2-3, п.1.3): звук/музыка не должны играть
 // со свёрнутой страницей или в фоновой вкладке — раньше на это не было
@@ -131,6 +131,7 @@ let pageHidden = false;
 function onVisibilityChange() {
   pageHidden = document.hidden;
   if (pageHidden) {
+    releaseAllInput();
     MUSIC.pauseForAd();
     SFX.suspend();
   } else if (!adPlaying) {
@@ -172,6 +173,12 @@ PLATFORM.ready.then(() => { if (screen === 'shop') renderShop(); });
 // нужно функционально (нет ссылок/картинок для сохранения игроком), поэтому
 // глушим на всём документе, а не только на арене.
 document.addEventListener('contextmenu', (e) => { e.preventDefault(); });
+// Аудит 05.10 (A20): отказ записи сейва — заметное сообщение, а не молчание;
+// слияние после позднего чтения облака — перерисовка того, что зависит от сейва.
+setSaveHooks({
+  problem: (kind) => showLoudNotice(I18N.t(kind === 'local' ? 'err.saveFailedLocal' : 'err.saveFailedCloud')),
+  replaced: () => { applyTheme(); SFX.setMuted(!!progress.muted); MUSIC.setMusicMuted(!!progress.musicMuted); refreshMuteButtons(); if (screen === 'shop') renderShop(); },
+});
 window.addEventListener('pagehide', () => { flushCloudPush(progress); });
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) flushCloudPush(progress);
@@ -220,6 +227,24 @@ const input = {
   buyPressed: null, upgradePressed: false, pausePressed: false,
 };
 const keysDown = new Set();
+let touchAxis = 0;
+let joyTouchId = null;
+// Аудит 05.10 (A08/A15): потеря фокуса, скрытие вкладки, начало рекламы или
+// отмена жеста не присылают keyup/touchend — клавиша/джойстик «залипали».
+// Единый сброс всего ввода.
+function releaseAllInput() {
+  keysDown.clear();
+  touchAxis = 0; joyTouchId = null;
+  if (DOM.joyStick) DOM.joyStick.style.transform = 'translate(-50%,-50%)';
+  input.attackPressed = input.specialPressed = input.pickaxePressed = input.cryPressed = false;
+  input.buyPressed = null; input.upgradePressed = false;
+}
+window.addEventListener('blur', releaseAllInput);
+// Аудит A08: пока идёт реклама, ни одна кнопка (переход миссии, магазин, выход)
+// не должна срабатывать — единый гейт в фазе перехвата, до обработчиков кнопок.
+window.addEventListener('click', (e) => {
+  if (adPlaying) { e.stopPropagation(); e.preventDefault(); }
+}, true);
 
 let screen = 'loading'; // loading | menu | missions | match | paused | result (r15 И10: 'loading' — до PLATFORM.ready, #screenLoading)
 let match = null; // состояние текущего матча
@@ -1165,6 +1190,12 @@ const CHAPTER_HILLS = [
 // viewBox (≥14px на экране при 800×450, см. tmp/i16), полоса главы выше
 // (100 → 114), холмы растянуты по высоте, чтобы звёзды нижних узлов влезли.
 const CHAPTER_STAR = 26, CHAPTER_SVG_H = 114;
+// Аудит 05.10 (A13): «пройдена» — следующая миссия открыта ИЛИ победа
+// записана звёздами. Последняя миссия (15) не имеет следующей: unlocked
+// остаётся 15, её победа видна только по missionStars.
+function missionCleared(m) {
+  return m.id < progress.unlocked || ((progress.missionStars && progress.missionStars[m.id]) || 0) > 0;
+}
 function chapterStarsSVG(cx, y, stars) {
   let s = '';
   const S = CHAPTER_STAR, step = S + 1;
@@ -1189,7 +1220,7 @@ function chapterRowSVG(ch, chapterIdx) {
     const x1 = xs[i], y1 = yPat[i], x2 = xs[i + 1], y2 = yPat[i + 1];
     const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
     const wave = (i % 2 === 0 ? 1 : -1) * 18;
-    const cleared = (ch.id - 1) * MISSIONS_PER_CHAPTER + i + 1 < progress.unlocked;
+    const cleared = missionCleared(MISSIONS[(ch.id - 1) * MISSIONS_PER_CHAPTER + i]);
     svg += `<path d="M${x1},${y1} Q${mx},${my + wave} ${x2},${y2}" fill="none"
       stroke="${cleared ? 'var(--gold-text)' : 'rgba(255,225,180,.28)'}" stroke-width="3"
       stroke-dasharray="7 6" stroke-linecap="round"/>`;
@@ -1199,7 +1230,7 @@ function chapterRowSVG(ch, chapterIdx) {
     const missionIndex = (ch.id - 1) * MISSIONS_PER_CHAPTER + (lvl - 1);
     const m = MISSIONS[missionIndex];
     const unlocked = m.id <= progress.unlocked;
-    const cleared = m.id < progress.unlocked;
+    const cleared = missionCleared(m);
     const current = unlocked && !cleared;
     const cx = xs[lvl - 1], cy = yPat[lvl - 1];
     const cls = 'trail-node-svg' + (unlocked ? '' : ' locked') + (cleared ? ' cleared' : '') + (current ? ' current' : '');
@@ -1343,8 +1374,7 @@ function shopLockedStrip(items) {
   return el;
 }
 function spend(cost) {
-  progress.shopCurrencySpent = (progress.shopCurrencySpent || 0) + cost;
-  recalcShopCurrency(progress);
+  shopSpend(progress, cost);
   saveProgress(progress);
   renderShop();
 }
@@ -1513,7 +1543,7 @@ function dlcRow(key, def, effectText) {
   // внутриигровую валюту, как и всё остальное в магазине.
   function buyWithDiamonds() {
     if (progress.shopCurrency < def.costDiamonds) { SFX.buyDenied(); return; }
-    progress.shopCurrencySpent = (progress.shopCurrencySpent || 0) + def.costDiamonds;
+    shopSpend(progress, def.costDiamonds);
     recalcShopCurrency(progress);
     commitPurchase();
   }
@@ -1601,7 +1631,7 @@ function timeOfDayRow() {
     btn.addEventListener('click', () => {
       if (!o.owned) {
         if (progress.shopCurrency < o.cost) return;
-        progress.shopCurrencySpent = (progress.shopCurrencySpent || 0) + o.cost;
+        shopSpend(progress, o.cost);
         recalcShopCurrency(progress);
         if (o.id === 'day') progress.ownedTimeDay = true;
         if (o.id === 'night') progress.ownedTimeNight = true;
@@ -1637,7 +1667,7 @@ function themeRow() {
     btn.addEventListener('click', () => {
       if (!owned) {
         if (progress.shopCurrency < t.cost) return;
-        progress.shopCurrencySpent = (progress.shopCurrencySpent || 0) + t.cost;
+        shopSpend(progress, t.cost);
         recalcShopCurrency(progress);
         progress[t.ownedKey] = true;
       }
@@ -3073,8 +3103,7 @@ function endMatch(result) {
   // (см. ПЛАН.md, раунд 3).
   // r15 И13: поражение — не больше половины «эталона победы» (data.js, lossRewardCap).
   const earned = result === 'win' ? Math.round(match.shopKills) : Math.min(Math.round(match.shopKills), lossRewardCap(match.mission));
-  progress.shopCurrencyEarned = (progress.shopCurrencyEarned || 0) + earned;
-  recalcShopCurrency(progress);
+  shopEarn(progress, earned);
   saveProgress(progress);
   // Округляем — накопление идёт дробными шагами decay-множителя (0.8/0.6/…),
   // без round тут вылезали хвосты вида "+22.7999999999995" (баг-репорт).
@@ -3392,14 +3421,17 @@ function plainLabel(s) {
   return String(s).replace(/[\u{1F000}-\u{1FAFF}\u{2190}-\u{21FF}\u{2300}-\u{23FF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{FE0F}\u{27F5}\u{27F6}]/gu, '').replace(/\s{2,}/g, ' ').trim();
 }
 // И7: награда за рекламу — сразу в виджете итога (докрутка к новой сумме).
-function bumpResultReward(add) {
-  if (!match || !(add > 0)) return;
+function bumpResultReward(add, forMatch) {
+  // аудит A08: поздний callback рекламы не должен рисовать награду в другом бою;
+  // деньги при этом уже начислены (progress), меняется только виджет итога
+  if (!match || !(add > 0) || (forMatch && forMatch !== match)) return;
   const from = match.resultReward || 0;
   match.resultReward = from + add;
   DOM.resultReward.classList.remove('hidden');
   countUpReward(match.resultReward, 0.1, from);
 }
 function renderResultAdRow(earnedDiamonds, isChapterFinal) {
+  const resultMatch = match; // аудит A08: награда привязана к бою, после которого показан ряд
   DOM.resultAdRow.innerHTML = '';
   const showMissionAd = earnedDiamonds > 0;
   DOM.resultAdRow.classList.toggle('hidden', !showMissionAd && !isChapterFinal);
@@ -3502,18 +3534,16 @@ function renderResultAdRow(earnedDiamonds, isChapterFinal) {
         ? I18N.t('result.adDouble', { from: earnedDiamonds, to: doubled })
         : `x${SHOP.adMissionMultiplier}: ${earnedDiamonds} → ${doubled}`;
     DOM.resultAdRow.appendChild(makeAdButton(doubleLabel, bonus, () => {
-      progress.shopCurrencyEarned = (progress.shopCurrencyEarned || 0) + bonus;
-      recalcShopCurrency(progress);
+      shopEarn(progress, bonus);
       DOM.shopCurrencyText.textContent = Math.floor(progress.shopCurrency);
-      bumpResultReward(bonus);
+      bumpResultReward(bonus, resultMatch);
     }, '<span class="diamond-dot"></span>'));
   }
   if (isChapterFinal && !showMissionAd) { // r15 И18: только если нет x2 — иначе бонус главы уже в ней
     DOM.resultAdRow.appendChild(makeAdButton(I18N.t('result.adBonusLabel'), SHOP.adChapterBonus, () => {
-      progress.shopCurrencyEarned = (progress.shopCurrencyEarned || 0) + SHOP.adChapterBonus;
-      recalcShopCurrency(progress);
+      shopEarn(progress, SHOP.adChapterBonus);
       DOM.shopCurrencyText.textContent = Math.floor(progress.shopCurrency);
-      bumpResultReward(SHOP.adChapterBonus);
+      bumpResultReward(SHOP.adChapterBonus, resultMatch);
     }));
   }
 }
@@ -3630,6 +3660,7 @@ window.addEventListener('keydown', (e) => {
 window.addEventListener('keyup', (e) => keysDown.delete(e.code));
 
 function handleHotkey(code, key) {
+  if (adPlaying || pageHidden) return; // аудит A08: на рекламной паузе действия клавишами недопустимы
   if (code === 'KeyP' || code === 'Escape') {
     if (screen === 'help') { closeHelp(); return; } // r15 И12: туда, откуда открыта
     if (screen === 'match' || screen === 'paused') togglePause();
@@ -3656,12 +3687,10 @@ function computeMoveAxis() {
   let a = 0;
   if (keysDown.has('ArrowLeft') || keysDown.has('KeyA')) a -= 1;
   if (keysDown.has('ArrowRight') || keysDown.has('KeyD')) a += 1;
-  return a + touchAxis;
+  return Math.max(-1, Math.min(1, a + touchAxis));
 }
 
-// touch joystick
-let touchAxis = 0;
-let joyTouchId = null;
+// touch joystick (touchAxis/joyTouchId объявлены выше, рядом с keysDown)
 DOM.joyBase.addEventListener('touchstart', (e) => {
   const t = e.changedTouches[0]; joyTouchId = t.identifier; updateJoy(t);
   e.preventDefault();
@@ -3670,9 +3699,11 @@ DOM.joyBase.addEventListener('touchmove', (e) => {
   for (const t of e.changedTouches) if (t.identifier === joyTouchId) updateJoy(t);
   e.preventDefault();
 }, { passive: false });
-window.addEventListener('touchend', (e) => {
+const onJoyTouchEnd = (e) => {
   for (const t of e.changedTouches) if (t.identifier === joyTouchId) { joyTouchId = null; touchAxis = 0; DOM.joyStick.style.transform = 'translate(-50%,-50%)'; }
-});
+};
+window.addEventListener('touchend', onJoyTouchEnd);
+window.addEventListener('touchcancel', onJoyTouchEnd); // аудит A15: системный жест/звонок отменяет касание без touchend
 function updateJoy(t) {
   const rect = DOM.joyBase.getBoundingClientRect();
   const cx = rect.left + rect.width / 2;

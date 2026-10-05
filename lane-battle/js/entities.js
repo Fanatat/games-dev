@@ -206,6 +206,9 @@ function updateBreakerUnit(world, u, t, dt) {
   } else {
     u.state = 'walk';
     u.walkPhase += dt * (t.speed / 12);
+    // Аудит 05.10 (A10): цель могла остаться позади (после первой башни
+    // следующая стоит правее) — идём К цели, а не всегда к ядру.
+    u.dir = target.ref.x > u.x ? 1 : -1;
     u.x += u.dir * t.speed * dt;
     u.x = Math.max(ARENA.laneMin, Math.min(ARENA.laneMax, u.x));
     u.chainLag += (6 - u.chainLag) * Math.min(1, dt * 3);

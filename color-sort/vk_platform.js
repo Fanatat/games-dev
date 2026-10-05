@@ -154,7 +154,7 @@ const Platform = (() => {
      раньше на ВК этого поля не было вовсе (undefined, не строка),
      плашка молчала всегда независимо от сборки; main.js трогать не
      нужно, правка живёт ТОЛЬКО здесь и в build.py. */
-  const BUILD = 'b62-32caf11-20261005';
+  const BUILD = 'b65-082345e-20261005';
 
   /* ---------- Единая точка времени (ТЗ №18) ----------
      Симметрично platform.js (Яндекс) — см. комментарий там же. Оба
@@ -175,29 +175,6 @@ const Platform = (() => {
   }
 
   let ready = false; // true только после успешного VKWebAppInit
-
-  /* ---------- Виброотклик (ТЗ №22, B4) ----------
-     Методы — «Документация к играм на VK.txt», раздел «Виброотклик»:
-     VKWebAppTapticImpactOccurred / NotificationOccurred /
-     SelectionChanged. Огонь-и-забыть: на вебе и старых клиентах мост
-     отвечает ошибкой — глотаем её молча, игра от вибрации не зависит.
-     kind — общий словарь обоих адаптеров: select/pour/lock/invalid/win. */
-  const HAPTIC_VK = {
-    select:  ['VKWebAppTapticSelectionChanged', {}],
-    pour:    ['VKWebAppTapticImpactOccurred', { style: 'light' }],
-    lock:    ['VKWebAppTapticImpactOccurred', { style: 'medium' }],
-    invalid: ['VKWebAppTapticNotificationOccurred', { type: 'warning' }],
-    win:     ['VKWebAppTapticNotificationOccurred', { type: 'success' }],
-  };
-  function haptic(kind) {
-    if (!ready || typeof vkBridge === 'undefined') return;
-    const call = HAPTIC_VK[kind];
-    if (!call) return;
-    try {
-      const p = vkBridge.send(call[0], call[1]);
-      if (p && typeof p.catch === 'function') p.catch(() => {});
-    } catch (e) { /* клиент без поддержки — молчим */ }
-  }
 
   function withTimeout(promise, ms) {
     return new Promise((resolve, reject) => {
@@ -260,7 +237,64 @@ const Platform = (() => {
     // ненадёжен для превентивной проверки (см. журнал наверху, п.1) —
     // доступность рекламы обрабатывается реактивно, в showRewarded().
     try { armMobileBanner(); } catch (e) { console.warn('[vk_platform] баннер:', e); }
+    // Предзагрузка рекламы — в фоне, init её НЕ ждёт (см. preloadAds).
+    preloadAds('reward');
+    preloadAds('interstitial');
     return true;
+  }
+
+  /* ---------- Предзагрузка рекламы ----------
+     Как в game1 (b53, где та же жалоба «первое нажатие — ничего, после
+     нескольких открывается реклама» ушла именно с этим). Документация ВК
+     («Реклама в играх → Необходимые события»): без предзагрузки
+     VKWebAppShowNativeAds сначала ЗАГРУЖАЕТ материалы и только потом
+     показывает; «проверка необходима для показа рекламы за вознаграждение»;
+     загрузка может не удаться при плохой сети — вызывать
+     VKWebAppCheckNativeAds по таймеру. Здесь вызов был убран целиком (он
+     прятал кнопку подсказки — это правильно не возвращать), а вместе с ним
+     пропала и предзагрузка: на телефоне ролик за подсказку не успевал или
+     не начинался вовсе.
+     Теперь: fire-and-forget после init и после каждого показа своего
+     формата. Ничего не ждёт и ни на что не влияет (кнопка видна всегда,
+     награда — только по result:true при показе). Ответ «материалов нет»/
+     ошибка/молчание — повтор через PRELOAD_RETRY_MS, не больше
+     PRELOAD_RETRIES раз подряд. */
+  const PRELOAD_TIMEOUT_MS = 8000;
+  const PRELOAD_RETRY_MS = 30000;
+  const PRELOAD_RETRIES = 5;
+  const preloadState = {};   // формат → { busy, tries, timer }
+  function bgTimer(fn, ms) {
+    const t = setTimeout(fn, ms);
+    if (t && typeof t.unref === 'function') t.unref();   // Node-тесты не должны висеть на повторе
+    return t;
+  }
+  function preloadAds(fmt) {
+    if (!ready || typeof vkBridge === 'undefined') return;
+    const st = preloadState[fmt] || (preloadState[fmt] = { busy: false, tries: 0, timer: null });
+    if (st.busy) return;
+    if (st.timer) { clearTimeout(st.timer); st.timer = null; }
+    st.busy = true;
+    let done = false;
+    const end = (okNow, why) => {
+      if (done) return;
+      done = true;
+      clearTimeout(guard);
+      st.busy = false;
+      if (okNow) { st.tries = 0; return; }
+      if (st.tries >= PRELOAD_RETRIES) {
+        console.warn('[vk_platform] предзагрузка ' + fmt + ': ' + why + ' — повторы исчерпаны, ролик загрузится при показе');
+        return;
+      }
+      st.tries++;
+      st.timer = bgTimer(() => { st.timer = null; preloadAds(fmt); }, PRELOAD_RETRY_MS);
+    };
+    const guard = bgTimer(() => end(false, 'мост молчит'), PRELOAD_TIMEOUT_MS);
+    let p;
+    try { p = vkBridge.send('VKWebAppCheckNativeAds', { ad_format: fmt }); } catch (e) { p = Promise.reject(e); }
+    Promise.resolve(p).then(
+      (res) => end(!!(res && res.result === true), 'материалов пока нет'),
+      () => end(false, 'ошибка')
+    );
   }
 
   /* ---------- Баннер снизу на телефоне в вертикали (ТЗ ads_rework
@@ -485,7 +519,8 @@ const Platform = (() => {
       .catch((e) => {
         console.error('[vk_platform] interstitial:', e);
         if (onResume) onResume(false);
-      });
+      })
+      .then(() => preloadAds('interstitial'));   // следующий ролик — заранее
   }
 
   /* Показ рекламы. Синхронный throw моста (ТЗ №26, ревью: onPause уже
@@ -594,6 +629,8 @@ const Platform = (() => {
     // пустого мостового Promise (см. журнал наверху) страхует
     // ТОЛЬКО таймаут-предохранитель ниже.
     const adPromise = sendAd({ ad_format: 'reward', useWaterfall: true });
+    // Следующий ролик — заранее, когда мост ответил про этот (как в game1).
+    Promise.resolve(adPromise).then(() => preloadAds('reward'), () => preloadAds('reward'));
     const timeoutTimer = setTimeout(() => {
       if (dbg) dbg(`[rewarded] мост НЕ ОТВЕТИЛ за ${REWARD_AD_TIMEOUT_MS}мс — сработал таймаут-предохранитель`);
       console.warn('[vk_platform] rewarded зависла — награды пока нет, ждём позднего ответа:', REWARD_AD_TIMEOUT_MS);
@@ -628,5 +665,5 @@ const Platform = (() => {
     );
   }
 
-  return { init, gameReady, getLang, save, load, showInterstitial, showRewarded, SHOP_SUPPORTED, SAVE_SIZE_GUARD_BYTES, BUILD, now, haptic };
+  return { init, gameReady, getLang, save, load, showInterstitial, showRewarded, SHOP_SUPPORTED, SAVE_SIZE_GUARD_BYTES, BUILD, now };
 })();

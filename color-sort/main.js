@@ -1725,8 +1725,8 @@
 
   /* ---------- ТЗ №22: отклик на ход, обучение, рестарт, помощь ----------
      Game сообщает о событиях хода через hooks (см. Game.init в boot()),
-     здесь они превращаются в эффекты (fx.js, Board.popVial), вибрацию
-     (Platform.haptic), шаги бестекстового обучения и «зов» кнопок при
+     здесь они превращаются в эффекты (fx.js, Board.popVial),
+     шаги бестекстового обучения и «зов» кнопок при
      застревании. Правила игры тут не меняются. */
   const btnRestart = document.getElementById('btn-restart');
   const btnUndo = document.getElementById('btn-undo');
@@ -1734,12 +1734,6 @@
   const STUCK_MS = 30000;          // C3: без удачного перелива столько — зовём подсказку
   const TUTORIAL_IDLE_L2_MS = 6000; // A2: на уровне 2 указатель — только при простое
   const RESTART_ARM_MS = 2500;      // A3: окно второго тапа-подтверждения
-
-  function haptic(kind) {
-    // Кнопка звука выключает и вибрацию — один «тихий режим» (см. ТЗ №22, «Решено за исполнителя»).
-    if (state.muted || typeof Platform.haptic !== 'function') return;
-    Platform.haptic(kind);
-  }
 
   let stuckTimer = null;
   let tutorialTimer = null;
@@ -1816,16 +1810,12 @@
 
   const gameHooks = {
     onSelect({ index }) {
-      haptic('select');
       clearTimeout(tutorialTimer); // игрок действует сам — отложенный указатель не нужен
       if (!tutorial) return;
       Board.setTutorial(index === tutorial.from ? tutorial.to : -1);
     },
     onDeselect() {
       if (tutorial) Board.setTutorial(tutorial.from);
-    },
-    onInvalid() {
-      haptic('invalid');
     },
     onPour({ toIdx, targetLen, element, collected }) {
       levelMoves++;
@@ -1854,7 +1844,6 @@
           Fx.splash(cx, cy + r.elSize * 0.35, color, r.elSize);
         }
       }
-      haptic(collected ? 'lock' : 'pour');
     },
     onUndo() {
       levelUndos++;
@@ -1904,7 +1893,6 @@
   // сразу, см. showWinOverlay/revealWinOverlay).
   function onLevelWon() {
     leaveLevelHelpers();
-    haptic('win');
     showWinOverlay();
   }
 
@@ -1970,14 +1958,21 @@
     return outcome === 'error' || outcome === 'timeout' || outcome === 'unavailable';
   }
 
+  let hintBusyRetries = 0;
   btnHint.addEventListener('click', () => {
     debugLog('[hint] клик по кнопке подсказки');
     // Аудит F10: во время анимации перелива модель ещё хранит СТАРУЮ позицию —
     // подсказка (и списание бонуса) относились бы к уже устаревшему ходу.
+    // Но молча проглатывать нажатие нельзя («кнопка не работает»): ждём конец
+    // перелива (доли секунды) и обрабатываем то же нажатие уже по новой позиции.
     if (Game.isBusy()) {
-      debugLog('[hint] идёт перелив — игнорирую клик');
+      if (hintBusyRetries >= 20) { hintBusyRetries = 0; debugLog('[hint] перелив не кончается — клик отброшен'); return; }
+      hintBusyRetries++;
+      debugLog('[hint] идёт перелив — повторю клик после него');
+      setTimeout(() => btnHint.click(), 100);
       return;
     }
+    hintBusyRetries = 0;
     if (rewardedInFlight) {
       debugLog('[hint] запрос уже в полёте — игнорирую повторный клик');
       return;

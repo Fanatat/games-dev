@@ -1,7 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<!-- Шаблон Web-страницы Police Runner: стандартный godot.html из шаблонов экспорта Godot 4.7.2
+     + vk-bridge и связка window.GameVK (этап 7). Пересобрать: см. docs/VK_DEPLOY.md. -->
+<html lang="ru">
 	<head>
-		<!-- Police Runner b8 (stage-6@8bfa8cb) 2026-10-07 — этап 6: мета и сохранение -->
+		<!-- Police Runner b9 (stage-7@0b9ce94) 2026-10-07 — этап 7: интеграция VK -->
 		<meta charset="utf-8">
 		<meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0">
 		<title>Police Runner</title>
@@ -91,6 +93,87 @@ body {
 	z-index: 1;
 }
 		</style>
+		<!-- @vkontakte/vk-bridge 3.0.2, dist/browser.min.js — MIT License, (c) 2017-present V Kontakte, LLC.
+		     https://github.com/VKCOM/vk-bridge — sha256 827ba6f457cd9e73519b58b2c66564caf138645202f1bba37dca0b567f601bb4 -->
+		<script>(()=>{"use strict";let e;var t={};let p="u">typeof window,n=!!(p&&window.AndroidBridge),o=!!(p&&window.webkit?.messageHandlers?.VKWebAppClose),r=!!(p&&window.ReactNativeWebView&&"function"==typeof window.ReactNativeWebView.postMessage),i=p&&!n&&!o,a=i&&/(^\?|&)vk_platform=mobile_web(&|$)/.test(location.search),s=i?"message":"VKWebAppEvent",d=["VKWebAppInit","VKWebAppGetCommunityAuthToken","VKWebAppAddToCommunity","VKWebAppAddToHomeScreenInfo","VKWebAppClose","VKWebAppCopyText","VKWebAppCreateHash","VKWebAppGetUserInfo","VKWebAppSetLocation","VKWebAppSendToClient","VKWebAppGetClientVersion","VKWebAppGetPhoneNumber","VKWebAppGetEmail","VKWebAppGetGroupInfo","VKWebAppGetGeodata","VKWebAppGetCommunityToken","VKWebAppGetConfig","VKWebAppGetLaunchParams","VKWebAppSetTitle","VKWebAppGetAuthToken","VKWebAppCallAPIMethod","VKWebAppJoinGroup","VKWebAppLeaveGroup","VKWebAppAllowMessagesFromGroup","VKWebAppDenyNotifications","VKWebAppAllowNotifications","VKWebAppOpenPayForm","VKWebAppOpenApp","VKWebAppShare","VKWebAppShowWallPostBox","VKWebAppScroll","VKWebAppShowOrderBox","VKWebAppShowLeaderBoardBox","VKWebAppShowInviteBox","VKWebAppShowRequestBox","VKWebAppAddToFavorites","VKWebAppShowStoryBox","VKWebAppStorageGet","VKWebAppStorageGetKeys","VKWebAppStorageSet","VKWebAppFlashGetInfo","VKWebAppSubscribeStoryApp","VKWebAppOpenWallPost","VKWebAppCheckAllowedScopes","VKWebAppCheckBannerAd","VKWebAppHideBannerAd","VKWebAppShowBannerAd","VKWebAppCheckNativeAds","VKWebAppShowNativeAds","VKWebAppRetargetingPixel","VKWebAppConversionHit","VKWebAppShowSubscriptionBox","VKWebAppCheckSurvey","VKWebAppShowSurvey","VKWebAppScrollTop","VKWebAppScrollTopStart","VKWebAppScrollTopStop","VKWebAppShowSlidesSheet","VKWebAppTranslate","VKWebAppRecommend","VKWebAppAddToProfile","VKWebAppGetFriends",...i&&!a?["VKWebAppResizeWindow","VKWebAppAddToMenu","VKWebAppShowInstallPushBox","VKWebAppShowCommunityWidgetPreviewBox","VKWebAppCallStart","VKWebAppCallJoin","VKWebAppCallGetStatus"]:["VKWebAppShowImages"]],A=p?window.AndroidBridge:void 0,b=o?window.webkit.messageHandlers:void 0,l=i?parent:void 0,u=function(t){var p;let a,u,W,V,K=[],c=Math.random().toString(36).substring(2,5);function w(e){K.push(e)}function S(e){return n?!!(A&&"function"==typeof A[e]):o?!!(b?.[e]&&"function"==typeof b[e].postMessage):!!i&&d.includes(e)}function f(){return o||n}function h(){return i&&window.parent!==window}function g(){return f()||h()}function v(e){if(o||n)return[...K].map(t=>t.call(null,e));let t=e?.data;if(!i||!t)return;if(r&&"string"==typeof t)try{t=JSON.parse(t)}catch{}let{type:p,data:s,frameId:d}=t;if(p){if("VKWebAppSettings"===p){a=d;return}[...K].map(e=>e({detail:{type:p,data:s}}))}}r&&/(android)/i.test(navigator.userAgent)?document.addEventListener(s,v):"u">typeof window&&"addEventListener"in window&&window.addEventListener(s,v);let y=(p=function(e,p){A?.[e]?A[e](JSON.stringify(p)):b?.[e]&&"function"==typeof b[e].postMessage?b[e].postMessage?.(p):r?window.ReactNativeWebView.postMessage(JSON.stringify({handler:e,params:p})):l&&"function"==typeof l.postMessage&&l.postMessage({handler:e,params:p,type:"vk-connect",webFrameId:a,connectVersion:t},"*")},u={current:0,next(){return++this.current}},W={},V={add(e,t){let p=null!=t?t:`${u.next()}_${c}`;return W[p]=e,p},resolve(e,t,p){let n=W[e];n&&(p(t)?n.resolve(t):n.reject(t),W[e]=null)}},w(e=>{if(e.detail?.data&&"object"==typeof e.detail.data&&"request_id"in e.detail.data){let{request_id:t,...p}=e.detail.data;t&&V.resolve(t,p,e=>!("error_type"in e))}}),function(e,t={}){return new Promise((n,o)=>{let r=V.add({resolve:n,reject:o},t.request_id);p(e,{...t,request_id:r})})});async function m(t){if(n||o)return S(t);if(e)return e.has(t);try{let t=await y("SetSupportedHandlers");e=new Set(t.supportedHandlers)}catch(t){e=new Set(["VKWebAppInit"])}return e.has(t)}return w(t=>{t.detail&&"SetSupportedHandlers"===t.detail.type&&(e=new Set(t.detail.data.supportedHandlers))}),{send:y,sendPromise:y,subscribe:w,unsubscribe:function(e){let t=K.indexOf(e);t>-1&&K.splice(t,1)},supports:function(e){return console.warn("bridge.supports method is deprecated. Use bridge.supportsAsync instead."),S(e)},supportsAsync:m,isWebView:f,isIframe:h,isEmbedded:g,isStandalone:function(){return!g()}}}("3.0.2");window.vkBridge=window.vkConnect=u;var W=window;for(var V in t)W[V]=t[V];t.__esModule&&Object.defineProperty(W,"__esModule",{value:!0})})();
+//# sourceMappingURL=browser.min.js.map</script>
+		<script>
+// Police Runner — связка с VK Bridge (этап 7). Godot ходит сюда только из platform/platform_vk.gd.
+// Если страница открыта не в VK (нет vk_app_id в адресе) — window.GameVK.active = false и игра
+// работает на PlatformMock. VKWebAppInit отправляем сразу, до загрузки движка (требование VK).
+(function () {
+	'use strict';
+	const search = new URLSearchParams(window.location.search);
+	const launch = {};
+	search.forEach(function (value, key) {
+		launch[key] = value;
+	});
+	const bridge = window.vkBridge;
+	const api = {
+		active: search.has('vk_app_id') && typeof bridge !== 'undefined',
+		// 0 — ждём ответа на VKWebAppInit, 1 — готово, -1 — ошибка.
+		initState: 0,
+		launch: launch,
+		_callback: null,
+		_queue: [],
+		launchJson: function () {
+			return JSON.stringify(launch);
+		},
+		// Ответ на запрос id придёт в callback строкой JSON { id, ok, data }.
+		setCallback: function (callback) {
+			api._callback = callback;
+			const queued = api._queue;
+			api._queue = [];
+			queued.forEach(function (text) {
+				callback(text);
+			});
+		},
+		send: function (id, method, paramsJson) {
+			let params = {};
+			try {
+				params = JSON.parse(paramsJson || '{}');
+			} catch (err) {
+				params = {};
+			}
+			if (!api.active) {
+				api._answer(id, false, { error_type: 'client_error', error_data: { error_code: 6 } });
+				return;
+			}
+			try {
+				bridge.send(method, params).then(function (data) {
+					api._answer(id, true, data);
+				}, function (err) {
+					api._answer(id, false, err);
+				});
+			} catch (err) {
+				api._answer(id, false, { error_type: 'client_error', error_data: { error_reason: String(err) } });
+			}
+		},
+		_answer: function (id, ok, data) {
+			let text;
+			try {
+				text = JSON.stringify({ id: id, ok: ok, data: data === undefined ? null : data });
+			} catch (err) {
+				text = JSON.stringify({ id: id, ok: ok, data: null });
+			}
+			if (api._callback) {
+				api._callback(text);
+			} else {
+				api._queue.push(text);
+			}
+		},
+	};
+	if (api.active) {
+		bridge.send('VKWebAppInit', {}).then(function () {
+			api.initState = 1;
+		}, function (err) {
+			api.initState = -1;
+			console.warn('VKWebAppInit failed', err);
+		});
+	}
+	window.GameVK = api;
+}());
+		</script>
 		<link id="-gd-engine-icon" rel="icon" type="image/png" href="index.icon.png" />
 <link rel="apple-touch-icon" href="index.apple-touch-icon.png"/>
 
@@ -112,7 +195,7 @@ body {
 
 		<script src="index.js"></script>
 		<script>
-const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":672436,"index.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
+const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":740436,"index.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
 const GODOT_THREADS_ENABLED = false;
 const engine = new Engine(GODOT_CONFIG);
 

@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<!--
+  Страница игры (шаблон WebGL "PROJECT:Game", его ставит BuildScript).
+  Canvas всегда на всё окно: на телефоне портрет, на ПК и в iframe 16:9
+  камера показывает больше поля по бокам (CLAUDE.md, инварианты). Своей
+  кнопки fullscreen, подвала и логотипов нет, Esc не перехватывается.
+  Названий площадок и внешних ссылок на странице нет; в билде под
+  площадку BuildScript подставляет её скрипты на место platform-head
+  (tools/platform/), и страница ждёт window.game7PlatformReady, если
+  скрипт его создал. Заголовок вкладки — название игры из game.json в
+  корне репозитория: BuildScript подставляет его на место game-title.
+  На место metrica-head BuildScript ставит счётчик Яндекс Метрики
+  (tools/platform/metrica_head.html), если он включён для цели сборки;
+  ход загрузки уходит в него целями load_* (docs/ANALYTICS.md).
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>game7</title>
+    <script>
+  // Яндекс Метрика (docs/ANALYTICS.md, «Яндекс Метрика»): BuildScript
+  // ставит этот кусок на место metrica-head. Счётчик поднимается до
+  // загрузки Unity, и шаблон отмечает целями ход загрузки (load_start,
+  // load_50, load_done, load_error): видно, сколько людей ушло, не
+  // дождавшись игры. Номер счётчика — из analytics.json (metrica), в
+  // dev-билде — из ?ym=<номер> в адресе.
+  (function () {
+    var id = 113440682;
+    if (false) {
+      var q = /[?&]ym=(\d+)/.exec(location.search);
+      if (q) id = +q[1];
+    }
+    window.game7YmGoal = function (name, params) {
+      if (window.game7Ym) window.ym(window.game7Ym, "reachGoal", name, params);
+    };
+    if (!id) return;
+    (function (m, e, t, r, i, k, a) {
+      m[i] = m[i] || function () { (m[i].a = m[i].a || []).push(arguments); };
+      m[i].l = 1 * new Date();
+      for (var j = 0; j < document.scripts.length; j++) {
+        if (document.scripts[j].src === r) return;
+      }
+      k = e.createElement(t); a = e.getElementsByTagName(t)[0];
+      k.async = 1; k.src = r; a.parentNode.insertBefore(k, a);
+    })(window, document, "script", "https://mc.yandex.ru/metrika/tag.js", "ym");
+    window.ym(id, "init", { clickmap: false, trackLinks: false, accurateTrackBounce: true, webvisor: false });
+    window.game7Ym = id;
+  })();
+</script>
+    <script src="vk-bridge-2.15.12.min.js"></script>
+<script>
+  // Цель ВК: BuildScript вставляет этот кусок в <head> index.html и кладёт
+  // рядом VK Bridge (MIT, docs/ASSETS.md). До старта Unity: VKWebAppInit и
+  // весь сейв из VK Storage в память — адаптер (Game.Platform.Vk) читает
+  // его сразу, без ожидания. Шаблон ждёт этот промис перед
+  // createUnityInstance; промис не отклоняется: нет моста, нет параметров
+  // запуска (страница не в ВК) или мост молчит — игра идёт как dev-билд.
+  //
+  // VK Storage: значение ключа до 4096 символов, ключ — [a-zA-Z0-9_-] до
+  // 100 символов, пустое значение — ключа нет. Длинное значение режется на
+  // куски key__0..N-1, а в самом ключе — заголовок «#game7chunks:N». Запись
+  // копится и уходит раз в WriteDelay (лимит запросов ВК), при уходе со
+  // страницы — сразу. Каждый вызов моста — с таймаутом: молчащий мост не
+  // вешает игру.
+  (function () {
+    var ChunkSize = 3000;
+    var ChunkHeader = "#game7chunks:";
+    var WriteDelay = 3000;
+    var vk = (window.game7Vk = { available: false, storage: null, storageError: "", writeError: "" });
+    var pending = {};
+    var timer = 0;
+
+    function withTimeout(promise, ms) {
+      return Promise.race([
+        promise,
+        new Promise(function (_, reject) {
+          setTimeout(function () { reject(new Error("timeout")); }, ms);
+        }),
+      ]);
+    }
+
+    vk.send = function (method, params, ms) {
+      return withTimeout(window.vkBridge.send(method, params || {}), ms || 8000);
+    };
+
+    function chunkCount(value) {
+      return value && value.indexOf(ChunkHeader) === 0 ? parseInt(value.substring(ChunkHeader.length), 10) || 0 : 0;
+    }
+
+    // null — ключа нет или кусок потерян (адаптер возьмёт копию устройства).
+    vk.read = function (key) {
+      var map = vk.storage;
+      if (!map) return null;
+      var value = map[key];
+      if (!value) return null;
+      var count = chunkCount(value);
+      if (count === 0) return value;
+      var parts = [];
+      for (var i = 0; i < count; i++) {
+        var part = map[key + "__" + i];
+        if (!part) {
+          console.warn("[game7] vk: storage кусок потерян", key, i);
+          return null;
+        }
+        parts.push(part);
+      }
+      return parts.join("");
+    };
+
+    // value null — удалить ключ.
+    vk.write = function (key, value) {
+      if (!vk.storage) return;
+      pending[key] = value;
+      if (!timer) timer = setTimeout(vk.flush, WriteDelay);
+    };
+
+    vk.flush = function () {
+      if (timer) clearTimeout(timer);
+      timer = 0;
+      var map = vk.storage;
+      if (!map) return;
+      var sets = [];
+      Object.keys(pending).forEach(function (key) {
+        var value = pending[key] || "";
+        var old = chunkCount(map[key]);
+        var parts = [];
+        for (var at = 0; at < value.length; at += ChunkSize) parts.push(value.substring(at, at + ChunkSize));
+        if (parts.length > 1) {
+          parts.forEach(function (part, i) { sets.push([key + "__" + i, part]); });
+          sets.push([key, ChunkHeader + parts.length]);
+        } else {
+          sets.push([key, value]);
+        }
+        // Куски прошлой, более длинной записи стираются после заголовка.
+        for (var i = parts.length > 1 ? parts.length : 0; i < old; i++) sets.push([key + "__" + i, ""]);
+      });
+      pending = {};
+      // По порядку: заголовок уходит после своих кусков.
+      sets.reduce(function (chain, kv) {
+        map[kv[0]] = kv[1];
+        return chain.then(function () {
+          return vk.send("VKWebAppStorageSet", { key: kv[0], value: kv[1] }, 5000).catch(function (e) {
+            vk.writeError = String((e && (e.error_data && e.error_data.error_reason)) || (e && e.message) || e);
+            console.warn("[game7] vk: storage запись не прошла", kv[0], vk.writeError);
+          });
+        });
+      }, Promise.resolve());
+    };
+
+    document.addEventListener("visibilitychange", function () {
+      if (document.visibilityState === "hidden") vk.flush();
+    });
+    window.addEventListener("pagehide", function () { vk.flush(); });
+
+    window.game7PlatformReady = (async function () {
+      if (!window.vkBridge) {
+        console.warn("[game7] vk: мост не загрузился");
+        return;
+      }
+      if (!/(^\?|&)vk_user_id=/.test(location.search)) {
+        console.warn("[game7] vk: нет параметров запуска, режим dev");
+        return;
+      }
+      try {
+        await vk.send("VKWebAppInit", {}, 4000);
+        vk.available = true;
+      } catch (e) {
+        console.warn("[game7] vk: init не прошёл", e);
+        return;
+      }
+      try {
+        var listed = await vk.send("VKWebAppStorageGetKeys", { count: 1000, offset: 0 }, 5000);
+        var keys = (listed && listed.keys) || [];
+        var map = {};
+        if (keys.length) {
+          var got = await vk.send("VKWebAppStorageGet", { keys: keys }, 5000);
+          ((got && got.keys) || []).forEach(function (kv) {
+            if (kv && kv.key) map[kv.key] = kv.value || "";
+          });
+        }
+        vk.storage = map;
+      } catch (e) {
+        vk.storageError = String((e && e.message) || e || "error");
+        console.warn("[game7] vk: storage не прочитан", e);
+      }
+    })();
+  })();
+</script>
+    <style>
+      html, body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #1b1420;
+        overscroll-behavior: none;
+      }
+      #unity-canvas {
+        position: fixed;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        display: block;
+        background: #1b1420;
+        outline: none;
+        touch-action: none;
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-tap-highlight-color: transparent;
+      }
+      #unity-loading-bar {
+        position: fixed;
+        left: 50%;
+        top: 50%;
+        width: min(60vw, 320px);
+        height: 10px;
+        transform: translate(-50%, -50%);
+        border-radius: 5px;
+        background: rgba(255, 255, 255, 0.15);
+        overflow: hidden;
+        display: none;
+      }
+      #unity-progress-bar-full {
+        width: 0%;
+        height: 100%;
+        background: #ff9a2e;
+        transition: width 0.2s;
+      }
+      #unity-warning {
+        position: fixed;
+        left: 50%;
+        top: 12px;
+        transform: translateX(-50%);
+        max-width: 90vw;
+        font: 14px sans-serif;
+        color: #fff;
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="unity-canvas" tabindex="-1"></canvas>
+    <div id="unity-loading-bar"><div id="unity-progress-bar-full"></div></div>
+    <div id="unity-warning"></div>
+    <script>
+      var canvas = document.querySelector("#unity-canvas");
+      var warning = document.querySelector("#unity-warning");
+
+      // Ход загрузки в Яндекс Метрику (без счётчика — ничего).
+      var loadStart = Date.now();
+      function ymGoal(name, params) {
+        if (window.game7YmGoal) window.game7YmGoal(name, params);
+      }
+      ymGoal("load_start");
+      var loadHalf = false;
+
+      // С showBanner загрузчик Unity шлёт свои ошибки только сюда, мимо
+      // консоли: без console.error smoke-тест не увидел бы, что игра не
+      // запустилась.
+      function unityShowBanner(msg, type) {
+        if (type == "error") console.error(msg);
+        var div = document.createElement("div");
+        div.textContent = msg;
+        div.style.padding = "8px 12px";
+        div.style.borderRadius = "6px";
+        div.style.background = type == "error" ? "#b3261e" : "#6b5a1e";
+        warning.appendChild(div);
+        warning.style.display = "block";
+        if (type != "error") {
+          setTimeout(function () {
+            warning.removeChild(div);
+            warning.style.display = warning.children.length ? "block" : "none";
+          }, 5000);
+        }
+      }
+
+      // Долгое нажатие на телефоне не открывает меню браузера поверх игры.
+      canvas.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+
+      var buildUrl = "Build";
+      var loaderUrl = buildUrl + "/vk-20261008-214624.loader.js";
+      var config = {
+        arguments: [],
+        dataUrl: buildUrl + "/vk-20261008-214624.data.unityweb",
+        frameworkUrl: buildUrl + "/vk-20261008-214624.framework.js.unityweb",
+        codeUrl: buildUrl + "/vk-20261008-214624.wasm.unityweb",
+        streamingAssetsUrl: "StreamingAssets",
+        companyName: "DefaultCompany",
+        productName: "unity",
+        productVersion: "1.0",
+        showBanner: unityShowBanner,
+        // Экраны с плотностью 3 рисовали бы в 9 раз больше пикселей, чем
+        // с плотностью 1: потолок 2 держит 60 FPS на среднем телефоне.
+        devicePixelRatio: Math.min(window.devicePixelRatio || 1, 2),
+      };
+
+      var loadingBar = document.querySelector("#unity-loading-bar");
+      var progressFull = document.querySelector("#unity-progress-bar-full");
+      loadingBar.style.display = "block";
+
+      var script = document.createElement("script");
+      script.src = loaderUrl;
+      script.onload = function () {
+        // Скрипт площадки (SDK) успевает подготовиться до старта игры: язык,
+        // звук и сейв нужны ей с первого кадра. Промис не отклоняется.
+        var platformReady = window.game7PlatformReady || Promise.resolve();
+        platformReady.then(function () {
+          return createUnityInstance(canvas, config, function (progress) {
+            progressFull.style.width = 100 * progress + "%";
+            if (!loadHalf && progress >= 0.5) {
+              loadHalf = true;
+              ymGoal("load_50", { load_sec: Math.round((Date.now() - loadStart) / 100) / 10 });
+            }
+          });
+        }).then(function (instance) {
+          window.unityInstance = instance; // знак для smoke и playtest: игра запустилась
+          loadingBar.style.display = "none";
+          canvas.focus();
+          ymGoal("load_done", { load_sec: Math.round((Date.now() - loadStart) / 100) / 10 });
+        }).catch(function (message) {
+          unityShowBanner(String(message), "error");
+          ymGoal("load_error", { message: String(message).slice(0, 200) });
+        });
+      };
+      document.body.appendChild(script);
+    </script>
+  </body>
+</html>

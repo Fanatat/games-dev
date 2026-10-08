@@ -1,9 +1,10 @@
 <!DOCTYPE html>
 <!-- Шаблон Web-страницы Police Runner: стандартный godot.html из шаблонов экспорта Godot 4.7.2
-     + vk-bridge и связка window.GameVK (этап 7). Пересобрать: см. docs/VK_DEPLOY.md. -->
+     + vk-bridge и связка window.GameVK (этап 7) + экран загрузки (этап 8).
+     Пересобрать: см. docs/VK_DEPLOY.md. -->
 <html lang="ru">
 	<head>
-		<!-- Police Runner b9 (stage-7@0b9ce94) 2026-10-07 — этап 7: интеграция VK -->
+<!-- Police Runner b10 (stage-8@3da6abd) 2026-10-08 — этап 8: VAT-коп, вибрация, звук, тени и автокачество на телефоне, экран загрузки -->
 		<meta charset="utf-8">
 		<meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0">
 		<title>Police Runner</title>
@@ -91,6 +92,49 @@ body {
 	padding: 1rem;
 	text-align: center;
 	z-index: 1;
+}
+/* Экран загрузки Police Runner (tools/make_web_shell.py). */
+body {
+	background-color: #1b243b;
+}
+
+#status-badge {
+	width: min(34vw, 34vh, 180px);
+	height: auto;
+	margin-bottom: 12vh;
+	animation: badge-bob 1.1s ease-in-out infinite alternate;
+	filter: drop-shadow(0 0.6rem 0.8rem rgba(0, 0, 0, 0.35));
+}
+
+@keyframes badge-bob {
+	from { transform: translateY(0) rotate(-4deg); }
+	to { transform: translateY(-0.8rem) rotate(4deg); }
+}
+
+#status-progress {
+	-webkit-appearance: none;
+	appearance: none;
+	bottom: 22%;
+	width: min(64vw, 340px);
+	height: 16px;
+	border: 3px solid rgba(255, 255, 255, 0.85);
+	border-radius: 11px;
+	background-color: rgba(0, 0, 0, 0.3);
+	overflow: hidden;
+}
+
+#status-progress::-webkit-progress-bar {
+	background-color: transparent;
+}
+
+#status-progress::-webkit-progress-value {
+	background-color: #ffc93c;
+	border-radius: 8px;
+}
+
+#status-progress::-moz-progress-bar {
+	background-color: #ffc93c;
+	border-radius: 8px;
 }
 		</style>
 		<!-- @vkontakte/vk-bridge 3.0.2, dist/browser.min.js — MIT License, (c) 2017-present V Kontakte, LLC.
@@ -188,6 +232,10 @@ body {
 		</noscript>
 
 		<div id="status">
+			<svg id="status-badge" viewBox="0 0 120 140" aria-hidden="true">
+				<path d="M60 4 L112 22 V66 C112 100 90 124 60 136 C30 124 8 100 8 66 V22 Z" fill="#2f6bff" stroke="#ffffff" stroke-width="6" stroke-linejoin="round"/>
+				<path d="M60 30 L69.4 52.5 L93.3 54.4 L75.1 70.2 L80.6 93.6 L60 81 L39.4 93.6 L44.9 70.2 L26.7 54.4 L50.6 52.5 Z" fill="#ffc93c" stroke="#e3a21a" stroke-width="3" stroke-linejoin="round"/>
+			</svg>
 			<img id="status-splash" class="show-image--false fullsize--true use-filter--true" src="index.png" alt="">
 			<progress id="status-progress"></progress>
 			<div id="status-notice"></div>
@@ -195,7 +243,7 @@ body {
 
 		<script src="index.js"></script>
 		<script>
-const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":740436,"index.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
+const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":910036,"index.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
 const GODOT_THREADS_ENABLED = false;
 const engine = new Engine(GODOT_CONFIG);
 

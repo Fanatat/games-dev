@@ -9,12 +9,45 @@
   (tools/platform/), и страница ждёт window.game7PlatformReady, если
   скрипт его создал. Заголовок вкладки — название игры из game.json в
   корне репозитория: BuildScript подставляет его на место game-title.
+  На место metrica-head BuildScript ставит счётчик Яндекс Метрики
+  (tools/platform/metrica_head.html), если он включён для цели сборки;
+  ход загрузки уходит в него целями load_* (docs/ANALYTICS.md).
 -->
 <html lang="en">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>game7</title>
+    <script>
+  // Яндекс Метрика (docs/ANALYTICS.md, «Яндекс Метрика»): BuildScript
+  // ставит этот кусок на место metrica-head. Счётчик поднимается до
+  // загрузки Unity, и шаблон отмечает целями ход загрузки (load_start,
+  // load_50, load_done, load_error): видно, сколько людей ушло, не
+  // дождавшись игры. Номер счётчика — из analytics.json (metrica), в
+  // dev-билде — из ?ym=<номер> в адресе.
+  (function () {
+    var id = 0;
+    if (true) {
+      var q = /[?&]ym=(\d+)/.exec(location.search);
+      if (q) id = +q[1];
+    }
+    window.game7YmGoal = function (name, params) {
+      if (window.game7Ym) window.ym(window.game7Ym, "reachGoal", name, params);
+    };
+    if (!id) return;
+    (function (m, e, t, r, i, k, a) {
+      m[i] = m[i] || function () { (m[i].a = m[i].a || []).push(arguments); };
+      m[i].l = 1 * new Date();
+      for (var j = 0; j < document.scripts.length; j++) {
+        if (document.scripts[j].src === r) return;
+      }
+      k = e.createElement(t); a = e.getElementsByTagName(t)[0];
+      k.async = 1; k.src = r; a.parentNode.insertBefore(k, a);
+    })(window, document, "script", "https://mc.yandex.ru/metrika/tag.js", "ym");
+    window.ym(id, "init", { clickmap: false, trackLinks: false, accurateTrackBounce: true, webvisor: false });
+    window.game7Ym = id;
+  })();
+</script>
     <script src="diag.js"></script>
     <!-- platform-head -->
     <style>
@@ -78,6 +111,14 @@
       var canvas = document.querySelector("#unity-canvas");
       var warning = document.querySelector("#unity-warning");
 
+      // Ход загрузки в Яндекс Метрику (без счётчика — ничего).
+      var loadStart = Date.now();
+      function ymGoal(name, params) {
+        if (window.game7YmGoal) window.game7YmGoal(name, params);
+      }
+      ymGoal("load_start");
+      var loadHalf = false;
+
       // С showBanner загрузчик Unity шлёт свои ошибки только сюда, мимо
       // консоли: без console.error smoke-тест не увидел бы, что игра не
       // запустилась.
@@ -102,12 +143,12 @@
       canvas.addEventListener("contextmenu", function (e) { e.preventDefault(); });
 
       var buildUrl = "Build";
-      var loaderUrl = buildUrl + "/dev-20261008-191056.loader.js";
+      var loaderUrl = buildUrl + "/dev-20261008-202519.loader.js";
       var config = {
         arguments: [],
-        dataUrl: buildUrl + "/dev-20261008-191056.data.unityweb",
-        frameworkUrl: buildUrl + "/dev-20261008-191056.framework.js.unityweb",
-        codeUrl: buildUrl + "/dev-20261008-191056.wasm.unityweb",
+        dataUrl: buildUrl + "/dev-20261008-202519.data.unityweb",
+        frameworkUrl: buildUrl + "/dev-20261008-202519.framework.js.unityweb",
+        codeUrl: buildUrl + "/dev-20261008-202519.wasm.unityweb",
         streamingAssetsUrl: "StreamingAssets",
         companyName: "DefaultCompany",
         productName: "unity",
@@ -131,13 +172,19 @@
         platformReady.then(function () {
           return createUnityInstance(canvas, config, function (progress) {
             progressFull.style.width = 100 * progress + "%";
+            if (!loadHalf && progress >= 0.5) {
+              loadHalf = true;
+              ymGoal("load_50", { load_sec: Math.round((Date.now() - loadStart) / 100) / 10 });
+            }
           });
         }).then(function (instance) {
           window.unityInstance = instance; // знак для smoke и playtest: игра запустилась
           loadingBar.style.display = "none";
           canvas.focus();
+          ymGoal("load_done", { load_sec: Math.round((Date.now() - loadStart) / 100) / 10 });
         }).catch(function (message) {
           unityShowBanner(String(message), "error");
+          ymGoal("load_error", { message: String(message).slice(0, 200) });
         });
       };
       document.body.appendChild(script);

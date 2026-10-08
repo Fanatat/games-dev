@@ -13,7 +13,7 @@
 | Королевская Косынка (Royal Solitaire) | [Открыть](https://fanatat.github.io/games-dev/royal-solitaire/) | [Код](https://github.com/Fanatat/Royal_solitaire) | `9f73050` |
 | Game7 (Horde), зомби-экшен на Unity WebGL | [Открыть](https://fanatat.github.io/games-dev/game7-horde/) | закрытый репозиторий | `953e638`, снимок от 30.09.2026 |
 | Police Runner, 3D-раннер на Godot 4 | [Открыть](https://fanatat.github.io/games-dev/police-runner/) | закрытый репозиторий | `a8e6244`, этап 2 (b3), 02.10.2026 |
-| Мастерская украшений, прототип на базе «Сортировки» | [Открыть](https://fanatat.github.io/games-dev/jewel-workshop/) | локальный форк, не публиковался | `478c9b9` (ветка fork/workshop от `69c831b`), 05.10.2026 |
+| Мастерская украшений, MVP на базе «Сортировки» | [Открыть](https://fanatat.github.io/games-dev/jewel-workshop/) | локальный форк, не публиковался | `f115554` (ветка fork/workshop-mvp от `69c831b`), сборка w17, 08.10.2026 |
 
 Идентификатор обозначает проверенный снимок репозитория, а не номер релиза игры.
 Game7 собрана как dev-сборка Unity WebGL (Gzip, с запасной распаковкой в JS — Pages не отдаёт `Content-Encoding`): показывает счётчик FPS, первая загрузка около 17 МБ.

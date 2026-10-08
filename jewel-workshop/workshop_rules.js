@@ -1,178 +1,165 @@
 /* ============================================================
-   workshop_rules.js — ПРАВИЛА «Мастерской украшений» без DOM.
+   workshop_rules.js — ПРАВИЛА «Мастерской украшений» (MVP) без DOM.
    Чистые функции: одним и тем же кодом играет workshop.js (браузер),
    считает решатель (tools/ws_design.js) и проверяют тесты (node).
 
-   Деталь (бусина) = { color: 'c1'|'c2'|'c3', shape: 'circle'|'square'|'diamond' }.
-   Ёмкость = массив бусин СНИЗУ ВВЕРХ, вместимость CAP = 4.
-   Перемещение между ёмкостями — ТЕ ЖЕ правила, что в game3 (game.js
-   computeMoveCount / isCollected): переносится верхняя группа одинаковых
-   бусин, пока хватает места; в непустую ёмкость — только на такую же
-   (цвет И форма); из собранной (полной однородной) ёмкости не льют.
+   Камень = строка-идентификатор ('ruby', 'emerald', …). Ёмкость = массив
+   камней СНИЗУ ВВЕРХ, вместимость CAP = 4.
 
-   Состояние: { vials, orders: [{color, shape, done}], goal, delivered }.
-   Выдача (deliver) — отдельное действие: полная однородная ёмкость,
-   подходящий невыполненный заказ → ёмкость становится пустой, заказ
-   done, delivered++. Победа — delivered >= goal (и только это).
+   Перелив — как в game3: переносится верхняя группа одинаковых камней,
+   сколько поместится; в непустую ёмкость — только на такой же камень.
+   Отличия MVP от прототипа (по разбору docs/WORKSHOP.md, 08.10):
+   - собранная ёмкость НЕ запирается: из неё можно брать камни;
+   - выдача АВТОМАТИЧЕСКАЯ: ёмкость из четырёх одинаковых камней сразу
+     уходит заказу этого камня, если такой заказ сейчас на столе;
+   - заказы идут очередью: на столе `slots` карточек, выполненная
+     сменяется следующим заказом из очереди; новый заказ может сразу
+     забрать уже собранную ёмкость (цепочка выдач);
+   - нужно выполнить ВСЕ заказы; камней на поле ровно на все заказы,
+     поэтому победа = пустой стол;
+   - отмена работает и через выдачу (состояние целиком — снимок).
+
+   Состояние: { vials, orders, slots, next, delivered }:
+     orders — типы камней всех заказов по очереди;
+     slots  — для каждой карточки на столе индекс заказа или -1;
+     next   — индекс следующего заказа в очереди.
    ============================================================ */
 (function (root) {
   'use strict';
 
   const CAP = 4;
+  const SEALED = '#';   // только для анализа: «выдача не освобождает ёмкость»
 
-  function sameType(a, b) {
-    return !!a && !!b && a.color === b.color && a.shape === b.shape;
-  }
-  function typeKey(el) { return el.color + ':' + el.shape; }
-
-  /* Ёмкость «собрана»: полная и однородная. Она заперта для переливания
-     (как в game3) и готова к выдаче. */
-  function isCollected(vial) {
-    return vial.length === CAP && vial.every(el => sameType(el, vial[0]));
+  function isComplete(vial) {
+    return vial.length === CAP && vial.every(g => g === vial[0]);
   }
 
-  /* Сколько верхних одинаковых бусин из src поместится в dst (game3). */
+  /* Сколько верхних одинаковых камней из src поместится в dst (как в game3). */
   function moveCount(src, dst) {
-    if (src.length === 0) return 0;
-    if (dst.length >= CAP) return 0;
+    if (!src || !dst || src.length === 0 || dst.length >= CAP) return 0;
     const top = src[src.length - 1];
-    const dstTop = dst[dst.length - 1];
-    if (dst.length > 0 && !sameType(dstTop, top)) return 0;
+    if (top === SEALED) return 0;
+    if (dst.length > 0 && dst[dst.length - 1] !== top) return 0;
     let count = 0;
-    for (let i = src.length - 1; i >= 0; i--) {
-      if (sameType(src[i], top)) count++; else break;
-    }
+    for (let i = src.length - 1; i >= 0 && src[i] === top; i--) count++;
     return Math.min(count, CAP - dst.length);
   }
 
-  /* Легальные переливания: источник не пуст и не собран. */
-  function legalMoves(vials) {
+  function isHomogeneous(vial) { return vial.length > 0 && vial.every(g => g === vial[0]); }
+
+  /* Все переливы. prune — для решателя: перенос ЦЕЛОЙ однородной ёмкости в
+     пустую даёт то же состояние с точностью до порядка ёмкостей. */
+  function legalMoves(vials, prune) {
     const moves = [];
     for (let i = 0; i < vials.length; i++) {
-      if (vials[i].length === 0 || isCollected(vials[i])) continue;
+      if (vials[i].length === 0) continue;
+      const homo = prune && isHomogeneous(vials[i]);
+      let emptyTried = false;
       for (let j = 0; j < vials.length; j++) {
-        if (i !== j && moveCount(vials[i], vials[j]) > 0) moves.push({ t: 'move', from: i, to: j });
+        if (i === j) continue;
+        if (prune && vials[j].length === 0) {
+          if (homo || emptyTried) continue;      // все пустые ёмкости равноценны
+          emptyTried = true;
+        }
+        if (moveCount(vials[i], vials[j]) > 0) moves.push({ from: i, to: j });
       }
     }
     return moves;
   }
 
-  /* Индексы НЕвыполненных заказов, подходящих собранной ёмкости. */
-  function matchingOrders(state, vialIdx) {
-    const vial = state.vials[vialIdx];
-    if (!vial || !isCollected(vial)) return [];
-    const res = [];
-    state.orders.forEach((o, i) => { if (!o.done && sameType(o, vial[0])) res.push(i); });
-    return res;
+  function makeState(level) {
+    const n = Math.min(level.slots, level.orders.length);
+    const slots = [];
+    for (let i = 0; i < n; i++) slots.push(i);
+    return { vials: level.vials.map(v => v.slice()), orders: level.orders.slice(), slots, next: n, delivered: 0 };
   }
 
   function cloneState(s) {
-    return {
-      vials: s.vials.map(v => v.slice()),
-      orders: s.orders.map(o => ({ color: o.color, shape: o.shape, done: !!o.done })),
-      goal: s.goal,
-      delivered: s.delivered
-    };
+    return { vials: s.vials.map(v => v.slice()), orders: s.orders, slots: s.slots.slice(), next: s.next, delivered: s.delivered };
   }
 
-  function makeState(level) {
-    return {
-      vials: level.vials.map(v => v.map(el => ({ color: el.color, shape: el.shape }))),
-      orders: level.orders.map(o => ({ color: o.color, shape: o.shape, done: false })),
-      goal: level.goal,
-      delivered: 0
-    };
+  function activeTypes(s) {
+    return s.slots.filter(o => o >= 0).map(o => s.orders[o]);
   }
 
-  /* Операции «на месте» меняют переданное состояние (их зовёт интерфейс:
-     Board держит ссылки на массивы ёмкостей). Возвращают число перенесённых
-     бусин / true / false; при отказе состояние НЕ меняется. */
-  function moveInPlace(s, mv) {
-    if (mv.from === mv.to || !s.vials[mv.from] || !s.vials[mv.to]) return 0;
-    if (isCollected(s.vials[mv.from])) return 0;
-    const n = moveCount(s.vials[mv.from], s.vials[mv.to]);
-    if (n === 0) return 0;
-    const moved = s.vials[mv.from].splice(s.vials[mv.from].length - n, n);
-    s.vials[mv.to].push(...moved);
-    return n;
-  }
-
-  /* opts.keepVial — ТОЛЬКО для анализа («а если бы выдача не освобождала
-     ёмкость»): бусины остаются в ёмкости, заказ отмечается. */
-  function deliverInPlace(s, mv, opts) {
-    const ok = matchingOrders(s, mv.vial);
-    if (ok.indexOf(mv.order) === -1) return false; // заказ уже выполнен или не подходит
-    s.orders[mv.order].done = true;
-    s.delivered++;
-    if (!(opts && opts.keepVial)) s.vials[mv.vial].length = 0;
-    return true;
-  }
-
-  /* Применяют ход к КОПИИ состояния; возвращают null, если ход нелегален. */
-  function applyMove(state, mv) {
-    const s = cloneState(state);
-    return moveInPlace(s, mv) ? s : null;
-  }
-  function applyDeliver(state, mv, opts) {
-    const s = cloneState(state);
-    return deliverInPlace(s, mv, opts) ? s : null;
-  }
-  function apply(state, mv, opts) {
-    return mv.t === 'deliver' ? applyDeliver(state, mv, opts) : applyMove(state, mv);
-  }
-
-  /* Все выдачи, доступные сейчас. Заказы одного типа взаимозаменяемы, но
-     в список попадают все — выбор карточки делает игрок. */
-  function deliverMoves(state) {
-    const res = [];
-    for (let v = 0; v < state.vials.length; v++) {
-      for (const o of matchingOrders(state, v)) res.push({ t: 'deliver', vial: v, order: o });
+  /* Ёмкость, которую можно выдать прямо сейчас: первая по порядку собранная,
+     для которой есть заказ на столе (карточка — самая левая подходящая). */
+  function findDelivery(s) {
+    for (let v = 0; v < s.vials.length; v++) {
+      const vial = s.vials[v];
+      if (!isComplete(vial) || vial[0] === SEALED) continue;
+      const slot = s.slots.findIndex(o => o >= 0 && s.orders[o] === vial[0]);
+      if (slot >= 0) return { vial: v, slot, order: s.slots[slot], gem: vial[0] };
     }
-    return res;
+    return null;
   }
 
-  function allMoves(state, opts) {
-    const dm = deliverMoves(state);
-    return legalMoves(state.vials).concat(dm);
+  /* Выдать заказы, пока есть что выдавать. Меняет s на месте, возвращает
+     события по порядку: { vial, slot, order, gem, incoming } — incoming:
+     заказ, занявший освободившуюся карточку (или -1). opts.keepVial —
+     только анализ: камни остаются в ёмкости, она запечатана. */
+  function settle(s, opts) {
+    const events = [];
+    let d;
+    while ((d = findDelivery(s))) {
+      if (opts && opts.keepVial) s.vials[d.vial] = [SEALED, SEALED, SEALED, SEALED];
+      else s.vials[d.vial].length = 0;
+      s.delivered++;
+      const incoming = s.next < s.orders.length ? s.next++ : -1;
+      s.slots[d.slot] = incoming;
+      events.push(Object.assign(d, { incoming }));
+    }
+    return events;
   }
 
-  function isWon(state) { return state.delivered >= state.goal; }
-
-  /* Тупик: ни перелива, ни выдачи, а цель не достигнута. */
-  function isDeadEnd(state) {
-    return !isWon(state) && allMoves(state).length === 0;
+  /* Перелив «на месте» + автоматическая выдача. Возвращает
+     { count, deliveries } или null, если ход нелегален (состояние не меняется). */
+  function moveInPlace(s, mv, opts) {
+    if (!mv || mv.from === mv.to) return null;
+    const src = s.vials[mv.from], dst = s.vials[mv.to];
+    const n = moveCount(src, dst);
+    if (n === 0) return null;
+    dst.push(...src.splice(src.length - n, n));
+    return { count: n, deliveries: settle(s, opts) };
   }
 
-  /* Ключ состояния для поиска: ёмкости взаимозаменяемы по порядку, заказы
-     одного типа тоже. */
+  /* Ход на КОПИИ состояния; null — ход нелегален. */
+  function applyMove(state, mv, opts) {
+    const s = cloneState(state);
+    return moveInPlace(s, mv, opts) ? s : null;
+  }
+
+  function isWon(s) { return s.delivered >= s.orders.length; }
+
+  /* Тупик: не выиграно и ни одного перелива. */
+  function isDeadEnd(s) { return !isWon(s) && legalMoves(s.vials).length === 0; }
+
+  /* Ключ состояния: порядок ёмкостей и порядок карточек на столе не важны. */
   function stateKey(s) {
-    const v = s.vials.map(vial => vial.map(typeKey).join(',')).sort().join('|');
-    const o = s.orders.filter(x => !x.done).map(typeKey).sort().join(',');
-    return v + '#' + o + '#' + s.delivered;
+    const v = s.vials.map(x => x.join(',')).sort().join('|');
+    return v + '#' + activeTypes(s).sort().join(',') + '#' + s.next;
   }
 
-  /* Кратчайшее решение (BFS по числу действий: перелив и выдача — по 1).
-     Возвращает { moves, states } или { moves: null }. opts.keepVial —
-     вариант анализа. opts.cap — предохранитель по числу состояний. */
+  /* Кратчайшее решение (BFS по числу переливов). { moves, visited } или
+     { moves: null }. opts.cap — предохранитель по числу состояний. */
   function solve(state, opts) {
     opts = opts || {};
-    const cap = opts.cap || 400000;
+    const cap = opts.cap || 300000;
     const start = cloneState(state);
+    settle(start, opts);
     if (isWon(start)) return { moves: [], visited: 1 };
-    const seen = new Map();
-    seen.set(stateKey(start), null);
+    const seen = new Set([stateKey(start)]);
     let frontier = [{ s: start, path: [] }];
     let visited = 1;
     while (frontier.length) {
       const next = [];
       for (const node of frontier) {
-        const cand = legalMoves(node.s.vials).concat(deliverMoves(node.s));
-        for (const mv of cand) {
-          const ns = apply(node.s, mv, opts);
+        for (const mv of legalMoves(node.s.vials, true)) {
+          const ns = applyMove(node.s, mv, opts);
           if (!ns) continue;
           const k = stateKey(ns);
           if (seen.has(k)) continue;
-          seen.set(k, 1);
+          seen.add(k);
           visited++;
           const path = node.path.concat([mv]);
           if (isWon(ns)) return { moves: path, visited };
@@ -185,50 +172,74 @@
     return { moves: null, visited };
   }
 
-  /* Полный обход достижимых состояний: сколько из них выигрышные/тупиковые
-     и можно ли победить, выполнив именно заданную пару заказов. Нужен
-     дизайну уровней и тестам («выбор между заказами»). */
-  function reachability(state, opts) {
+  /* Полный граф достижимых состояний: сколько всего, сколько безнадёжных
+     (победа недостижима), сколько тупиков (нет ходов). Нужен дизайну
+     уровней и тестам. */
+  function analyze(state, opts) {
     opts = opts || {};
-    const cap = opts.cap || 400000;
-    const seen = new Map(); // key -> {s, win, dead}
-    const stack = [cloneState(state)];
-    seen.set(stateKey(stack[0]), true);
-    let states = 0, dead = 0, won = 0;
-    const pairs = new Set(); // варианты «какие заказы выполнены» в победных состояниях
-    while (stack.length) {
-      const s = stack.pop();
-      states++;
-      if (states > cap) return { states, capped: true };
-      if (isWon(s)) {
-        won++;
-        pairs.add(s.orders.map((o, i) => o.done ? i : -1).filter(i => i >= 0).join('+'));
-        continue; // после победы дальше не играем
-      }
-      const cand = legalMoves(s.vials).concat(deliverMoves(s));
-      if (cand.length === 0) { dead++; continue; }
-      for (const mv of cand) {
-        const ns = apply(s, mv, opts);
+    const cap = opts.cap || 300000;
+    const start = cloneState(state);
+    settle(start, opts);
+    const keys = new Map();
+    const nodes = [];      // { won, dead, out: [ids] }
+    const queue = [start];
+    keys.set(stateKey(start), 0);
+    nodes.push({ won: isWon(start), out: [] });
+    for (let qi = 0; qi < queue.length; qi++) {
+      if (nodes.length > cap) return { states: nodes.length, capped: true };
+      const s = queue[qi];
+      const node = nodes[qi];
+      if (node.won) continue;
+      const moves = legalMoves(s.vials, true);
+      node.dead = moves.length === 0;
+      for (const mv of moves) {
+        const ns = applyMove(s, mv, opts);
         if (!ns) continue;
         const k = stateKey(ns);
-        if (seen.has(k)) continue;
-        seen.set(k, true);
-        stack.push(ns);
+        let id = keys.get(k);
+        if (id === undefined) {
+          id = nodes.length;
+          keys.set(k, id);
+          nodes.push({ won: isWon(ns), out: [] });
+          queue.push(ns);
+        }
+        node.out.push(id);
       }
     }
-    return { states, dead, won, winningPairs: Array.from(pairs).sort(), capped: false };
+    // Обратный проход: «хорошие» — из которых достижима победа.
+    const rev = nodes.map(() => []);
+    nodes.forEach((n, i) => n.out.forEach(j => rev[j].push(i)));
+    const good = new Uint8Array(nodes.length);
+    const stack = [];
+    nodes.forEach((n, i) => { if (n.won) { good[i] = 1; stack.push(i); } });
+    while (stack.length) {
+      const j = stack.pop();
+      for (const i of rev[j]) if (!good[i]) { good[i] = 1; stack.push(i); }
+    }
+    let lost = 0, dead = 0;
+    nodes.forEach((n, i) => { if (!good[i]) lost++; if (n.dead) dead++; });
+    const startMoves = nodes[0].out.length;
+    const startTraps = nodes[0].out.filter(j => !good[j]).length;
+    return { states: nodes.length, lost, dead, winnable: !!good[0], startMoves, startTraps, capped: false };
   }
 
-  /* Подсказка: первый шаг кратчайшего решения от ТЕКУЩЕЙ позиции. */
-  function hint(state) {
-    const r = solve(state);
+  /* Подсказка: первый шаг кратчайшего решения от ТЕКУЩЕЙ позиции; null —
+     отсюда не выиграть. */
+  function hint(state, opts) {
+    const r = solve(state, opts);
     return r.moves && r.moves.length ? r.moves[0] : null;
   }
 
+  /* Можно ли ещё выиграть из позиции (с предохранителем: при переполнении
+     считаем «можно», чтобы не пугать игрока ложной тревогой). */
+  function isWinnable(state, opts) {
+    const r = solve(state, Object.assign({ cap: 60000 }, opts || {}));
+    return !!r.moves || !!r.capped;
+  }
+
   const api = {
-    CAP, sameType, typeKey, isCollected, moveCount, legalMoves, matchingOrders,
-    makeState, cloneState, moveInPlace, deliverInPlace, applyMove, applyDeliver, apply, deliverMoves, allMoves,
-    isWon, isDeadEnd, stateKey, solve, reachability, hint
+    CAP, SEALED, isComplete, isHomogeneous, moveCount, legalMoves, makeState, cloneState, activeTypes,
+    findDelivery, settle, moveInPlace, applyMove, isWon, isDeadEnd, stateKey, solve, analyze, hint, isWinnable
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.WorkshopRules = api;

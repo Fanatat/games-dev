@@ -126,7 +126,9 @@ function findTarget(world, unit) {
   // главе 1 и так снижен (playerCoreDmgMult).
   if (world.enemySiege && unit.team === 'enemy' && enemyCore.hp > 0) {
     const ut = UNIT_TYPES[unit.typeId];
-    if (ut.role === 'ranged' && Math.abs(enemyCore.x - unit.x) <= ut.range + world.enemySiege) return { kind: 'core', ref: enemyCore };
+    // «Последний конвой» (world.convoy): вражеские лучники всегда целят в конвой — идут к дальности
+    // выстрела + siege и бьют его поверх строя, пока их не догонят (ТЗ_КОНВОЙ_MVP1, «скрытые правила»).
+    if (ut.role === 'ranged' && (world.convoy || Math.abs(enemyCore.x - unit.x) <= ut.range + world.enemySiege)) return { kind: 'core', ref: enemyCore };
   }
   // r15 И17 (куратор №6: «крепость врага 2,5 мин держалась на 25/1043 HP при
   // армии у ворот»): бойцы игрока били ближайшего — свежего защитника, который
@@ -323,7 +325,9 @@ function dealDamage(world, targetInfo, dmg, onKillTeamGold, attackerRole = 'mele
   // в м1–м3 не сносит крепость за 20 с. По вражеской крепости — без изменений.
   // r15 И15: овертайм (game.js, OVERTIME) — крепость врага «сдаёт», урон по ней выше.
   const coreMult = targetInfo.kind !== 'core' ? 1 : ref.team === 'player' ? (world.playerCoreDmgMult || 1) : (world.enemyCoreDmgTakenMult || 1);
-  let finalDmg = dmg * (1 - reduction) * coreMult;
+  // «Последний конвой»: усиление «Укрепление» — стрелы по конвою слабее (world.convoyRangedTaken, convoy.js)
+  const shield = targetInfo.kind === 'core' && ref.team === 'player' && attackerRole === 'ranged' && world.convoyRangedTaken ? world.convoyRangedTaken : 1;
+  let finalDmg = dmg * (1 - reduction) * coreMult * shield;
   // r15 И19 (куратор №7: «вражеская крепость висит на 45→29 HP 60+ с»):
   // ниже FINISH_ONE_HIT её HP любой удар бойца, героя или «Залпа» игрока
   // добивает. Крепость ИГРОКА так не падает (её держит FORT_GUARD).
@@ -338,7 +342,7 @@ function dealDamage(world, targetInfo, dmg, onKillTeamGold, attackerRole = 'mele
     SFX.coreHit();
     // Раунд 15: урон по ядру даёт опыт стороне-атакующему (смена эпохи).
     addTeamXp(world, ref.team === 'player' ? 'enemy' : 'player', Math.min(finalDmg, finalDmg + ref.hp) * AGE_UP.xpPerCoreDmg);
-    world.onCoreHit && world.onCoreHit(ref, finalDmg);
+    world.onCoreHit && world.onCoreHit(ref, finalDmg, attackerRole, shield);
     if (ref.hp <= 0) { ref.hp = 0; world.onCoreDestroyed && world.onCoreDestroyed(ref); }
     return;
   }
@@ -352,7 +356,7 @@ function dealDamage(world, targetInfo, dmg, onKillTeamGold, attackerRole = 'mele
   // только на отрисовку) для читаемости попадания
   ref.knockback = -ref.dir * 4;
   // Раунд 14: хук только для VFX (искры в точке контакта), логики нет.
-  world.onHit && world.onHit(ref, attackerRole);
+  world.onHit && world.onHit(ref, attackerRole, finalDmg + Math.min(0, ref.hp)); // 3-й аргумент — снятое HP (учёт «Наступления»)
   if (ref.hp <= 0 && ref.state !== 'dead') {
     ref.hp = 0;
     ref.state = 'dead';
@@ -419,9 +423,11 @@ function updateUnits(world, dt, onKillTeamGold) {
         }
       }
     } else if (world.holdLine && u.team === 'player' && u.x >= (world.holdLine[t.role] || world.holdLine.default) - (u.holdOff || 0) &&
-               target.ref.x > (world.holdLine[t.role] || world.holdLine.default) + world.holdLine.chase) {
+               target.ref.x > (world.holdLine[t.role] || world.holdLine.default) + world.holdLine.chase &&
+               target.ref.state !== 'attack') {
       // «Последний конвой»: оборона — свои держат линию у конвоя и ждут врага (выходят навстречу только к
-      // тем, кто остановился в пределах holdLine.chase за линией), не бегут к точке появления врагов
+      // тем, кто остановился в пределах holdLine.chase за линией), не бегут к точке появления врагов.
+      // Врага, который уже бьёт (стрелок за линией погони расстреливает передних), — атакуют (ТЗ_КОНВОЙ_MVP1).
       u.state = 'idle';
     } else {
       u.state = 'walk';

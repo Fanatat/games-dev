@@ -4104,6 +4104,12 @@ function update(dt) {
 // см. ПЛАН.md, раунд 3, «мир живее».
 const DAY_CYCLE_SEC = 120;
 function computeDayNight(elapsed) {
+  // «Последний конвой»: без ночи — ночью бой не читался (ТЗ_КОНВОЙ_MVP1 п.9). Бой 1 — утро, бой 2 — после полудня.
+  if (window.CONVOY_PROTOTYPE) {
+    const localT = match && match.convoy && match.convoy.battle === 2 ? 0.66 : 0.3;
+    const alt = Math.sin(Math.PI * localT);
+    return { sunUp: true, localT, alt, light: 0.45 + 0.55 * alt };
+  }
   // Косметика из магазина отключает цикл целиком (см. ПЛАН.md, раунд 3).
   if (progress.cosmeticTime === 'day') return { sunUp: true, localT: 0.5, alt: 1, light: 1 };
   if (progress.cosmeticTime === 'night') return { sunUp: false, localT: 0.5, alt: 1, light: 0.15 };

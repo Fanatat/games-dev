@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-<!-- Последний конвой, тестовая сборка fork1-last-convoy@c28784b (2026-10-05) -->
+<!-- Последний конвой, тестовая сборка 2 MVP-1 convoy-mvp@84ed646 (2026-10-09) -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>Последний конвой</title>
@@ -175,10 +175,12 @@
           <div class="cv-wave-label" id="cvWaveLabel">Подготовка</div>
           <div class="cv-dots" id="cvDots"></div>
           <div class="cv-wave-timer" id="cvWaveTimer"></div>
+          <div class="cv-wave-next" id="cvWaveNext"></div>
         </div>
         <button id="cvPause" class="icon-btn hud-round" title="Пауза (P)" aria-label="Пауза"><svg class="ico"><use href="#i-pause"/></svg></button>
       </div>
       <div class="cv-alert hidden" id="cvAlert" role="alert"><span class="cv-alert-ico">!</span><span id="cvAlertText"></span></div>
+      <div class="cv-tip hidden" id="cvHint" role="status"><b>Лучники бьют конвой из-за спин своих.</b> Бойцы догоняют их и бьют в 1,5 раза сильнее.</div>
       <div class="cv-bottom">
         <div class="cv-gold"><span class="gold-dot"></span><b id="cvGold">60</b><span class="cv-income" id="cvIncome">+6/с</span></div>
         <div class="cv-cards" id="cvCards"></div>
@@ -340,7 +342,7 @@
     <div id="cvMenu" class="screen hidden">
       <div class="menu-main">
         <h1 class="logo"><span class="logo-back">ПОСЛЕДНИЙ КОНВОЙ</span><span class="logo-front" aria-hidden="true">ПОСЛЕДНИЙ КОНВОЙ</span></h1>
-        <p class="cv-lead">Короткий поход из двух столкновений. Защитите неподвижный конвой, соберите отряд и выберите одно усиление между боями.</p>
+        <p class="cv-lead">Короткий поход из двух столкновений. Защитите неподвижный конвой, соберите отряд и выберите одно усиление перед переправой. Потом сравните с другим.</p>
         <button class="menu-btn primary-big" id="cvMenuPlay">Начать поход</button>
         <p class="cv-hint">Играть можно мышью или касаниями. Бой на паузу — кнопка вверху справа или клавиша P.</p>
       </div>
@@ -352,6 +354,7 @@
         <h2 id="cvBriefTitle">Засада у брода</h2>
         <p id="cvBriefStory"></p>
         <p class="cv-brief-waves" id="cvBriefWaves"></p>
+        <div class="cv-threats" id="cvBriefThreats"></div>
         <p class="cv-brief-boost hidden" id="cvBriefBoost"></p>
         <div class="cv-brief-classes" id="cvBriefClasses"></div>
         <button class="menu-btn primary-big" id="cvBriefGo" data-battle="1">В бой</button>
@@ -372,8 +375,12 @@
         <p id="cvResultSub"></p>
         <p class="cv-result-boost" id="cvResultBoost"></p>
         <div class="cv-res-rows" id="cvResultRows"></div>
-        <button class="menu-btn result-main" id="cvResultAgain">Повторить поход</button>
-        <button class="menu-btn secondary small" id="cvResultMenu">В меню</button>
+        <div class="cv-compare hidden" id="cvResultCompare"></div>
+        <div class="cv-result-btns">
+          <button class="menu-btn result-main hidden" id="cvResultRetry2">Переправа с другим усилением</button>
+          <button class="menu-btn result-main" id="cvResultAgain">Повторить поход</button>
+          <button class="menu-btn secondary small" id="cvResultMenu">В меню</button>
+        </div>
       </div>
     </div>
   </div>

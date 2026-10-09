@@ -74,8 +74,13 @@
   // ставит этот кусок на место metrica-head. Счётчик поднимается до
   // загрузки Unity, и шаблон отмечает целями ход загрузки (load_start,
   // load_50, load_done, load_error): видно, сколько людей ушло, не
-  // дождавшись игры. Номер счётчика — из analytics.json (metrica), в
-  // dev-билде — из ?ym=<номер> в адресе.
+  // дождавшись игры. Номер счётчика — из analytics.json (metrica) только
+  // в релизной цели площадки; в dev-билде счётчика нет, пока в адресе нет
+  // ?ym=<номер>.
+  // Просмотр страницы (hit) — вручную (defer: true), по адресу без
+  // параметров: в адресе игры ВК — параметры запуска с номером игрока, им
+  // в Метрике не место; источник перехода — только сайт. Заказы
+  // электронной коммерции счётчик читает из window.dataLayer.
   (function () {
     var id = 0;
     if (true) {
@@ -86,6 +91,7 @@
       if (window.game7Ym) window.ym(window.game7Ym, "reachGoal", name, params);
     };
     if (!id) return;
+    window.dataLayer = window.dataLayer || [];
     (function (m, e, t, r, i, k, a) {
       m[i] = m[i] || function () { (m[i].a = m[i].a || []).push(arguments); };
       m[i].l = 1 * new Date();
@@ -95,7 +101,13 @@
       k = e.createElement(t); a = e.getElementsByTagName(t)[0];
       k.async = 1; k.src = r; a.parentNode.insertBefore(k, a);
     })(window, document, "script", "https://mc.yandex.ru/metrika/tag.js", "ym");
-    window.ym(id, "init", { clickmap: false, trackLinks: false, accurateTrackBounce: true, webvisor: false });
+    window.ym(id, "init", {
+      defer: true, clickmap: false, trackLinks: false, accurateTrackBounce: true, webvisor: false,
+      ecommerce: "dataLayer"
+    });
+    var referer = "";
+    try { if (document.referrer) referer = new URL(document.referrer).origin + "/"; } catch (e) {}
+    window.ym(id, "hit", location.origin + location.pathname, { title: document.title, referer: referer });
     window.game7Ym = id;
   })();
 </script>
@@ -194,16 +206,16 @@
       canvas.addEventListener("contextmenu", function (e) { e.preventDefault(); });
 
       var buildUrl = "Build";
-      var loaderUrl = buildUrl + "/dev-20261009-061711.loader.js";
+      var loaderUrl = buildUrl + "/dev-20261009-120442.loader.js";
       var config = {
         arguments: [],
-        dataUrl: buildUrl + "/dev-20261009-061711.data.unityweb",
-        frameworkUrl: buildUrl + "/dev-20261009-061711.framework.js.unityweb",
-        codeUrl: buildUrl + "/dev-20261009-061711.wasm.unityweb",
+        dataUrl: buildUrl + "/dev-20261009-120442.data.unityweb",
+        frameworkUrl: buildUrl + "/dev-20261009-120442.framework.js.unityweb",
+        codeUrl: buildUrl + "/dev-20261009-120442.wasm.unityweb",
         streamingAssetsUrl: "StreamingAssets",
         companyName: "DefaultCompany",
         productName: "unity",
-        productVersion: "1.0",
+        productVersion: "dev-20261009-120442",
         showBanner: unityShowBanner,
         // Экраны с плотностью 3 рисовали бы в 9 раз больше пикселей, чем
         // с плотностью 1: потолок 2 держит 60 FPS на среднем телефоне.

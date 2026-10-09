@@ -19,6 +19,57 @@
     <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>game7</title>
     <script>
+      // Звук страницы спит, пока её не видно. Все AudioContext (звук Unity и
+      // музыка) записываются при создании; спрятали страницу — suspend,
+      // показали — resume. Причины прятать независимы: вкладка
+      // (visibilitychange, pagehide) и площадка (ВК сворачивает мини-
+      // приложение событием VKWebAppViewHide, а вкладка остаётся «видна» —
+      // так музыка играла поверх приложения ВК). Площадка зовёт
+      // game7PageAudio.hide(причина) и show(причина).
+      (function () {
+        var Base = window.AudioContext || window.webkitAudioContext;
+        var contexts = [];
+        var reasons = {};
+        function hidden() {
+          for (var key in reasons) if (reasons[key]) return true;
+          return false;
+        }
+        function apply() {
+          var sleep = hidden();
+          contexts.forEach(function (ctx) {
+            try {
+              if (sleep && ctx.state === "running") ctx.suspend();
+              else if (!sleep && ctx.state === "suspended") ctx.resume();
+            } catch (e) {}
+          });
+        }
+        if (Base) {
+          var Watched = class extends Base {
+            constructor(options) {
+              super(options);
+              contexts.push(this);
+              if (hidden()) this.suspend();
+            }
+          };
+          window.AudioContext = Watched;
+          if (window.webkitAudioContext) window.webkitAudioContext = Watched;
+        }
+        function set(reason, on) {
+          reasons[reason] = on;
+          apply();
+        }
+        window.game7PageAudio = {
+          hide: function (reason) { set(reason, true); },
+          show: function (reason) { set(reason, false); },
+        };
+        document.addEventListener("visibilitychange", function () {
+          set("page", document.visibilityState === "hidden");
+        });
+        window.addEventListener("pagehide", function () { set("page", true); });
+        window.addEventListener("pageshow", function () { set("page", document.visibilityState === "hidden"); });
+      })();
+    </script>
+    <script>
   // Яндекс Метрика (docs/ANALYTICS.md, «Яндекс Метрика»): BuildScript
   // ставит этот кусок на место metrica-head. Счётчик поднимается до
   // загрузки Unity, и шаблон отмечает целями ход загрузки (load_start,
@@ -143,12 +194,12 @@
       canvas.addEventListener("contextmenu", function (e) { e.preventDefault(); });
 
       var buildUrl = "Build";
-      var loaderUrl = buildUrl + "/dev-20261008-230213.loader.js";
+      var loaderUrl = buildUrl + "/dev-20261009-061711.loader.js";
       var config = {
         arguments: [],
-        dataUrl: buildUrl + "/dev-20261008-230213.data.unityweb",
-        frameworkUrl: buildUrl + "/dev-20261008-230213.framework.js.unityweb",
-        codeUrl: buildUrl + "/dev-20261008-230213.wasm.unityweb",
+        dataUrl: buildUrl + "/dev-20261009-061711.data.unityweb",
+        frameworkUrl: buildUrl + "/dev-20261009-061711.framework.js.unityweb",
+        codeUrl: buildUrl + "/dev-20261009-061711.wasm.unityweb",
         streamingAssetsUrl: "StreamingAssets",
         companyName: "DefaultCompany",
         productName: "unity",

@@ -73,16 +73,16 @@ const CONVOY = {
   // at — сколько славы нужно всего; v — сила награды (newRun, setupMatch, rollOffer, rerollCost, drawWagon).
   glory: { run: 2, perStop: 3, elite: 2, boss: 15, win: 10, killsPer: 25 },
   meta: [
-    { id: 'supplies', at: 15, v: 40, icon: 'gold', name: 'Запас в дорогу', desc: '+40 золота в начале похода' },
-    { id: 'cardShield', at: 35, icon: { unit: 'shieldbearer' }, name: 'Щитоносцы', desc: 'Карта «Щитоносцы» в колоде усилений' },
-    { id: 'hull', at: 60, v: 0.15, icon: 'hull', name: 'Крепкие борта', desc: 'Прочность конвоя +15%' },
-    { id: 'cardEra', at: 90, icon: 'era', name: 'Новая эпоха', desc: 'Карта «Новая эпоха» в колоде усилений' },
-    { id: 'cardBomb', at: 120, icon: { unit: 'bomber' }, name: 'Бомбометатели', desc: 'Карта «Бомбометатели» в колоде усилений' },
-    { id: 'rockCd', at: 155, v: 0.85, icon: 'clock', name: 'Сноровка', desc: 'Камнепад перезаряжается на 15% быстрее' },
-    { id: 'cards4', at: 195, icon: 'cards4', name: 'Широкий выбор', desc: 'Четыре карты на выбор вместо трёх' },
-    { id: 'skin', at: 240, icon: 'skin', name: 'Расписной полог', desc: 'Повозки в праздничном пологе' },
-    { id: 'freeReroll', at: 290, icon: 'reroll', name: 'Гадальщик', desc: 'Первый переброс карт на стоянке — даром' },
-    { id: 'banner', at: 350, v: 1.08, icon: 'banner', name: 'Знамя похода', desc: 'Весь отряд +8% урона, золотое знамя над конвоем' },
+    { id: 'supplies', at: 15, v: 40, icon: 'gold', name: 'Запас в дорогу', desc: '+40 золота на старте' },
+    { id: 'cardShield', at: 35, icon: { unit: 'shieldbearer' }, name: 'Щитоносцы', desc: 'Новая карта' },
+    { id: 'hull', at: 60, v: 0.15, icon: 'hull', name: 'Крепкие борта', desc: 'Прочность +15%' },
+    { id: 'cardEra', at: 90, icon: 'era', name: 'Новая эпоха', desc: 'Новая карта' },
+    { id: 'cardBomb', at: 120, icon: { unit: 'bomber' }, name: 'Бомбометатели', desc: 'Новая карта' },
+    { id: 'rockCd', at: 155, v: 0.85, icon: 'clock', name: 'Сноровка', desc: 'Камнепад быстрее' },
+    { id: 'cards4', at: 195, icon: 'cards4', name: 'Широкий выбор', desc: '4 карты на выбор' },
+    { id: 'skin', at: 240, icon: 'skin', name: 'Расписной полог', desc: 'Новый полог повозок' },
+    { id: 'freeReroll', at: 290, icon: 'reroll', name: 'Гадальщик', desc: 'Первая смена карт даром' },
+    { id: 'banner', at: 350, v: 1.08, icon: 'banner', name: 'Знамя похода', desc: '+8% урона отряду' },
   ],
   // Волны стоянок. stat — HP и урон врагов (entities.js spawnUnit, world.enemyStatMult);
   // groups — группы внутри волны: at — секунда от начала волны, elite — элитные враги, boss — Вождь.
@@ -142,7 +142,7 @@ const CONVOY_CARDS = (() => {
     apply: (run) => { run.syn[flag] = true; },
   });
   const newUnit = (id, unit, name, desc) => ({
-    id, rarity: 'rare', name, max: 1, icon: { unit }, big: 'Новые', desc: () => desc,
+    id, rarity: 'rare', name, max: 1, icon: { unit }, big: '', desc: () => desc,
     cond: (run) => !owned(run, unit),
     apply: (run, api) => { run.unlocked.push(unit); if (unit === 'spear') run.mods.spear = true; api.freeUnit(unit); },
   });
@@ -163,98 +163,98 @@ const CONVOY_CARDS = (() => {
     classCard('hammer', 'common', 'heavy', 'dmg', 1.35, 'Боевой молот', 'Защитники', 3),
     {
       id: 'treasury', rarity: 'common', name: 'Казна', max: 3, icon: 'gold', big: '+80',
-      desc: () => '+80 золота сейчас и +1 в секунду в бою',
+      desc: () => 'Сейчас +80, в бою +1/с',
       apply: (run, api) => { api.gainGold(80); run.mods.income += 1; },
     },
     {
       id: 'patch', rarity: 'common', name: 'Ремонт', max: 99, icon: 'repair', big: '+35%',
-      desc: (run, m) => `Починить конвой: +${R(m.world.playerCore.maxHp * 0.35)} прочности`,
+      desc: (run, m) => `Конвой +${R(m.world.playerCore.maxHp * 0.35)} прочности`,
       cond: (run, m) => m.world.playerCore.hp < m.world.playerCore.maxHp * 0.85,
       apply: (run, api) => api.healConvoy(0.35),
     },
     {
       id: 'plating', rarity: 'common', name: 'Обшивка', max: 3, icon: 'hull', big: '+150',
-      desc: (run, m) => `Прочность конвоя ${R(m.world.playerCore.maxHp)} → ${R(m.world.playerCore.maxHp + 150)}`,
+      desc: (run, m) => `Прочность ${R(m.world.playerCore.maxHp)} → ${R(m.world.playerCore.maxHp + 150)}`,
       apply: (run, api) => api.addConvoyHp(150),
     },
     {
       id: 'heavyRocks', rarity: 'common', name: 'Тяжёлые камни', max: 3, icon: 'rockHeavy', big: '+50%',
-      desc: (run) => `Камнепад: урон камня ${R(CONVOY.rock.dmg * run.mods.rockDmg)} → ${R(CONVOY.rock.dmg * run.mods.rockDmg * 1.5)}`,
+      desc: (run) => `Урон камня ${R(CONVOY.rock.dmg * run.mods.rockDmg)} → ${R(CONVOY.rock.dmg * run.mods.rockDmg * 1.5)}`,
       apply: (run) => { run.mods.rockDmg *= 1.5; },
     },
     {
       id: 'reinforce', rarity: 'common', name: 'Подкрепление', max: 99, icon: { unit: 'infantry', badge: 'x3' }, big: '+3',
-      desc: () => 'Три Бойца бесплатно — сразу в строй',
+      desc: () => 'Три бойца в строй',
       apply: (run, api) => { for (let i = 0; i < 3; i++) api.freeUnit('infantry'); },
     },
     {
       id: 'quickBow', rarity: 'rare', name: 'Быстрая тетива', max: 2, icon: { unit: 'archer', badge: 'spd' }, big: '+25%',
-      desc: () => 'Стрелки стреляют на 25% чаще',
+      desc: () => 'Стрелки бьют чаще',
       apply: (run) => { run.mods.cls.archer.atk *= 0.8; },
     },
     {
       id: 'cheapKit', rarity: 'rare', name: 'Дешёвый набор', max: 1, icon: { unit: 'infantry', badge: 'cost' }, big: '−25%',
-      desc: (run, m, api) => `Боец стоит ${api.unitCost('infantry')} → ${R(api.unitCost('infantry') * 0.75)}`,
+      desc: (run, m, api) => `Боец: цена ${api.unitCost('infantry')} → ${R(api.unitCost('infantry') * 0.75)}`,
       apply: (run) => { run.mods.cls.infantry.cost *= 0.75; },
     },
-    newUnit('spears', 'spear', 'Копейщики', 'Боец крепче обычного, бьёт тяжёлых в полтора раза сильнее. Первый — сразу в строй'),
-    newUnit('shieldbearers', 'shieldbearer', 'Щитоносцы', 'Держат удар: получают на 35% меньше урона. Первый — сразу в строй'),
-    newUnit('bombers', 'bomber', 'Бомбометатели', 'Стрелки: бомба ранит всех врагов рядом с целью. Первый — сразу в строй'),
+    newUnit('spears', 'spear', 'Копейщики', 'Сильны против тяжёлых'),
+    newUnit('shieldbearers', 'shieldbearer', 'Щитоносцы', 'Держат удар'),
+    newUnit('bombers', 'bomber', 'Бомбометатели', 'Бомба по толпе'),
     classCard('spearEdge', 'rare', 'spear', 'dmg', 1.35, 'Длинные пики', 'Копейщики', 2),
     {
       id: 'trophies', rarity: 'rare', name: 'Трофеи', max: 2, icon: 'trophy', big: '+50%',
-      desc: () => 'Золото за убийства +50%',
+      desc: () => 'Золото за врагов',
       apply: (run) => { run.mods.goldKill *= 1.5; },
     },
     {
       id: 'shields', rarity: 'rare', name: 'Щиты на борт', max: 2, icon: 'shield', big: '−40%',
-      desc: () => 'Стрелы бьют конвой на 40% слабее',
+      desc: () => 'Стрелы по конвою слабее',
       apply: (run, api) => { run.mods.rangedTaken *= 0.6; api.syncWorld(); },
     },
     {
       id: 'quickRock', rarity: 'rare', name: 'Быстрый заряд', max: 2, icon: 'clock', big: '−30%',
-      desc: (run) => `Камнепад: перезарядка ${Math.round(CONVOY.rock.cd * run.mods.rockCd)} → ${Math.round(CONVOY.rock.cd * run.mods.rockCd * 0.7)} с`,
+      desc: (run) => `Перезарядка ${Math.round(CONVOY.rock.cd * run.mods.rockCd)} → ${Math.round(CONVOY.rock.cd * run.mods.rockCd * 0.7)} с`,
       apply: (run) => { run.mods.rockCd *= 0.7; },
     },
     {
       id: 'avalanche', rarity: 'rare', name: 'Лавина', max: 2, icon: 'avalanche', big: '×1,5',
-      desc: () => 'Камнепад шире в полтора раза и на 6 камней больше',
+      desc: () => 'Камнепад шире, +6 камней',
       apply: (run) => { run.mods.rockWidth *= 1.5; run.mods.rockShells += 6; },
     },
     {
       id: 'morale', rarity: 'epic', name: 'Боевой дух', max: 2, icon: 'morale', big: '+20%',
-      desc: () => 'Весь отряд: +20% урона',
+      desc: () => 'Урон всего отряда',
       apply: (run) => { run.mods.allDmg *= 1.2; },
     },
     {
       id: 'doubleRock', rarity: 'epic', name: 'Двойной обвал', max: 1, icon: 'double', big: '×2',
-      desc: () => 'Каждый камнепад обрушивается дважды',
+      desc: () => 'Камнепад бьёт дважды',
       apply: (run) => { run.mods.rockDouble = true; },
     },
     {
       id: 'warChest', rarity: 'epic', name: 'Военная казна', max: 1, icon: 'gold2', big: '+150',
-      desc: () => '+150 золота сейчас и +2 в секунду в бою',
+      desc: () => 'Сейчас +150, в бою +2/с',
       apply: (run, api) => { api.gainGold(150); run.mods.income += 2; },
     },
     {
       id: 'era', rarity: 'epic', name: 'Новая эпоха', max: 2, icon: 'era', big: '×1,35',
-      desc: (run) => `Отряд переходит в ${AGES[AGE_ORDER[(run.ageStep || 0) + 1]].name.toLowerCase()}: здоровье и урон всех бойцов ×1,35`,
+      desc: (run) => `${AGES[AGE_ORDER[(run.ageStep || 0) + 1]].name}: весь отряд сильнее`,
       cond: (run) => (run.ageStep || 0) < AGE_ORDER.length - 1,
       apply: (run, api) => api.ageUp(),
     },
     // сочетания: открываются тремя картами одного знака, всегда предлагаются первыми
     synergy('mobRage', 'mob', 'Ярость толпы', 'rage', '+3%',
-      () => `Каждый живой боец даёт всему отряду +${R(CONVOY.rage.per * 100)}% урона (до +${R(CONVOY.rage.max * 100)}%)`),
+      () => 'Чем больше отряд, тем сильнее'),
     synergy('arrowHail', 'bow', 'Град стрел', 'hail', `${CONVOY.hail.cd} с`,
-      () => `Каждые ${CONVOY.hail.cd} с град из ${CONVOY.hail.shells} стрел сам падает на гущу врагов`),
+      () => `Град стрел каждые ${CONVOY.hail.cd} с`),
     synergy('shieldWall', 'guard', 'Стена щитов', 'wall', `−${R((1 - CONVOY.wall) * 100)}%`,
-      () => `Весь отряд получает на ${R((1 - CONVOY.wall) * 100)}% меньше урона`),
-    synergy('rockBreaker', 'rock', 'Камнелом', 'breaker', 'Оглушение',
-      () => `Камни оглушают врагов на ${ruNum(CONVOY.breaker.stun)} с и отбрасывают назад`),
+      () => 'Отряд получает меньше урона'),
+    synergy('rockBreaker', 'rock', 'Камнелом', 'breaker', '',
+      () => 'Камни оглушают и отбрасывают'),
     synergy('goldVein', 'gold', 'Золотая жила', 'vein', `×${CONVOY.vein.mult}`,
-      () => `${R(CONVOY.vein.chance * 100)}% врагов приносят вчетверо больше золота`),
+      () => `Часть врагов — ×${CONVOY.vein.mult} золота`),
     synergy('ballista', 'wagon', 'Баллиста', 'ballista', `${CONVOY.ballista.dmg}`,
-      () => `На повозке баллиста: каждые ${ruNum(CONVOY.ballista.cd)} с болт пробивает строй врагов насквозь (${CONVOY.ballista.dmg} урона каждому)`),
+      () => `Болт насквозь каждые ${ruNum(CONVOY.ballista.cd)} с`),
   ];
   const TAG_OF = {
     tough: 'mob', blades: 'mob', reinforce: 'mob', cheapKit: 'mob', spears: 'mob', spearEdge: 'mob',
@@ -281,7 +281,6 @@ const Convoy = (() => {
   const JOURNAL_MAX = 500;
   const STOPS = CONVOY.waves.length;
   const TAU = Math.PI * 2;
-  const RARITY_NAME = { common: 'Обычная', rare: 'Редкая', epic: 'Эпическая', synergy: 'Сочетание' };
   const CARD_BY_ID = Object.fromEntries(CONVOY_CARDS.map(c => [c.id, c]));
   const SYN_FLAG = { mobRage: 'rage', arrowHail: 'hail', shieldWall: 'wall', rockBreaker: 'breaker', goldVein: 'vein', ballista: 'ballista' };
   // текущий поход: см. newRun()
@@ -627,7 +626,7 @@ const Convoy = (() => {
     C.waveHp = m.world.playerCore.hp;
     if (C.headless) return;
     const last = run.stop === STOPS;
-    banner(last ? 'Последняя стоянка!' : `Стоянка ${run.stop}`, waveText(waveTotals(C.def)), last ? 'red' : 'gold', 2.2);
+    banner(last ? 'Последняя стоянка!' : `Стоянка ${run.stop}`, last ? 'Вождь!' : '', last ? 'red' : 'gold', 2.2);
     SFX.alarm();
   }
   // Ответ врага на перекос отряда (CONVOY.counter): копия волны, где часть пехоты и стрелков — контра
@@ -680,7 +679,7 @@ const Convoy = (() => {
       if (!u) return;
       C.boss = u; C.slamT = CONVOY.boss.slamCd * 0.6; C.summoned = false; C.slam = null;
       if (!C.headless) {
-        banner('Вождь!', 'Копейщики бьют его в полтора раза сильнее', 'red', 2.4);
+        banner('Вождь!', '', 'red', 2.4);
         shakeScreen(m, 7);
         SFX.bossRoar();
         VFX.spawn(m, 'ring', u.x, -40, { size: 180, width: 7, life: 0.7, color: ART.enemy.eliteOutline, glow: ART.enemy.eliteGlow, gravity: 0 });
@@ -690,7 +689,7 @@ const Convoy = (() => {
       if (!u) return;
       u.dmgMult *= CONVOY.elite.dmg;
       if (!C.headless) {
-        if (!C.banner || C.banner.t > 1.2) banner('Вожак!', 'Крупный враг — двойная награда', 'red', 1.6);
+        if (!C.banner || C.banner.t > 1.2) banner('Вожак!', '×2', 'red', 1.6, true);
         SFX.elite();
       }
     } else u = spawnUnit(w, 'enemy', q.type);
@@ -705,7 +704,7 @@ const Convoy = (() => {
       let i = 0;
       for (const [t, n] of Object.entries(B.adds)) for (let k = 0; k < n; k++) C.queue.push({ at: C.waveT + 0.4 + (i++) * CONVOY.spawnGap, type: t });
       C.queue.sort((a, b) => a.at - b.at);
-      if (!C.headless) { banner('Вождь зовёт подмогу!', '', 'red', 1.6); SFX.bossRoar(); shakeScreen(m, 5); }
+      if (!C.headless) { banner('Подмога!', '', 'red', 1.6); SFX.bossRoar(); shakeScreen(m, 5); }
     }
     if (C.slam) {
       C.slam.t += dt;
@@ -751,7 +750,7 @@ const Convoy = (() => {
       if (!C.headless) VFX.burst(m, 'spark', u.x, -30 * VIEW.fig, 4, { speed: 70, life: 0.7, size: 2.6, colors: ['#b8f5a0', '#6fd46a', '#fff6c0'], lift: 40, gravity: -20 });
     }
     if (C.headless) return;
-    banner('Волна отбита!', `+${bonus} золота · отряд ${CONVOY.squadHeal >= 1 ? 'вылечен' : 'подлечен'}`, 'gold', CONVOY.clearSec + 0.3);
+    banner('Волна отбита!', `+${bonus}`, 'gold', CONVOY.clearSec + 0.3, true);
     SFX.waveClear();
   }
 
@@ -905,38 +904,38 @@ const Convoy = (() => {
     if (C.headless) return;
     saveRun();
     syncOverlays();
-    banner(win ? 'Конвой доставлен!' : 'Конвой пал', win ? 'Все 10 стоянок позади' : `Стоянка ${run.stop} из ${STOPS}`, win ? 'gold' : 'red', CONVOY.endSec + 1);
+    banner(win ? 'Конвой доставлен!' : 'Конвой пал', '', win ? 'gold' : 'red', CONVOY.endSec + 1);
     MUSIC.play(win ? 'victory_sting' : 'defeat_sting');
     if (!win) shakeScreen(m, 8);
   }
+  // Итог похода: маршрут с отметкой, три значка-цифры, иконки взятых карт, слава до следующей награды.
   function showResult() {
     const win = run.win, reached = win ? STOPS : run.stop;
     $('cvResultTitle').textContent = win ? 'Конвой доставлен!' : 'Конвой пал';
     $('cvResultTitle').className = win ? 'win' : 'lose';
-    $('cvResultSub').textContent = win ? 'Все десять стоянок пройдены.' : `На стоянке ${reached} из ${STOPS}.`;
-    $('cvResultTrack').innerHTML = Array.from({ length: STOPS }, (_, i) => {
-      const cls = i < reached - 1 || win ? 'done' : i === reached - 1 ? 'fail' : '';
-      return `<i class="${cls}">${i + 1}</i>`;
-    }).join('');
+    const track = $('cvResultTrack');
+    track.innerHTML = Array.from({ length: STOPS }, (_, i) =>
+      `<i class="${win || i < reached - 1 ? 'done' : i === reached - 1 ? 'fail' : ''}${i === STOPS - 1 ? ' last' : ''}"></i>`).join('');
+    track.title = `Стоянка ${reached} из ${STOPS}`;
     const s = run.stats;
-    const rows = [
-      ['Врагов повержено', s.kills], ['Золота добыто', Math.floor(s.gold)], ['Лучшая серия', s.bestStreak > 1 ? `×${s.bestStreak}` : '—'],
-      ['Камнепадов', s.rocks], ['Время похода', fmtSec(match.elapsed)],
-    ];
-    $('cvResultStats').innerHTML = rows.map(([k, v]) => `<div><span>${k}</span><b>${v}</b></div>`).join('');
+    $('cvResultStats').innerHTML =
+      `<span class="cv-res-stat kills" title="Врагов повержено"><svg class="ico"><use href="#i-sword"/></svg><b>${s.kills}</b></span>` +
+      `<span class="cv-res-stat gold" title="Золота добыто"><i class="gold-dot"></i><b>${Math.floor(s.gold)}</b></span>` +
+      (s.bestStreak > 1 ? `<span class="cv-res-stat streak" title="Лучшая серия"><svg class="ico"><use href="#i-burst"/></svg><b>×${s.bestStreak}</b></span>` : '');
     const counts = {};
     for (const id of run.cards) counts[id] = (counts[id] || 0) + 1;
-    $('cvResultCards').innerHTML = Object.keys(counts).length
-      ? Object.entries(counts).map(([id, n]) => `<span class="cv-chip r-${CARD_BY_ID[id].rarity}">${CARD_BY_ID[id].name}${n > 1 ? ` ×${n}` : ''}</span>`).join('')
-      : '<span class="cv-chip">Усилений не взято</span>';
+    const ids = Object.keys(counts), cardsBox = $('cvResultCards');
+    cardsBox.innerHTML = ids.map(id => `<span class="cv-res-card r-${CARD_BY_ID[id].rarity}" title="${CARD_BY_ID[id].name}">` +
+      `<canvas width="64" height="64"></canvas>${counts[id] > 1 ? `<em>×${counts[id]}</em>` : ''}</span>`).join('');
+    cardsBox.querySelectorAll('canvas').forEach((cv, i) => drawCardIcon(cv, CARD_BY_ID[ids[i]]));
     const rec = run.record || { prev: 0, isNew: false };
     const best = $('cvResultBest');
-    best.className = 'cv-res-best' + (rec.isNew ? ' new' : '');
-    best.textContent = rec.isNew ? (win ? 'Первая доставка! Новый рекорд' : `Новый рекорд: стоянка ${reached}`) : `Рекорд: ${rec.prev >= STOPS ? 'конвой доставлен' : `стоянка ${rec.prev}`}`;
+    best.textContent = 'Новый рекорд!';
+    best.classList.toggle('hidden', !rec.isNew);
     renderResultGlory();
     syncOverlays();
   }
-  // Слава за поход: «+N» набегает, полоса до следующей награды заполняется, открытые награды выезжают со звуком.
+  // Слава за поход: «+N ★» набегает, шкала до следующей награды (её значок в конце), открытые награды выезжают со звуком.
   function renderResultGlory() {
     const box = $('cvResultGlory'), g = run.glory;
     if (!box) return;
@@ -944,17 +943,16 @@ const Convoy = (() => {
     const next = CONVOY.meta.find(u => u.at > g.total);
     const floor = CONVOY.meta.filter(u => u.at <= g.total).reduce((a, u) => Math.max(a, u.at), 0);
     const frac = (v) => next ? clamp01((v - floor) / (next.at - floor)) : 1;
-    const parts = g.parts.map(([k, v]) => `${k} ${v}`).join(' · ');
     box.innerHTML =
-      `<div class="cv-glory-head"><b class="cv-glory-gain">+0</b><span>славы</span><em>${parts}</em></div>` +
-      `<div class="cv-glory-bar"><i style="width:${frac(g.prev) * 100}%"></i>` +
-      `<span>Всего ${g.total} · ${next ? `до «${next.name}» ещё ${next.at - g.total}` : 'все награды открыты'}</span></div>` +
-      (g.prev === 0 ? '<p class="cv-glory-note">Слава копится от похода к походу и открывает постоянные награды.</p>' : '') +
-      (g.fresh.length ? `<div class="cv-unlocks">${g.fresh.map((u, i) =>
-        `<div class="cv-unlock" style="animation-delay:${0.7 + i * 0.25}s"><canvas width="64" height="64"></canvas>` +
-        `<div><b>Открыто: ${u.name}</b><span>${u.desc}</span></div></div>`).join('')}</div>` : '');
+      '<b class="cv-glory-gain" title="Слава за поход"><span>+0</span><svg class="ico"><use href="#i-star"/></svg></b>' +
+      `<div class="cv-glory-row"><div class="cv-glory-bar"><i style="width:${frac(g.prev) * 100}%"></i>` +
+      `<span>${next ? `${g.total} / ${next.at}` : g.total}</span></div>` +
+      (next ? `<canvas class="cv-glory-next" width="64" height="64" title="${next.name}: ${next.desc}"></canvas>` : '') + '</div>' +
+      g.fresh.map((u, i) => `<div class="cv-unlock" style="animation-delay:${0.7 + i * 0.25}s"><canvas width="64" height="64"></canvas>` +
+        `<div><b>Открыто: ${u.name}</b><span>${u.desc}</span></div></div>`).join('');
+    if (next) drawCardIcon(box.querySelector('.cv-glory-next'), next);
     box.querySelectorAll('.cv-unlock canvas').forEach((cv, i) => drawCardIcon(cv, g.fresh[i]));
-    const gain = box.querySelector('.cv-glory-gain'), bar = box.querySelector('.cv-glory-bar i'), t0 = performance.now();
+    const gain = box.querySelector('.cv-glory-gain span'), bar = box.querySelector('.cv-glory-bar i'), t0 = performance.now();
     const tick = () => {
       if (!box.contains(gain)) return;
       const k = Math.min(1, (performance.now() - t0) / 700);
@@ -1013,7 +1011,7 @@ const Convoy = (() => {
     if (C.headless) return;
     requestHitStop(0.16);
     shakeScreen(m, 14);
-    banner('Вождь повержен!', 'Добейте остальных', 'gold', 2.2);
+    banner('Вождь повержен!', '', 'gold', 2.2);
     SFX.bossDown();
     for (let i = 0; i < 3; i++) VFX.spawn(m, 'ring', u.x, -40 * VIEW.fig, { size: 120 + i * 90, width: 6 - i, life: 0.5 + i * 0.15, color: ART.hero.gold, glow: ART.hero.goldGlow, gravity: 0 });
     VFX.burst(m, 'spark', u.x, -50 * VIEW.fig, 30, { speed: 260, life: 0.9, size: 3.6, colors: ART.spark, lift: 80 });
@@ -1084,8 +1082,9 @@ const Convoy = (() => {
     if (!el) return;
     el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump');
   }
-  function banner(text, sub, color, life) {
-    match.convoy.banner = { text, sub, color, t: 0, life: life || 1.8 };
+  // coin — перед подписью рисуется монета (подпись — сумма золота)
+  function banner(text, sub, color, life, coin) {
+    match.convoy.banner = { text, sub, color, t: 0, life: life || 1.8, coin: !!coin };
   }
 
   // ------------------------------------------------------------ сочетания в бою
@@ -1179,7 +1178,7 @@ const Convoy = (() => {
       if (!C.headless && m.elapsed - C.deniedAt > 0.6) {
         C.deniedAt = m.elapsed;
         SFX.buyDenied();
-        VFX.floater(m, Math.max(140, Math.min(860, x)), -120, `Камнепад через ${Math.ceil(C.rockCd)} с`, '#ffb08a');
+        VFX.floater(m, Math.max(140, Math.min(860, x)), -120, `Ещё ${Math.ceil(C.rockCd)} с`, '#ffb08a');
       }
       return false;
     }
@@ -1291,6 +1290,8 @@ const Convoy = (() => {
     hudCache[cacheKey] = on;
     el.classList.toggle(cls, on);
   }
+  // Плитка найма (макет UI_МАКЕТЫ/КОНВОЙ_UI.md): портрет и цена на ленте; ▲ — вид усилен картами.
+  // Имя и роль — только в title/aria-label: в бою игрок смотрит на картинки, а не читает.
   function buildCards() {
     const list = classes();
     const age = ageStatMult(run.ageStep);
@@ -1299,33 +1300,34 @@ const Convoy = (() => {
     cardKey = sig;
     const box = $('cvCards');
     box.innerHTML = '';
-    box.classList.toggle('many', list.length > 4);
-    box.classList.toggle('four', list.length === 4);   // четыре вида: плитки на узком экране (style.css)
     cardEls = {};
     list.forEach((id, i) => {
-      const t = UNIT_TYPES[id], L = CONVOY.labels[id], cm = run.mods.cls[id];
-      const hp = Math.round(t.hp * cm.hp * age), dmg = Math.round(t.dmg * cm.dmg * run.mods.allDmg * age);
+      const L = CONVOY.labels[id], cm = run.mods.cls[id], cost = unitCost(id);
+      const up = cm.hp > 1 || cm.dmg * run.mods.allDmg > 1 || cm.atk < 1;
       const btn = document.createElement('button');
       btn.className = 'cv-card';
       btn.dataset.unit = id;
-      btn.setAttribute('aria-label', `${L.name}, ${L.role}, цена ${unitCost(id)}`);
+      btn.title = `${L.name} — ${L.role.toLowerCase()}`;
+      btn.setAttribute('aria-label', `${L.name}, цена ${cost}`);
       btn.innerHTML =
-        `<canvas class="cv-card-icon" width="80" height="88"></canvas>` +
-        `<span class="cv-card-body"><span class="cv-card-name">${L.name}</span>` +
-        `<span class="cv-card-stats"><b${hp > t.hp ? ' class="up"' : ''}>${hp}</b> HP · <b${dmg > t.dmg ? ' class="up"' : ''}>${dmg}</b> урон</span></span>` +
-        `<span class="cv-card-cost${cm.cost < 1 ? ' up' : ''}"><i class="gold-dot"></i>${unitCost(id)}</span>` +
+        `<canvas class="cv-card-icon" width="88" height="88"></canvas>` +
+        (up ? '<span class="cv-card-up" aria-hidden="true">▲</span>' : '') +
+        `<span class="cv-card-cost${cm.cost < 1 ? ' cheap' : ''}"><i class="gold-dot"></i>${cost}</span>` +
         `<span class="tool-key">${i + 1}</span>`;
       btn.addEventListener('click', () => { buy(id); btn.blur(); });
       box.appendChild(btn);
       drawClassIcon(btn.querySelector('canvas'), id);
       cardEls[id] = btn;
     });
-    for (const k of Object.keys(hudCache)) if (k.startsWith('card:')) delete hudCache[k];
+    for (const k of Object.keys(hudCache)) if (k.startsWith('card')) delete hudCache[k];
+    delete hudCache.lesson;
   }
+  // Маршрут: 10 точек, текущая — крупная с номером (data-n), последняя — Вождь; повозка едет на марше.
   function buildTrack() {
     const box = $('cvTrack');
     if (box.childElementCount === STOPS + 1) return;
-    box.innerHTML = Array.from({ length: STOPS }, (_, i) => `<i${i === STOPS - 1 ? ' class="last"' : ''}></i>`).join('') + '<b class="cv-track-cart"></b>';
+    box.innerHTML = Array.from({ length: STOPS }, (_, i) => `<i data-n="${i + 1}"${i === STOPS - 1 ? ' class="last"' : ''}></i>`).join('') +
+      '<b class="cv-track-cart"><svg class="ico"><use href="#i-wagon"/></svg></b>';
   }
   function updateHud() {
     const m = match; if (!m || !m.convoy || !run) return;
@@ -1333,12 +1335,11 @@ const Convoy = (() => {
     const core = w.playerCore;
     const frac = Math.max(0, core.hp / core.maxHp);
     const fill = $('cvHpFill');
-    const wpct = (frac * 100).toFixed(1) + '%';
-    if (hudCache.hpw !== wpct) { hudCache.hpw = wpct; fill.style.width = wpct; }
+    const sx = frac.toFixed(3);
+    if (hudCache.hpw !== sx) { hudCache.hpw = sx; fill.style.transform = `scaleX(${sx})`; }
     setCls(fill, 'low', frac < 0.35, 'hplow');
-    setText('cvHpText', `${Math.max(0, Math.ceil(core.hp))}/${Math.round(core.maxHp)}`);
-    setText('cvStop', run.stop === STOPS && C.phase !== 'march' ? `Последняя стоянка` : `Стоянка ${run.stop}/${STOPS}`);
-    // дорожка стоянок: пройденные, текущая, повозка едет в переходе
+    setText('cvHpText', String(Math.max(0, Math.ceil(core.hp))));
+    setText('cvStop', `Стоянка ${run.stop} из ${STOPS}`);
     buildTrack();
     const track = $('cvTrack');
     const cleared = C.phase === 'wave' || C.phase === 'march' ? run.stop - 1 : C.phase === 'end' && !C.win ? run.stop - 1 : run.stop;
@@ -1348,26 +1349,26 @@ const Convoy = (() => {
       setCls(el, 'now', i === run.stop - 1 && C.phase !== 'march' && !(C.phase === 'end' && C.win), `tr${i}n`);
       setCls(el, 'next', i === run.stop - 1 && C.phase === 'march', `tr${i}x`);
     }
-    let pos = run.stop - 1;
-    if (C.phase === 'march') pos = run.stop - 2 + clamp01(C.phaseT / C.marchLen);
-    const left = (Math.max(0, pos) / (STOPS - 1) * 100).toFixed(1) + '%';
-    if (hudCache.cart !== left) { hudCache.cart = left; track.lastElementChild.style.left = left; }
-    let status = '';
-    if (C.phase === 'wave') { const n = enemiesLeft(); status = `Врагов: ${n}`; }
-    else if (C.phase === 'march') status = run.stop === 1 ? 'Конвой выходит в путь…' : 'В пути…';
-    else if (C.phase === 'clear') status = 'Волна отбита!';
-    else if (C.phase === 'pick') status = 'Выберите усиление';
-    setText('cvStatus', status);
+    setCls(track, 'moving', C.phase === 'march', 'trmove');
+    if (C.phase === 'march') {
+      const pos = Math.max(0, run.stop - 2 + clamp01(C.phaseT / C.marchLen)) / (STOPS - 1);
+      const left = `calc(.93em + (100% - 1.98em) * ${pos.toFixed(3)})`;
+      if (hudCache.cart !== left) { hudCache.cart = left; track.lastElementChild.style.left = left; }
+    }
+    const wave = C.phase === 'wave';
+    setCls($('cvStatus'), 'hidden', !wave, 'foeshide');
+    if (wave) setText('cvFoes', String(enemiesLeft()));
     setText('cvGold', String(Math.floor(m.gold)));
-    setText('cvIncome', `+${incomeRate()}/с в бою`);
-    const squad = alive('player');
-    setText('cvSquad', `Отряд ${squad}/${CONVOY.unitCap}`);
-    setCls($('cvSquad'), 'full', squad >= CONVOY.unitCap, 'sqfull');
+    const squad = alive('player'), full = squad >= CONVOY.unitCap;
+    setText('cvSquadN', `${squad}/${CONVOY.unitCap}`);
+    setCls($('cvSquad'), 'full', full, 'sqfull');
     if (cardEls) for (const id of classes()) {
       const el = cardEls[id];
-      if (el) setCls(el, 'disabled', m.gold < unitCost(id) || squad >= CONVOY.unitCap || m.resolved, `card:${id}`);
+      if (!el) continue;
+      setCls(el, 'disabled', full || m.resolved, `card:${id}`);
+      setCls(el, 'poor', m.gold < unitCost(id), `cardp:${id}`);
     }
-    // камнепад: заряд и готовность
+    // камнепад: шторка перезарядки, секунды, готовность
     const cdMax = rockCdMax();
     const cdFrac = C.phase === 'pick' || C.phase === 'end' ? 1 : clamp01(C.rockCd / cdMax);
     const cdPct = (cdFrac * 100).toFixed(0) + '%';
@@ -1377,13 +1378,7 @@ const Convoy = (() => {
     setCls(rock, 'ready', ready, 'rockready');
     setCls(rock, 'off', C.phase !== 'wave', 'rockoff');
     setText('cvRockTime', C.rockCd > 0 && C.phase !== 'pick' && C.phase !== 'end' ? `${Math.ceil(C.rockCd)}` : '');
-    // подсказка сверху: первый найм, камнепад, ответ врага
-    const tip = tipHtml(ready);
-    if (hudCache.tip !== tip) {
-      hudCache.tip = tip;
-      if (tip) $('cvHint').innerHTML = tip;
-      $('cvHint').classList.toggle('hidden', !tip);
-    }
+    updatePointer(ready);
     setCls($('cvPause'), 'hidden', C.phase === 'end', 'pausehide');
     // полоса Вождя
     const boss = C.boss && C.boss.state !== 'dead' ? C.boss : null;
@@ -1393,42 +1388,68 @@ const Convoy = (() => {
       if (hudCache.bossw !== bp) { hudCache.bossw = bp; $('cvBossFill').style.width = bp; }
       setCls($('cvBoss'), 'slam', !!C.slam, 'bossslam');
     }
-    // открытые сочетания — значки под золотом
+    // собранные сочетания — значки под полосой прочности, имя во всплывающей подсказке
     const synSig = Object.keys(run.syn).join(',');
     if (hudCache.syn !== synSig) {
       hudCache.syn = synSig;
-      $('cvSyn').innerHTML = CONVOY_CARDS.filter(c => c.syn && run.syn[SYN_FLAG[c.id]])
-        .map(c => `<span class="cv-syn-chip" style="--tag:${CONVOY_TAGS[c.syn].color}">${c.name}</span>`).join('');
+      const list = CONVOY_CARDS.filter(c => c.syn && run.syn[SYN_FLAG[c.id]]);
+      $('cvSyn').innerHTML = list.map(c => `<canvas width="56" height="56" title="${c.name}" style="--tag:${CONVOY_TAGS[c.syn].color}"></canvas>`).join('');
+      $('cvSyn').querySelectorAll('canvas').forEach((cv, i) => drawCardIcon(cv, list[i]));
     }
     if (C.phase === 'pick' && !C.chosen) updatePickButtons();
   }
 
-  const PLURAL = { infantry: 'Бойцы', archer: 'Стрелки', heavy: 'Защитники', spear: 'Копейщики', shieldbearer: 'Щитоносцы', bomber: 'Бомбометатели' };
-  const COUNTER_WORD = { spear: ['копьями', 'копий'], archer: ['лучниками', 'лучников'], infantry: ['пехотой', 'пехоты'] };
-  function tipHtml(ready) {
+  // Обучение действием: облачко из 1–2 слов со стрелкой над нужной плиткой (.cv-point), плитка светится.
+  // Камнепад в первый раз — стрелка и кольцо прямо на поле, над толпой (drawOverlay → C.lesson).
+  const COUNTER_TIP = { spear: 'Против копий!', archer: 'Против стрел!', infantry: 'Против пехоты!' };
+  function lesson(ready) {
     const C = match.convoy;
-    if (C.phase === 'pick' || C.phase === 'end') return '';
-    // обучение: пока не нанят ни один боец
+    if (C.phase === 'pick' || C.phase === 'end' || match.resolved) return null;
     if (run.stop === 1 && run.stats.bought === 0 && (C.phase !== 'march' || C.phaseT > 0.6))
-      return '<b>Наймите бойцов!</b> Кнопки внизу или клавиши 1–3. Золото идёт в бою и за каждого врага.';
+      return { unit: classes()[0], text: 'Найми!' };
     if (C.phase === 'wave' && ready && run.stats.rocks === 0 && alive('enemy') > 0 && C.waveT > 2 && run.stop <= 3)
-      return '<b>Камнепад готов!</b> Нажмите на толпу врагов на поле (или Пробел).';
+      return { rock: true };
     if (C.phase === 'wave' && C.counter && C.waveT < CONVOY.counter.tipSec) {
-      const { vs, into } = C.counter, w = COUNTER_WORD[into];
-      const fix = into === 'spear' ? 'Стрелки' : into === 'archer' ? 'Бойцы' : classes().includes('spear') ? 'Копейщики' : 'Защитники';
-      return `<b>Враг ответил ${w[0]}!</b> У вас почти одни ${PLURAL[vs]}. Против ${w[1]} хороши ${fix}.`;
+      const into = C.counter.into;
+      const unit = into === 'spear' ? 'archer' : into === 'archer' ? 'infantry' : classes().includes('spear') ? 'spear' : 'heavy';
+      return { unit, text: COUNTER_TIP[into] };
     }
-    return '';
+    return null;
+  }
+  let pointEl = null;
+  function updatePointer(ready) {
+    const C = match.convoy, L = lesson(ready);
+    C.lesson = L && L.rock ? 'rock' : null;
+    const target = L && !L.rock && cardEls ? cardEls[L.unit] : null;
+    const sig = L ? (L.rock ? 'rock' : `${cardKey}|${L.unit}|${L.text}`) : '';
+    if (!pointEl) {
+      pointEl = document.createElement('div');
+      pointEl.className = 'cv-point hidden';
+      pointEl.setAttribute('aria-live', 'polite');
+      pointEl.innerHTML = '<div class="cv-point-in"><span class="cv-point-bubble"></span><i class="cv-point-arrow"></i></div>';
+      $('cvHud').appendChild(pointEl);
+    }
+    if (hudCache.lesson !== sig) {
+      hudCache.lesson = sig;
+      if (cardEls) for (const [id, el] of Object.entries(cardEls)) el.classList.toggle('hint', !!target && id === L.unit);
+      $('cvRock').classList.toggle('hint', !!(L && L.rock));
+      pointEl.querySelector('.cv-point-bubble').textContent = target ? L.text : '';
+      pointEl.classList.toggle('hidden', !target);
+      delete hudCache.pointAt;
+    }
+    if (!target) return;
+    const r = target.getBoundingClientRect(), h = $('cvHud').getBoundingClientRect();
+    const at = `${Math.round(r.left + r.width / 2 - h.left)},${Math.round(r.top - h.top - 4)}`;
+    if (hudCache.pointAt === at) return;
+    hudCache.pointAt = at;
+    const [x, y] = at.split(',');
+    pointEl.style.left = `${x}px`; pointEl.style.top = `${y}px`;
   }
 
   // ------------------------------------------------------------ окно выбора карты
+  // Карточка награды: самоцвет редкости (у сочетания — лента), иконка с крупным числом, имя, одна строка, знак.
   function renderPick() {
     const C = match.convoy;
-    $('cvPickTitle').textContent = `Стоянка ${run.stop} пройдена!`;
-    // первые походы: подсказка про знаки карт (плашка внизу карты) и сочетания
-    const learn = run.stop <= 2 && readBest().runs < 2;
-    $('cvPickSub').textContent = `Впереди стоянка ${run.stop + 1}${run.stop + 1 === STOPS ? ' — последняя' : ''}. ` +
-      (learn ? 'Три карты одного знака (плашка внизу карты) открывают сильное сочетание.' : 'Выберите одно усиление.');
     $('cvPickCards').classList.toggle('four', C.offer.length > 3);
     const box = $('cvPickCards');
     box.innerHTML = '';
@@ -1439,19 +1460,20 @@ const Convoy = (() => {
       btn.dataset.card = card.id;
       btn.style.animationDelay = `${i * 0.07}s`;
       btn.innerHTML =
-        `<span class="cv-pick-rarity">${RARITY_NAME[card.rarity]}</span>` +
-        `<canvas class="cv-pick-icon" width="120" height="120"></canvas>` +
-        `<span class="cv-pick-big">${card.big}</span>` +
+        '<span class="cv-pick-shine"></span>' +
+        (card.rarity === 'synergy' ? '<span class="cv-pick-ribbon">Сочетание</span>' : '<i class="cv-gem" aria-hidden="true"></i>') +
+        '<span class="cv-pick-art"><canvas class="cv-pick-icon" width="120" height="120"></canvas>' +
+        (card.big ? `<b class="cv-pick-big">${card.big}</b>` : '') + '</span>' +
         `<span class="cv-pick-name">${card.name}</span>` +
         `<span class="cv-pick-desc">${card.desc(run, match, api)}</span>` +
         tagLine(card) +
-        (have ? `<span class="cv-pick-have">уже есть ×${have}</span>` : '') +
+        (have ? `<span class="cv-pick-have" title="Уже взято: ${have}">×${have + 1}</span>` : '') +
         `<span class="tool-key">${i + 1}</span>`;
       btn.addEventListener('click', () => choose(card.id));
       box.appendChild(btn);
       drawCardIcon(btn.querySelector('canvas'), card);
     });
-    for (const k of ['pkRepair', 'pkReroll', 'pkRepairOff', 'pkRerollOff']) delete hudCache[k];
+    for (const k of ['pkRepair', 'pkRepairHide', 'pkReroll', 'pkRepairOff', 'pkRerollOff', 'pkRerollFree']) delete hudCache[k];
     updatePickButtons();
   }
   // Знак карты: «Толпа ●●○» — сколько будет после этой карты; третья открывает сочетание.
@@ -1459,7 +1481,7 @@ const Convoy = (() => {
     const tag = card.syn || card.tag;
     if (!tag) return '';
     const T = CONVOY_TAGS[tag], need = CONVOY.synergyNeed;
-    if (card.syn) return `<span class="cv-pick-tag syn" style="--tag:${T.color}">Знак «${T.name}» собран</span>`;
+    if (card.syn) return `<span class="cv-pick-tag syn" style="--tag:${T.color}"><span>${T.name}</span>${'<i class="on"></i>'.repeat(need)}</span>`;
     const synCard = CONVOY_CARDS.find(c => c.syn === tag);
     const synTaken = synCard && run.cards.includes(synCard.id);
     const now = run.tags[tag] || 0, after = Math.min(need, now + 1);
@@ -1468,15 +1490,18 @@ const Convoy = (() => {
     return `<span class="cv-pick-tag${opens ? ' opens' : ''}" style="--tag:${T.color}"><span>${T.name}</span>${synTaken || now >= need ? '' : dots}` +
       `${opens ? `<em>→ ${synCard.name}</em>` : ''}</span>`;
   }
+  // «Другие карты» — цена или «даром»; починка видна, только пока конвой ранен и на этой стоянке не чинился.
   function updatePickButtons() {
     const m = match, C = m.convoy, core = m.world.playerCore;
     const rc = repairCost(), heal = Math.round(core.maxHp * CONVOY.repair.heal);
-    const repairOff = C.repaired || core.hp >= core.maxHp || m.gold < rc;
-    setText('cvRepairText', C.repaired ? 'Конвой починен' : core.hp >= core.maxHp ? 'Конвой цел' : `Починить +${heal}`);
-    setText('cvRepairCost', C.repaired || core.hp >= core.maxHp ? '' : String(rc));
-    setCls($('cvRepair'), 'disabled', repairOff, 'pkRepairOff');
-    setText('cvRerollCost', rerollCost() ? String(rerollCost()) : 'даром');
-    setCls($('cvReroll'), 'disabled', m.gold < rerollCost(), 'pkRerollOff');
+    setCls($('cvRepair'), 'hidden', !!C.repaired || core.hp >= core.maxHp, 'pkRepairHide');
+    setCls($('cvRepair'), 'disabled', m.gold < rc, 'pkRepairOff');
+    setText('cvRepairText', `+${heal}`);
+    setText('cvRepairCost', String(rc));
+    const cost = rerollCost();
+    setText('cvRerollCost', cost ? String(cost) : 'даром');
+    setCls($('cvRerollBox'), 'free', !cost, 'pkRerollFree');
+    setCls($('cvReroll'), 'disabled', m.gold < cost, 'pkRerollOff');
   }
 
   // ------------------------------------------------------------ экраны
@@ -1497,28 +1522,30 @@ const Convoy = (() => {
     $('cvResult').classList.toggle('hidden', !(live && C.phase === 'end' && C.shown));
   }
   function canPause() { return !(match && match.convoy && match.convoy.phase === 'end'); }
+  // Меню: рекорд одной плашкой и следующая награда за славу — иконка, имя, шкала, точки всех наград.
   function renderMenu() {
     const b = readBest();
     const el = $('cvMenuBest');
     if (!el) return;
     el.classList.toggle('hidden', !b.runs);
-    el.textContent = b.wins ? `Рекорд: конвой доставлен · доставок: ${b.wins}` : `Рекорд: стоянка ${b.stop} из ${STOPS}`;
-    // дорожка наград за славу: открытые — цветные, закрытые — с порогом; нажатие показывает, что даёт награда
+    el.textContent = b.wins ? `Доставлено ×${b.wins}` : `Рекорд ${b.stop}/${STOPS}`;
     const total = readGlory().total, have = metaOf(total);
     menuDeco = { skin: have.includes('skin'), banner: have.includes('banner') };
     const box = $('cvMenuGlory');
     if (!box) return;
     const next = CONVOY.meta.find(u => u.at > total);
-    const status = (u) => have.includes(u.id) ? `${u.name}: ${u.desc}. Открыто` : `${u.name}: ${u.desc}. Нужно славы: ${u.at} (сейчас ${total})`;
-    box.innerHTML = `<div class="cv-meta-track">${CONVOY.meta.map((u, i) =>
-      `<button class="cv-meta${have.includes(u.id) ? ' on' : ''}${u === next ? ' next' : ''}" data-i="${i}" aria-label="${status(u)}">` +
-      `<canvas width="64" height="64"></canvas>${have.includes(u.id) ? '' : `<em>${u.at}</em>`}</button>`).join('')}</div>` +
-      `<p id="cvMenuGloryText"><b>Слава: ${total}</b> · ${next ? `следующая награда — «${next.name}»: ещё ${next.at - total}` : 'все награды открыты'}</p>`;
-    box.querySelectorAll('.cv-meta').forEach((btn) => {
-      const u = CONVOY.meta[Number(btn.dataset.i)];
-      drawCardIcon(btn.querySelector('canvas'), u);
-      btn.addEventListener('click', () => { SFX.click(); $('cvMenuGloryText').textContent = status(u); });
-    });
+    const floor = CONVOY.meta.filter(u => u.at <= total).reduce((a, u) => Math.max(a, u.at), 0);
+    const pips = CONVOY.meta.map(u => `<i class="${have.includes(u.id) ? 'on' : u === next ? 'next' : ''}" title="${u.name}"></i>`).join('');
+    const shown = next || CONVOY.meta[CONVOY.meta.length - 1];
+    box.innerHTML =
+      `<div class="cv-next"${next ? ' title="Следующая награда за славу"' : ''}><canvas class="cv-next-ico" width="96" height="96"></canvas><div class="cv-next-body">` +
+      (next
+        ? `<b class="cv-next-name">${next.name}</b><span class="cv-next-desc">${next.desc}</span>` +
+          `<div class="cv-glory-bar"><i style="width:${clamp01((total - floor) / (next.at - floor)) * 100}%"></i>` +
+          `<span>${total} / ${next.at} <svg class="ico"><use href="#i-star"/></svg></span></div>`
+        : '<b class="cv-next-name">Все награды открыты</b>') +
+      `<div class="cv-pips" aria-label="Открыто наград: ${have.length} из ${CONVOY.meta.length}">${pips}</div></div></div>`;
+    drawCardIcon(box.querySelector('canvas'), shown);
   }
 
   // ------------------------------------------------------------ журнал для наблюдателя (index.html?journal)
@@ -1725,12 +1752,6 @@ const Convoy = (() => {
     // повреждения видны издалека: дымок над передней повозкой с половины прочности, густой дым над обеими — с трети
     if (core.hp > 0 && hpFrac < 0.55) drawSmoke(WAGON_X[1] + 6 * s, ARENA.groundY - 36 * s, performance.now(), 2, 'rgba(70,62,55,.4)');
     if (core.hp > 0 && hpFrac < 0.3) drawSmoke(WAGON_X[0], ARENA.groundY - 40 * s, performance.now() + 700, 3, 'rgba(50,42,38,.6)');
-    const bx = WAGON_X[0] - 24 * s, bw = WAGON_X[1] - WAGON_X[0] + 48 * s, bh = 8, by = ARENA.groundY - 76 * s;
-    ctx.save();
-    ctx.fillStyle = 'rgba(26,18,10,.7)'; ctx.fillRect(bx - 1.5, by - 1.5, bw + 3, bh + 3);
-    ctx.fillStyle = hpFrac < 0.35 ? '#e0503a' : hpFrac < 0.6 ? '#e8b845' : '#5fc46a';
-    ctx.fillRect(bx, by, bw * hpFrac, bh);
-    ctx.restore();
   }
   // Сцена меню: те же повозки вместо крепостей и героя.
   function drawMenuWagons(t) {
@@ -1791,25 +1812,34 @@ const Convoy = (() => {
       drawCoin(x, y, 7.5 * (1 - 0.25 * k), c.spin);
     }
     ctx.save();
-    // большая надпись фазы (стоянка, «Волна отбита!», итог)
+    // обучение камнепаду: кольцо и стрелка над самой густой толпой, «Тапни!» / «Кликни!»
+    if (C.lesson === 'rock' && screen === 'match') {
+      const x = densestEnemyX();
+      if (x !== null) {
+        const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 160), gy = ARENA.groundY;
+        ctx.strokeStyle = `rgba(255,214,90,${0.55 + 0.45 * pulse})`; ctx.lineWidth = 4;
+        ctx.beginPath(); ctx.ellipse(x, gy + 8, 48 + pulse * 8, 13 + pulse * 2, 0, 0, TAU); ctx.stroke();
+        const ay = gy - 100 * VIEW.fig - 20 - pulse * 10;
+        ctx.fillStyle = '#ffd35c'; ctx.strokeStyle = 'rgba(30,18,8,.95)'; ctx.lineWidth = 3; ctx.lineJoin = 'round';
+        ctx.beginPath();
+        ctx.moveTo(x - 9, ay - 24); ctx.lineTo(x + 9, ay - 24); ctx.lineTo(x + 9, ay); ctx.lineTo(x + 20, ay);
+        ctx.lineTo(x, ay + 22); ctx.lineTo(x - 20, ay); ctx.lineTo(x - 9, ay); ctx.closePath(); ctx.fill(); ctx.stroke();
+        drawText(coarsePointer() ? 'Тапни!' : 'Кликни!', x, ay - 44, 30, '#fff4dc', 'rgba(30,18,8,.92)', 7);
+      }
+    }
+    // большая надпись фазы (стоянка, «Волна отбита!», итог); у наград — монета перед суммой
     const b = C.banner;
     if (b) {
       const k = b.t / b.life, inT = Math.min(1, b.t / 0.2);
       const alpha = k < 0.78 ? 1 : Math.max(0, 1 - (k - 0.78) / 0.22);
       const sc = (0.55 + 0.45 * (1 - Math.pow(1 - inT, 3))) * (1 + k * 0.05);
-      // надпись стоянки — под подсказкой поверх боя, если та видна (низкий экран: иначе подсказка закрывает надпись)
-      let y = VIEW.y0 + VIEW.h * 0.3;
-      const tip = $('cvHint');
-      if (tip && !tip.classList.contains('hidden')) {
-        const r = tip.getBoundingClientRect(), cr = canvas.getBoundingClientRect();
-        if (r.height) y = Math.min(VIEW.y0 + VIEW.h * 0.45, Math.max(y, VIEW.y0 + (r.bottom - cr.top) / VIEW.k + 40));
-      }
       ctx.globalAlpha = alpha;
       ctx.save();
-      ctx.translate(ARENA.width / 2, y);
+      ctx.translate(ARENA.width / 2, VIEW.y0 + VIEW.h * 0.3);
       ctx.scale(sc, sc);
       drawText(b.text, 0, 0, 56, b.color === 'red' ? '#ff6a4a' : ART.hero.gold, 'rgba(30,18,8,.92)', 10);
-      if (b.sub) drawText(b.sub, 0, 44, 24, '#fff4dc', 'rgba(30,18,8,.92)', 6);
+      if (b.sub && b.coin) coinText(b.sub, 48, 32, '#fff4dc');
+      else if (b.sub) drawText(b.sub, 0, 46, 28, '#fff4dc', 'rgba(30,18,8,.92)', 6);
       ctx.restore();
     }
     // серия убийств
@@ -1823,10 +1853,22 @@ const Convoy = (() => {
       ctx.rotate(-0.06);
       ctx.scale(sc, sc);
       drawText(`×${L.n} ${L.text}`, 0, 0, 44, '#ffb347', 'rgba(60,10,0,.92)', 9);
-      drawText(`+${L.bonus} золота`, 0, 34, 20, '#fff0b0', 'rgba(30,18,8,.9)', 5);
+      coinText(`+${L.bonus}`, 36, 24, '#fff0b0');
       ctx.restore();
     }
     ctx.restore();
+  }
+  // Монета и число по центру строки (награда в объявлениях).
+  function coinText(text, y, size, fill) {
+    ctx.font = `${size}px 'Lilita One', 'Fredoka', sans-serif`;
+    const r = size * 0.36, gap = size * 0.22, tw = ctx.measureText(text).width, x0 = -(2 * r + gap + tw) / 2;
+    drawCoin(x0 + r, y, r, 0);
+    drawText(text, x0 + 2 * r + gap + tw / 2, y, size, fill, 'rgba(30,18,8,.92)', Math.max(4, size * 0.22));
+  }
+  let coarseMq = null;
+  function coarsePointer() {
+    if (!coarseMq) coarseMq = window.matchMedia('(hover: none) and (pointer: coarse)');
+    return coarseMq.matches && !aim.mouse;
   }
 
   function drawBattleFx(m, C) {
@@ -2091,6 +2133,7 @@ const Convoy = (() => {
         c.fillStyle = '#c0442e'; c.beginPath(); c.arc(50, 31, 8, 0, TAU); c.fill(); c.stroke();
         c.fillStyle = '#ffd35c'; c.beginPath(); c.arc(26, 9, 5, 0, TAU); c.fill(); c.stroke();
         break;
+      case 'rock': fallLines(50, 30, 22); boulder(48, 60, 26, 0.2); break;
       default: boulder(48, 50, 26, 0);
     }
     c.restore();
@@ -2182,6 +2225,7 @@ const Convoy = (() => {
     for (const id of ['joyBase', 'touchAttack', 'touchSpecial', 'touchPickaxe', 'touchCry', 'btnBuyback', 'heroMini', 'heroReviveBox']) {
       const el = $(id); if (el) el.remove();
     }
+    drawCardIcon($('cvRockIco'), { icon: 'rock' });
     $('cvPause').addEventListener('click', () => { SFX.click(); togglePause(); });
     $('cvMenuPlay').addEventListener('click', () => { SFX.unlock(); SFX.click(); startRun(); });
     $('cvResultAgain').addEventListener('click', () => { SFX.click(); startRun(); });

@@ -6,8 +6,8 @@
   кнопки fullscreen, подвала и логотипов нет, Esc не перехватывается.
   Названий площадок и внешних ссылок на странице нет; в билде под
   площадку BuildScript подставляет её скрипты на место platform-head
-  (tools/platform/), и страница ждёт window.game7PlatformReady, если
-  скрипт его создал. Заголовок вкладки — название игры из game.json в
+  (tools/platform/), и движок стартует после window.game7PlatformReady,
+  если скрипт его создал (файлы билда качаются сразу, не дожидаясь). Заголовок вкладки — название игры из game.json в
   корне репозитория: BuildScript подставляет его на место game-title.
   На место metrica-head BuildScript ставит счётчик Яндекс Метрики
   (tools/platform/metrica_head.html), если он включён для цели сборки;
@@ -17,14 +17,70 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>game7</title>
+    <title>&#1047;&#1086;&#1084;&#1073;&#1080; &#1051;&#1077;&#1085;&#1076;</title>
+    <script>
+      // Звук страницы спит, пока её не видно. Все AudioContext (звук Unity и
+      // музыка) записываются при создании; спрятали страницу — suspend,
+      // показали — resume. Причины прятать независимы: вкладка
+      // (visibilitychange, pagehide) и площадка (ВК сворачивает мини-
+      // приложение событием VKWebAppViewHide, а вкладка остаётся «видна» —
+      // так музыка играла поверх приложения ВК). Площадка зовёт
+      // game7PageAudio.hide(причина) и show(причина).
+      (function () {
+        var Base = window.AudioContext || window.webkitAudioContext;
+        var contexts = [];
+        var reasons = {};
+        function hidden() {
+          for (var key in reasons) if (reasons[key]) return true;
+          return false;
+        }
+        function apply() {
+          var sleep = hidden();
+          contexts.forEach(function (ctx) {
+            try {
+              if (sleep && ctx.state === "running") ctx.suspend();
+              else if (!sleep && ctx.state === "suspended") ctx.resume();
+            } catch (e) {}
+          });
+        }
+        if (Base) {
+          var Watched = class extends Base {
+            constructor(options) {
+              super(options);
+              contexts.push(this);
+              if (hidden()) this.suspend();
+            }
+          };
+          window.AudioContext = Watched;
+          if (window.webkitAudioContext) window.webkitAudioContext = Watched;
+        }
+        function set(reason, on) {
+          reasons[reason] = on;
+          apply();
+        }
+        window.game7PageAudio = {
+          hide: function (reason) { set(reason, true); },
+          show: function (reason) { set(reason, false); },
+        };
+        document.addEventListener("visibilitychange", function () {
+          set("page", document.visibilityState === "hidden");
+        });
+        window.addEventListener("pagehide", function () { set("page", true); });
+        window.addEventListener("pageshow", function () { set("page", document.visibilityState === "hidden"); });
+      })();
+    </script>
     <script>
   // Яндекс Метрика (docs/ANALYTICS.md, «Яндекс Метрика»): BuildScript
   // ставит этот кусок на место metrica-head. Счётчик поднимается до
   // загрузки Unity, и шаблон отмечает целями ход загрузки (load_start,
   // load_50, load_done, load_error): видно, сколько людей ушло, не
-  // дождавшись игры. Номер счётчика — из analytics.json (metrica), в
-  // dev-билде — из ?ym=<номер> в адресе.
+  // дождавшись игры. Номер счётчика — из analytics.json (metrica) только
+  // в релизной цели площадки; в dev-билде счётчика нет, пока в адресе нет
+  // ?ym=<номер>.
+  // Просмотр страницы (hit) — вручную (defer: true), по адресу без
+  // параметров: в адресе игры ВК — параметры запуска с номером игрока, им
+  // в Метрике не место; источник перехода — только сайт. Заказы
+  // электронной коммерции счётчик читает из window.dataLayer.
   (function () {
     var id = 113440682;
     if (false) {
@@ -35,6 +91,7 @@
       if (window.game7Ym) window.ym(window.game7Ym, "reachGoal", name, params);
     };
     if (!id) return;
+    window.dataLayer = window.dataLayer || [];
     (function (m, e, t, r, i, k, a) {
       m[i] = m[i] || function () { (m[i].a = m[i].a || []).push(arguments); };
       m[i].l = 1 * new Date();
@@ -44,7 +101,13 @@
       k = e.createElement(t); a = e.getElementsByTagName(t)[0];
       k.async = 1; k.src = r; a.parentNode.insertBefore(k, a);
     })(window, document, "script", "https://mc.yandex.ru/metrika/tag.js", "ym");
-    window.ym(id, "init", { clickmap: false, trackLinks: false, accurateTrackBounce: true, webvisor: false });
+    window.ym(id, "init", {
+      defer: true, clickmap: false, trackLinks: false, accurateTrackBounce: true, webvisor: false,
+      ecommerce: "dataLayer"
+    });
+    var referer = "";
+    try { if (document.referrer) referer = new URL(document.referrer).origin + "/"; } catch (e) {}
+    window.ym(id, "hit", location.origin + location.pathname, { title: document.title, referer: referer });
     window.game7Ym = id;
   })();
 </script>
@@ -57,19 +120,39 @@
   // createUnityInstance; промис не отклоняется: нет моста, нет параметров
   // запуска (страница не в ВК) или мост молчит — игра идёт как dev-билд.
   //
-  // VK Storage: значение ключа до 4096 символов, ключ — [a-zA-Z0-9_-] до
-  // 100 символов, пустое значение — ключа нет. Длинное значение режется на
-  // куски key__0..N-1, а в самом ключе — заголовок «#game7chunks:N». Запись
-  // копится и уходит раз в WriteDelay (лимит запросов ВК), при уходе со
-  // страницы — сразу. Каждый вызов моста — с таймаутом: молчащий мост не
-  // вешает игру.
+  // VK Storage: ключ — [a-zA-Z0-9_-] до 100 символов, пустое значение —
+  // ключа нет. Значения ВК хранит «только первые 4096 символов, для
+  // сериализованной строки — 2236» (dev.vk.com, VKWebAppStorageSet), лишнее
+  // молча отрезает; сейв — JSON, поэтому кусок — до ChunkSize символов, а
+  // не-ASCII символ считается за 6 (в JSON он может стать \uXXXX). Длинное
+  // значение режется на куски в одном из двух слотов: key__a0..aN-1 или
+  // key__b0..bN-1, а в самом ключе — заголовок «#game7chunks:<слот>:N:<хеш>». Новая версия
+  // пишется в слот, на который заголовок не указывает, и заголовок
+  // меняется только после всех её кусков: сбой посередине оставляет
+  // прошлую целую версию. Хеш (FNV-1a) не совпал — значения нет, адаптер
+  // возьмёт копию устройства. Старый заголовок «#game7chunks:N» (куски
+  // key__0..) читается, куски прошлых билдов по 3000 — тоже (ВК мог их
+  // обрезать: хеш не сойдётся, и адаптер возьмёт копию устройства, а
+  // следующая запись ляжет новыми кусками).
+  //
+  // Запись копится и уходит раз в WriteDelay (лимит запросов ВК), при уходе
+  // со страницы — сразу. Ключи — по одному, в порядке последней записи
+  // (save раньше save_t); первый сбой останавливает пачку, ключ и всё за ним
+  // остаются в очереди до повтора с нарастающей паузой. Каждый вызов моста —
+  // с таймаутом: молчащий мост не вешает игру.
   (function () {
-    var ChunkSize = 3000;
+    var ChunkSize = 2000;
     var ChunkHeader = "#game7chunks:";
     var WriteDelay = 3000;
+    var RetryMax = 60000;
     var vk = (window.game7Vk = { available: false, storage: null, storageError: "", writeError: "" });
     var pending = {};
     var timer = 0;
+    var flushing = false;
+    var again = false;
+    var retry = WriteDelay;
+    // Страницу спрятали: запись игры (сейв по уходу) уходит сразу, без паузы.
+    var hidden = false;
 
     function withTimeout(promise, ms) {
       return Promise.race([
@@ -84,74 +167,181 @@
       return withTimeout(window.vkBridge.send(method, params || {}), ms || 8000);
     };
 
-    function chunkCount(value) {
-      return value && value.indexOf(ChunkHeader) === 0 ? parseInt(value.substring(ChunkHeader.length), 10) || 0 : 0;
+    function hash(text) {
+      var h = 0x811c9dc5;
+      for (var i = 0; i < text.length; i++) {
+        h ^= text.charCodeAt(i);
+        h = Math.imul(h, 0x01000193) >>> 0;
+      }
+      return ("0000000" + h.toString(16)).slice(-8);
     }
 
-    // null — ключа нет или кусок потерян (адаптер возьмёт копию устройства).
+    // Куски не длиннее ChunkSize по весу: ASCII — 1, прочее — 6. Суррогатная
+    // пара (эмодзи) не разрывается.
+    function pieces(value) {
+      var out = [];
+      var start = 0;
+      var weight = 0;
+      for (var i = 0; i < value.length; i++) {
+        var code = value.charCodeAt(i);
+        var w = code < 128 ? 1 : 6;
+        if (weight + w > ChunkSize && i > start && (code < 0xdc00 || code > 0xdfff)) {
+          out.push(value.substring(start, i));
+          start = i;
+          weight = 0;
+        }
+        weight += w;
+      }
+      out.push(value.substring(start));
+      return out;
+    }
+
+    // Заголовок кусков: { slot: "a"|"b"|"" (старый), count, hash } или null.
+    function header(value) {
+      if (!value || value.indexOf(ChunkHeader) !== 0) return null;
+      var f = value.substring(ChunkHeader.length).split(":");
+      if (f.length === 1) return { slot: "", count: parseInt(f[0], 10) || 0, hash: "" };
+      return { slot: f[0], count: parseInt(f[1], 10) || 0, hash: f[2] || "" };
+    }
+
+    // null — ключа нет, кусок потерян или не сходится хеш (адаптер возьмёт
+    // копию устройства).
     vk.read = function (key) {
       var map = vk.storage;
       if (!map) return null;
       var value = map[key];
       if (!value) return null;
-      var count = chunkCount(value);
-      if (count === 0) return value;
+      var head = header(value);
+      if (!head) return value;
       var parts = [];
-      for (var i = 0; i < count; i++) {
-        var part = map[key + "__" + i];
+      for (var i = 0; i < head.count; i++) {
+        var part = map[key + "__" + head.slot + i];
         if (!part) {
-          console.warn("[game7] vk: storage кусок потерян", key, i);
+          console.warn("[game7] vk: storage кусок потерян", key, head.slot + i);
           return null;
         }
         parts.push(part);
       }
-      return parts.join("");
+      var text = parts.join("");
+      if (head.slot && hash(text) !== head.hash) {
+        console.warn("[game7] vk: storage куски не сходятся", key);
+        return null;
+      }
+      return text;
     };
 
-    // value null — удалить ключ.
+    // value null — удалить ключ. Ключ встаёт в конец очереди: порядок
+    // записи — порядок вызовов.
     vk.write = function (key, value) {
       if (!vk.storage) return;
+      delete pending[key];
       pending[key] = value;
-      if (!timer) timer = setTimeout(vk.flush, WriteDelay);
+      if (hidden) vk.flush();
+      else if (!timer && !flushing) timer = setTimeout(vk.flush, WriteDelay);
     };
+
+    function set(key, value) {
+      return vk.send("VKWebAppStorageSet", { key: key, value: value }, 5000).then(function () {
+        vk.storage[key] = value;
+      });
+    }
+
+    // Один ключ целиком: куски в свободный слот, потом заголовок, потом
+    // уборка кусков старого формата (её сбой не мешает).
+    function writeKey(key, value) {
+      var map = vk.storage;
+      var old = header(map[key]);
+      var steps = [];
+      var parts = pieces(value);
+      if (parts.length > 1) {
+        var slot = old && old.slot === "a" ? "b" : "a";
+        for (var n = 0; n < parts.length; n++) steps.push([key + "__" + slot + n, parts[n]]);
+        steps.push([key, ChunkHeader + slot + ":" + parts.length + ":" + hash(value)]);
+      } else {
+        steps.push([key, value]);
+      }
+      var chain = steps.reduce(function (done, kv) {
+        return done.then(function () { return set(kv[0], kv[1]); });
+      }, Promise.resolve());
+      if (!old || old.slot) return chain;
+      return chain.then(function () {
+        var tidy = Promise.resolve();
+        for (var i = 0; i < old.count; i++) {
+          (function (part) {
+            tidy = tidy.then(function () { return set(part, "").catch(function () {}); });
+          })(key + "__" + i);
+        }
+        return tidy;
+      });
+    }
 
     vk.flush = function () {
       if (timer) clearTimeout(timer);
       timer = 0;
-      var map = vk.storage;
-      if (!map) return;
-      var sets = [];
-      Object.keys(pending).forEach(function (key) {
-        var value = pending[key] || "";
-        var old = chunkCount(map[key]);
-        var parts = [];
-        for (var at = 0; at < value.length; at += ChunkSize) parts.push(value.substring(at, at + ChunkSize));
-        if (parts.length > 1) {
-          parts.forEach(function (part, i) { sets.push([key + "__" + i, part]); });
-          sets.push([key, ChunkHeader + parts.length]);
-        } else {
-          sets.push([key, value]);
-        }
-        // Куски прошлой, более длинной записи стираются после заголовка.
-        for (var i = parts.length > 1 ? parts.length : 0; i < old; i++) sets.push([key + "__" + i, ""]);
-      });
-      pending = {};
-      // По порядку: заголовок уходит после своих кусков.
-      sets.reduce(function (chain, kv) {
-        map[kv[0]] = kv[1];
+      if (!vk.storage) return;
+      if (flushing) {
+        again = true;
+        return;
+      }
+      var batch = Object.keys(pending).map(function (key) { return [key, pending[key]]; });
+      if (!batch.length) return;
+      flushing = true;
+      again = false;
+      var failed = false;
+      batch.reduce(function (chain, kv) {
         return chain.then(function () {
-          return vk.send("VKWebAppStorageSet", { key: kv[0], value: kv[1] }, 5000).catch(function (e) {
+          if (failed) return;
+          return writeKey(kv[0], kv[1] || "").then(function () {
+            if (pending[kv[0]] === kv[1]) delete pending[kv[0]];
+          }, function (e) {
+            failed = true;
             vk.writeError = String((e && (e.error_data && e.error_data.error_reason)) || (e && e.message) || e);
             console.warn("[game7] vk: storage запись не прошла", kv[0], vk.writeError);
           });
         });
-      }, Promise.resolve());
+      }, Promise.resolve()).then(function () {
+        flushing = false;
+        if (failed) {
+          // Повтор с нарастающей паузой; уход со страницы пишет сразу.
+          timer = setTimeout(vk.flush, retry);
+          retry = Math.min(retry * 2, RetryMax);
+          return;
+        }
+        retry = WriteDelay;
+        if (again) vk.flush();
+        else if (Object.keys(pending).length && !timer) timer = setTimeout(vk.flush, WriteDelay);
+      });
     };
 
+    function hide() {
+      hidden = true;
+      vk.flush();
+    }
+
     document.addEventListener("visibilitychange", function () {
-      if (document.visibilityState === "hidden") vk.flush();
+      if (document.visibilityState === "hidden") hide();
+      else hidden = false;
     });
-    window.addEventListener("pagehide", function () { vk.flush(); });
+    window.addEventListener("pagehide", hide);
+
+    // Мини-приложение свернули или закрыли «Выйти»: приложение ВК держит
+    // страницу живой и видимой, сигнал — только событие моста. Звук спит
+    // (game7PageAudio — шаблон), сейв пишется сразу, бой — на паузу.
+    if (window.vkBridge && window.vkBridge.subscribe) {
+      window.vkBridge.subscribe(function (e) {
+        var type = e && e.detail && e.detail.type;
+        var audio = window.game7PageAudio;
+        if (type === "VKWebAppViewHide") {
+          hide();
+          if (audio) audio.hide("vk");
+          // Игре — как уход со страницы (Game7_WatchPageHide): сейв, пауза боя.
+          window.dispatchEvent(new Event("game7-hide"));
+        } else if (type === "VKWebAppViewRestore") {
+          hidden = false;
+          if (audio) audio.show("vk");
+        }
+      });
+    }
 
     window.game7PlatformReady = (async function () {
       if (!window.vkBridge) {
@@ -280,20 +470,37 @@
       canvas.addEventListener("contextmenu", function (e) { e.preventDefault(); });
 
       var buildUrl = "Build";
-      var loaderUrl = buildUrl + "/vk-20261008-225804.loader.js";
+      var loaderUrl = buildUrl + "/vk-20261010-120642.loader.js";
       var config = {
         arguments: [],
-        dataUrl: buildUrl + "/vk-20261008-225804.data.unityweb",
-        frameworkUrl: buildUrl + "/vk-20261008-225804.framework.js.unityweb",
-        codeUrl: buildUrl + "/vk-20261008-225804.wasm.unityweb",
+        dataUrl: buildUrl + "/vk-20261010-120642.data.unityweb",
+        frameworkUrl: buildUrl + "/vk-20261010-120642.framework.js.unityweb",
+        codeUrl: buildUrl + "/vk-20261010-120642.wasm.unityweb",
         streamingAssetsUrl: "StreamingAssets",
         companyName: "DefaultCompany",
         productName: "unity",
-        productVersion: "1.0",
+        productVersion: "vk-20261010-120642",
         showBanner: unityShowBanner,
         // Экраны с плотностью 3 рисовали бы в 9 раз больше пикселей, чем
         // с плотностью 1: потолок 2 держит 60 FPS на среднем телефоне.
         devicePixelRatio: Math.min(window.devicePixelRatio || 1, 2),
+        // Имена файлов Build/ уникальны для каждой сборки (штамп в имени,
+        // tools/unity_build_webgl.sh), поэтому data, wasm и framework берутся
+        // из кэша Unity (Cache Storage) без условного запроса к серверу. По
+        // умолчанию loader перепроверяет data (304) и не кэширует wasm и
+        // framework вовсе: повторный заход качал 12.6 МБ wasm заново, если
+        // WebView вытеснил его из HTTP-кэша. Записи прошлых сборок loader
+        // стирает сам (другая productVersion = имя билда).
+        // Только эти три файла: через ту же функцию идёт каждый GET
+        // UnityWebRequest (framework: Module.cacheControl(url)). "immutable"
+        // для всех отдал бы из кэша старый ответ /v1/purchases?after=N
+        // (купленные монеты не выдаются, а на общем телефоне — чужой заказ:
+        // ключ кэша — только адрес) и застывшие рекорды. Остальное — как у
+        // Unity по умолчанию: "no-store".
+        cacheControl: function (url) {
+          return url === config.dataUrl || url === config.codeUrl || url === config.frameworkUrl
+            ? "immutable" : "no-store";
+        },
       };
 
       var loadingBar = document.querySelector("#unity-loading-bar");
@@ -305,15 +512,21 @@
       script.onload = function () {
         // Скрипт площадки (SDK) успевает подготовиться до старта игры: язык,
         // звук и сейв нужны ей с первого кадра. Промис не отклоняется.
+        // Файлы билда качаются сразу, параллельно с SDK (мост ВК — три
+        // запроса, до 4–5 с каждый), а движок ждёт площадку: зависимость
+        // запуска Emscripten держит main() до готовности промиса.
         var platformReady = window.game7PlatformReady || Promise.resolve();
-        platformReady.then(function () {
-          return createUnityInstance(canvas, config, function (progress) {
-            progressFull.style.width = 100 * progress + "%";
-            if (!loadHalf && progress >= 0.5) {
-              loadHalf = true;
-              ymGoal("load_50", { load_sec: Math.round((Date.now() - loadStart) / 100) / 10 });
-            }
-          });
+        config.preRun = [function (module) {
+          module.addRunDependency("game7Platform");
+          var release = function () { module.removeRunDependency("game7Platform"); };
+          platformReady.then(release, release);
+        }];
+        createUnityInstance(canvas, config, function (progress) {
+          progressFull.style.width = 100 * progress + "%";
+          if (!loadHalf && progress >= 0.5) {
+            loadHalf = true;
+            ymGoal("load_50", { load_sec: Math.round((Date.now() - loadStart) / 100) / 10 });
+          }
         }).then(function (instance) {
           window.unityInstance = instance; // знак для smoke и playtest: игра запустилась
           loadingBar.style.display = "none";

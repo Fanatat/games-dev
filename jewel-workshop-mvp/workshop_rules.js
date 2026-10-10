@@ -1,33 +1,25 @@
 /* ============================================================
-   workshop_rules.js — ПРАВИЛА «Мастерской украшений» без DOM.
+   workshop_rules.js — ПРАВИЛА «Мастерской украшений» (MVP) без DOM.
    Чистые функции: одним и тем же кодом играет workshop.js (браузер),
    считает решатель (tools/ws_design.js) и проверяют тесты (node).
 
-   Камень = строка-идентификатор (буква из GEMS). Ёмкость = массив
+   Камень = строка-идентификатор ('ruby', 'emerald', …). Ёмкость = массив
    камней СНИЗУ ВВЕРХ, вместимость CAP = 4.
 
    Перелив — как в game3: переносится верхняя группа одинаковых камней,
    сколько поместится; в непустую ёмкость — только на такой же камень.
+   Отличия MVP от прототипа (по разбору docs/WORKSHOP.md, 08.10):
    - собранная ёмкость НЕ запирается: из неё можно брать камни;
    - выдача АВТОМАТИЧЕСКАЯ: ёмкость из четырёх одинаковых камней сразу
      уходит заказу этого камня, если такой заказ сейчас на столе;
    - заказы идут очередью: на столе `slots` карточек, выполненная
      сменяется следующим заказом из очереди; новый заказ может сразу
-     забрать уже собранную ёмкость (цепочка выдач — «каскад»);
+     забрать уже собранную ёмкость (цепочка выдач);
    - нужно выполнить ВСЕ заказы; камней на поле ровно на все заказы,
      поэтому победа = пустой стол;
    - отмена работает и через выдачу (состояние целиком — снимок).
 
-   Новинки (этап 5, docs/WORKSHOP.md):
-   - тайные камни: hid[v] — сколько НИЖНИХ камней ёмкости скрыто под
-     бархатом. Верхний камень всегда открыт: когда верхняя группа уходит,
-     новый верхний открывается. На ходы это не влияет (камень остаётся
-     собой), только на то, что видит игрок;
-   - запертая пробирка: lock = { vial, order } — ёмкость нельзя трогать
-     (ни брать, ни класть), пока не выполнен заказ order (на его карточке
-     ключ). Открывается сама при этой выдаче.
-
-   Состояние: { vials, orders, slots, next, delivered, hid, lock }:
+   Состояние: { vials, orders, slots, next, delivered }:
      orders — типы камней всех заказов по очереди;
      slots  — для каждой карточки на столе индекс заказа или -1;
      next   — индекс следующего заказа в очереди.
@@ -56,17 +48,15 @@
   function isHomogeneous(vial) { return vial.length > 0 && vial.every(g => g === vial[0]); }
 
   /* Все переливы. prune — для решателя: перенос ЦЕЛОЙ однородной ёмкости в
-     пустую даёт то же состояние с точностью до порядка ёмкостей.
-     blocked — запертая ёмкость (или -1): её не трогают. */
-  function legalMoves(vials, prune, blocked) {
+     пустую даёт то же состояние с точностью до порядка ёмкостей. */
+  function legalMoves(vials, prune) {
     const moves = [];
-    const b = blocked === undefined ? -1 : blocked;
     for (let i = 0; i < vials.length; i++) {
-      if (vials[i].length === 0 || i === b) continue;
+      if (vials[i].length === 0) continue;
       const homo = prune && isHomogeneous(vials[i]);
       let emptyTried = false;
       for (let j = 0; j < vials.length; j++) {
-        if (i === j || j === b) continue;
+        if (i === j) continue;
         if (prune && vials[j].length === 0) {
           if (homo || emptyTried) continue;      // все пустые ёмкости равноценны
           emptyTried = true;
@@ -81,41 +71,23 @@
     const n = Math.min(level.slots, level.orders.length);
     const slots = [];
     for (let i = 0; i < n; i++) slots.push(i);
-    const hid = level.vials.map((v, i) => Math.max(0, Math.min((level.hidden && level.hidden[i]) | 0, v.length - 1)));
-    return {
-      vials: level.vials.map(v => v.slice()), orders: level.orders.slice(), slots, next: n, delivered: 0,
-      hid, lock: level.lock ? { vial: level.lock.vial, order: level.lock.order } : null
-    };
+    return { vials: level.vials.map(v => v.slice()), orders: level.orders.slice(), slots, next: n, delivered: 0 };
   }
 
   function cloneState(s) {
-    return {
-      vials: s.vials.map(v => v.slice()), orders: s.orders, slots: s.slots.slice(), next: s.next,
-      delivered: s.delivered, hid: s.hid ? s.hid.slice() : s.vials.map(() => 0), lock: s.lock || null
-    };
+    return { vials: s.vials.map(v => v.slice()), orders: s.orders, slots: s.slots.slice(), next: s.next, delivered: s.delivered };
   }
 
   function activeTypes(s) {
     return s.slots.filter(o => o >= 0).map(o => s.orders[o]);
   }
 
-  /* Заказ o уже выполнен: вышел из очереди и его нет на столе. */
-  function isDelivered(s, o) { return o < s.next && s.slots.indexOf(o) === -1; }
-
-  /* Индекс запертой сейчас ёмкости или -1. */
-  function lockedVial(s) {
-    return s.lock && !isDelivered(s, s.lock.order) ? s.lock.vial : -1;
-  }
-
-  function movesOf(s, prune) { return legalMoves(s.vials, prune, lockedVial(s)); }
-
   /* Ёмкость, которую можно выдать прямо сейчас: первая по порядку собранная,
      для которой есть заказ на столе (карточка — самая левая подходящая). */
   function findDelivery(s) {
-    const locked = lockedVial(s);
     for (let v = 0; v < s.vials.length; v++) {
       const vial = s.vials[v];
-      if (v === locked || !isComplete(vial) || vial[0] === SEALED) continue;
+      if (!isComplete(vial) || vial[0] === SEALED) continue;
       const slot = s.slots.findIndex(o => o >= 0 && s.orders[o] === vial[0]);
       if (slot >= 0) return { vial: v, slot, order: s.slots[slot], gem: vial[0] };
     }
@@ -123,49 +95,32 @@
   }
 
   /* Выдать заказы, пока есть что выдавать. Меняет s на месте, возвращает
-     события по порядку: { vial, slot, order, gem, incoming, unlocked } —
-     incoming: заказ, занявший освободившуюся карточку (или -1); unlocked:
-     ёмкость, открывшаяся этой выдачей (или -1). opts.keepVial — только
-     анализ: камни остаются в ёмкости, она запечатана. */
+     события по порядку: { vial, slot, order, gem, incoming } — incoming:
+     заказ, занявший освободившуюся карточку (или -1). opts.keepVial —
+     только анализ: камни остаются в ёмкости, она запечатана. */
   function settle(s, opts) {
     const events = [];
     let d;
     while ((d = findDelivery(s))) {
-      const wasLocked = lockedVial(s);
       if (opts && opts.keepVial) s.vials[d.vial] = [SEALED, SEALED, SEALED, SEALED];
       else s.vials[d.vial].length = 0;
-      if (s.hid) s.hid[d.vial] = 0;
       s.delivered++;
       const incoming = s.next < s.orders.length ? s.next++ : -1;
       s.slots[d.slot] = incoming;
-      const unlocked = wasLocked >= 0 && lockedVial(s) === -1 ? wasLocked : -1;
-      events.push(Object.assign(d, { incoming, unlocked }));
+      events.push(Object.assign(d, { incoming }));
     }
     return events;
   }
 
   /* Перелив «на месте» + автоматическая выдача. Возвращает
-     { count, deliveries, revealed, movedHidden } или null, если ход нелегален
-     (состояние не меняется). revealed — открылся новый верхний камень
-     ёмкости-источника; movedHidden — сколько скрытых камней уехало вместе
-     с группой (на новом месте они открыты). */
+     { count, deliveries } или null, если ход нелегален (состояние не меняется). */
   function moveInPlace(s, mv, opts) {
     if (!mv || mv.from === mv.to) return null;
-    const locked = lockedVial(s);
-    if (mv.from === locked || mv.to === locked) return null;
     const src = s.vials[mv.from], dst = s.vials[mv.to];
     const n = moveCount(src, dst);
     if (n === 0) return null;
     dst.push(...src.splice(src.length - n, n));
-    let revealed = false, movedHidden = 0;
-    if (s.hid) {
-      const h = s.hid[mv.from];
-      movedHidden = Math.max(0, h - src.length);
-      let nh = Math.min(h, src.length);
-      if (src.length && nh > src.length - 1) { nh = src.length - 1; revealed = true; }
-      s.hid[mv.from] = nh;
-    }
-    return { count: n, deliveries: settle(s, opts), revealed, movedHidden };
+    return { count: n, deliveries: settle(s, opts) };
   }
 
   /* Ход на КОПИИ состояния; null — ход нелегален. */
@@ -177,30 +132,12 @@
   function isWon(s) { return s.delivered >= s.orders.length; }
 
   /* Тупик: не выиграно и ни одного перелива. */
-  function isDeadEnd(s) { return !isWon(s) && movesOf(s).length === 0; }
+  function isDeadEnd(s) { return !isWon(s) && legalMoves(s.vials).length === 0; }
 
-  /* Ключ состояния: порядок ёмкостей и порядок карточек на столе не важны.
-     Запертая ёмкость помечена «!» (её содержимое нельзя смешивать с другими). */
+  /* Ключ состояния: порядок ёмкостей и порядок карточек на столе не важны. */
   function stateKey(s) {
-    const locked = lockedVial(s);
-    const v = s.vials.map((x, i) => (i === locked ? '!' : '') + x.join(',')).sort().join('|');
+    const v = s.vials.map(x => x.join(',')).sort().join('|');
     return v + '#' + activeTypes(s).sort().join(',') + '#' + s.next;
-  }
-
-  /* Оценка «сколько ещё работы» для поиска с эвристикой: камни над нижней
-     однородной частью ёмкости + разбитые по нескольким ёмкостям основания. */
-  function disorder(s) {
-    let h = 0;
-    const bases = {};
-    for (const v of s.vials) {
-      if (!v.length) continue;
-      let k = 1;
-      while (k < v.length && v[k] === v[0]) k++;
-      h += v.length - k;
-      if (bases[v[0]] === undefined) bases[v[0]] = k;
-      else { h += Math.min(bases[v[0]], k); bases[v[0]] = Math.max(bases[v[0]], k); }
-    }
-    return h + (s.orders.length - s.delivered);
   }
 
   /* Кратчайшее решение (BFS по числу переливов). { moves, visited } или
@@ -217,7 +154,7 @@
     while (frontier.length) {
       const next = [];
       for (const node of frontier) {
-        for (const mv of movesOf(node.s, true)) {
+        for (const mv of legalMoves(node.s.vials, true)) {
           const ns = applyMove(node.s, mv, opts);
           if (!ns) continue;
           const k = stateKey(ns);
@@ -231,63 +168,6 @@
         }
       }
       frontier = next;
-    }
-    return { moves: null, visited };
-  }
-
-  /* Быстрый поиск ЛЮБОГО решения: лучший-первым по g + w·disorder.
-     Решение не обязательно кратчайшее. { moves, visited } / { moves: null[, capped] }. */
-  function solveFast(state, opts) {
-    opts = opts || {};
-    const cap = opts.cap || 60000, w = opts.weight || 2;
-    const start = cloneState(state);
-    settle(start);
-    if (isWon(start)) return { moves: [], visited: 1 };
-    const heap = [];
-    const push = (n) => {
-      heap.push(n);
-      let i = heap.length - 1;
-      while (i > 0) { const p = (i - 1) >> 1; if (heap[p].f <= n.f) break; heap[i] = heap[p]; i = p; }
-      heap[i] = n;
-    };
-    const pop = () => {
-      const top = heap[0], last = heap.pop();
-      if (heap.length) {
-        let i = 0;
-        for (;;) {
-          const l = 2 * i + 1, r = l + 1;
-          let m = i, mf = last.f;
-          if (l < heap.length && heap[l].f < mf) { m = l; mf = heap[l].f; }
-          if (r < heap.length && heap[r].f < mf) m = r;
-          if (m === i) break;
-          heap[i] = heap[m]; i = m;
-        }
-        heap[i] = last;
-      }
-      return top;
-    };
-    const seen = new Set([stateKey(start)]);
-    push({ s: start, g: 0, f: w * disorder(start), path: null });
-    let visited = 1, seq = 0;
-    while (heap.length) {
-      const node = pop();
-      for (const mv of movesOf(node.s, true)) {
-        const ns = applyMove(node.s, mv);
-        if (!ns) continue;
-        const k = stateKey(ns);
-        if (seen.has(k)) continue;
-        seen.add(k);
-        visited++;
-        const path = { mv, prev: node.path };
-        if (isWon(ns)) {
-          const moves = [];
-          for (let p = path; p; p = p.prev) moves.unshift(p.mv);
-          return { moves, visited };
-        }
-        if (visited > cap) return { moves: null, visited, capped: true };
-        // seq — устойчивость порядка при равных оценках
-        push({ s: ns, g: node.g + 1, f: node.g + 1 + w * disorder(ns) + (seq++) * 1e-9, path });
-      }
     }
     return { moves: null, visited };
   }
@@ -310,7 +190,7 @@
       const s = queue[qi];
       const node = nodes[qi];
       if (node.won) continue;
-      const moves = movesOf(s, true);
+      const moves = legalMoves(s.vials, true);
       node.dead = moves.length === 0;
       for (const mv of moves) {
         const ns = applyMove(s, mv, opts);
@@ -343,30 +223,23 @@
     return { states: nodes.length, lost, dead, winnable: !!good[0], startMoves, startTraps, capped: false };
   }
 
-  /* Подсказка: первый шаг кратчайшего решения от ТЕКУЩЕЙ позиции; если
-     позиций слишком много для поиска в ширину (просторные уровни) — первый
-     шаг быстрого решения. null — отсюда не выиграть. */
+  /* Подсказка: первый шаг кратчайшего решения от ТЕКУЩЕЙ позиции; null —
+     отсюда не выиграть. */
   function hint(state, opts) {
-    opts = opts || {};
-    const r = solve(state, { cap: opts.cap || 25000 });
-    if (r.moves) return r.moves.length ? r.moves[0] : null;
-    if (!r.capped) return null;
-    const f = solveFast(state, { cap: opts.fastCap || 80000 });
-    return f.moves && f.moves.length ? f.moves[0] : null;
+    const r = solve(state, opts);
+    return r.moves && r.moves.length ? r.moves[0] : null;
   }
 
-  /* Можно ли ещё выиграть из позиции. Быстрый поиск находит решение почти
-     сразу, если оно есть; безнадёжные позиции тесные и перебираются целиком.
-     При переполнении считаем «можно», чтобы не пугать игрока ложной тревогой. */
+  /* Можно ли ещё выиграть из позиции (с предохранителем: при переполнении
+     считаем «можно», чтобы не пугать игрока ложной тревогой). */
   function isWinnable(state, opts) {
-    const r = solveFast(state, Object.assign({ cap: 60000 }, opts || {}));
+    const r = solve(state, Object.assign({ cap: 60000 }, opts || {}));
     return !!r.moves || !!r.capped;
   }
 
   const api = {
-    CAP, SEALED, isComplete, isHomogeneous, moveCount, legalMoves, movesOf, makeState, cloneState, activeTypes,
-    isDelivered, lockedVial, findDelivery, settle, moveInPlace, applyMove, isWon, isDeadEnd, stateKey, disorder,
-    solve, solveFast, analyze, hint, isWinnable
+    CAP, SEALED, isComplete, isHomogeneous, moveCount, legalMoves, makeState, cloneState, activeTypes,
+    findDelivery, settle, moveInPlace, applyMove, isWon, isDeadEnd, stateKey, solve, analyze, hint, isWinnable
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.WorkshopRules = api;

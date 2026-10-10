@@ -1699,7 +1699,7 @@ body.convoy #heroDownFlash, body.convoy #fortEdge { display: none !important; }
 /* Сборка 4 (макет UI_МАКЕТЫ/КОНВОЙ_UI.md). Три семейства элементов и больше ничего:
    сводка — тёмная плашка (не нажимается), действие — деревянная плитка, главная кнопка — золотая (.menu-btn).
    Слов в бою нет: значки и числа; обучение — указатель над плиткой (.cv-point). */
-#cvHud, #cvMenu, #cvResult {
+#cvHud, #cvMenu, #cvResult, #screenPause {
   --cv-sum-bg: rgba(28,19,11,.8);
   --cv-sum-edge: rgba(8,5,2,.85);
   --cv-r: .75em;
@@ -2097,7 +2097,7 @@ body.convoy #heroDownFlash, body.convoy #fortEdge { display: none !important; }
 #cvMenu .menu-main { display: flex; flex-direction: column; align-items: center; gap: max(8px, 2.2vh); }
 #cvMenu .logo {
   display: grid; margin: 0 0 max(4px, 1.2vh); word-spacing: .16em; font-family: 'Lilita One', 'Fredoka', sans-serif; font-weight: 400;
-  font-size: min(10vh, 6.6vw); line-height: 1.05; letter-spacing: .04em; white-space: nowrap; transform: rotate(-1.5deg);
+  font-size: min(10vh, 6.6vw, calc((100vw - 236px) / 12.6)); line-height: 1.05; letter-spacing: .04em; white-space: nowrap; transform: rotate(-1.5deg);
 }
 #cvMenu .logo > span { grid-area: 1 / 1; padding: 0 .12em; }
 #cvMenu .logo-back {
@@ -2109,3 +2109,40 @@ body.convoy #heroDownFlash, body.convoy #fortEdge { display: none !important; }
 #cvMenu .logo-front { background: linear-gradient(#fffbe6 0%, #ffe38f 40%, #f4ae3e 62%, #e07a26 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
 #cvMenu .menu-btn { white-space: nowrap; }
 #cvMenu .menu-btn.primary-big { font-size: max(20px, 4.6vh); min-height: 0; padding: .38em 2.8em; min-width: 7.5em; }
+
+/* ---------------------------------------------------------------- сборка 5: шлифовка */
+/* Пауза: звук и музыка — круглые плитки (перечёркнуты, когда выключены), «Продолжить» и домик как в итоге. */
+body.convoy #screenPause .mute-row, body.convoy #btnResume, body.convoy #btnToMenuFromPause { display: none; }
+body:not(.convoy) .cv-pause-snd, body:not(.convoy) .cv-pause-btns, body:not(.convoy) .cv-menu-snd { display: none; }
+body.convoy #screenPause .popup-card { min-width: 0; gap: max(10px, 1em); padding: 1.1em 1.8em 1.4em; }
+.cv-pause-snd, .cv-menu-snd { display: flex; justify-content: center; gap: .8em; }
+.cv-pause-snd .cv-snd { font-size: 1.15em; }
+.cv-menu-snd { position: absolute; top: max(10px, 1.6vh); right: max(10px, 1.2vw); z-index: 2; gap: .55em; }
+.cv-snd { position: relative; }
+.cv-snd.off svg.ico { opacity: .7; }
+.cv-snd.off::after {
+  content: ''; position: absolute; left: 18%; right: 18%; top: calc(50% - .08em); height: .16em; border-radius: 1em;
+  background: #e8453a; box-shadow: 0 0 0 1.5px var(--ink); transform: rotate(-45deg); pointer-events: none;
+}
+.cv-pause-btns .menu-btn.result-main { display: inline-flex; align-items: center; gap: .4em; padding: 0 1.6em 0 1.3em; }
+.cv-pause-btns .menu-btn.result-main svg.ico { width: .95em; height: .95em; color: #fff6d8; vertical-align: 0; }
+
+/* Отказ без надписи: золото, отряд или камнепад вздрагивают и краснеют. */
+.cv-gold.deny, .cv-squad.deny { animation: cvDeny .32s ease-out; }
+.cv-gold.deny b, .cv-squad.deny b, .cv-squad.deny svg.ico { color: var(--cv-bad); }
+.cv-gold.deny .gold-dot { filter: grayscale(.4) brightness(.9); }
+.cv-rock.deny { animation: cvDeny .32s ease-out; }
+@keyframes cvDeny { 0%, 100% { transform: translateX(0); } 20% { transform: translateX(-5px); } 40% { transform: translateX(5px); } 60% { transform: translateX(-3px); } 80% { transform: translateX(3px); } }
+
+/* Описание карты — значок вместо слова: ❤ здоровье, меч — урон, монета — цена, часы — перезарядка, повозка — прочность. */
+.cv-pick-desc svg.ico, .cv-pick-desc .gold-dot { width: 1.2em; height: 1.2em; vertical-align: -.25em; margin-right: .2em; color: #f2e6cf; }
+.cv-pick-desc .gold-dot { width: .95em; height: .95em; vertical-align: -.12em; border-width: 1.5px; }
+.cv-pick-have {
+  top: .35em; right: .35em; padding: .12em .4em .14em; border-radius: .5em; font-size: .78em;
+  background: var(--cv-sum-bg); box-shadow: 0 0 0 1.5px var(--cv-up); color: var(--cv-up);
+}
+
+/* Поворот телефона: телефон поворачивается сам — без длинного текста. */
+#rotatePrompt .cv-rotate-ico { width: 6em; height: 6em; color: var(--gold-text); animation: cvRotate 2.6s ease-in-out infinite; }
+#rotatePrompt p { font-family: 'Lilita One', sans-serif; font-size: 1.5em; color: var(--gold-text); text-shadow: 0 2px 0 var(--ink); margin: 0; }
+@keyframes cvRotate { 0%, 20% { transform: rotate(0); } 50%, 80% { transform: rotate(-90deg); } 100% { transform: rotate(0); } }

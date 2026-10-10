@@ -146,21 +146,22 @@ const CONVOY_CARDS = (() => {
     cond: (run) => !owned(run, unit),
     apply: (run, api) => { run.unlocked.push(unit); if (unit === 'spear') run.mods.spear = true; api.freeUnit(unit); },
   });
-  const classCard = (id, rarity, unit, stat, mult, name, who, max) => ({
+  // В описаниях {hp} {dmg} {gold} {cd} {hull} — значки (fmtDesc): сердце, меч, монета, часы, повозка.
+  const classCard = (id, rarity, unit, stat, mult, name, max) => ({
     id, rarity, name, max, icon: { unit, badge: stat },
     big: `+${R((mult - 1) * 100)}%`,
     desc: (run) => stat === 'hp'
-      ? `${who}: здоровье ${R(hpOf(run, unit))} → ${R(hpOf(run, unit) * mult)}`
-      : `${who}: урон ${R(dmgOf(run, unit))} → ${R(dmgOf(run, unit) * mult)}`,
+      ? `{hp}${R(hpOf(run, unit))} → ${R(hpOf(run, unit) * mult)}`
+      : `{dmg}${R(dmgOf(run, unit))} → ${R(dmgOf(run, unit) * mult)}`,
     cond: (run) => owned(run, unit),
     apply: (run) => { cls(run, unit)[stat === 'hp' ? 'hp' : 'dmg'] *= mult; },
   });
   const cards = [
-    classCard('tough', 'common', 'infantry', 'hp', 1.35, 'Закалка', 'Бойцы', 3),
-    classCard('blades', 'common', 'infantry', 'dmg', 1.3, 'Острые клинки', 'Бойцы', 3),
-    classCard('aim', 'common', 'archer', 'dmg', 1.3, 'Меткость', 'Стрелки', 3),
-    classCard('armor', 'common', 'heavy', 'hp', 1.4, 'Тяжёлая броня', 'Защитники', 3),
-    classCard('hammer', 'common', 'heavy', 'dmg', 1.35, 'Боевой молот', 'Защитники', 3),
+    classCard('tough', 'common', 'infantry', 'hp', 1.35, 'Закалка', 3),
+    classCard('blades', 'common', 'infantry', 'dmg', 1.3, 'Острые клинки', 3),
+    classCard('aim', 'common', 'archer', 'dmg', 1.3, 'Меткость', 3),
+    classCard('armor', 'common', 'heavy', 'hp', 1.4, 'Тяжёлая броня', 3),
+    classCard('hammer', 'common', 'heavy', 'dmg', 1.35, 'Боевой молот', 3),
     {
       id: 'treasury', rarity: 'common', name: 'Казна', max: 3, icon: 'gold', big: '+80',
       desc: () => 'Сейчас +80, в бою +1/с',
@@ -168,18 +169,18 @@ const CONVOY_CARDS = (() => {
     },
     {
       id: 'patch', rarity: 'common', name: 'Ремонт', max: 99, icon: 'repair', big: '+35%',
-      desc: (run, m) => `Конвой +${R(m.world.playerCore.maxHp * 0.35)} прочности`,
+      desc: (run, m) => `{hull}+${R(m.world.playerCore.maxHp * 0.35)}`,
       cond: (run, m) => m.world.playerCore.hp < m.world.playerCore.maxHp * 0.85,
       apply: (run, api) => api.healConvoy(0.35),
     },
     {
       id: 'plating', rarity: 'common', name: 'Обшивка', max: 3, icon: 'hull', big: '+150',
-      desc: (run, m) => `Прочность ${R(m.world.playerCore.maxHp)} → ${R(m.world.playerCore.maxHp + 150)}`,
+      desc: (run, m) => `{hull}${R(m.world.playerCore.maxHp)} → ${R(m.world.playerCore.maxHp + 150)}`,
       apply: (run, api) => api.addConvoyHp(150),
     },
     {
       id: 'heavyRocks', rarity: 'common', name: 'Тяжёлые камни', max: 3, icon: 'rockHeavy', big: '+50%',
-      desc: (run) => `Урон камня ${R(CONVOY.rock.dmg * run.mods.rockDmg)} → ${R(CONVOY.rock.dmg * run.mods.rockDmg * 1.5)}`,
+      desc: (run) => `{dmg}${R(CONVOY.rock.dmg * run.mods.rockDmg)} → ${R(CONVOY.rock.dmg * run.mods.rockDmg * 1.5)}`,
       apply: (run) => { run.mods.rockDmg *= 1.5; },
     },
     {
@@ -194,13 +195,13 @@ const CONVOY_CARDS = (() => {
     },
     {
       id: 'cheapKit', rarity: 'rare', name: 'Дешёвый набор', max: 1, icon: { unit: 'infantry', badge: 'cost' }, big: '−25%',
-      desc: (run, m, api) => `Боец: цена ${api.unitCost('infantry')} → ${R(api.unitCost('infantry') * 0.75)}`,
+      desc: (run, m, api) => `{gold}${api.unitCost('infantry')} → ${R(api.unitCost('infantry') * 0.75)}`,
       apply: (run) => { run.mods.cls.infantry.cost *= 0.75; },
     },
     newUnit('spears', 'spear', 'Копейщики', 'Сильны против тяжёлых'),
     newUnit('shieldbearers', 'shieldbearer', 'Щитоносцы', 'Держат удар'),
     newUnit('bombers', 'bomber', 'Бомбометатели', 'Бомба по толпе'),
-    classCard('spearEdge', 'rare', 'spear', 'dmg', 1.35, 'Длинные пики', 'Копейщики', 2),
+    classCard('spearEdge', 'rare', 'spear', 'dmg', 1.35, 'Длинные пики', 2),
     {
       id: 'trophies', rarity: 'rare', name: 'Трофеи', max: 2, icon: 'trophy', big: '+50%',
       desc: () => 'Золото за врагов',
@@ -213,7 +214,7 @@ const CONVOY_CARDS = (() => {
     },
     {
       id: 'quickRock', rarity: 'rare', name: 'Быстрый заряд', max: 2, icon: 'clock', big: '−30%',
-      desc: (run) => `Перезарядка ${Math.round(CONVOY.rock.cd * run.mods.rockCd)} → ${Math.round(CONVOY.rock.cd * run.mods.rockCd * 0.7)} с`,
+      desc: (run) => `{cd}${Math.round(CONVOY.rock.cd * run.mods.rockCd)} → ${Math.round(CONVOY.rock.cd * run.mods.rockCd * 0.7)} с`,
       apply: (run) => { run.mods.rockCd *= 0.7; },
     },
     {
@@ -1178,7 +1179,8 @@ const Convoy = (() => {
       if (!C.headless && m.elapsed - C.deniedAt > 0.6) {
         C.deniedAt = m.elapsed;
         SFX.buyDenied();
-        VFX.floater(m, Math.max(140, Math.min(860, x)), -120, `Ещё ${Math.ceil(C.rockCd)} с`, '#ffb08a');
+        VFX.floater(m, Math.max(140, Math.min(860, x)), -120, `${Math.ceil(C.rockCd)} с`, '#ffb08a');
+        shake('cvRock');
       }
       return false;
     }
@@ -1232,9 +1234,9 @@ const Convoy = (() => {
   function buy(typeId) {
     if (!canBuy() || !classes().includes(typeId)) return false;
     const m = match;
-    if (alive('player') >= CONVOY.unitCap) { deny(typeId, 'Отряд полон'); return false; }
+    if (alive('player') >= CONVOY.unitCap) { deny(typeId, 'cvSquad'); return false; }
     const cost = unitCost(typeId);
-    if (m.gold < cost) { deny(typeId); return false; }
+    if (m.gold < cost) { deny(typeId, 'cvGoldBox'); return false; }
     m.gold -= cost;
     spawnPlayer(typeId);
     run.stats.bought++;
@@ -1248,14 +1250,19 @@ const Convoy = (() => {
     if (C.phase === 'pick') return C.offer && C.offer[i] ? choose(C.offer[i].id) : false;
     return buyIndex(i);
   }
-  function deny(typeId, text) {
+  // Отказ: плитка и то, чего не хватает (золото или место в отряде), вздрагивают — без надписи над полем.
+  function deny(typeId, whyId) {
     if (match.convoy.headless) return;
     SFX.buyDenied();
     pulseCard(typeId, 'denied');
-    if (text && match.elapsed - match.convoy.deniedAt > 0.6) {
-      match.convoy.deniedAt = match.elapsed;
-      VFX.floater(match, 160, -110, text, '#ffb08a');
-    }
+    shake(whyId);
+  }
+  function shake(id) {
+    const el = id && $(id);
+    if (!el) return;
+    el.classList.remove('deny'); void el.offsetWidth; el.classList.add('deny');
+    clearTimeout(el._denyT);
+    el._denyT = setTimeout(() => el.classList.remove('deny'), 340);
   }
   function pulseCard(typeId, cls) {
     const el = !match.convoy.headless && cardEls && cardEls[typeId];
@@ -1465,9 +1472,9 @@ const Convoy = (() => {
         '<span class="cv-pick-art"><canvas class="cv-pick-icon" width="120" height="120"></canvas>' +
         (card.big ? `<b class="cv-pick-big">${card.big}</b>` : '') + '</span>' +
         `<span class="cv-pick-name">${card.name}</span>` +
-        `<span class="cv-pick-desc">${card.desc(run, match, api)}</span>` +
+        `<span class="cv-pick-desc">${fmtDesc(card.desc(run, match, api))}</span>` +
         tagLine(card) +
-        (have ? `<span class="cv-pick-have" title="Уже взято: ${have}">×${have + 1}</span>` : '') +
+        (have ? `<span class="cv-pick-have" title="Уже взято: ${have}">Ур. ${have + 1}</span>` : '') +
         `<span class="tool-key">${i + 1}</span>`;
       btn.addEventListener('click', () => choose(card.id));
       box.appendChild(btn);
@@ -1476,6 +1483,11 @@ const Convoy = (() => {
     for (const k of ['pkRepair', 'pkRepairHide', 'pkReroll', 'pkRepairOff', 'pkRerollOff', 'pkRerollFree']) delete hudCache[k];
     updatePickButtons();
   }
+  const DESC_ICON = {
+    hp: '<svg class="ico"><use href="#i-heart"/></svg>', dmg: '<svg class="ico"><use href="#i-dmg"/></svg>',
+    gold: '<i class="gold-dot"></i>', cd: '<svg class="ico"><use href="#i-clock"/></svg>', hull: '<svg class="ico"><use href="#i-wagon"/></svg>',
+  };
+  function fmtDesc(s) { return s.replace(/\{(\w+)\}/g, (all, k) => DESC_ICON[k] || all); }
   // Знак карты: «Толпа ●●○» — сколько будет после этой карты; третья открывает сочетание.
   function tagLine(card) {
     const tag = card.syn || card.tag;
@@ -2215,6 +2227,16 @@ const Convoy = (() => {
     healConvoy, addConvoyHp, freeUnit, syncWorld, alive, enemiesLeft, ageUp,
   };
 
+  // Плитки звука и музыки: перечёркнуты, когда выключены (состояние — progress из game.js).
+  function syncSound() {
+    const off = { sfx: !!progress.muted, music: !!progress.musicMuted };
+    for (const b of document.querySelectorAll('.cv-snd')) {
+      const o = off[b.dataset.snd];
+      b.classList.toggle('off', o);
+      b.setAttribute('aria-pressed', String(!o));
+    }
+  }
+
   // ------------------------------------------------------------ запуск
   function worldX(e) {
     const r = canvas.getBoundingClientRect();
@@ -2227,6 +2249,17 @@ const Convoy = (() => {
     }
     drawCardIcon($('cvRockIco'), { icon: 'rock' });
     $('cvPause').addEventListener('click', () => { SFX.click(); togglePause(); });
+    $('cvResume').addEventListener('click', () => { SFX.click(); togglePause(); });
+    $('cvPauseHome').addEventListener('click', () => { SFX.click(); $('btnToMenuFromPause').click(); });
+    for (const b of document.querySelectorAll('.cv-snd')) {
+      b.addEventListener('click', (e) => {
+        SFX.unlock();
+        if (b.dataset.snd === 'music') toggleMusicMuted(); else toggleSfxMuted();
+        syncSound();
+        e.currentTarget.blur();
+      });
+    }
+    syncSound();
     $('cvMenuPlay').addEventListener('click', () => { SFX.unlock(); SFX.click(); startRun(); });
     $('cvResultAgain').addEventListener('click', () => { SFX.click(); startRun(); });
     $('cvResultMenu').addEventListener('click', () => { SFX.click(); toMenu(); });

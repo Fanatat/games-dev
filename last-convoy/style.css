@@ -1977,7 +1977,7 @@ body.convoy #heroDownFlash, body.convoy #fortEdge { display: none !important; }
 
 /* ---------- итог похода ---------- */
 .cv-result-card { align-items: center; width: min(27em, 94vw); gap: .55em; padding: 1.1em 1.4em 1.2em; text-align: center; }
-.cv-result-card h2 { margin: 0; font-size: 1.8em; line-height: 1.1; }
+.cv-result-card h2 { margin: 0; font-size: 1.7em; line-height: 1.1; white-space: nowrap; }
 #cvResultTitle.win { color: #ffd35c; }
 #cvResultTitle.lose { color: #ff9a7c; }
 .cv-pill {
@@ -2013,8 +2013,10 @@ body.convoy #heroDownFlash, body.convoy #fortEdge { display: none !important; }
 /* слава: «+N ★», шкала до следующей награды с её значком, открытая награда */
 .cv-res-glory { display: flex; flex-direction: column; align-items: center; gap: .35em; width: 100%; }
 .cv-res-glory:empty { display: none; }
-.cv-glory-gain { display: inline-flex; align-items: center; gap: .2em; font-family: 'Lilita One', sans-serif; font-weight: 400; font-size: 1.4em; line-height: 1.1; color: #ffd35c; text-shadow: var(--cv-outline); }
-.cv-glory-gain svg.ico { color: #ffd35c; width: .95em; height: .95em; vertical-align: 0; }
+.cv-glory-gain { display: inline-flex; align-items: center; gap: .2em; font-family: 'Lilita One', sans-serif; font-weight: 400; font-size: 1.85em; line-height: 1.05; color: #ffd35c; text-shadow: var(--cv-outline), 0 0 14px rgba(255,211,92,.45); }
+.cv-glory-gain svg.ico { color: #ffd35c; width: .95em; height: .95em; vertical-align: 0; filter: drop-shadow(0 0 5px rgba(255,211,92,.8)); }
+.cv-glory-gain.pop { animation: cvGloryPop .42s cubic-bezier(.34,1.56,.64,1); }
+@keyframes cvGloryPop { 0% { transform: scale(1); } 45% { transform: scale(1.28); } 100% { transform: scale(1); } }
 .cv-glory-row { display: flex; align-items: center; gap: .45em; width: min(19em, 100%); }
 .cv-glory-row .cv-glory-bar { flex: 1 1 0; }
 .cv-glory-bar { position: relative; height: 1.35em; border-radius: 999px; border: 2.5px solid var(--ink); background: rgba(26,18,10,.65); overflow: hidden; }
@@ -2074,7 +2076,7 @@ body.convoy #heroDownFlash, body.convoy #fortEdge { display: none !important; }
   .cv-result-card h2 { font-size: 1.35em; }
   .cv-res-stat { font-size: 1em; padding: .1em .65em .1em .5em; }
   .cv-res-card { width: 2em; height: 2em; }
-  .cv-glory-gain { font-size: 1.2em; }
+  .cv-glory-gain { font-size: 1.5em; }
   .cv-unlock canvas { width: 1.9em; height: 1.9em; }
   .cv-result-btns { margin-top: 0; }
 }
@@ -2146,3 +2148,37 @@ body.convoy #screenPause .popup-card { min-width: 0; gap: max(10px, 1em); paddin
 #rotatePrompt .cv-rotate-ico { width: 6em; height: 6em; color: var(--gold-text); animation: cvRotate 2.6s ease-in-out infinite; }
 #rotatePrompt p { font-family: 'Lilita One', sans-serif; font-size: 1.5em; color: var(--gold-text); text-shadow: 0 2px 0 var(--ink); margin: 0; }
 @keyframes cvRotate { 0%, 20% { transform: rotate(0); } 50%, 80% { transform: rotate(-90deg); } 100% { transform: rotate(0); } }
+
+/* ---------- сборка 6: золото «+N», итог ---------- */
+/* «+N» над счётчиком золота: сумма монет, прилетевших подряд; каждая новая монета обновляет число */
+.cv-gold { position: relative; }
+.cv-gold-gain {
+  position: absolute; left: 50%; bottom: 100%; margin-bottom: .1em; transform: translateX(-50%);
+  font-style: normal; font-size: .78em; line-height: 1; white-space: nowrap; color: #ffe27a;
+  text-shadow: var(--cv-outline), 0 0 8px rgba(255,211,92,.6); opacity: 0; pointer-events: none;
+}
+.cv-gold-gain.show { animation: cvGoldGain 1.1s ease-out forwards; }
+@keyframes cvGoldGain {
+  0% { opacity: 1; transform: translateX(-50%) translateY(2px) scale(1.25); }
+  18% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+  70% { opacity: 1; transform: translateX(-50%) translateY(-4px) scale(1); }
+  100% { opacity: 0; transform: translateX(-50%) translateY(-12px) scale(.95); }
+}
+/* итог: значок «повержено» — враг (залитый, читается на 16 px), серия крупнее */
+.cv-res-stat.kills svg.ico { color: #ff8a6a; width: 1.2em; height: 1.2em; }
+.cv-res-stat.streak svg.ico { width: 1.15em; height: 1.15em; }
+/* победа: лучи за карточкой итога (как в итоге game4) */
+#cvResult { overflow: hidden; }
+#cvResult .cv-result-card { position: relative; z-index: 1; }
+.cv-res-rays {
+  position: absolute; left: 50%; top: 50%; width: 150vmax; height: 150vmax; margin: -75vmax 0 0 -75vmax;
+  pointer-events: none; opacity: 0;
+  background: repeating-conic-gradient(from 0deg, rgba(255,226,140,.24) 0deg 7deg, rgba(255,226,140,0) 7deg 20deg);
+  -webkit-mask-image: radial-gradient(circle, #000 0, rgba(0,0,0,.85) 14%, transparent 42%);
+  mask-image: radial-gradient(circle, #000 0, rgba(0,0,0,.85) 14%, transparent 42%);
+}
+#cvResult.celebrate .cv-res-rays { opacity: 1; animation: raysSpin 26s linear infinite, raysFade .6s ease-out; }
+/* значки в описаниях наград (меню, итог) — как на картах */
+.cv-unlock span svg.ico, .cv-unlock span .gold-dot, .cv-next-desc svg.ico, .cv-next-desc .gold-dot { width: 1.15em; height: 1.15em; vertical-align: -.22em; margin-right: .15em; color: #f2e6cf; }
+.cv-unlock span .gold-dot, .cv-next-desc .gold-dot { width: .92em; height: .92em; vertical-align: -.1em; border-width: 1.5px; }
+@media (prefers-reduced-motion: reduce) { #cvResult.celebrate .cv-res-rays { animation: none; } .cv-gold-gain.show { animation-duration: .01s; } }

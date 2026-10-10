@@ -156,20 +156,6 @@ const WsJewel = (() => {
     return { s, x0: box.x + (box.w - 2 * s) / 2, y0: box.y + (box.h - s) / 2 };
   }
 
-  /* Крупный план (окно победы): рамка по самому изделию, а не по полю 2×1.
-     У кулона цепочка шире медальона — берём медальон, цепочка уходит за край
-     и гаснет (см. draw). Увеличение не больше cap от обычного. */
-  function closeFrame(box, d, piece, cap) {
-    let u0 = 9, v0 = 9, u1 = -9, v1 = -9;
-    const add = (u, v, ru, rv) => { u0 = Math.min(u0, u - ru); u1 = Math.max(u1, u + ru); v0 = Math.min(v0, v - rv); v1 = Math.max(v1, v + rv); };
-    d.sockets.forEach(p => add(p.u, p.v, p.r * 1.25, p.r * 1.25));
-    d.rings.forEach(r => add(r.u, r.v, r.rx + r.w, r.ry + r.w));
-    if (piece === 'pendant') v0 -= 0.12;
-    else d.lines.forEach(pts => { for (let i = 0; i < pts.length; i += 2) add(pts[i], pts[i + 1], 0.03, 0.03); });
-    const s = Math.min(frame(box).s * cap, box.w * 0.94 / (u1 - u0), box.h * 0.94 / (v1 - v0));
-    return { s, x0: box.x + box.w / 2 - (u0 + u1) / 2 * s, y0: box.y + box.h / 2 - (v0 + v1) / 2 * s };
-  }
-
   /* Гнёзда в координатах canvas (для полёта камня в гнездо). */
   function sockets(piece, K, box) {
     const f = frame(box);
@@ -201,13 +187,11 @@ const WsJewel = (() => {
      opts.ghost — массив типов для пустых гнёзд (бледный намёк, какой камень
      сюда ляжет); opts.silhouette — тёмный силуэт без камней (следующее
      изделие на витрине); opts.drawGem(g, type, x, y, size, alpha);
-     opts.pop — { i, k } гнездо, в которое только что лёг камень (k 0..1);
-     opts.closeup — крупный план (окно победы, холст только под изделие); число — предел
-     увеличения (по умолчанию 1,9). */
+     opts.pop — { i, k } гнездо, в которое только что лёг камень (k 0..1). */
   function draw(g, piece, K, gems, box, opts) {
     opts = opts || {};
+    const f = frame(box);
     const d = design(piece, K);
-    const f = opts.closeup ? closeFrame(box, d, piece, typeof opts.closeup === 'number' ? opts.closeup : 1.9) : frame(box);
     const sil = !!opts.silhouette;
     const lw = Math.max(1.2, f.s * 0.045);
     g.save();
@@ -263,21 +247,9 @@ const WsJewel = (() => {
     }
     if (sil) {
       g.fillStyle = 'rgba(255,230,180,0.55)';
-      g.font = `900 ${Math.round(f.s * 0.34)}px Nunito, "Arial Rounded MT Bold", Arial, sans-serif`;
+      g.font = `bold ${Math.round(f.s * 0.34)}px Georgia, serif`;
       g.textAlign = 'center'; g.textBaseline = 'middle';
       g.fillText('?', f.x0 + f.s, f.y0 + f.s * 0.52);
-    }
-    if (opts.closeup && piece === 'pendant') {   // цепочка гаснет к краям холста
-      g.globalCompositeOperation = 'destination-in';
-      const fade = g.createLinearGradient(box.x, 0, box.x + box.w, 0);
-      fade.addColorStop(0, 'rgba(0,0,0,0)'); fade.addColorStop(0.16, '#000');
-      fade.addColorStop(0.84, '#000'); fade.addColorStop(1, 'rgba(0,0,0,0)');
-      g.fillStyle = fade;
-      g.fillRect(box.x - 8, box.y - 8, box.w + 16, box.h + 16);
-      const top = g.createLinearGradient(0, box.y, 0, box.y + box.h * 0.12);   // и к верхнему краю
-      top.addColorStop(0, 'rgba(0,0,0,0)'); top.addColorStop(1, '#000');
-      g.fillStyle = top;
-      g.fillRect(box.x - 8, box.y - 8, box.w + 16, box.h + 16);
     }
     g.restore();
   }

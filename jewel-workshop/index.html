@@ -3,68 +3,81 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <meta name="theme-color" content="#2a190e">
+  <meta name="theme-color" content="#e8b4c2">
   <title>Мастерская украшений</title>
-  <meta name="ws-build" content="w19-a76d6e3-20261010">
+  <meta name="ws-build" content="w38-7ba17bf-20261010">
   <!-- Форк game3 «Мастерская украшений». Отдельная точка входа:
        main.js/board.js/style.css/платформенные адаптеры game3 НЕ подключены —
        ни рекламы, ни энергии, ни магазина, ни сейвов исходной игры.
        Поле — workshop_board.js, изделия — workshop_jewelry.js, правила —
        workshop_rules.js, звуки — workshop_sfx.js через sound.js game3. -->
-  <link rel="preload" href="workshop_assets/gems.webp?v=19" as="image" type="image/webp">
-  <link rel="stylesheet" href="workshop.css?v=19">
+  <link rel="preload" href="workshop_assets/gems.webp?v=38" as="image" type="image/webp">
+  <link rel="stylesheet" href="workshop.css?v=38">
 </head>
 <body>
 
-  <!-- Меню: витрина коллекций -->
+  <!-- Меню — карта бутика (образ — ref/workshop/concept/03_map.jpeg): комната
+       стоит на месте, по ней снизу вверх вьётся дорожка из 30 значков; после
+       каждых пяти — шкатулка коллекции, рядом на пьедесталах готовые изделия,
+       у текущего уровня — героиня. Слов на экране нет: название, подсказка и
+       подробности — в строках ws-sr и aria-подписях. Дорожку рисует renderMap. -->
   <div id="screen-menu" class="screen active">
-    <div class="ws-menu">
-      <div class="ws-menu-top">
-        <button id="ws-menu-coins" class="ws-coins" type="button" aria-label="Монеты"><span class="ws-coin-ico" aria-hidden="true"></span><span id="ws-menu-coins-n">0</span></button>
-        <button id="btn-sound" class="ws-knob" aria-label="Звук" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 17.5V6l10-2v11.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="6.5" cy="17.5" r="2.6" fill="currentColor"/><circle cx="16.5" cy="15.5" r="2.6" fill="currentColor"/></svg></button>
+    <svg class="ws-defs" width="0" height="0" aria-hidden="true"><defs>
+      <linearGradient id="ws-ch-wood" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d08a4c"/><stop offset="0.55" stop-color="#9a5526"/><stop offset="1" stop-color="#6e3615"/></linearGradient>
+      <linearGradient id="ws-ch-gold" gradientUnits="userSpaceOnUse" x1="0" y1="6" x2="0" y2="52"><stop offset="0" stop-color="#fff1bf"/><stop offset="0.35" stop-color="#f0c55a"/><stop offset="0.7" stop-color="#b98226"/><stop offset="1" stop-color="#f6d77a"/></linearGradient>
+      <radialGradient id="ws-ch-glow"><stop offset="0" stop-color="#fffbe0"/><stop offset="0.5" stop-color="#ffe9a0" stop-opacity="0.8"/><stop offset="1" stop-color="#ffe9a0" stop-opacity="0"/></radialGradient>
+      <filter id="ws-path-blur" x="-30%" y="-5%" width="160%" height="110%"><feGaussianBlur stdDeviation="8"/></filter>
+    </defs></svg>
+    <h1 class="ws-sr">Мастерская украшений</h1>
+    <p class="ws-sr">Перекладывайте камни по пробиркам. Четыре одинаковых — заказчица заберёт их сама, а камень встанет в украшение.</p>
+    <div class="ws-map" id="ws-map" role="region" aria-label="Карта уровней">
+      <div class="ws-map-track" id="ws-map-track"></div>
+    </div>
+    <div class="ws-map-top">
+      <button id="ws-menu-coins" class="ws-coins" type="button" aria-label="Монеты"><span class="ws-coin-ico" aria-hidden="true"></span><span id="ws-menu-coins-n">0</span></button>
+      <div class="ws-map-knobs">
+        <button id="btn-decor" class="ws-round ws-round-cream ws-map-knob" aria-label="Убранство мастерской"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8c-5.2 0-9.3 3.9-9.3 9 0 5 4 9.3 9 9.3 1.3 0 2-.8 2-1.8 0-.5-.2-.9-.5-1.2-.3-.4-.5-.8-.5-1.3 0-1 .8-1.8 1.8-1.8h2.1c2.9 0 5.1-2.3 5.1-5.2 0-3.9-4-7-9.7-7z" fill="#e8b4c6" stroke="#9a4f74" stroke-width="1.6"/><circle cx="7.4" cy="11.6" r="1.7" fill="#f0507f"/><circle cx="10" cy="7.3" r="1.7" fill="#ffc83a"/><circle cx="15" cy="7.2" r="1.7" fill="#3ab88f"/><circle cx="18" cy="11" r="1.7" fill="#7f8cf0"/></svg></button>
+        <button id="btn-sound" class="ws-round ws-round-cream ws-map-knob" aria-label="Звук" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 9.2h3.6l5-4.2v14l-5-4.2H3.5z" fill="#c2733a" stroke="#8a4a1c" stroke-width="1.3" stroke-linejoin="round"/><path d="M15.2 8.8a4.6 4.6 0 0 1 0 6.4M17.9 6.2a8.3 8.3 0 0 1 0 11.6" fill="none" stroke="#8a4a1c" stroke-width="2.2" stroke-linecap="round"/></svg></button>
       </div>
-      <h1 class="ws-title">Мастерская<br>украшений</h1>
-      <p class="ws-sub">Перекладывайте камни по пробиркам. Четыре одинаковых — заказчик заберёт их сам, а камень встанет в украшение.</p>
-      <button id="btn-play" class="ws-btn ws-btn-primary ws-btn-hero">Играть</button>
-      <div class="ws-play-note" id="ws-play-note"></div>
-      <section class="ws-showcase" id="ws-showcase" aria-label="Витрина изделий"></section>
-      <section class="ws-decor" id="ws-decor" aria-label="Убранство мастерской"></section>
-      <div class="ws-menu-foot">
-        <span class="ws-proto">Тестовая сборка · 30 уровней</span>
-      </div>
+    </div>
+    <div class="ws-map-foot">
+      <button id="btn-play" class="ws-play ws-map-play" aria-label="Играть"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.6v14.8c0 .8.9 1.3 1.6.8l11-7.4c.6-.4.6-1.2 0-1.6l-11-7.4C7.9 3.3 7 3.8 7 4.6z" fill="#fff"/></svg><span id="ws-play-word" class="ws-sr">Играть</span><span id="ws-play-n">1</span></button>
+      <div class="ws-play-note ws-sr" id="ws-play-note"></div>
     </div>
   </div>
 
-  <!-- Игра -->
+  <!-- Игра (образ — ref/workshop/concept/01_level.jpeg): сверху изделие на
+       подушке, заказчицы с пузырями, поле не меньше 60% высоты, внизу три
+       круглые кнопки без подписей. Слова на экране — не больше трёх;
+       подробности — в aria-подписях и строке ws-caption для чтения с экрана. -->
   <div id="screen-workshop" class="screen">
     <div class="ws-root">
       <header class="ws-header">
-        <button id="btn-back" class="ws-knob" aria-label="На витрину"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H6m5-6-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-        <div class="ws-head-mid">
-          <div id="ws-level-title" class="ws-level-title"></div>
-          <div id="ws-level-name" class="ws-level-name"></div>
+        <div class="ws-head-side">
+          <button id="btn-back" class="ws-round ws-round-cream" aria-label="На карту"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          <span id="ws-level-title" class="ws-level-pill"></span>
+          <span class="ws-moves" id="ws-moves"></span>
         </div>
-        <button id="ws-coins" class="ws-coins" type="button" aria-label="Монеты"><span class="ws-coin-ico" aria-hidden="true"></span><span id="ws-coins-n">0</span></button>
-        <button id="btn-sound-game" class="ws-knob" aria-label="Звук" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 17.5V6l10-2v11.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="6.5" cy="17.5" r="2.6" fill="currentColor"/><circle cx="16.5" cy="15.5" r="2.6" fill="currentColor"/></svg></button>
+        <div class="ws-stage">
+          <canvas id="ws-piece" class="ws-piece" aria-label="Изделие: камни встают в гнёзда по мере выдачи заказов"></canvas>
+        </div>
+        <div class="ws-head-side ws-head-right">
+          <button id="ws-coins" class="ws-coins" type="button" aria-label="Монеты"><span class="ws-coin-ico" aria-hidden="true"></span><span id="ws-coins-n">0</span></button>
+          <span class="ws-stars" id="ws-stars"><i></i><i></i><i></i><em id="ws-star-next" class="ws-sr"></em></span>
+        </div>
+        <span id="ws-level-name" class="ws-sr"></span>
+        <span class="ws-counter ws-sr" id="ws-counter" aria-live="polite"></span>
       </header>
 
       <section class="ws-orders-panel" aria-label="Заказы">
-        <div class="ws-status">
-          <canvas id="ws-piece" class="ws-piece" aria-label="Изделие: камни встают в гнёзда по мере выдачи заказов"></canvas>
-          <div class="ws-stat">
-            <span class="ws-counter" id="ws-counter" aria-live="polite"></span>
-            <span class="ws-moves" id="ws-moves"></span>
-            <span class="ws-stars" id="ws-stars"><i>★</i><i>★</i><i>★</i><em id="ws-star-next"></em></span>
-          </div>
-        </div>
         <div class="ws-orders" id="ws-orders"></div>
-        <div class="ws-queue" id="ws-queue"><span class="ws-queue-label">Далее:</span><span class="ws-queue-items" id="ws-queue-items"></span></div>
+        <div class="ws-queue" id="ws-queue"><span class="ws-queue-label ws-sr">Далее:</span><span class="ws-queue-items" id="ws-queue-items"></span></div>
       </section>
 
-      <div class="ws-caption" id="ws-caption" aria-live="polite"></div>
+      <div class="ws-caption ws-sr" id="ws-caption" aria-live="polite"></div>
       <div class="ws-rescue hidden" id="ws-rescue" role="alert">
         <span id="ws-rescue-text"></span>
-        <button id="btn-rescue" class="ws-btn ws-btn-primary ws-btn-small"></button>
+        <button id="btn-rescue" class="ws-btn ws-btn-green ws-btn-small"></button>
       </div>
 
       <main id="board-wrap" class="ws-board-wrap">
@@ -73,54 +86,80 @@
 
       <footer class="ws-actions">
         <div class="ws-action">
-          <button id="btn-undo" class="ws-knob ws-knob-lg" aria-label="Отменить ход"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 9h10a6 6 0 0 1 0 12h-3" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg></button>
-          <span>Отменить</span>
+          <button id="btn-undo" class="ws-round ws-round-lilac" aria-label="Отменить ход"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.5 14.5 4.5 9.5l5-5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 9.5h9a5.5 5.5 0 0 1 0 11h-3" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg></button>
         </div>
         <div class="ws-action">
-          <button id="btn-hint" class="ws-tile" aria-label="Подсказка">?</button>
-          <span id="ws-hint-label">Подсказка</span>
+          <button id="btn-hint" class="ws-round ws-round-lilac ws-round-hint" aria-label="Подсказка"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8a6.6 6.6 0 0 0-3.9 11.9c.8.6 1.2 1.4 1.2 2.3h5.4c0-.9.4-1.7 1.2-2.3A6.6 6.6 0 0 0 12 2.8z" fill="#ffe27a" stroke="#a8741c" stroke-width="1.2"/><path d="M9.6 18.4h4.8v1.4a1.6 1.6 0 0 1-1.6 1.6h-1.6a1.6 1.6 0 0 1-1.6-1.6z" fill="#cfd3dc" stroke="#8a8f9c" stroke-width="1"/><path d="M9.4 7.6a3.2 3.2 0 0 1 2.4-1.6" fill="none" stroke="#fffbe0" stroke-width="1.6" stroke-linecap="round"/></svg></button>
+          <span id="ws-hint-label" class="ws-price"></span>
         </div>
         <div class="ws-action">
-          <button id="btn-restart" class="ws-knob ws-knob-lg" aria-label="Начать заново"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12a7 7 0 1 1-2.05-4.95" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/><path d="M19.5 3.5v5h-5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-          <span>Заново</span>
+          <button id="btn-restart" class="ws-round ws-round-lilac" aria-label="Начать заново"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18.8 12.5a6.8 6.8 0 1 1-2-5.1" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M19.4 3.8v4.9h-4.9" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
         </div>
       </footer>
     </div>
 
-    <!-- Победа: показывается ровно один раз за прохождение уровня -->
-    <div id="win-overlay" class="ws-win hidden">
+    <!-- Победа (образ — ref/workshop/concept/02_victory.jpeg): уровень виден
+         сквозь светлую дымку, сверху три большие звезды, посередине изделие в
+         сиянии, монеты летят в счётчик, внизу зелёная кнопка и две круглые.
+         Подписи — только в aria и строках ws-sr. Показывается ровно один раз
+         за прохождение уровня. -->
+    <div id="win-overlay" class="ws-win ws-celebrate hidden" role="dialog" aria-modal="true" aria-labelledby="ws-win-title">
+      <svg class="ws-defs" width="0" height="0" aria-hidden="true"><defs>
+        <linearGradient id="ws-star-gold" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff6b0"/><stop offset="0.42" stop-color="#ffd43a"/><stop offset="1" stop-color="#f39a12"/></linearGradient>
+      </defs></svg>
       <div class="ws-win-box">
-        <div class="ws-win-kicker" id="ws-win-kicker"></div>
-        <div class="ws-win-title" id="ws-win-title">Готово!</div>
-        <canvas id="ws-win-jewel" class="ws-win-jewel" aria-hidden="true"></canvas>
-        <div class="ws-win-name" id="ws-win-name"></div>
-        <div class="ws-win-stars" id="ws-win-stars" aria-hidden="true"><i>★</i><i>★</i><i>★</i></div>
-        <div class="ws-win-pay"><span class="ws-coin-ico" aria-hidden="true"></span><span id="ws-win-coins">+0</span></div>
-        <div class="ws-win-text" id="ws-win-text"></div>
-        <div class="ws-win-tip" id="ws-win-tip"></div>
+        <div class="ws-coins ws-win-bank" id="ws-win-bank" aria-hidden="true"><span class="ws-coin-ico"></span><span id="ws-win-bank-n">0</span></div>
+        <div class="ws-win-pay"><span id="ws-win-coins">+0</span></div>
+        <div class="ws-win-kicker ws-sr" id="ws-win-kicker"></div>
+        <div class="ws-win-title ws-sr" id="ws-win-title">Готово!</div>
+        <div class="ws-win-stars" id="ws-win-stars" aria-hidden="true">
+          <i><svg viewBox="0 0 24 24"><path class="st" d="M12 2 15.29 8.07 22.08 9.32 17.33 14.33 18.23 21.18 12 18.2 5.77 21.18 6.67 14.33 1.92 9.32 8.71 8.07z"/><ellipse class="hl" cx="9.4" cy="9.6" rx="2.3" ry="1.2" transform="rotate(-35 9.4 9.6)"/></svg></i>
+          <i><svg viewBox="0 0 24 24"><path class="st" d="M12 2 15.29 8.07 22.08 9.32 17.33 14.33 18.23 21.18 12 18.2 5.77 21.18 6.67 14.33 1.92 9.32 8.71 8.07z"/><ellipse class="hl" cx="9.4" cy="9.6" rx="2.3" ry="1.2" transform="rotate(-35 9.4 9.6)"/></svg></i>
+          <i><svg viewBox="0 0 24 24"><path class="st" d="M12 2 15.29 8.07 22.08 9.32 17.33 14.33 18.23 21.18 12 18.2 5.77 21.18 6.67 14.33 1.92 9.32 8.71 8.07z"/><ellipse class="hl" cx="9.4" cy="9.6" rx="2.3" ry="1.2" transform="rotate(-35 9.4 9.6)"/></svg></i>
+        </div>
+        <div class="ws-win-stage">
+          <div class="ws-win-rays" aria-hidden="true"></div>
+          <canvas id="ws-win-jewel" class="ws-win-jewel" aria-hidden="true"></canvas>
+        </div>
+        <div class="ws-win-name ws-sr" id="ws-win-name"></div>
         <div class="ws-coll">
           <div class="ws-coll-dots" id="ws-coll-dots" aria-hidden="true"></div>
-          <div class="ws-coll-text" id="ws-coll-text"></div>
+          <div class="ws-coll-text ws-sr" id="ws-coll-text"></div>
         </div>
-        <button id="btn-next" class="ws-btn ws-btn-primary">Дальше</button>
-        <div class="ws-win-row">
-          <button id="btn-again" class="ws-btn ws-btn-secondary">Ещё раз</button>
-          <button id="btn-win-menu" class="ws-btn ws-btn-secondary">Витрина</button>
+        <div class="ws-win-text ws-sr" id="ws-win-text"></div>
+        <div class="ws-win-tip ws-sr" id="ws-win-tip"></div>
+        <div class="ws-win-foot">
+          <span class="ws-win-hero" aria-hidden="true"><span class="ws-face f-curly"></span><svg class="ws-heart" viewBox="0 0 24 24"><path d="M12 20.5s-7.6-4.6-7.6-10.2A4.3 4.3 0 0 1 12 7.7a4.3 4.3 0 0 1 7.6 2.6c0 5.6-7.6 10.2-7.6 10.2z"/></svg></span>
+          <button id="btn-next" class="ws-play" data-mode="next" aria-label="Дальше">
+            <svg class="i-next" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.6v12.8a1.3 1.3 0 0 0 2 1.1l10-6.4a1.3 1.3 0 0 0 0-2.2L10 4.5a1.3 1.3 0 0 0-2 1.1z" fill="#f6fff0"/></svg>
+            <svg class="i-chest" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11h17v8.4a1.6 1.6 0 0 1-1.6 1.6H5.1a1.6 1.6 0 0 1-1.6-1.6z" fill="#b8692e" stroke="#6b3412" stroke-width="1.2"/><path d="M3.5 11a8.5 6.2 0 0 1 17 0z" fill="#d88a44" stroke="#6b3412" stroke-width="1.2"/><path d="M3.5 13.6h17" stroke="#ffd65a" stroke-width="2"/><rect x="10" y="11.6" width="4" height="5" rx="1" fill="#ffe27a" stroke="#8a5a10" stroke-width="1"/></svg>
+            <svg class="i-menu" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="4.5" width="14" height="13.5" rx="1.4" fill="#eef9fc" fill-opacity="0.9" stroke="#fff" stroke-width="1.4"/><path d="M3.5 18h17v2.1a1.4 1.4 0 0 1-1.4 1.4H4.9a1.4 1.4 0 0 1-1.4-1.4z" fill="#a8622f" stroke="#fff" stroke-width="1"/><circle cx="12" cy="13.6" r="2.5" fill="none" stroke="#e0a536" stroke-width="1.6"/><path d="M12 7.6l1.7 1.7-1.7 2-1.7-2z" fill="#e2416b"/></svg>
+          </button>
+          <div class="ws-win-side">
+            <button id="btn-again" class="ws-round ws-round-cream" aria-label="Ещё раз"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18.8 12.5a6.8 6.8 0 1 1-2-5.1" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M19.4 3.8v4.9h-4.9" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+            <button id="btn-win-menu" class="ws-round ws-round-cream" aria-label="Витрина"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="4.5" width="14" height="13.5" rx="1.4" fill="#e3f4fa" fill-opacity="0.85" stroke="#6fa6bd" stroke-width="1.4"/><path d="M3.5 18h17v2.1a1.4 1.4 0 0 1-1.4 1.4H4.9a1.4 1.4 0 0 1-1.4-1.4z" fill="#a8622f" stroke="#6b3a17" stroke-width="1"/><circle cx="12" cy="13.6" r="2.5" fill="none" stroke="#d9982a" stroke-width="1.6"/><path d="M12 7.6l1.7 1.7-1.7 2-1.7-2z" fill="#e2416b"/><path d="M7.3 7v5.2" stroke="#fff" stroke-width="1.2" stroke-linecap="round"/></svg></button>
+          </div>
         </div>
       </div>
     </div>
 
-    <!-- «Сложный заказ»: ходы кончились -->
+    <!-- «Сложный заказ»: ходы кончились. На виду — песочные часы, «Ходы
+         кончились», точки выданных заказов и три кнопки-значка. -->
     <div id="lose-overlay" class="ws-win ws-lose hidden" role="alertdialog" aria-labelledby="ws-lose-title">
       <div class="ws-win-box">
-        <div class="ws-win-kicker">Сложный заказ</div>
+        <div class="ws-lose-badge" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M6 3h12M6 21h12" stroke="#b07c22" stroke-width="2.4" stroke-linecap="round"/><path d="M7.5 3.8c0 4.4 4.5 5.6 4.5 8.2s-4.5 3.8-4.5 8.2h9c0-4.4-4.5-5.6-4.5-8.2s4.5-3.8 4.5-8.2z" fill="#eef8fc" stroke="#7a5a8a" stroke-width="1.3" stroke-linejoin="round"/><path d="M9.2 19.6c.6-2.2 2.8-3 2.8-3s2.2.8 2.8 3z" fill="#f0b43c"/><path d="M10.2 7.4h3.6c-.6 1-1.8 1.9-1.8 1.9s-1.2-.9-1.8-1.9z" fill="#f0b43c"/></svg></div>
+        <div class="ws-win-kicker ws-sr">Сложный заказ</div>
         <div class="ws-win-title" id="ws-lose-title">Ходы кончились</div>
-        <div class="ws-win-text" id="ws-lose-text"></div>
-        <button id="btn-more" class="ws-btn ws-btn-primary">+5 ходов · 50</button>
-        <div class="ws-lose-coins" id="ws-lose-coins"></div>
+        <div class="ws-lose-dots" id="ws-lose-dots" aria-hidden="true"></div>
+        <div class="ws-win-text ws-sr" id="ws-lose-text"></div>
+        <button id="btn-more" class="ws-play ws-more" aria-label="Ещё 5 ходов за 50 монет">
+          <span class="ws-more-moves"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12M6 21h12" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/><path d="M7.5 3.8c0 4.4 4.5 5.6 4.5 8.2s-4.5 3.8-4.5 8.2h9c0-4.4-4.5-5.6-4.5-8.2s4.5-3.8 4.5-8.2z" fill="#eef8fc" stroke="#2f7a28" stroke-width="1.3" stroke-linejoin="round"/><path d="M9.2 19.6c.6-2.2 2.8-3 2.8-3s2.2.8 2.8 3z" fill="#f0b43c"/></svg><span id="ws-more-n">+5</span></span>
+          <span class="ws-more-price"><span class="ws-coin-ico" aria-hidden="true"></span><span id="ws-more-price">50</span></span>
+        </button>
+        <div class="ws-lose-coins ws-sr" id="ws-lose-coins"></div>
         <div class="ws-win-row">
-          <button id="btn-lose-undo" class="ws-btn ws-btn-secondary">Отменить ход</button>
-          <button id="btn-lose-again" class="ws-btn ws-btn-secondary">Заново</button>
+          <button id="btn-lose-undo" class="ws-round ws-round-lilac" aria-label="Отменить ход"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.5 14.5 4.5 9.5l5-5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 9.5h9a5.5 5.5 0 0 1 0 11h-3" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg></button>
+          <button id="btn-lose-again" class="ws-round ws-round-lilac" aria-label="Заново"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18.8 12.5a6.8 6.8 0 1 1-2-5.1" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M19.4 3.8v4.9h-4.9" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
         </div>
       </div>
     </div>
@@ -133,20 +172,29 @@
     <div class="ws-win-box">
       <div class="ws-win-kicker" id="ws-modal-kicker"></div>
       <canvas id="ws-modal-art" class="ws-modal-art" aria-hidden="true"></canvas>
+      <div id="ws-modal-pic" class="ws-modal-pic hidden" aria-hidden="true"></div>
       <div class="ws-win-title" id="ws-modal-title"></div>
       <div class="ws-win-text" id="ws-modal-text"></div>
       <button id="btn-modal-ok" class="ws-btn ws-btn-primary">Понятно</button>
     </div>
   </div>
+  <!-- Убранство: стол и стекло (выдаются шкатулками коллекций) -->
+  <div id="decor-overlay" class="ws-win ws-modal hidden" role="dialog" aria-modal="true" aria-labelledby="ws-decor-kicker">
+    <div class="ws-win-box">
+      <div class="ws-win-kicker" id="ws-decor-kicker">Убранство</div>
+      <section class="ws-decor" id="ws-decor" aria-label="Убранство мастерской"></section>
+      <button id="btn-decor-ok" class="ws-play ws-decor-ok" aria-label="Готово"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.6 4.6L19 7.6" fill="none" stroke="#fff" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    </div>
+  </div>
   <canvas id="confetti-canvas" class="ws-confetti" aria-hidden="true"></canvas>
 
-  <script src="workshop_sfx.js?v=19"></script>
-  <script src="sound.js?v=19"></script>
-  <script src="confetti.js?v=19"></script>
-  <script src="workshop_rules.js?v=19"></script>
-  <script src="workshop_levels.js?v=19"></script>
-  <script src="workshop_board.js?v=19"></script>
-  <script src="workshop_jewelry.js?v=19"></script>
-  <script src="workshop.js?v=19"></script>
+  <script src="workshop_sfx.js?v=38"></script>
+  <script src="sound.js?v=38"></script>
+  <script src="confetti.js?v=38"></script>
+  <script src="workshop_rules.js?v=38"></script>
+  <script src="workshop_levels.js?v=38"></script>
+  <script src="workshop_board.js?v=38"></script>
+  <script src="workshop_jewelry.js?v=38"></script>
+  <script src="workshop.js?v=38"></script>
 </body>
 </html>

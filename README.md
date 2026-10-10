@@ -13,7 +13,8 @@
 | Королевская Косынка (Royal Solitaire) | [Открыть](https://fanatat.github.io/games-dev/royal-solitaire/) | [Код](https://github.com/Fanatat/Royal_solitaire) | `9f73050` |
 | Game7 (Horde), зомби-экшен на Unity WebGL | [Открыть](https://fanatat.github.io/games-dev/game7-horde/) | закрытый репозиторий | `953e638`, снимок от 30.09.2026 |
 | Police Runner, 3D-раннер на Godot 4 | [Открыть](https://fanatat.github.io/games-dev/police-runner/) | закрытый репозиторий | `a8e6244`, этап 2 (b3), 02.10.2026 |
-| Мастерская украшений, эксперимент на базе «Сортировки» | [Открыть](https://fanatat.github.io/games-dev/jewel-workshop/) | локальный форк, не публиковался | `a76d6e3` (ветка fork/workshop-fun), сборка w19, 10.10.2026 |
+| Мастерская украшений, эксперимент на базе «Сортировки», новый облик | [Открыть](https://fanatat.github.io/games-dev/jewel-workshop/) | локальный форк, не публиковался | `7ba17bf` (ветка fork/workshop-look), сборка w38, 10.10.2026 |
+| Мастерская украшений, облик w19 (для сравнения) | [Открыть](https://fanatat.github.io/games-dev/jewel-workshop-w19/) | локальный форк, не публиковался | `a76d6e3` (ветка fork/workshop-fun), сборка w19, 10.10.2026 |
 | Мастерская украшений, первый MVP (для сравнения) | [Открыть](https://fanatat.github.io/games-dev/jewel-workshop-mvp/) | локальный форк, не публиковался | `f115554` (ветка fork/workshop-mvp от `69c831b`), сборка w17, 08.10.2026 |
 
 Идентификатор обозначает проверенный снимок репозитория, а не номер релиза игры.

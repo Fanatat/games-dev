@@ -27,7 +27,6 @@ const Confetti = (() => {
   function burst(opts) {
     if (!canvas || reduceMotion) return;
     const count = (opts && opts.count) || 44;
-    const colors = (opts && opts.colors) || COLORS;   // свои цвета — у «Мастерской»
     const durationMs = (opts && opts.durationMs) || 2600;
     const dpr = window.devicePixelRatio || 1;
     const cssW = canvas.clientWidth, cssH = canvas.clientHeight;
@@ -45,7 +44,7 @@ const Confetti = (() => {
         size: 5 + Math.random() * 6,
         rot: Math.random() * Math.PI * 2,
         vrot: (Math.random() - 0.5) * 0.25,
-        color: colors[Math.floor(Math.random() * colors.length)],
+        color: COLORS[Math.floor(Math.random() * COLORS.length)],
         isCircle: Math.random() < 0.5
       });
     }

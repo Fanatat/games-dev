@@ -37,7 +37,7 @@
   const HIST_SAVE = 60;                   // шагов отмены в сейве
   const GOLD = 'Z';                       // золотой топаз
   const REDUCED = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
-  const FONT = 'Nunito, "Arial Rounded MT Bold", Arial, sans-serif';
+  const FONT = 'Georgia, "Noto Serif", "PT Serif", "DejaVu Serif", serif';
 
   const PENTA = [0, 2, 4, 7, 9, 12];      // ноты укладки: камень выше — нота выше
   const PAY = { order: 10, urgent: 3, jackpot: 100, key: 15, firstWin: 20, star: 10 };
@@ -69,14 +69,11 @@
     walnut: '#5a3a1f', emerald: '#1f6b4d', wine: '#74203a', navy: '#22346a',
     clear: '#f4ecdc', sea: '#8fe0d8', rose: '#f2a7bd', royal: '#b49cf0'
   };
-  // конфетти в цветах бутика: розовый, золото, сирень, белый, мята
-  const CONFETTI = ['#ff8fb1', '#ffd23a', '#e9b4ff', '#ffffff', '#8fe3c8', '#ffb347', '#f0618f'];
-
   const NOVELTY = {
-    hidden: { title: 'Тайные камни', text: 'Снимите верхний камень — нижний откроется.' },
-    urgent: { title: 'Срочный заказ', text: 'Успейте за отмеченные ходы — заплатят втрое.' },
-    lock: { title: 'Запертая пробирка', text: 'Откроется, когда выдадите заказ с ключом.' },
-    gold: { title: 'Золотой топаз', text: 'Четыре топаза — сразу +100 монет.' }
+    hidden: { title: 'Тайные камни', text: 'Часть камней спрятана под бархатом. Снимите камень сверху — нижний откроется.' },
+    urgent: { title: 'Срочный заказ', text: 'Карточка с лентой ждёт недолго: успейте собрать её за отмеченное число ходов — заплатят втрое.' },
+    lock: { title: 'Запертая пробирка', text: 'Пробирку с замком не трогать, пока не выполнен заказ с ключом. Выдали его — замок откроется сам, и за это тоже заплатят.' },
+    gold: { title: 'Золотой топаз', text: 'Четыре золотых топаза — джекпот: сразу +100 монет.' }
   };
 
   const $ = (id) => document.getElementById(id);
@@ -286,7 +283,7 @@
   let cardTimer = null, cardJob = null;   // отложенная смена карточки после последней выдачи
   let pieceGems = [];      // камни в гнёздах изделия (по заказам)
   let pendingUnlock = -1;  // ключ летит к этой пробирке — замок ещё виден
-  let justWon = 0;         // id уровня, пройденного последним (значок на карте «выпрыгивает»)
+  let justWon = 0;         // id уровня, пройденного последним (подсветка на витрине)
   let modalOpen = false, modalOk = null;
   let winShineTimer = 0;
 
@@ -508,11 +505,11 @@
         g.globalAlpha = k > 0.6 ? 1 - (k - 0.6) / 0.4 : 1;
         g.translate(x.x, x.y - x.rise * k);
         g.scale(sc, sc);
-        g.font = `900 ${x.size}px ${FONT}`;
+        g.font = `bold ${x.size}px ${FONT}`;
         g.textAlign = 'center'; g.textBaseline = 'middle';
         g.lineJoin = 'round';
-        g.lineWidth = Math.max(3, x.size * 0.2);
-        g.strokeStyle = 'rgba(110,40,80,0.92)';
+        g.lineWidth = Math.max(3, x.size * 0.18);
+        g.strokeStyle = 'rgba(40,18,4,0.88)';
         g.strokeText(x.str, 0, 0);
         g.fillStyle = x.color;
         g.fillText(x.str, 0, 0);
@@ -522,21 +519,17 @@
       landed.forEach(j => j.done());
       if (jobs.length || sparks.length || texts.length || rings.length || drops.length) request();
     }
-    /* Монеты от точки к счётчику: n монет делится между 1–8 летящими
-       (o.count — сколько именно, o.size, o.lift, o.dur — для церемонии). */
-    function coins(from, to, n, onEach, cb, o) {
-      o = o || {};
-      const cnt = Math.max(1, Math.min(o.count || 8, n, o.count ? n : Math.round(n / 8)));
+    /* Монеты от точки к счётчику: n монет делится между 1–8 летящими. */
+    function coins(from, to, n, onEach, cb) {
+      const cnt = Math.max(1, Math.min(8, Math.round(n / 8)));
       const shares = [];
       let rest = n;
       for (let i = 0; i < cnt; i++) { const s = Math.round(rest / (cnt - i)); shares.push(s); rest -= s; }
       const items = shares.map(() => ({
-        x: from.x + (Math.random() - 0.5) * (o.spread || 22), y: from.y + (Math.random() - 0.5) * (o.spread || 14) * 0.7, size: o.size || 18,
+        x: from.x + (Math.random() - 0.5) * 22, y: from.y + (Math.random() - 0.5) * 14, size: 18,
         draw: (gg, x, y, s, t) => drawCoin(gg, x, y, s, t / 90)
       }));
-      fly(items, { x: to.x, y: to.y, size: 16 }, cb, {
-        step: o.step || 55, dur: o.dur || 520, lift: o.lift === undefined ? 50 : o.lift, sparkle: false, onEach: (i) => onEach(shares[i], i)
-      });
+      fly(items, { x: to.x, y: to.y, size: 16 }, cb, { step: 55, dur: 520, lift: 50, sparkle: false, onEach: (i) => onEach(shares[i], i) });
     }
     function clear() {
       jobs = []; sparks = []; texts = []; rings = []; drops = [];
@@ -611,51 +604,22 @@
     return k;
   }
 
-  /* Касание заказчицы — подсказка не длиннее трёх слов. */
   function cardTip(o) {
     const t = st.orders[o];
-    if (L.urgent && o === L.urgent.order) return 'Срочно! Оплата ×3';
-    if (L.lock && o === L.lock.order) return 'Принесёт ключ';
-    if (t === GOLD) return 'Джекпот +' + PAY.jackpot;
-    return 'Соберите 4 камня';
+    if (L.urgent && o === L.urgent.order) return 'Срочный заказ: успейте за ' + movesWord(L.urgent.moves) + ' с его появления — оплата втрое';
+    if (L.lock && o === L.lock.order) return 'С этим заказом придёт ключ от запертой пробирки';
+    if (t === GOLD) return 'Золотой топаз: четыре в одной пробирке — джекпот +' + PAY.jackpot + ' монет';
+    return 'Соберите четыре камня «' + gemName(t) + '» в одной пробирке — заказчик заберёт их сам';
   }
 
-  /* Лица заказчиц: у заказа своё лицо на весь уровень, на виду — без повторов. */
-  const FACES = ['bride', 'grandma', 'curly'];
-  let faces = {};
-  function assignFaces(slots) {
-    const used = [];
-    const vis = slots.filter(o => o >= 0);
-    vis.forEach(o => {
-      if (faces[o] !== undefined && used.indexOf(faces[o]) === -1) used.push(faces[o]);
-      else delete faces[o];
-    });
-    vis.forEach(o => {
-      if (faces[o] !== undefined) return;
-      let f = o % FACES.length;
-      for (let k = 0; k < FACES.length && used.indexOf(f) !== -1; k++) f = (f + 1) % FACES.length;
-      faces[o] = f;
-      used.push(f);
-    });
-  }
-
-  /* Заказ — заказчица: портрет в золотой оправе, «4» на нём и пузырь с
-     камнем. Джекпот — золотой пузырь с ценой, ключ — значок на пузыре,
-     срочный — красный кружок с остатком ходов. */
   function renderOrders(enterSlot) {
     const box = $('ws-orders');
     box.innerHTML = '';
-    box.dataset.n = String(view.slots.length);
-    assignFaces(view.slots);
     view.slots.forEach((o, i) => {
       const card = document.createElement('div');
-      const face = document.createElement('span');
-      const bubble = document.createElement('span');
-      bubble.className = 'ws-bubble';
       if (o < 0) {
         card.className = 'ws-card is-empty';
         card.setAttribute('aria-label', 'Свободное место');
-        face.className = 'ws-face';
       } else {
         const t = st.orders[o];
         card.className = 'ws-card' + (i === enterSlot ? ' is-enter' : '') + (t === GOLD ? ' is-gold' : '');
@@ -663,28 +627,25 @@
         card.dataset.order = String(o);
         card.setAttribute('role', 'img');
         card.setAttribute('aria-label', 'Заказ: ' + gemName(t) + ', четыре камня');
-        face.className = 'ws-face f-' + FACES[faces[o]];
+        card.appendChild(gemSpan(t));
         const q = document.createElement('span');
         q.className = 'ws-card-qty';
-        q.textContent = '4';
-        face.appendChild(q);
-        bubble.appendChild(gemSpan(t));
+        q.textContent = '×4';
+        card.appendChild(q);
         if (t === GOLD) {
           const tag = document.createElement('span');
           tag.className = 'ws-card-tag';
-          tag.innerHTML = '<span class="ws-coin-ico"></span>' + PAY.jackpot;
-          bubble.appendChild(tag);
+          tag.textContent = 'Джекпот';
+          card.appendChild(tag);
         }
-        if (L.lock && o === L.lock.order) bubble.appendChild(keyBadge());
+        if (L.lock && o === L.lock.order) card.appendChild(keyBadge());
         if (L.urgent && o === L.urgent.order) {
           const rb = document.createElement('span');
           rb.className = 'ws-ribbon';
           card.appendChild(rb);
         }
-        card.addEventListener('click', () => { if (!won) toast(cardTip(o), 1600); });
+        card.addEventListener('click', () => { if (!won) toast(cardTip(o)); });
       }
-      card.appendChild(face);
-      card.appendChild(bubble);
       box.appendChild(card);
     });
     const qBox = $('ws-queue-items');
@@ -722,9 +683,8 @@
     const rb = document.querySelector('#ws-orders .ws-ribbon');
     if (!rb) return;
     const n = urgentLeft();
-    if (n === null) { rb.textContent = '!'; rb.setAttribute('aria-label', 'Срочно'); return; }
-    rb.textContent = String(Math.max(0, n));
-    rb.setAttribute('aria-label', n > 0 ? 'Срочно: осталось ' + movesWord(n) : 'Не успели');
+    if (n === null) { rb.textContent = 'Срочно'; return; }
+    rb.textContent = n > 0 ? 'Срочно · ' + n : 'Не успели';
     rb.classList.toggle('is-hot', n > 0 && n <= 2);
     rb.classList.toggle('is-late', n <= 0);
   }
@@ -751,19 +711,12 @@
     if (L.hard && next) next = Math.min(next, limitNow());   // за лимит не заманиваем
     $('ws-star-next').textContent = next ? 'до ' + next : '';
     $('ws-stars').setAttribute('aria-label', 'Звёзд: ' + s + (next ? ', пока ходов не больше ' + next : ''));
-    // полоска под звёздами: сколько ходов осталось до потери следующей звезды
-    const from = s === 3 ? 0 : s === 2 ? L.s3 : L.s2;
-    const tier = next ? Math.max(0, Math.min(1, (next - moves) / Math.max(1, next - from))) : 0;
-    $('ws-stars').style.setProperty('--tier', tier.toFixed(3));
     const mv = $('ws-moves');
     if (L.hard) {
-      const left = Math.max(0, limitNow() - moves);
-      mv.textContent = String(left);
-      mv.setAttribute('aria-label', 'Ходы: ' + moves + ' из ' + limitNow());
-      mv.classList.toggle('is-low', left <= 3);
+      mv.textContent = 'Ходы: ' + moves + ' из ' + limitNow();
+      mv.classList.toggle('is-low', limitNow() - moves <= 3);
     } else {
       mv.textContent = 'Ходы: ' + moves;
-      mv.removeAttribute('aria-label');
       mv.classList.remove('is-low');
     }
     renderCoins(false);
@@ -816,11 +769,13 @@
     if (!step) { WsBoard.setTutorial(-1); return ''; }
     if (sel === step.from) {
       WsBoard.setTutorial(step.to);
-      return 'Теперь — куда положить';
+      return 'Теперь коснитесь пробирки, куда положить: пустой или с таким же камнем сверху';
     }
     WsBoard.setTutorial(step.from);
-    if (sel >= 0) return 'Коснитесь пробирки';
-    return st.delivered > 0 ? 'Следующий заказ' : 'Коснитесь пробирки';
+    if (sel >= 0) return 'Коснитесь подсвеченной пробирки';
+    return st.delivered > 0
+      ? 'Пробирка освободилась! Соберите следующий заказ'
+      : 'Коснитесь подсвеченной пробирки — верхние камни поднимутся';
   }
 
   function updateGuide() {
@@ -832,12 +787,12 @@
     if (won || lost || rescueK !== null) text = '';
     else if (flash && performance.now() < flash.until) { text = flash.text; if (tutorial) tutorialText(); }
     else if (tutorial) text = tutorialText();
-    else if (hintMv) text = 'Подсказка: по стрелке';
+    else if (hintMv) text = 'Подсказка: перенесите камни из подсвеченной пробирки к стрелке';
     else {
       const w = busy ? [] : waitingVials();
-      if (w.length) text = 'Готово, ждёт заказа';
+      if (w.length) text = 'Готово: ' + w.map(v => gemName(st.vials[v][0]) + ' ×4').join(', ') + ' — заказ пока в очереди';
       else if (moves === 0 && st.delivered === 0 && L.intent) text = L.intent;
-      else if (L.hard && moves === 0) text = 'Сложный заказ: ' + movesWord(limitNow());
+      else if (L.hard && moves === 0) text = 'Сложный заказ: уложитесь в ' + movesWord(limitNow());
     }
     cap.textContent = text;
     WsBoard.setWaiting(busy ? [] : waitingVials());
@@ -851,12 +806,10 @@
     $('btn-undo').disabled = hist.length === 0 || won;
     $('btn-restart').disabled = won || (moves === 0 && st.delivered === 0);
     const p = hintPrice();
-    $('ws-hint-label').textContent = p && !hintMv ? String(p) : '';
-    $('btn-hint').setAttribute('aria-label', p && !hintMv ? 'Подсказка за ' + coinsWord(p) : 'Подсказка');
+    $('ws-hint-label').textContent = p && !hintMv ? 'Подсказка · ' + p : 'Подсказка';
   }
 
   /* ---------- спасение: победа стала недостижимой ---------- */
-  const UNDO_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 7L4 12l5 5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 12h9a5 5 0 0 1 0 10h-2" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>';
   function checkWinnable() {
     if (won || R.isWon(st)) { rescueK = null; return; }
     if (R.isWinnable(st)) { rescueK = null; return; }
@@ -872,10 +825,8 @@
     const box = $('ws-rescue');
     if (rescueK === null || won || lost) { box.classList.add('hidden'); return; }
     const dead = R.movesOf(st).length === 0;
-    $('ws-rescue-text').textContent = dead ? 'Тупик' : 'Не собрать';
-    const b = $('btn-rescue');
-    b.innerHTML = rescueK > 0 ? UNDO_ICON + '<b>' + rescueK + '</b>' : 'Заново';
-    b.setAttribute('aria-label', rescueK > 0 ? 'Вернуть ' + movesWord(rescueK) : 'Начать заново');
+    $('ws-rescue-text').textContent = dead ? 'Ходов больше нет.' : 'Так все заказы уже не собрать.';
+    $('btn-rescue').textContent = rescueK > 0 ? 'Вернуть ' + movesWord(rescueK) : 'Начать заново';
     box.classList.remove('hidden');
   }
 
@@ -910,20 +861,15 @@
   function renderLose() {
     $('ws-lose-text').textContent = 'Собрано заказов: ' + st.delivered + ' из ' + st.orders.length +
       '. Докупите ходы, отмените последний ход или начните заново.';
-    const dots = $('ws-lose-dots');
-    dots.innerHTML = '';
-    st.orders.forEach((o, i) => { const d = document.createElement('i'); if (i < st.delivered) d.className = 'on'; dots.appendChild(d); });
     const b = $('btn-more');
-    $('ws-more-n').textContent = '+' + MORE_MOVES;
-    $('ws-more-price').textContent = String(MORE_PRICE);
-    b.setAttribute('aria-label', 'Ещё ' + movesWord(MORE_MOVES) + ' за ' + coinsWord(MORE_PRICE));
+    b.textContent = '+' + MORE_MOVES + ' ходов · ' + MORE_PRICE;
     b.disabled = Store.data.coins < MORE_PRICE;
     $('ws-lose-coins').textContent = 'У вас ' + coinsWord(Store.data.coins);
   }
 
   function buyMoves() {
     if (!lost) return;
-    if (Store.data.coins < MORE_PRICE) { sfx('invalid'); toast('Мало монет', 1600); return; }
+    if (Store.data.coins < MORE_PRICE) { sfx('invalid'); toast('Не хватает монет — отмените ход или начните заново'); return; }
     Store.data.coins -= MORE_PRICE;
     shownCoins = Store.data.coins;
     bonusMoves += MORE_MOVES;
@@ -952,7 +898,6 @@
     sel = -1; busy = false; won = false; levelWins = 0; pendingUnlock = -1;
     hintMv = null; flash = null; rescueK = null;
     lost = false;
-    faces = {};
     clearTimeout(cardTimer); cardJob = null;
     clearInterval(winShineTimer);
     stats = { hints: 0, undos: 0, restarts: 0 };
@@ -990,7 +935,7 @@
       if (e !== epoch || !L.hard || isPassed(levelIdx)) return;
       showModal({
         kicker: 'Уровень ' + L.id, title: 'Сложный заказ',
-        text: 'Награда вдвое больше.',
+        text: 'Уложитесь в ' + movesWord(L.limit) + '. Награда за прохождение — вдвое больше.',
         art: drawHardArt, ok: 'Берусь!'
       });
     };
@@ -1040,7 +985,7 @@
   function lockedTap(idx) {
     sfx('invalid'); buzz(20);
     WsBoard.shake(idx);
-    toast('Нужен ключ', 1600);
+    toast('Пробирка заперта: ключ придёт с заказом «' + gemName(st.orders[L.lock.order]) + '»', 2400);
     track('invalid', { level: L.id, locked: idx });
   }
 
@@ -1064,7 +1009,9 @@
     if (count === 0) {
       sfx('invalid'); buzz(20);
       WsBoard.shake(idx);
-      toast(st.vials[idx].length >= R.CAP ? 'Пробирка полна' : 'Нужен такой же', 1500);
+      toast(st.vials[idx].length >= R.CAP
+        ? 'Пробирка полна: в ней уже четыре камня'
+        : 'Класть можно только на такой же камень или в пустую пробирку', 2200);
       track('invalid', { level: L.id, from: sel, to: idx });
       return;
     }
@@ -1215,7 +1162,7 @@
     else if (pay.urgent === false) Fx.text(cx, cy - 34, 'Не успели', { color: '#e6d6bf', size: 16, delay: 140 });
     if (pay.jackpot) setTimeout(() => { if (e === epoch) jackpotFx(pay.jackpot, e); }, REDUCED ? 0 : 250);
     if (ev.unlocked >= 0) keyFx(ev, pay, card, e);
-    if (L.id <= 3 && k === 0) setFlash('Заказ готов', 2400);
+    if (L.id <= 3 && k === 0) setFlash('Заказ «' + gemName(ev.gem) + ' ×4» выполнен — пробирка свободна', 2400);
     track('stamp', { level: L.id, order: ev.order, coins: pay.coins + pay.jackpot + pay.key });
   }
 
@@ -1292,7 +1239,7 @@
     stats.undos++;
     track('undo', { level: L.id, kind: snap.kind, depth: hist.length });
     restoreSnap(snap);
-    if (snap.kind === 'restart') toast('Партия вернулась', 1600);
+    if (snap.kind === 'restart') toast('Партия до «Заново» возвращена', 1800);
   }
 
   function restart() {
@@ -1302,14 +1249,14 @@
     stats.restarts++;
     track('restart', { level: L.id, moves, delivered: st.delivered });
     restoreSnap({ st: R.makeState(L), moves: 0, us: initialUrgent(), ld: 0 });
-    toast('Отменить — вернёт партию', 2000);
+    toast('Начали заново. Передумали — «Отменить» вернёт партию', 2600);
   }
 
   /* ---------- подсказка: решатель от текущей позиции, за монеты ---------- */
   function onHint() {
     if (!L || won || busy || lost || modalOpen) return;
     if (rescueK !== null) {
-      toast('Сначала верните ходы', 1800);
+      toast('Отсюда уже не выиграть — сначала верните ходы', 2400);
       bump($('ws-rescue'));
       return;
     }
@@ -1317,7 +1264,7 @@
     const price = hintPrice();
     if (price > Store.data.coins) {
       sfx('invalid');
-      toast('Мало монет', 1600);
+      toast('Подсказка стоит ' + coinsWord(price) + '. Монеты — за каждый выполненный заказ', 2600);
       return;
     }
     const step = R.hint(st);
@@ -1388,7 +1335,7 @@
      прогресс коллекции; новая полная коллекция ведёт к шкатулке. */
   function showWin(r) {
     const e = epoch;
-    Confetti.burst({ count: r.collNew ? 80 : 55, durationMs: 2400, colors: CONFETTI });
+    Confetti.burst({ count: r.collNew ? 80 : 55, durationMs: 2400 });
     $('ws-win-kicker').textContent = 'Уровень ' + L.id + (L.hard ? ' · Сложный заказ' : '');
     $('ws-win-title').textContent = levelIdx === LEVELS.length - 1 ? 'Корона готова!' : 'Готово!';
     $('ws-win-name').textContent = L.name;
@@ -1416,20 +1363,9 @@
     const last = levelIdx === LEVELS.length - 1;
     const nextBtn = $('btn-next');
     nextBtn.dataset.mode = r.collNew ? 'chest' : last ? 'menu' : 'next';
-    nextBtn.setAttribute('aria-label', r.collNew ? 'Открыть шкатулку' : last ? 'На витрину' : 'Дальше');
+    nextBtn.textContent = r.collNew ? 'Открыть шкатулку' : last ? 'На витрину' : 'Дальше';
     nextBtn.classList.toggle('is-chest', r.collNew);
-    // свой счётчик монет — ровно поверх счётчика в шапке, «+N» под ним
-    const ov = $('win-overlay'), hc = $('ws-coins').getBoundingClientRect();
-    const flat = innerWidth > innerHeight && innerHeight <= 520;
-    ov.style.setProperty('--bank-t', Math.round(hc.top) + 'px');
-    ov.style.setProperty('--bank-r', Math.round(innerWidth - hc.right) + 'px');
-    ov.style.setProperty('--bank-b', Math.round(hc.bottom) + 'px');
-    ov.style.setProperty('--bank-l', Math.round(hc.left) + 'px');
-    ov.style.setProperty('--win-top', (flat ? 10 : Math.round(hc.bottom + 46)) + 'px');
-    ov.classList.toggle('is-flat', flat);   // лёжа «+N» встаёт левее счётчика, не под ним
-    let bank = shownCoins;
-    $('ws-win-bank-n').textContent = String(Math.max(0, bank));
-    ov.classList.remove('hidden');
+    $('win-overlay').classList.remove('hidden');
     drawWinJewel(0);
     // звёзды по одной
     for (let i = 0; i < r.stars; i++) {
@@ -1453,20 +1389,6 @@
           if (s % 2 === 0 || s === steps) sfx('count', { semis: Math.min(12, s) });
           if (s === steps) { bump(coinsEl.parentElement); shownCoins = Store.data.coins; renderCoins(false); }
         }, REDUCED ? 0 : s * 60);
-      }
-      // ещё не долетевшие монеты (награда за звёзды) — струйкой из изделия в счётчик
-      const pend = Store.data.coins - bank;
-      const jr = $('ws-win-jewel').getBoundingClientRect(), br = $('ws-win-bank').getBoundingClientRect();
-      if (pend > 0 && jr.width && br.width) {
-        let k = 0;
-        Fx.coins({ x: jr.left + jr.width / 2, y: jr.top + jr.height / 2 }, { x: br.left + 16, y: br.top + br.height / 2 }, pend, (part) => {
-          if (e !== epoch) return;
-          bank += part;
-          $('ws-win-bank-n').textContent = String(bank);
-          bump($('ws-win-bank'));
-          if (k++ % 2 === 0) sfx('coin', { semis: Math.min(7, k) });
-        }, () => { if (e === epoch) $('ws-win-bank-n').textContent = String(Store.data.coins); },
-        { count: 10, size: 30, spread: 90, lift: 120, dur: 760, step: 70 });
       }
     }, t0);
     // блик по изделию, пока открыта церемония
@@ -1497,7 +1419,7 @@
   function drawWinJewel(k) {
     const { g, w, h } = sizeCanvas($('ws-win-jewel'));
     const box = { x: 4, y: 4, w: w - 8, h: h - 8 };
-    WsJewel.draw(g, L.piece, L.orders.length, L.orders, box, { drawGem: WsBoard.drawGem, closeup: true });
+    WsJewel.draw(g, L.piece, L.orders.length, L.orders, box, { drawGem: WsBoard.drawGem });
     if (k > 0 && k < 1) WsJewel.shine(g, box, k);
   }
 
@@ -1540,25 +1462,11 @@
   }
 
   /* ---------- окно-карточка (новинка, «Сложный заказ», шкатулка) ---------- */
-  const CHECK_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.6 4.6L19 7.6" fill="none" stroke="#fff" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   function showModal(o) {
     $('ws-modal-kicker').textContent = o.kicker || '';
     $('ws-modal-title').textContent = o.title || '';
-    const txt = $('ws-modal-text');
-    txt.textContent = o.text || '';
-    txt.classList.toggle('is-coins', !!o.coins);
-    if (o.coins) {   // награда: монетка и «+N», подробности — для чтецов
-      const ico = Object.assign(document.createElement('span'), { className: 'ws-coin-ico' });
-      ico.setAttribute('aria-hidden', 'true');
-      txt.append(ico, '+' + o.coins);
-      if (o.sr) txt.append(Object.assign(document.createElement('span'), { className: 'ws-sr', textContent: ' ' + o.sr }));
-    }
-    const ok = $('btn-modal-ok');
-    if (o.okIcon) { ok.innerHTML = CHECK_SVG; ok.setAttribute('aria-label', o.ok); } else { ok.textContent = o.ok || 'Понятно'; ok.removeAttribute('aria-label'); }
-    ok.classList.toggle('is-icon', !!o.okIcon);
-    const pic = $('ws-modal-pic');
-    pic.classList.toggle('hidden', !o.pic);
-    pic.innerHTML = o.pic || '';
+    $('ws-modal-text').textContent = o.text || '';
+    $('btn-modal-ok').textContent = o.ok || 'Понятно';
     const art = $('ws-modal-art');
     art.classList.toggle('hidden', !o.art);
     $('modal-overlay').classList.remove('hidden');
@@ -1595,11 +1503,10 @@
       WsBoard.drawGem(g, 'R', w / 2, y + ch * 0.45, ch * 0.55);
       g.fillStyle = '#c0392b';
       g.fillRect(x - 6, y + ch * 0.78, cw + 12, ch * 0.2);
-      hourglass(g, w / 2 - ch * 0.1, y + ch * 0.88, ch * 0.15, '#fff3dc');
       g.fillStyle = '#fff3dc';
-      g.font = `900 ${Math.round(ch * 0.16)}px ${FONT}`;
+      g.font = `bold ${Math.round(ch * 0.13)}px ${FONT}`;
       g.textAlign = 'center'; g.textBaseline = 'middle';
-      g.fillText('6', w / 2 + ch * 0.1, y + ch * 0.89);
+      g.fillText('Срочно · 6', w / 2, y + ch * 0.88);
     },
     lock(g, w, h) {
       Fx.drawKey(g, w * 0.34, h / 2, h * 0.5);
@@ -1619,44 +1526,13 @@
   };
 
   function drawHardArt(g, w, h) {
-    const glow = g.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, h * 0.6);
-    glow.addColorStop(0, 'rgba(255,214,110,0.5)'); glow.addColorStop(1, 'rgba(255,214,110,0)');
-    g.fillStyle = glow; g.fillRect(0, 0, w, h);
-    hourglass(g, w / 2 - h * 0.42, h * 0.44, h * 0.62, '#b07c22');
-    g.font = `900 ${Math.round(h * 0.5)}px ${FONT}`;
+    g.font = `bold ${Math.round(h * 0.42)}px ${FONT}`;
     g.textAlign = 'center'; g.textBaseline = 'middle';
-    g.lineJoin = 'round'; g.lineWidth = h * 0.06; g.strokeStyle = '#fff6e0';
-    g.strokeText(String(L.limit), w / 2 + h * 0.2, h * 0.46);
-    g.fillStyle = '#c2334f';
-    g.fillText(String(L.limit), w / 2 + h * 0.2, h * 0.46);
-    g.font = `800 ${Math.round(h * 0.15)}px ${FONT}`;
+    g.fillStyle = '#8a3a1c';
+    g.fillText(String(L.limit), w / 2, h * 0.46);
+    g.font = `italic ${Math.round(h * 0.16)}px ${FONT}`;
     g.fillStyle = '#6b4a2a';
-    g.fillText(plural(L.limit, 'ход', 'хода', 'ходов'), w / 2 + h * 0.2, h * 0.86);
-  }
-
-  /* Песочные часы: золотые перекладины, стекло, песок. s — высота. */
-  function hourglass(g, x, y, s, rim) {
-    const w = s * 0.62, t = s / 2;
-    g.save();
-    g.translate(x, y);
-    g.lineCap = 'round'; g.lineJoin = 'round';
-    g.beginPath();
-    g.moveTo(-w * 0.42, -t * 0.9);
-    g.bezierCurveTo(-w * 0.42, -t * 0.2, -w * 0.06, -t * 0.12, -w * 0.06, 0);
-    g.bezierCurveTo(-w * 0.06, t * 0.12, -w * 0.42, t * 0.2, -w * 0.42, t * 0.9);
-    g.lineTo(w * 0.42, t * 0.9);
-    g.bezierCurveTo(w * 0.42, t * 0.2, w * 0.06, t * 0.12, w * 0.06, 0);
-    g.bezierCurveTo(w * 0.06, -t * 0.12, w * 0.42, -t * 0.2, w * 0.42, -t * 0.9);
-    g.closePath();
-    g.fillStyle = 'rgba(238,248,252,0.92)'; g.fill();
-    g.lineWidth = Math.max(1, s * 0.05); g.strokeStyle = '#7a5a8a'; g.stroke();
-    g.fillStyle = '#f0b43c';
-    g.beginPath(); g.moveTo(-w * 0.3, t * 0.86); g.quadraticCurveTo(0, t * 0.2, w * 0.3, t * 0.86); g.closePath(); g.fill();
-    g.beginPath(); g.moveTo(-w * 0.26, -t * 0.5); g.lineTo(w * 0.26, -t * 0.5); g.lineTo(0, -t * 0.14); g.closePath(); g.fill();
-    g.strokeStyle = rim; g.lineWidth = s * 0.1;
-    g.beginPath(); g.moveTo(-w * 0.55, -t * 0.95); g.lineTo(w * 0.55, -t * 0.95); g.stroke();
-    g.beginPath(); g.moveTo(-w * 0.55, t * 0.95); g.lineTo(w * 0.55, t * 0.95); g.stroke();
-    g.restore();
+    g.fillText(plural(L.limit, 'ход', 'хода', 'ходов'), w / 2, h * 0.84);
   }
 
   function arrow(g, x0, y0, x1, y1) {
@@ -1675,12 +1551,34 @@
 
   /* Шкатулка: деревянный ларец с золотой оковкой, крышка откинута, внутри
      свечение и образец убранства. */
-  // картинка окна шкатулки: открытая шкатулка, из неё поднимается образец нового убранства
-  function chestPic(id) {
-    return '<div class="ws-chest is-open ws-chest-big">' + CHEST_SVG +
-      '<span class="ws-chest-prize" style="background:' + (SWATCH[id] || '#fff') + '"></span></div>';
+  function drawChestArt(kind, id) {
+    return (g, w, h) => {
+      const cw = Math.min(w * 0.5, h * 0.95), ch = cw * 0.5, x = (w - cw) / 2, y = h * 0.5;
+      const glow = g.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, h * 0.5);
+      glow.addColorStop(0, 'rgba(255,222,140,0.75)'); glow.addColorStop(1, 'rgba(255,222,140,0)');
+      g.fillStyle = glow; g.fillRect(0, 0, w, h);
+      // крышка
+      g.fillStyle = '#6b3d1a';
+      g.beginPath(); g.moveTo(x, y); g.lineTo(x + cw * 0.08, y - ch * 0.9); g.lineTo(x + cw * 0.92, y - ch * 0.9); g.lineTo(x + cw, y); g.closePath(); g.fill();
+      // образец убранства
+      g.fillStyle = SWATCH[id] || '#fff';
+      g.beginPath(); g.ellipse(w / 2, y - ch * 0.05, cw * 0.28, ch * 0.22, 0, 0, Math.PI * 2); g.fill();
+      g.strokeStyle = 'rgba(255,240,200,0.9)'; g.lineWidth = 2; g.stroke();
+      // корпус
+      const grd = g.createLinearGradient(0, y, 0, y + ch);
+      grd.addColorStop(0, '#8a5226'); grd.addColorStop(1, '#4e2a10');
+      g.fillStyle = grd;
+      roundRect(g, x, y, cw, ch, 6); g.fill();
+      g.strokeStyle = '#e6b95c'; g.lineWidth = 3;
+      roundRect(g, x, y, cw, ch, 6); g.stroke();
+      g.beginPath(); g.moveTo(x, y + ch * 0.45); g.lineTo(x + cw, y + ch * 0.45); g.stroke();
+      g.fillStyle = '#f0cd7c';
+      g.fillRect(w / 2 - 6, y + ch * 0.3, 12, ch * 0.3);
+      // монеты рядом
+      Fx.drawCoin(g, x - 14, y + ch * 0.75, 20, 0);
+      Fx.drawCoin(g, x + cw + 14, y + ch * 0.7, 18, 0.6);
+    };
   }
-
 
   /* ---------- меню: витрина коллекций и убранство ---------- */
   function nextLevelIdx() {
@@ -1693,182 +1591,92 @@
   function renderMenu() {
     shownCoins = Store.data.coins;
     renderCoins(false);
+    renderShowcase();
+    renderDecor();
     const cur = restoreGame(Store.data.cur);
-    let idx, word;
     if (cur) {
-      idx = cur.idx;
-      word = 'Продолжить';
+      $('btn-play').textContent = 'Продолжить';
       $('ws-play-note').textContent = 'Уровень ' + LEVELS[cur.idx].id + ' · ' + LEVELS[cur.idx].name + ' · ' + movesWord(cur.moves);
     } else {
       const all = LEVELS.every((l, i) => isPassed(i));
-      idx = nextLevelIdx();
-      const nx = LEVELS[idx];
-      word = all ? 'Играть' : (Object.keys(Store.data.stars).length ? 'Дальше' : 'Играть');
+      const nx = LEVELS[nextLevelIdx()];
+      $('btn-play').textContent = all ? 'Играть' : (Object.keys(Store.data.stars).length ? 'Дальше' : 'Играть');
       $('ws-play-note').textContent = all
         ? 'Все изделия готовы — соберите три звезды: уровень ' + nx.id
         : 'Уровень ' + nx.id + ' · ' + nx.name + (nx.hard ? ' · Сложный заказ' : '');
     }
-    $('ws-play-word').textContent = word;
-    $('ws-play-n').textContent = String(LEVELS[idx].id);
-    $('btn-play').setAttribute('aria-label', word + ': уровень ' + LEVELS[idx].id);
-    renderMap(idx);
-    renderDecor();
   }
 
-  /* ---------- карта (образ — ref/workshop/concept/03_map.jpeg) ----------
-     Места на дорожке снизу вверх: пять уровней коллекции, затем её шкатулка.
-     Дорожка — синусоида через места; у каждой начатой коллекции на пьедестале
-     стоит последнее готовое изделие; героиня — рядом с уровнем кнопки «Играть». */
-  const MAP = { step: 80, top: 132, bottom: 150, k: 0.8, phase: 0.6 };
-  const HARD_SVG = '<svg viewBox="0 0 24 24"><path d="M6 3h12M6 21h12" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/><path d="M7.5 3.8c0 4.4 4.5 5.6 4.5 8.2s-4.5 3.8-4.5 8.2h9c0-4.4-4.5-5.6-4.5-8.2s4.5-3.8 4.5-8.2z" fill="#fff4f6"/></svg>';
-  // шкатулка: деревянный короб с куполом в золотой оправе; открытая — крышка откинута, внутри свет
-  const CH_BODY = 'M7 30h50v17a4 4 0 0 1-4 4H11a4 4 0 0 1-4-4z';
-  const CH_LID = 'M7 31V21c0-8.5 7-14 15.5-14h19C50 7 57 12.5 57 21v10z';
-  const CHEST_SVG = '<svg viewBox="0 0 64 58" aria-hidden="true">' +
-    '<ellipse cx="32" cy="53.5" rx="26" ry="4" fill="rgba(90,30,50,0.28)"/>' +
-    '<ellipse class="ch-glow" cx="32" cy="24" rx="31" ry="23" fill="url(#ws-ch-glow)"/>' +
-    '<path d="' + CH_BODY + '" fill="none" stroke="#5a2a10" stroke-width="5.6" stroke-linejoin="round"/>' +
-    '<path d="' + CH_BODY + '" fill="url(#ws-ch-wood)" stroke="url(#ws-ch-gold)" stroke-width="3" stroke-linejoin="round"/>' +
-    '<path d="M10 38h44M10 44.5h44" stroke="rgba(90,40,10,0.35)" stroke-width="1"/>' +
-    '<path d="M16.5 31v19M47.5 31v19" stroke="url(#ws-ch-gold)" stroke-width="4"/>' +
-    '<path d="M8.5 30.5h47l-3.5-4.5H12z" fill="#4a210b"/><ellipse cx="32" cy="29" rx="15" ry="2.6" fill="#ffe7a0" opacity="0.9"/>' +
-    '<g class="ch-lid"><path d="' + CH_LID + '" fill="none" stroke="#5a2a10" stroke-width="5.6" stroke-linejoin="round"/>' +
-    '<path d="' + CH_LID + '" fill="url(#ws-ch-wood)" stroke="url(#ws-ch-gold)" stroke-width="3" stroke-linejoin="round"/>' +
-    '<path d="M16.5 30V9.6M47.5 30V9.6" stroke="url(#ws-ch-gold)" stroke-width="4"/>' +
-    '<path d="M21 11.5c3-1.6 6-2 11-2s8 .4 11 2" fill="none" stroke="rgba(255,236,200,0.55)" stroke-width="2" stroke-linecap="round"/></g>' +
-    '<path d="M25.5 25h13v9.5c0 3.4-3.4 6-6.5 7.5-3.1-1.5-6.5-4.1-6.5-7.5z" fill="url(#ws-ch-gold)" stroke="#8a5410" stroke-width="1.2" stroke-linejoin="round"/>' +
-    '<path d="M32 27.6l4 3.7-4 5.4-4-5.4z" fill="#f0507f" stroke="#fff3f6" stroke-width="0.9" stroke-linejoin="round"/>' +
-    '</svg>';
-  const LOCK_SVG = '<svg viewBox="0 0 24 24"><path d="M8 11V8.2a4 4 0 0 1 8 0V11" fill="none" stroke="#fff" stroke-width="2.6"/><rect x="5.5" y="10.5" width="13" height="10" rx="2.5" fill="#fff"/><circle cx="12" cy="15.4" r="1.7" fill="#b98226"/></svg>';
-  let mapIdx = 0;          // уровень у героини (перерисовка карты при повороте экрана)
-
-  function smoothPath(p) {   // Катмулл — Ром через точки -> кубические кривые
-    const f = (v) => v.toFixed(1);
-    let d = 'M' + f(p[0].x) + ' ' + f(p[0].y);
-    for (let k = 0; k < p.length - 1; k++) {
-      const a = p[k - 1] || p[k], b = p[k], c = p[k + 1], e = p[k + 2] || c;
-      d += ' C' + [b.x + (c.x - a.x) / 6, b.y + (c.y - a.y) / 6, c.x - (e.x - b.x) / 6, c.y - (e.y - b.y) / 6, c.x, c.y].map(f).join(' ');
-    }
-    return d;
-  }
-
-  function renderMap(playIdx) {
-    if (playIdx == null) playIdx = mapIdx; else mapIdx = playIdx;
-    const track = $('ws-map-track'), map = $('ws-map');
-    track.innerHTML = '';
-    const slots = [];
-    COLLECTIONS.forEach((c, ci) => {
-      const lv = collLevels(ci);
-      if (!lv.length) return;
-      lv.forEach((l, k) => slots.push({ i: ci * PER_COLL + k }));
-      slots.push({ ci });
-    });
-    const W = track.clientWidth || Math.min(innerWidth, 480);
-    const H = MAP.top + (slots.length - 1) * MAP.step + MAP.bottom;
-    track.style.height = H + 'px';
-    const amp = Math.min(W * 0.27, 140);
-    const wave = (s) => Math.sin(s * MAP.k + MAP.phase);
-    const at = (s) => ({ x: W / 2 + amp * wave(s), y: H - MAP.bottom - s * MAP.step });
-    const curSlot = Math.max(0, slots.findIndex(sl => sl.i === playIdx));
-    const firstOpen = LEVELS.findIndex((l, i) => !isPassed(i));
+  function renderShowcase() {
+    const box = $('ws-showcase');
+    box.innerHTML = '';
     const draws = [];
-
-    // дорожка: свечение, кромка, светлое полотно, пройденная часть теплее
-    const pts = [];
-    for (let s = -2; s <= slots.length; s++) pts.push(at(s));
-    const NS = 'http://www.w3.org/2000/svg';
-    const svg = document.createElementNS(NS, 'svg');
-    svg.setAttribute('class', 'ws-map-path');
-    svg.setAttribute('width', W);
-    svg.setAttribute('height', H);
-    svg.setAttribute('aria-hidden', 'true');
-    const full = smoothPath(pts), done = smoothPath(pts.slice(0, curSlot + 3));
-    [['glow', full], ['edge', full], ['body', full], ['done', done]].forEach(([cls, d]) => {
-      const p = document.createElementNS(NS, 'path');
-      p.setAttribute('class', 'p-' + cls);
-      p.setAttribute('d', d);
-      svg.appendChild(p);
-    });
-    track.appendChild(svg);
-
-    // пьедесталы: последнее готовое изделие коллекции, напротив самого дальнего изгиба
+    const nextIdx = LEVELS.findIndex((l, i) => !isPassed(i));
     COLLECTIONS.forEach((c, ci) => {
-      const lv = collLevels(ci).filter(l => Store.data.stars[l.id]).pop();
-      if (!lv) return;
-      const s0 = ci * (PER_COLL + 1);
-      let best = s0;
-      for (let s = s0; s < s0 + PER_COLL; s++) if (Math.abs(wave(s)) > Math.abs(wave(best))) best = s;
-      const side = wave(best) > 0 ? -1 : 1;
-      const ped = document.createElement('div');
-      ped.className = 'ws-ped';
-      ped.setAttribute('aria-hidden', 'true');
-      ped.style.left = (W / 2 + side * amp * 0.92) + 'px';
-      ped.style.top = at(best).y + 'px';
-      const cv = document.createElement('canvas');
-      cv.className = 'ws-ped-art';
-      ped.appendChild(cv);
-      track.appendChild(ped);
-      draws.push(() => {
-        const { g, w, h } = sizeCanvas(cv);
-        WsJewel.draw(g, lv.piece, lv.orders.length, lv.orders, { x: 2, y: 2, w: w - 4, h: h - 4 }, { drawGem: WsBoard.drawGem, closeup: 3.2 });
+      const lvls = collLevels(ci);
+      if (!lvls.length) return;
+      const first = ci * PER_COLL;
+      const shelf = document.createElement('section');
+      const openShelf = isOpen(first);
+      shelf.className = 'ws-shelf' + (openShelf ? '' : ' is-locked');
+      const head = document.createElement('div');
+      head.className = 'ws-shelf-head';
+      const name = document.createElement('span');
+      name.className = 'ws-shelf-name';
+      name.textContent = c.name;
+      const cnt = document.createElement('span');
+      cnt.className = 'ws-shelf-count';
+      cnt.textContent = collCount(ci) + ' из ' + PER_COLL;
+      head.appendChild(name);
+      head.appendChild(cnt);
+      head.appendChild(chestButton(ci));
+      shelf.appendChild(head);
+      const grid = document.createElement('div');
+      grid.className = 'ws-shelf-grid';
+      lvls.forEach((lv, k) => {
+        const i = first + k;
+        const done = isPassed(i), open = isOpen(i);
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'ws-piece-tile' + (done ? ' is-done' : open ? ' is-next' : ' is-locked') +
+          (lv.hard ? ' is-hard' : '') + (lv.id === justWon ? ' is-new' : '') + (i === nextIdx ? ' is-current' : '');
+        const art = document.createElement('canvas');
+        art.className = 'ws-tile-art';
+        art.setAttribute('aria-hidden', 'true');
+        b.appendChild(art);
+        const n = document.createElement('span');
+        n.className = 'ws-tile-n';
+        n.textContent = String(lv.id);
+        b.appendChild(n);
+        if (done) {
+          const s = document.createElement('span');
+          s.className = 'ws-tile-stars';
+          const k3 = Store.data.stars[lv.id];
+          s.textContent = '★'.repeat(k3) + '☆'.repeat(3 - k3);
+          b.appendChild(s);
+        }
+        b.setAttribute('aria-label', 'Уровень ' + lv.id + ': ' + lv.name +
+          (done ? ', пройден, звёзд ' + Store.data.stars[lv.id] + ', лучший результат ' + movesWord(Store.data.best[lv.id]) : open ? ', открыт' : ', закрыт') +
+          (lv.hard ? ', сложный заказ' : ''));
+        b.title = lv.name;
+        b.addEventListener('click', () => {
+          if (!isOpen(i)) { sfx('invalid'); toast('Откроется, когда будет готово изделие ' + (i) + ' — уровни открываются по одному', 2400); return; }
+          sfx('click');
+          startLevel(i);
+        });
+        grid.appendChild(b);
+        draws.push(() => {
+          const { g, w, h } = sizeCanvas(art);
+          const bx = { x: 2, y: 2, w: w - 4, h: h - 4 };
+          if (done) WsJewel.draw(g, lv.piece, lv.orders.length, lv.orders, bx, { drawGem: WsBoard.drawGem });
+          else WsJewel.draw(g, lv.piece, lv.orders.length, null, bx, { silhouette: true });
+        });
       });
-    });
-
-    slots.forEach((sl, s) => {
-      const p = at(s);
-      if (sl.ci != null) {
-        const b = chestButton(sl.ci);
-        b.style.left = p.x + 'px';
-        b.style.top = p.y + 'px';
-        track.appendChild(b);
-        return;
-      }
-      const i = sl.i, lv = LEVELS[i];
-      const done = isPassed(i), open = isOpen(i);
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'ws-node' + (done ? ' is-done' : open ? ' is-next' : ' is-locked') +
-        (lv.hard ? ' is-hard' : '') + (lv.id === justWon ? ' is-new' : '') + (i === playIdx ? ' is-current' : '');
-      b.style.left = p.x + 'px';
-      b.style.top = p.y + 'px';
-      const n = document.createElement('span');
-      n.className = 'ws-node-n';
-      n.textContent = String(lv.id);
-      b.appendChild(n);
-      if (done) {
-        const k3 = Store.data.stars[lv.id];
-        const st3 = document.createElement('span');
-        st3.className = 'ws-node-stars';
-        st3.dataset.n = String(k3);
-        for (let k = 0; k < 3; k++) st3.appendChild(Object.assign(document.createElement('i'), { className: k < k3 ? 'on' : '' }));
-        b.appendChild(st3);
-      }
-      if (lv.hard) b.insertAdjacentHTML('beforeend', '<span class="ws-node-hard" aria-hidden="true">' + HARD_SVG + '</span>');
-      b.setAttribute('aria-label', 'Уровень ' + lv.id + ': ' + lv.name +
-        (done ? ', пройден, звёзд ' + Store.data.stars[lv.id] + ', лучший результат ' + movesWord(Store.data.best[lv.id]) : open ? ', открыт' : ', закрыт') +
-        (lv.hard ? ', сложный заказ' : ''));
-      b.addEventListener('click', () => {
-        if (!isOpen(i)) { sfx('invalid'); toast('Сначала уровень ' + LEVELS[Math.max(0, firstOpen)].id, 1800); return; }
-        sfx('click');
-        startLevel(i);
-      });
-      track.appendChild(b);
-      if (i === playIdx) {
-        // героиня сбоку от значка: у края — к середине, на переходе — против хода дорожки
-        const nx = at(s + 1).x;
-        const side = Math.abs(p.x - W / 2) > amp * 0.5 ? (p.x > W / 2 ? -1 : 1) : (nx > p.x ? -1 : 1);
-        const me = document.createElement('span');
-        me.className = 'ws-map-me ' + (side < 0 ? 'is-left' : 'is-right');
-        me.setAttribute('aria-hidden', 'true');
-        me.innerHTML = '<span class="ws-face f-jeweler"></span>';
-        me.style.left = (p.x + side * 80) + 'px';
-        me.style.top = (p.y - 16) + 'px';
-        track.appendChild(me);
-      }
+      shelf.appendChild(grid);
+      box.appendChild(shelf);
     });
     draws.forEach(d => d());
     justWon = 0;
-    map.scrollTop = Math.max(0, at(curSlot).y - map.clientHeight * 0.58);
   }
 
   function chestButton(ci) {
@@ -1876,17 +1684,15 @@
     b.type = 'button';
     const done = collDone(ci), opened = !!Store.data.chests[ci];
     b.className = 'ws-chest' + (opened ? ' is-open' : done ? ' is-ready' : ' is-locked');
-    b.innerHTML = CHEST_SVG;
+    b.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10h18v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z" fill="currentColor"/><path d="M4 10V7a3 3 0 0 1 3-3h10a3 3 0 0 1 3 3v3" fill="none" stroke="currentColor" stroke-width="2"/><rect x="10.5" y="11.5" width="3" height="4" rx="0.6" fill="#3a2410"/></svg>';
+    const t = document.createElement('span');
+    t.textContent = opened ? 'Открыта' : done ? 'Открыть!' : 'Шкатулка';
+    b.appendChild(t);
     const c = COLLECTIONS[ci];
-    b.setAttribute('aria-label', 'Шкатулка коллекции «' + c.name + '»: ' + (opened ? 'открыта, в ней было «' + decorName(c.decor[0], c.decor[1]) + '»' : done ? 'можно открыть' : 'пройдите все пять уровней коллекции'));
+    b.setAttribute('aria-label', 'Шкатулка коллекции «' + c.name + '»: ' + (opened ? 'открыта' : done ? 'можно открыть' : 'пройдите все пять изделий'));
     b.addEventListener('click', () => {
-      if (opened) { sfx('click'); openDecor(); return; }
-      if (!done) {
-        sfx('invalid');
-        const left = PER_COLL - collCount(ci);
-        toast('Ещё ' + left + ' ' + plural(left, 'уровень', 'уровня', 'уровней'), 1800);
-        return;
-      }
+      if (opened) { sfx('click'); toast('В шкатулке были ' + coinsWord(c.coins) + ' и «' + decorName(c.decor[0], c.decor[1]) + '»', 2400); return; }
+      if (!done) { sfx('invalid'); toast('Шкатулка откроется, когда будут готовы все пять изделий «' + c.name + '»: +' + coinsWord(c.coins) + ' и «' + decorName(c.decor[0], c.decor[1]) + '»', 3000); return; }
       openChest(ci);
     });
     return b;
@@ -1903,36 +1709,31 @@
     applyDecor();
     sfx('reward');
     buzz([30, 40, 30]);
-    Confetti.burst({ count: 80, durationMs: 2600, colors: CONFETTI });
+    Confetti.burst({ count: 80, durationMs: 2600 });
     track('chest', { collection: ci, coins: c.coins, decor: id });
     renderMenu();
     showModal({
-      kicker: '«' + c.name + '»', title: 'Шкатулка открыта!', coins: c.coins,
-      sr: coinsWord(c.coins) + ' и новое убранство «' + decorName(kind, id) + '»',
-      pic: chestPic(id), ok: 'Красота!', okIcon: true
+      kicker: 'Коллекция «' + c.name + '» собрана', title: 'Шкатулка открыта!',
+      text: '+' + coinsWord(c.coins) + ' и «' + decorName(kind, id) + '» — уже в мастерской. Сменить убранство можно ниже на витрине.',
+      art: drawChestArt(kind, id), ok: 'Красота!'
     });
     bump($('ws-menu-coins'));
   }
 
-  const DECOR_ICON = {
-    cloth: '<svg viewBox="0 0 24 24"><path d="M2.5 9.5h19l-1.6 3.2H4.1z" fill="#d79a5a" stroke="#8a4a1c" stroke-width="1.3" stroke-linejoin="round"/><path d="M6 12.7v7.3M18 12.7v7.3" stroke="#8a4a1c" stroke-width="2.2" stroke-linecap="round"/><path d="M5 9.5c1-2.6 2.6-3.6 7-3.6s6 1 7 3.6" fill="#f2a7bd" stroke="#b5527a" stroke-width="1.2"/></svg>',
-    tube: '<svg viewBox="0 0 24 24"><path d="M8.5 2.8h7" stroke="#b98226" stroke-width="2.4" stroke-linecap="round"/><path d="M9.6 3.6v14.2a2.4 2.4 0 0 0 4.8 0V3.6" fill="rgba(255,255,255,0.75)" stroke="#9a6a8a" stroke-width="1.5"/><path d="M9.6 12.6h4.8v5.2a2.4 2.4 0 0 1-4.8 0z" fill="#f0507f"/></svg>'
-  };
-  let decorOpen = false;
-
   function renderDecor() {
     const box = $('ws-decor');
     box.innerHTML = '';
+    const title = document.createElement('div');
+    title.className = 'ws-decor-title';
+    title.textContent = 'Убранство мастерской';
+    box.appendChild(title);
     [['cloth', 'Стол'], ['tube', 'Стекло']].forEach(([kind, label]) => {
       const row = document.createElement('div');
       row.className = 'ws-decor-row';
-      row.setAttribute('role', 'group');
-      row.setAttribute('aria-label', label);
-      const ico = document.createElement('span');
-      ico.className = 'ws-decor-ico';
-      ico.setAttribute('aria-hidden', 'true');
-      ico.innerHTML = DECOR_ICON[kind];
-      row.appendChild(ico);
+      const l = document.createElement('span');
+      l.className = 'ws-decor-label';
+      l.textContent = label;
+      row.appendChild(l);
       DECOR[kind].forEach(d => {
         const b = document.createElement('button');
         b.type = 'button';
@@ -1942,13 +1743,12 @@
         sw.className = 'ws-swatch';
         sw.style.background = SWATCH[d.id];
         b.appendChild(sw);
-        if (!own) b.insertAdjacentHTML('beforeend', '<span class="ws-decor-lock" aria-hidden="true">' + LOCK_SVG + '</span>');
         b.title = d.name;
         const src = COLLECTIONS.find(c => c.decor[0] === kind && c.decor[1] === d.id);
         b.setAttribute('aria-label', d.name + (on ? ', выбрано' : own ? '' : ', в шкатулке «' + (src ? src.name : '') + '»'));
         b.setAttribute('aria-pressed', on ? 'true' : 'false');
         b.addEventListener('click', () => {
-          if (!own) { sfx('invalid'); toast('В шкатулке «' + (src ? src.name : '') + '»', 2000); return; }
+          if (!own) { sfx('invalid'); toast('«' + d.name + '» лежит в шкатулке коллекции «' + (src ? src.name : '') + '»', 2400); return; }
           sfx('click');
           Store.data.decor[kind] = d.id;
           Store.save();
@@ -1960,19 +1760,6 @@
       });
       box.appendChild(row);
     });
-  }
-
-  function openDecor() {
-    renderDecor();
-    $('decor-overlay').classList.remove('hidden');
-    decorOpen = true;
-    setTimeout(() => { if (decorOpen) $('btn-decor-ok').focus(); }, 60);
-  }
-  function closeDecor() {
-    if (!decorOpen) return;
-    decorOpen = false;
-    $('decor-overlay').classList.add('hidden');
-    $('btn-decor').focus();
   }
 
   function applyDecor() {
@@ -1989,7 +1776,7 @@
 
   function applyMute() {
     Sound.setMuted(Store.data.muted);
-    ['btn-sound', 'btn-sound-game'].forEach(id => { if ($(id)) $(id).setAttribute('aria-pressed', Store.data.muted ? 'true' : 'false'); });
+    ['btn-sound', 'btn-sound-game'].forEach(id => $(id).setAttribute('aria-pressed', Store.data.muted ? 'true' : 'false'));
   }
 
   /* ---------- запуск ---------- */
@@ -2003,7 +1790,7 @@
       colorOf: (t) => (GEMS[t] ? GEMS[t].color : '#c33'),
       atlasUrl: (document.querySelector('link[rel="preload"][as="image"]') || {}).href || 'workshop_assets/gems.webp',
       onAtlas: () => {
-        if (screen === 'menu') renderMap(); else Piece.request();
+        if (screen === 'menu') renderShowcase(); else Piece.request();
         if (!$('win-overlay').classList.contains('hidden')) drawWinJewel(0);
       }
     });
@@ -2021,10 +1808,6 @@
       tapVial(WsBoard.hitTest(ev.clientX, ev.clientY));
     });
     document.addEventListener('keydown', (ev) => {
-      if (decorOpen && !modalOpen) {
-        if (ev.key === 'Escape') { ev.preventDefault(); sfx('click'); closeDecor(); }
-        return;
-      }
       if (modalOpen) {
         if (ev.key === 'Enter' || ev.key === 'Escape' || ev.key === ' ') { ev.preventDefault(); closeModal(); }
         return;
@@ -2056,12 +1839,8 @@
     $('btn-lose-undo').addEventListener('click', undo);
     $('btn-lose-again').addEventListener('click', () => { lost && restart(); });
     $('btn-modal-ok').addEventListener('click', () => closeModal());
-    $('btn-decor').addEventListener('click', () => { sfx('click'); openDecor(); });
-    $('btn-decor-ok').addEventListener('click', () => { sfx('click'); closeDecor(); });
-    $('decor-overlay').addEventListener('click', (ev) => { if (ev.target === $('decor-overlay')) { sfx('click'); closeDecor(); } });
-    $('ws-menu-coins').addEventListener('click', () => toast('Монеты — за заказы', 1800));
-    $('ws-coins').addEventListener('click', () => toast('Монеты — за заказы', 1800));
-    ['btn-sound', 'btn-sound-game'].filter(id => $(id)).forEach(id => $(id).addEventListener('click', () => {
+    $('ws-coins').addEventListener('click', () => toast('Монеты: за каждый заказ, каскады, срочные заказы и звёзды. Тратятся на подсказки и ходы в «Сложном заказе»', 3200));
+    ['btn-sound', 'btn-sound-game'].forEach(id => $(id).addEventListener('click', () => {
       Store.data.muted = !Store.data.muted;
       Store.save();
       applyMute();
@@ -2077,7 +1856,6 @@
         resizeRaf = 0;
         Fx.resize();
         if (screen === 'game') { WsBoard.resize(); Piece.resize(); updateGuide(); }
-        if (screen === 'menu') renderMap();
         if (!$('win-overlay').classList.contains('hidden')) drawWinJewel(0);
       });
     });

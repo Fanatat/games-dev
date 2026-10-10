@@ -1936,6 +1936,36 @@ body.convoy #heroDownFlash, body.convoy #fortEdge { display: none !important; }
   .cv-cards.many .cv-card-name { font-size: 11px; font-family: 'Fredoka', sans-serif; font-weight: 700; }
   .cv-cards.many .cv-card-stats { display: none; }
 }
+/* узкий телефон лёжа (замер 10.10: на 640 px три карточки и камнепад вылезали на 20 px, цена третьей пряталась
+   за краем прокрутки): цена над именем, без отступа справа под неё */
+@media (max-width: 700px) {
+  .cv-cards { gap: .35em; padding-left: 2px; padding-right: 2px; }
+  .cv-row { gap: .4em; }
+  .cv-card { min-width: 0; padding: .2em .45em .2em .3em; gap: .3em; }
+  .cv-card-icon { width: 2.1em; height: 2.3em; }
+  .cv-card-body { padding-right: 0; padding-top: .95em; }
+  .cv-card-cost { top: .15em; right: .4em; font-size: 12.5px; }
+  .cv-rock { min-width: 5.6em; }
+}
+/* четыре вида (замер 10.10: на 720–800 px четвёртая карточка уходила за край на 45–120 px): уже 900 px — сжатая
+   карточка как у 5–6 видов, уже 620 px — плитка */
+@media (max-width: 900px) {
+  .cv-cards.four { gap: .35em; }
+  .cv-cards.four .cv-card { min-width: 0; padding: .2em .45em .2em .3em; gap: .3em; }
+  .cv-cards.four .cv-card-icon { width: 2.1em; height: 2.3em; }
+  .cv-cards.four .cv-card-body { padding-right: 0; padding-top: .95em; }
+  .cv-cards.four .cv-card-name { font-size: .9em; }
+  .cv-cards.four .cv-card-stats { font-size: 11px; }
+  .cv-cards.four .cv-card-cost { top: .15em; right: .4em; font-size: 12.5px; }
+}
+@media (max-width: 620px) {
+  .cv-cards.four, .cv-cards.many { gap: .25em; }
+  .cv-cards.four .cv-card { flex-direction: column; justify-content: flex-end; gap: 0; padding: .9em .35em .2em; min-height: 52px; }
+  .cv-cards.four .cv-card-icon { width: 1.9em; height: 2.05em; }
+  .cv-cards.four .cv-card-body { padding-top: 0; align-items: center; }
+  .cv-cards.four .cv-card-name { font-size: 11px; font-family: 'Fredoka', sans-serif; font-weight: 700; }
+  .cv-cards.four .cv-card-stats { display: none; }
+}
 .cv-income, .cv-squad { white-space: nowrap; }
 
 @media (max-height: 520px) {

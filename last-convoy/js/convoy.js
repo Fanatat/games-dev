@@ -1300,6 +1300,7 @@ const Convoy = (() => {
     const box = $('cvCards');
     box.innerHTML = '';
     box.classList.toggle('many', list.length > 4);
+    box.classList.toggle('four', list.length === 4);   // четыре вида: плитки на узком экране (style.css)
     cardEls = {};
     list.forEach((id, i) => {
       const t = UNIT_TYPES[id], L = CONVOY.labels[id], cm = run.mods.cls[id];
@@ -1796,7 +1797,13 @@ const Convoy = (() => {
       const k = b.t / b.life, inT = Math.min(1, b.t / 0.2);
       const alpha = k < 0.78 ? 1 : Math.max(0, 1 - (k - 0.78) / 0.22);
       const sc = (0.55 + 0.45 * (1 - Math.pow(1 - inT, 3))) * (1 + k * 0.05);
-      const y = VIEW.y0 + VIEW.h * 0.3;
+      // надпись стоянки — под подсказкой поверх боя, если та видна (низкий экран: иначе подсказка закрывает надпись)
+      let y = VIEW.y0 + VIEW.h * 0.3;
+      const tip = $('cvHint');
+      if (tip && !tip.classList.contains('hidden')) {
+        const r = tip.getBoundingClientRect(), cr = canvas.getBoundingClientRect();
+        if (r.height) y = Math.min(VIEW.y0 + VIEW.h * 0.45, Math.max(y, VIEW.y0 + (r.bottom - cr.top) / VIEW.k + 40));
+      }
       ctx.globalAlpha = alpha;
       ctx.save();
       ctx.translate(ARENA.width / 2, y);

@@ -469,17 +469,47 @@
       // Долгое нажатие на телефоне не открывает меню браузера поверх игры.
       canvas.addEventListener("contextmenu", function (e) { e.preventDefault(); });
 
+      // Текстуры: основной data — в DXT (ПК), второй — в ASTC для телефонов
+      // (BuildScript ставит его имя на место маркера; null — второго нет).
+      // DXT видеокарты Adreno и Mali не понимают: Unity распаковал бы все
+      // текстуры на CPU при загрузке. ASTC берём, только если DXT нет, а
+      // ASTC есть: ПК с обоими форматами остаётся на основном. ?tex=astc
+      // или ?tex=dxt в адресе — выбрать файл вручную (проверки).
+      var dataFile = "vk-20261010-222034.data.unityweb";
+      var astcDataFile = "vk-20261010-222034.astc.data.unityweb";
+      var texFormat = "dxt";
+      if (astcDataFile) {
+        var texForce = /[?&]tex=(astc|dxt)(&|$)/.exec(location.search);
+        if (texForce) {
+          texFormat = texForce[1];
+        } else {
+          try {
+            var probe = document.createElement("canvas");
+            var gl = probe.getContext("webgl2") || probe.getContext("webgl");
+            if (gl) {
+              if (!gl.getExtension("WEBGL_compressed_texture_s3tc") && gl.getExtension("WEBGL_compressed_texture_astc")) {
+                texFormat = "astc";
+              }
+              var lose = gl.getExtension("WEBGL_lose_context");
+              if (lose) lose.loseContext();
+            }
+          } catch (e) {}
+        }
+        if (texFormat == "astc") dataFile = astcDataFile;
+      }
+      window.game7TexFormat = texFormat;
+
       var buildUrl = "Build";
-      var loaderUrl = buildUrl + "/vk-20261010-120642.loader.js";
+      var loaderUrl = buildUrl + "/vk-20261010-222034.loader.js";
       var config = {
         arguments: [],
-        dataUrl: buildUrl + "/vk-20261010-120642.data.unityweb",
-        frameworkUrl: buildUrl + "/vk-20261010-120642.framework.js.unityweb",
-        codeUrl: buildUrl + "/vk-20261010-120642.wasm.unityweb",
+        dataUrl: buildUrl + "/" + dataFile,
+        frameworkUrl: buildUrl + "/vk-20261010-222034.framework.js.unityweb",
+        codeUrl: buildUrl + "/vk-20261010-222034.wasm.unityweb",
         streamingAssetsUrl: "StreamingAssets",
         companyName: "DefaultCompany",
         productName: "unity",
-        productVersion: "vk-20261010-120642",
+        productVersion: "vk-20261010-222034",
         showBanner: unityShowBanner,
         // Экраны с плотностью 3 рисовали бы в 9 раз больше пикселей, чем
         // с плотностью 1: потолок 2 держит 60 FPS на среднем телефоне.
@@ -531,7 +561,7 @@
           window.unityInstance = instance; // знак для smoke и playtest: игра запустилась
           loadingBar.style.display = "none";
           canvas.focus();
-          ymGoal("load_done", { load_sec: Math.round((Date.now() - loadStart) / 100) / 10 });
+          ymGoal("load_done", { load_sec: Math.round((Date.now() - loadStart) / 100) / 10, tex: texFormat });
         }).catch(function (message) {
           unityShowBanner(String(message), "error");
           ymGoal("load_error", { message: String(message).slice(0, 200) });

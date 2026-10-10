@@ -5,11 +5,14 @@
 
    Рисуется на любом canvas в прямоугольнике box = { x, y, w, h }: полоса
    изделия над заказами, большое изделие в церемонии победы, миниатюры на
-   витрине меню, силуэт следующего изделия. Без DOM и без атласа: камни
-   рисует переданная функция drawGem (WsBoard.drawGem).
+   витрине меню, силуэт следующего изделия. Камни рисует переданная
+   функция drawGem (WsBoard.drawGem).
 
-   Координаты оправы — в условной рамке 2×1 (u ∈ [0, 2], v ∈ [0, 1]),
-   масштаб — по меньшей стороне box.
+   Оправа — картинка с листа (workshop_assets/jw_<изделие>.webp, грузит
+   load); гнёзда под K камней заданы в пикселях картинки (seats). Пока
+   картинки нет (и в тестах без Image), оправа рисуется кодом: координаты
+   в условной рамке 2×1 (u ∈ [0, 2], v ∈ [0, 1]), масштаб — по меньшей
+   стороне box.
    ============================================================ */
 const WsJewel = (() => {
   'use strict';
@@ -170,8 +173,113 @@ const WsJewel = (() => {
     return { s, x0: box.x + box.w / 2 - (u0 + u1) / 2 * s, y0: box.y + box.h / 2 - (v0 + v1) / 2 * s };
   }
 
+  /* ---------- нарисованные изделия (лист E) ----------
+     workshop_assets/jw_<изделие>.webp: размер картинки и гнёзда в её пикселях
+     [x, y, r]. Пока картинка не загрузилась (или не загрузится вовсе), изделие
+     рисуется оправой кодом (design выше). */
+  const ART = {
+    ring: [177, 188], earrings: [193, 217], pendant: [143, 230], brooch: [214, 218], bracelet: [303, 180],
+    necklace: [280, 211], hairpin: [262, 206], tiara: [298, 175], cufflinks: [256, 160], crown: [241, 186]
+  };
+  const SPRITE = {};
+  const ART_CAP = 1.5;   // крупный план: не больше полутора пикселей экрана на пиксель картинки
+
+  /* K гнёзд вдоль ломаной path с шагом не больше step, по центру пути. */
+  function along(path, K, step, rmax) {
+    const seg = [];
+    let len = 0;
+    for (let i = 1; i < path.length; i++) { const d = Math.hypot(path[i][0] - path[i - 1][0], path[i][1] - path[i - 1][1]); seg.push(d); len += d; }
+    const d = Math.min(step, len / K), r = Math.min(rmax, d * 0.42);
+    const at = (s) => {
+      let i = 0;
+      while (i < seg.length - 1 && s > seg[i]) { s -= seg[i]; i++; }
+      const k = Math.max(0, Math.min(1, s / seg[i]));
+      return [path[i][0] + (path[i + 1][0] - path[i][0]) * k, path[i][1] + (path[i + 1][1] - path[i][1]) * k];
+    };
+    return Array.from({ length: K }, (_, i) => at(len / 2 + (i - (K - 1) / 2) * d).concat(r));
+  }
+
+  /* K гнёзд розеткой вокруг (cx, cy); при K ≥ 6 одно — в центре. */
+  function rosette(cx, cy, K, R, rmax, tilt) {
+    if (K <= 1) return K ? [[cx, cy, rmax * 1.25]] : [];
+    const mid = K >= 6, n = mid ? K - 1 : K;
+    const rr = R * (mid ? 1 : K === 2 ? 0.62 : K === 3 ? 0.8 : 0.9);
+    const r = Math.min(rmax, rr * Math.sin(Math.PI / n) * 0.82);
+    const S = mid ? [[cx, cy, Math.min(rmax, rr / 1.2 - r)]] : [];
+    for (let i = 0; i < n; i++) {
+      const a = -Math.PI / 2 + (tilt || 0) + i * Math.PI * 2 / n;
+      S.push([cx + Math.cos(a) * rr, cy + Math.sin(a) * rr, r]);
+    }
+    return S;
+  }
+
+  /* Взять K мест из списка: таблица выбора по K, иначе первые K. */
+  const pick = (list, K, table) => (table[K] || list.map((_, i) => i).slice(0, K)).map(i => list[i]);
+
+  function seats(piece, K) {
+    switch (piece) {
+      case 'ring':
+        return along([[16, 116], [22, 80], [46, 50], [88, 40], [130, 48], [154, 76], [161, 112]], K, 34, 16);
+      case 'earrings': {
+        const nL = Math.ceil(K / 2), side = (x, n) => [
+          [[x, 165, 19]],
+          [[x, 34, 12], [x, 165, 19]],
+          [[x, 34, 12], [x, 98, 10], [x, 165, 19]],
+          [[x, 34, 12], [x, 98, 10], [x, 146, 13], [x, 184, 14]]
+        ][Math.max(0, Math.min(4, n) - 1)].slice(0, n);
+        return side(46, nL).concat(side(147, K - nL));
+      }
+      case 'pendant':
+        return rosette(71.5, 163, K, 30, 17);
+      case 'brooch': {
+        const P = [[107, 102, 24], [107, 30, 17], [172, 62, 16], [42, 62, 16], [178, 126, 16], [36, 126, 16], [143, 182, 16], [71, 182, 16]];
+        return pick(P, K, { 2: [1, 0], 3: [0, 2, 3], 4: [0, 1, 6, 7], 5: [0, 2, 3, 6, 7], 6: [0, 1, 2, 3, 6, 7], 7: [0, 1, 2, 3, 4, 5, 6] });
+      }
+      case 'bracelet':
+        return along([[22, 86], [58, 108], [100, 124], [151, 130], [202, 124], [244, 108], [281, 86]], K, 60, 17);
+      case 'necklace':
+        return along([[20, 80], [42, 124], [86, 158], [140, 172], [194, 158], [238, 124], [260, 80]], K, 42, 17);
+      case 'hairpin':
+        return along([[34, 168], [130, 100], [228, 32]], K, 42, 16);
+      case 'tiara': {
+        const P = [[149, 62, 16], [87, 80, 13], [211, 80, 13], [40, 100, 11], [258, 100, 11], [149, 128, 11], [96, 124, 10], [202, 124, 10]];
+        return pick(P, K, { 2: [1, 2], 3: [0, 1, 2], 4: [1, 2, 3, 4], 7: [0, 1, 2, 3, 4, 6, 7] });
+      }
+      case 'cufflinks': {
+        const nL = Math.ceil(K / 2);
+        return rosette(52, 66, nL, 24, 18, Math.PI / 4).concat(rosette(201, 96, K - nL, 24, 18, Math.PI / 4));
+      }
+      case 'crown': {
+        const P = [[120, 156, 15], [72, 152, 13], [168, 152, 13], [120, 72, 12], [18, 58, 10], [223, 58, 10], [120, 14, 10], [54, 30, 9], [187, 30, 9]];
+        return pick(P, K, {});
+      }
+      default: return seats('ring', K);
+    }
+  }
+
+  /* Место картинки в box: вписать, крупный план — не больше ART_CAP. */
+  function place(piece, box, cap) {
+    const a = ART[piece] || ART.ring;
+    let s = Math.min(box.w / a[0], box.h / a[1]) * 0.96;
+    if (cap) s = Math.min(s, cap);
+    return { s, w: a[0] * s, h: a[1] * s, x0: box.x + (box.w - a[0] * s) / 2, y0: box.y + (box.h - a[1] * s) / 2 };
+  }
+  const artOf = (piece) => SPRITE[ART[piece] ? piece : 'ring'] || null;
+  const artSeats = (piece, K, f) => seats(ART[piece] ? piece : 'ring', K).map(([x, y, r]) => ({ x: f.x0 + x * f.s, y: f.y0 + y * f.s, r: r * f.s }));
+
+  /* Загрузить картинки изделий; cb(piece) — после каждой (перерисовать). */
+  function load(base, cb) {
+    if (typeof Image === 'undefined') return;
+    Object.keys(ART).forEach(p => {
+      const im = new Image();
+      im.onload = () => { SPRITE[p] = im; if (cb) cb(p); };
+      im.src = base + 'jw_' + p + '.webp';
+    });
+  }
+
   /* Гнёзда в координатах canvas (для полёта камня в гнездо). */
   function sockets(piece, K, box) {
+    if (artOf(piece)) return artSeats(piece, K, place(piece, box, 0));
     const f = frame(box);
     return design(piece, K).sockets.map(p => ({ x: f.x0 + p.u * f.s, y: f.y0 + p.v * f.s, r: p.r * f.s }));
   }
@@ -196,6 +304,34 @@ const WsJewel = (() => {
     g.stroke();
   }
 
+  /* Гнёзда S = [{ x, y, r }]: золотой ободок и тёмное ложе, камни, вспышка
+     у только что вставленного. */
+  function stones(g, S, gems, opts, sil) {
+    S.forEach(({ x, y, r }, i) => {
+      g.beginPath(); g.arc(x, y, r * 1.2, 0, Math.PI * 2);
+      g.fillStyle = sil ? 'rgba(20,10,4,0.6)' : gold(g, y - r, y + r);
+      g.fill();
+      if (!sil && gems && gems[i]) return;
+      g.beginPath(); g.arc(x, y, r * 0.92, 0, Math.PI * 2);
+      g.fillStyle = sil ? 'rgba(0,0,0,0.5)' : 'rgba(40,20,8,0.85)';
+      g.fill();
+      if (!sil && opts.ghost && opts.ghost[i] && opts.drawGem) opts.drawGem(g, opts.ghost[i], x, y, r * 2.1, 0.28);
+    });
+    if (sil || !gems || !opts.drawGem) return;
+    S.forEach(({ x, y, r }, i) => {
+      if (!gems[i]) return;
+      let size = r * 2.35;
+      if (opts.pop && opts.pop.i === i) {
+        const k = opts.pop.k;
+        size *= 1 + 0.45 * Math.sin(Math.min(1, k) * Math.PI) * (1 - k * 0.5);
+        g.beginPath(); g.arc(x, y, r * (1.3 + 1.4 * k), 0, Math.PI * 2);
+        g.fillStyle = `rgba(255,232,160,${0.5 * (1 - k)})`;
+        g.fill();
+      }
+      opts.drawGem(g, gems[i], x, y, size);
+    });
+  }
+
   /* Нарисовать изделие.
      gems — массив длины K: тип камня в гнезде или null (пустое гнездо);
      opts.ghost — массив типов для пустых гнёзд (бледный намёк, какой камень
@@ -206,9 +342,21 @@ const WsJewel = (() => {
      увеличения (по умолчанию 1,9). */
   function draw(g, piece, K, gems, box, opts) {
     opts = opts || {};
+    const sil = !!opts.silhouette, img = !sil && artOf(piece);
+    if (img) {
+      const f = place(piece, box, opts.closeup ? ART_CAP : 0);
+      g.save();
+      g.imageSmoothingEnabled = true;
+      g.imageSmoothingQuality = 'high';
+      g.shadowColor = 'rgba(70,24,40,0.35)'; g.shadowBlur = Math.max(2, f.s * 9); g.shadowOffsetY = Math.max(1, f.s * 3);
+      g.drawImage(img, f.x0, f.y0, f.w, f.h);
+      g.shadowColor = 'rgba(0,0,0,0)'; g.shadowBlur = 0; g.shadowOffsetY = 0;
+      stones(g, artSeats(piece, K, f), gems, opts, false);
+      g.restore();
+      return;
+    }
     const d = design(piece, K);
     const f = opts.closeup ? closeFrame(box, d, piece, typeof opts.closeup === 'number' ? opts.closeup : 1.9) : frame(box);
-    const sil = !!opts.silhouette;
     const lw = Math.max(1.2, f.s * 0.045);
     g.save();
     g.lineCap = 'round';
@@ -232,35 +380,7 @@ const WsJewel = (() => {
     g.lineWidth = lw;
     d.lines.forEach(pts => strokeLine(g, f, pts));
     g.shadowBlur = 0; g.shadowOffsetY = 0;
-    // гнёзда: золотой ободок и тёмное ложе
-    d.sockets.forEach((p, i) => {
-      const x = f.x0 + p.u * f.s, y = f.y0 + p.v * f.s, r = p.r * f.s;
-      g.beginPath(); g.arc(x, y, r * 1.2, 0, Math.PI * 2);
-      g.fillStyle = sil ? 'rgba(20,10,4,0.6)' : gold(g, y - r, y + r);
-      g.fill();
-      const has = !sil && gems && gems[i];
-      if (!has) {
-        g.beginPath(); g.arc(x, y, r * 0.92, 0, Math.PI * 2);
-        g.fillStyle = sil ? 'rgba(0,0,0,0.5)' : 'rgba(40,20,8,0.85)';
-        g.fill();
-        if (!sil && opts.ghost && opts.ghost[i] && opts.drawGem) opts.drawGem(g, opts.ghost[i], x, y, r * 2.1, 0.28);
-      }
-    });
-    if (!sil && gems && opts.drawGem) {
-      d.sockets.forEach((p, i) => {
-        if (!gems[i]) return;
-        const x = f.x0 + p.u * f.s, y = f.y0 + p.v * f.s, r = p.r * f.s;
-        let size = r * 2.35;
-        if (opts.pop && opts.pop.i === i) {
-          const k = opts.pop.k;
-          size *= 1 + 0.45 * Math.sin(Math.min(1, k) * Math.PI) * (1 - k * 0.5);
-          g.beginPath(); g.arc(x, y, r * (1.3 + 1.4 * k), 0, Math.PI * 2);
-          g.fillStyle = `rgba(255,232,160,${0.5 * (1 - k)})`;
-          g.fill();
-        }
-        opts.drawGem(g, gems[i], x, y, size);
-      });
-    }
+    stones(g, d.sockets.map(p => ({ x: f.x0 + p.u * f.s, y: f.y0 + p.v * f.s, r: p.r * f.s })), gems, opts, sil);
     if (sil) {
       g.fillStyle = 'rgba(255,230,180,0.55)';
       g.font = `900 ${Math.round(f.s * 0.34)}px Nunito, "Arial Rounded MT Bold", Arial, sans-serif`;
@@ -297,5 +417,5 @@ const WsJewel = (() => {
     g.restore();
   }
 
-  return { PIECES, design, sockets, draw, shine };
+  return { PIECES, ART, design, seats, sockets, draw, shine, load };
 })();

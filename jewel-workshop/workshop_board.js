@@ -55,6 +55,7 @@ const WsBoard = (() => {
 
   let canvas = null, ctx = null, dpr = 1, W = 0, H = 0;
   let atlas = null, atlasReady = false;
+  let handImg = null, lockImg = null;   // рука-подсказка и замок с листа (ui_hand, ui_lock); до загрузки — рисунок кодом
   let spriteOf = () => 0, colorOf = () => '#c33';
   let vials = [];
   let hid = [];                   // сколько нижних камней каждой пробирки под бархатом
@@ -497,6 +498,8 @@ const WsBoard = (() => {
     ctx.restore();
   }
 
+  const ready = (im) => !!(im && im.complete && im.naturalWidth);
+
   /* Замок на запертой пробирке: сливовая вуаль, золотая цепочка и замок. */
   function drawLock(v, cx, t) {
     const s = lay.slots[v], tw = lay.tw;
@@ -521,8 +524,15 @@ const WsBoard = (() => {
     ctx.moveTo(cx + tw * 0.55, y - tw * 0.7); ctx.lineTo(cx - tw * 0.55, y + tw * 0.5);
     ctx.stroke();
     ctx.setLineDash([]);
-    // дужка (при открытии поднимается) и корпус замка
+    // замок; при открытии поднимается и гаснет
     const lift = k * tw * 0.3;
+    if (ready(lockImg)) {
+      const w = tw * 0.62, h = w * lockImg.naturalHeight / lockImg.naturalWidth;
+      ctx.shadowColor = 'rgba(90,30,60,0.35)'; ctx.shadowBlur = tw * 0.12; ctx.shadowOffsetY = tw * 0.04;
+      ctx.drawImage(lockImg, cx - w / 2, y - h * 0.44 - lift, w, h);
+      ctx.restore();
+      return;
+    }
     ctx.lineCap = 'round';
     ctx.strokeStyle = GOLD_EDGE;
     ctx.lineWidth = Math.max(3, tw * 0.13);
@@ -557,6 +567,15 @@ const WsBoard = (() => {
       ctx.strokeStyle = `rgba(255,255,255,${0.85 * (1 - rk)})`;
       ctx.lineWidth = Math.max(2, tw * 0.07);
       ctx.stroke();
+    }
+    if (ready(handImg)) {   // палец картинки — в (0.08, 0.06) от её размера, указывает влево-вверх
+      const h = tw * 1.45, w = h * handImg.naturalWidth / handImg.naturalHeight;
+      const back = u * (0.16 - 0.12 * press);
+      ctx.save();
+      ctx.shadowColor = 'rgba(90,30,60,0.35)'; ctx.shadowBlur = tw * 0.25; ctx.shadowOffsetY = tw * 0.06;
+      ctx.drawImage(handImg, tip.x + back * 0.67 - w * 0.08, tip.y + back * 0.74 - h * 0.06, w, h);
+      ctx.restore();
+      return;
     }
     ctx.save();
     ctx.translate(tip.x, tip.y);
@@ -765,6 +784,9 @@ const WsBoard = (() => {
     atlas = new Image();
     atlas.onload = () => { atlasReady = true; request(); opts.onAtlas && opts.onAtlas(); };
     atlas.src = opts.atlasUrl;
+    const pic = (name) => { const im = new Image(); im.onload = request; im.src = opts.atlasUrl.replace(/[^/]*$/, '') + name + '.webp'; return im; };
+    handImg = pic('ui_hand');
+    lockImg = pic('ui_lock');
     resize();
     // Область поля меняется не только с окном: плашка «тупик», поворот.
     // Холст подстраивается сам, иначе он вылезает на кнопки.

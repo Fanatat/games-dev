@@ -621,7 +621,11 @@
   }
 
   /* Лица заказчиц: у заказа своё лицо на весь уровень, на виду — без повторов. */
-  const FACES = ['bride', 'grandma', 'curly'];
+  const FACES = ['bride', 'grandma', 'curly', 'lady', 'redhead', 'blonde'];
+  // героиня окна победы по изделию: невеста — кольца, колье, диадемы и короны; кудрявая —
+  // серьги, браслеты и заколки; бабушка — кулоны, броши и запонки
+  const HERO = { ring: 'bride', necklace: 'bride', tiara: 'bride', crown: 'bride', earrings: 'curly',
+    bracelet: 'curly', hairpin: 'curly', pendant: 'grandma', brooch: 'grandma', cufflinks: 'grandma' };
   let faces = {};
   function assignFaces(slots) {
     const used = [];
@@ -1429,6 +1433,7 @@
     ov.classList.toggle('is-flat', flat);   // лёжа «+N» встаёт левее счётчика, не под ним
     let bank = shownCoins;
     $('ws-win-bank-n').textContent = String(Math.max(0, bank));
+    $('ws-win-hero').className = 'ws-win-hero h-' + (HERO[L.piece] || 'curly');
     ov.classList.remove('hidden');
     drawWinJewel(0);
     // звёзды по одной
@@ -1673,11 +1678,9 @@
     g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath();
   }
 
-  /* Шкатулка: деревянный ларец с золотой оковкой, крышка откинута, внутри
-     свечение и образец убранства. */
-  // картинка окна шкатулки: открытая шкатулка, из неё поднимается образец нового убранства
+  // картинка окна шкатулки: открытая шкатулка (chest_open), из неё поднимается образец нового убранства
   function chestPic(id) {
-    return '<div class="ws-chest is-open ws-chest-big">' + CHEST_SVG +
+    return '<div class="ws-chest is-open ws-chest-big">' +
       '<span class="ws-chest-prize" style="background:' + (SWATCH[id] || '#fff') + '"></span></div>';
   }
 
@@ -1721,25 +1724,6 @@
      стоит последнее готовое изделие; героиня — рядом с уровнем кнопки «Играть». */
   const MAP = { step: 80, top: 132, bottom: 150, k: 0.8, phase: 0.6 };
   const HARD_SVG = '<svg viewBox="0 0 24 24"><path d="M6 3h12M6 21h12" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/><path d="M7.5 3.8c0 4.4 4.5 5.6 4.5 8.2s-4.5 3.8-4.5 8.2h9c0-4.4-4.5-5.6-4.5-8.2s4.5-3.8 4.5-8.2z" fill="#fff4f6"/></svg>';
-  // шкатулка: деревянный короб с куполом в золотой оправе; открытая — крышка откинута, внутри свет
-  const CH_BODY = 'M7 30h50v17a4 4 0 0 1-4 4H11a4 4 0 0 1-4-4z';
-  const CH_LID = 'M7 31V21c0-8.5 7-14 15.5-14h19C50 7 57 12.5 57 21v10z';
-  const CHEST_SVG = '<svg viewBox="0 0 64 58" aria-hidden="true">' +
-    '<ellipse cx="32" cy="53.5" rx="26" ry="4" fill="rgba(90,30,50,0.28)"/>' +
-    '<ellipse class="ch-glow" cx="32" cy="24" rx="31" ry="23" fill="url(#ws-ch-glow)"/>' +
-    '<path d="' + CH_BODY + '" fill="none" stroke="#5a2a10" stroke-width="5.6" stroke-linejoin="round"/>' +
-    '<path d="' + CH_BODY + '" fill="url(#ws-ch-wood)" stroke="url(#ws-ch-gold)" stroke-width="3" stroke-linejoin="round"/>' +
-    '<path d="M10 38h44M10 44.5h44" stroke="rgba(90,40,10,0.35)" stroke-width="1"/>' +
-    '<path d="M16.5 31v19M47.5 31v19" stroke="url(#ws-ch-gold)" stroke-width="4"/>' +
-    '<path d="M8.5 30.5h47l-3.5-4.5H12z" fill="#4a210b"/><ellipse cx="32" cy="29" rx="15" ry="2.6" fill="#ffe7a0" opacity="0.9"/>' +
-    '<g class="ch-lid"><path d="' + CH_LID + '" fill="none" stroke="#5a2a10" stroke-width="5.6" stroke-linejoin="round"/>' +
-    '<path d="' + CH_LID + '" fill="url(#ws-ch-wood)" stroke="url(#ws-ch-gold)" stroke-width="3" stroke-linejoin="round"/>' +
-    '<path d="M16.5 30V9.6M47.5 30V9.6" stroke="url(#ws-ch-gold)" stroke-width="4"/>' +
-    '<path d="M21 11.5c3-1.6 6-2 11-2s8 .4 11 2" fill="none" stroke="rgba(255,236,200,0.55)" stroke-width="2" stroke-linecap="round"/></g>' +
-    '<path d="M25.5 25h13v9.5c0 3.4-3.4 6-6.5 7.5-3.1-1.5-6.5-4.1-6.5-7.5z" fill="url(#ws-ch-gold)" stroke="#8a5410" stroke-width="1.2" stroke-linejoin="round"/>' +
-    '<path d="M32 27.6l4 3.7-4 5.4-4-5.4z" fill="#f0507f" stroke="#fff3f6" stroke-width="0.9" stroke-linejoin="round"/>' +
-    '</svg>';
-  const LOCK_SVG = '<svg viewBox="0 0 24 24"><path d="M8 11V8.2a4 4 0 0 1 8 0V11" fill="none" stroke="#fff" stroke-width="2.6"/><rect x="5.5" y="10.5" width="13" height="10" rx="2.5" fill="#fff"/><circle cx="12" cy="15.4" r="1.7" fill="#b98226"/></svg>';
   let mapIdx = 0;          // уровень у героини (перерисовка карты при повороте экрана)
 
   function smoothPath(p) {   // Катмулл — Ром через точки -> кубические кривые
@@ -1860,9 +1844,8 @@
         const me = document.createElement('span');
         me.className = 'ws-map-me ' + (side < 0 ? 'is-left' : 'is-right');
         me.setAttribute('aria-hidden', 'true');
-        me.innerHTML = '<span class="ws-face f-jeweler"></span>';
-        me.style.left = (p.x + side * 80) + 'px';
-        me.style.top = (p.y - 16) + 'px';
+        me.style.left = (p.x + side * 64) + 'px';   // остриё булавки — у края значка
+        me.style.top = (p.y + 10) + 'px';
         track.appendChild(me);
       }
     });
@@ -1876,7 +1859,6 @@
     b.type = 'button';
     const done = collDone(ci), opened = !!Store.data.chests[ci];
     b.className = 'ws-chest' + (opened ? ' is-open' : done ? ' is-ready' : ' is-locked');
-    b.innerHTML = CHEST_SVG;
     const c = COLLECTIONS[ci];
     b.setAttribute('aria-label', 'Шкатулка коллекции «' + c.name + '»: ' + (opened ? 'открыта, в ней было «' + decorName(c.decor[0], c.decor[1]) + '»' : done ? 'можно открыть' : 'пройдите все пять уровней коллекции'));
     b.addEventListener('click', () => {
@@ -1942,7 +1924,7 @@
         sw.className = 'ws-swatch';
         sw.style.background = SWATCH[d.id];
         b.appendChild(sw);
-        if (!own) b.insertAdjacentHTML('beforeend', '<span class="ws-decor-lock" aria-hidden="true">' + LOCK_SVG + '</span>');
+        if (!own) b.insertAdjacentHTML('beforeend', '<span class="ws-decor-lock" aria-hidden="true"></span>');
         b.title = d.name;
         const src = COLLECTIONS.find(c => c.decor[0] === kind && c.decor[1] === d.id);
         b.setAttribute('aria-label', d.name + (on ? ', выбрано' : own ? '' : ', в шкатулке «' + (src ? src.name : '') + '»'));
@@ -1998,15 +1980,30 @@
     Store.data.sessions++;
     Store.save();
     track('session_start', { sessions: Store.data.sessions, coins: Store.data.coins, passed: Object.keys(Store.data.stars).length });
+    // атлас камней, картинки изделий и руки приходят после запуска: перерисовать то, что на виду
+    let artRaf = 0;
+    const redrawArt = () => {
+      if (artRaf) return;
+      artRaf = requestAnimationFrame(() => {
+        artRaf = 0;
+        if (screen === 'menu') renderMap(); else Piece.request();
+        if (!$('win-overlay').classList.contains('hidden')) drawWinJewel(0);
+      });
+    };
+    const atlasUrl = (document.querySelector('link[rel="preload"][as="image"]') || {}).href || 'workshop_assets/gems.webp';
+    const assets = atlasUrl.replace(/[^/]*$/, '');
     WsBoard.init($('board-canvas'), {
       spriteOf: (t) => (GEMS[t] ? GEMS[t].sprite : 0),
       colorOf: (t) => (GEMS[t] ? GEMS[t].color : '#c33'),
-      atlasUrl: (document.querySelector('link[rel="preload"][as="image"]') || {}).href || 'workshop_assets/gems.webp',
-      onAtlas: () => {
-        if (screen === 'menu') renderMap(); else Piece.request();
-        if (!$('win-overlay').classList.contains('hidden')) drawWinJewel(0);
-      }
+      atlasUrl,
+      onAtlas: redrawArt
     });
+    WsJewel.load(assets, redrawArt);
+    // радостные лица и героини победы — заранее, чтобы не появлялись с задержкой
+    if (typeof Image !== 'undefined') {
+      FACES.map(f => 'face_' + f + '_joy').concat(['hero_bride', 'hero_curly', 'hero_grandma'])
+        .forEach(n => { new Image().src = assets + n + '.webp'; });
+    }
     Fx.init($('fx-canvas'));
     Piece.init($('ws-piece'));
     Confetti.init($('confetti-canvas'));

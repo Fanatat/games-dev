@@ -328,6 +328,8 @@ function dealDamage(world, targetInfo, dmg, onKillTeamGold, attackerRole = 'mele
   // «Последний конвой»: усиление «Укрепление» — стрелы по конвою слабее (world.convoyRangedTaken, convoy.js)
   const shield = targetInfo.kind === 'core' && ref.team === 'player' && attackerRole === 'ranged' && world.convoyRangedTaken ? world.convoyRangedTaken : 1;
   let finalDmg = dmg * (1 - reduction) * coreMult * shield;
+  // «Последний конвой»: сочетание «Стена щитов» — свои бойцы получают меньше урона (u.dmgTaken, convoy.js applyMods)
+  if (targetInfo.kind === 'unit' && ref.dmgTaken) finalDmg *= ref.dmgTaken;
   // r15 И19 (куратор №7: «вражеская крепость висит на 45→29 HP 60+ с»):
   // ниже FINISH_ONE_HIT её HP любой удар бойца, героя или «Залпа» игрока
   // добивает. Крепость ИГРОКА так не падает (её держит FORT_GUARD).
@@ -390,6 +392,8 @@ function updateUnits(world, dt, onKillTeamGold) {
     const t = UNIT_TYPES[u.typeId];
     if (t.role === 'breaker') { updateBreakerUnit(world, u, t, dt); continue; }
     if (u.raid) { updateRaider(world, u, t, dt); continue; } // r15 И15: «налётчик» м1
+    // «Последний конвой»: оглушение камнем («Камнелом», convoy.js) — стоит, не бьёт
+    if (u.stunT > 0) { u.stunT = Math.max(0, u.stunT - dt); u.state = 'idle'; continue; }
     const target = findTarget(world, u);
     if (!target) { u.state = 'walk'; continue; }
     const dist = Math.abs(target.ref.x - u.x);
@@ -407,7 +411,7 @@ function updateUnits(world, dt, onKillTeamGold) {
       u.state = 'attack';
       u.attackTimer -= dt;
       if (u.attackTimer <= 0) {
-        u.attackTimer = t.atkInterval;
+        u.attackTimer = t.atkInterval * (u.atkMult || 1); // «Последний конвой»: карта «Быстрая тетива»
         if (t.role === 'ranged' || t.role === 'rider') {
           world.projectiles.push({
             team: u.team, x: u.x, y: -30, targetKind: target.kind, targetRef: target.ref,
@@ -431,8 +435,8 @@ function updateUnits(world, dt, onKillTeamGold) {
       u.state = 'idle';
     } else {
       u.state = 'walk';
-      u.walkPhase += dt * (t.speed * crySpeed / 12);
-      u.x += u.dir * t.speed * crySpeed * dt;
+      u.walkPhase += dt * (t.speed * crySpeed * (u.speedMult || 1) / 12);
+      u.x += u.dir * t.speed * crySpeed * (u.speedMult || 1) * dt;
       u.x = Math.max(ARENA.laneMin, Math.min(ARENA.laneMax, u.x));
     }
     // «Наездник» — нижний боец вдобавок бьёт лоу-киком вплотную, на своём

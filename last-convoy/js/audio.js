@@ -97,6 +97,25 @@ const SFX = (() => {
     src.start(now + delay);
   }
 
+  // Мягкий синусовый «удар» без сэмпла (стук сердца, гул): частота f0 → f1 за dur секунд.
+  function thump(f0, f1, at, vol, dur) {
+    if (muted || platformMuted) return;
+    const c = ensure();
+    const t0 = c.currentTime + at;
+    const o = c.createOscillator();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(f0, t0);
+    o.frequency.exponentialRampToValueAtTime(f1, t0 + dur);
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + 0.015);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g).connect(master);
+    o.onended = () => g.disconnect();
+    o.start(t0);
+    o.stop(t0 + dur + 0.03);
+  }
+
   return {
     setMuted(v) { muted = v; },
     isMuted() { return muted; },
@@ -141,6 +160,24 @@ const SFX = (() => {
     click() { play('click', { vol: 0.4, gap: 0.03 }); },
     alarm() { play('bell', { vol: 0.5, gap: 0.5 }); }, // «Последний конвой»: предупреждение о волне
     coreHit() { play('core_hit', { vol: 0.45, gap: 0.08 }); },
+    // «Последний конвой»: монета долетела (тон растёт с цепочкой), камнепад, серия, волна отбита
+    coin(extra = 0) { play('coins', { vol: 0.2, rate: 1.1 + extra, gap: 0.045 }); },
+    rockLaunch() { play('swing', { vol: 0.5, rate: 0.8 }); },
+    rockHit() { play('hit_heavy', { vol: 0.5, rate: 0.7, gap: 0.06 }); },
+    streak() { play('bell', { vol: 0.35, rate: 1.5 }); play('coins', { vol: 0.35, rate: 1.3, delay: 0.06 }); },
+    waveClear() { play('upgrade', { vol: 0.45, rate: 1.1 }); play('bell', { vol: 0.3, rate: 1.25, delay: 0.12 }); },
+    // этап 2: стук сердца (конвой при смерти), Вождь, вожак, сочетания
+    heartbeat() { thump(70, 42, 0, 0.32, 0.16); thump(62, 38, 0.17, 0.22, 0.14); },
+    elite() { play('bell', { vol: 0.4, rate: 0.75, gap: 0.6 }); },
+    bossRoar() { play('hit_hero_special', { vol: 0.6, rate: 0.6 }); play('death', { vol: 0.45, rate: 0.5, delay: 0.05 }); thump(55, 30, 0, 0.35, 0.5); },
+    slam() { play('hit_heavy', { vol: 0.75, rate: 0.55 }); play('core_hit', { vol: 0.4, rate: 0.6, delay: 0.03 }); thump(60, 28, 0, 0.4, 0.35); },
+    bossDown() { play('hit_hero_special', { vol: 0.6, rate: 0.75 }); play('upgrade', { vol: 0.5, rate: 0.9, delay: 0.15 }); play('coins', { vol: 0.5, delay: 0.25 }); play('bell', { vol: 0.35, rate: 1.2, delay: 0.3 }); },
+    // «Последний конвой»: открыта награда за славу (экран итога)
+    gloryUnlock() { play('bell', { vol: 0.45, rate: 1.1 }); play('upgrade', { vol: 0.5, rate: 1.05, delay: 0.12 }); play('bell', { vol: 0.4, rate: 1.5, delay: 0.3 }); play('coins', { vol: 0.4, rate: 1.2, delay: 0.34 }); },
+    synergy() { play('upgrade', { vol: 0.5, rate: 1.2 }); play('bell', { vol: 0.4, rate: 1.6, delay: 0.1 }); play('coins', { vol: 0.45, rate: 1.4, delay: 0.18 }); },
+    vein() { play('coins', { vol: 0.55, rate: 0.9 }); play('coins', { vol: 0.45, rate: 1.3, delay: 0.08 }); play('bell', { vol: 0.25, rate: 1.8, delay: 0.1, gap: 0.3 }); },
+    ballista() { play('swing', { vol: 0.35, rate: 1.4, gap: 0.2 }); play('shoot', { vol: 0.35, rate: 0.6, gap: 0.2 }); },
+    hail() { play('shoot', { vol: 0.3, rate: 1.3 }); play('shoot', { vol: 0.25, rate: 1.5, delay: 0.08 }); play('shoot', { vol: 0.2, rate: 1.2, delay: 0.16 }); },
   };
 })();
 

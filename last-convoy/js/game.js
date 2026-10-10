@@ -3666,7 +3666,7 @@ function startConfetti() {
 // Раунд 9: спец-удар K -> R, апгрейд дохода U -> Q; K освободился под новую
 // способность "Боевой клич" (см. handleHotkey).
 // Раунд 15 (П6): V — «Залп», T — «Новая эра» (обе были свободны).
-const GAME_KEYS = new Set(['Space', 'KeyJ', 'KeyR', 'KeyE', 'ShiftLeft', 'ShiftRight', 'KeyF', 'KeyQ', 'KeyB', 'KeyV', 'KeyT', 'Digit1', 'Digit2', 'Digit3', 'Digit4', 'KeyP', 'Escape']);
+const GAME_KEYS = new Set(['Space', 'KeyJ', 'KeyR', 'KeyE', 'ShiftLeft', 'ShiftRight', 'KeyF', 'KeyQ', 'KeyB', 'KeyV', 'KeyT', 'Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'KeyP', 'Escape']);
 window.addEventListener('keydown', (e) => {
   if (screen === 'match' && GAME_KEYS.has(e.code)) e.preventDefault();
   if (keysDown.has(e.code)) return;
@@ -3679,14 +3679,17 @@ function handleHotkey(code, key) {
   if (adPlaying || pageHidden) return; // аудит A08: на рекламной паузе действия клавишами недопустимы
   if (code === 'KeyP' || code === 'Escape') {
     if (screen === 'help') { closeHelp(); return; } // r15 И12: туда, откуда открыта
+    if (screen === 'match' && window.CONVOY_PROTOTYPE && !Convoy.canPause()) return; // итог похода — без паузы
     if (screen === 'match' || screen === 'paused') togglePause();
     return;
   }
   if (screen !== 'match') return;
-  // «Последний конвой»: из клавиш боя остались только покупка 1–3 (и пауза выше);
-  // ручная атака, спецудары, апгрейд, выкуп героя, Залп и эра отключены.
+  // «Последний конвой»: 1–6 — покупка бойца (в окне выбора — карта), Пробел/Q — камнепад
+  // по самой густой толпе, R — другие карты. Ручная атака, спецудары, выкуп героя и эра отключены.
   if (match && match.convoy) {
-    if (code === 'Digit1' || code === 'Digit2' || code === 'Digit3') Convoy.buyIndex(Number(code.slice(-1)) - 1);
+    if (/^Digit[1-6]$/.test(code)) Convoy.key(Number(code.slice(-1)) - 1); // «Последний конвой»: до 6 классов
+    else if (code === 'Space' || code === 'KeyQ') Convoy.rockAuto();
+    else if (code === 'KeyR') Convoy.reroll();
     return;
   }
   if (code === 'Space' || code === 'KeyJ') input.attackPressed = true;
@@ -4104,9 +4107,10 @@ function update(dt) {
 // см. ПЛАН.md, раунд 3, «мир живее».
 const DAY_CYCLE_SEC = 120;
 function computeDayNight(elapsed) {
-  // «Последний конвой»: без ночи — ночью бой не читался (ТЗ_КОНВОЙ_MVP1 п.9). Бой 1 — утро, бой 2 — после полудня.
+  // «Последний конвой»: без ночи — ночью бой не читался (ТЗ_КОНВОЙ_MVP1 п.9). Солнце идёт от утра
+  // на первой стоянке к закату на последней (Convoy.dayT).
   if (window.CONVOY_PROTOTYPE) {
-    const localT = match && match.convoy && match.convoy.battle === 2 ? 0.66 : 0.3;
+    const localT = Convoy.dayT();
     const alt = Math.sin(Math.PI * localT);
     return { sunUp: true, localT, alt, light: 0.45 + 0.55 * alt };
   }
@@ -4212,7 +4216,7 @@ function render() {
     const sideAge = dressing ? AGES[u.dressFrom] : teamAgeOf(u.team);
     if (u.dressT0 !== undefined && !dressing && !u.dressFx && deathSec === null) { u.dressFx = true; VFX.dressUp(match, u.x, u.team === 'player'); }
     const weapon = sideAge.weapon[t.role] || null; // раунд 15 (И2): силуэт в эпохе стороны
-    const attackPhase = u.state === 'attack' ? (1 - Math.max(0, u.attackTimer) / t.atkInterval) : null;
+    const attackPhase = u.state === 'attack' ? (1 - Math.max(0, u.attackTimer) / (t.atkInterval * (u.atkMult || 1))) : null;
     const dead = deathSec !== null;
     const cheer = celebrate && u.team === 'player' && !dead;
     const enemy = u.team !== 'player';
@@ -4292,6 +4296,7 @@ function render() {
   // Раунд 15 (И2): «Залп» (снаряды и метка участка) и надпись смены эпохи.
   VFX.drawVolley(ctx, match.world, ARENA.groundY);
   drawAgeBanner();
+  if (match.convoy) Convoy.drawOverlay(); // «Последний конвой»: монеты, надписи стоянок, серии, прицел камнепада
 
   ctx.restore();
 }

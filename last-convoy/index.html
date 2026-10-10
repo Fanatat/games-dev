@@ -1,10 +1,11 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-<!-- Последний конвой, тестовая сборка 2 MVP-1 convoy-mvp@84ed646 (2026-10-09) -->
+<!-- Последний конвой, тестовая сборка 3 поход-рогалик convoy-roguelite@a29f907 (2026-10-10) -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>Последний конвой</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M4 20 Q16 4 28 20Z' fill='%23e8d9b8' stroke='%232a2218' stroke-width='2'/%3E%3Crect x='3' y='19' width='26' height='5' fill='%238a5a30' stroke='%232a2218' stroke-width='2'/%3E%3Ccircle cx='9' cy='26' r='4' fill='%235a3a20' stroke='%232a2218' stroke-width='2'/%3E%3Ccircle cx='23' cy='26' r='4' fill='%235a3a20' stroke='%232a2218' stroke-width='2'/%3E%3C/svg%3E">
 <!-- Шрифты — локальные (24.09.2026): сервер шрифтов Google из России висел до
      13,5 с и падал, см. assets/fonts/fonts.css. -->
 <link rel="stylesheet" href="assets/fonts/fonts.css">
@@ -164,26 +165,46 @@
     <div id="cvHud" class="hidden">
       <div class="cv-top">
         <div class="cv-fort">
-          <div class="cv-fort-head"><span class="cv-fort-ico"></span><span>Конвой</span><b id="cvHpText">500/500</b></div>
+          <div class="cv-fort-head"><span class="cv-fort-ico"></span><span>Конвой</span><b id="cvHpText">600/600</b></div>
           <div class="bar bar-hp-player"><div class="bar-fill" id="cvHpFill"></div></div>
         </div>
         <div class="cv-center">
-          <div class="cv-enc" id="cvEnc">Столкновение 1/2</div>
-          <div class="cv-boost-badge hidden" id="cvBoostBadge"></div>
-        </div>
-        <div class="cv-wave">
-          <div class="cv-wave-label" id="cvWaveLabel">Подготовка</div>
-          <div class="cv-dots" id="cvDots"></div>
-          <div class="cv-wave-timer" id="cvWaveTimer"></div>
-          <div class="cv-wave-next" id="cvWaveNext"></div>
+          <div class="cv-stop" id="cvStop">Стоянка 1/10</div>
+          <div class="cv-track" id="cvTrack"></div>
+          <div class="cv-status" id="cvStatus"></div>
         </div>
         <button id="cvPause" class="icon-btn hud-round" title="Пауза (P)" aria-label="Пауза"><svg class="ico"><use href="#i-pause"/></svg></button>
       </div>
-      <div class="cv-alert hidden" id="cvAlert" role="alert"><span class="cv-alert-ico">!</span><span id="cvAlertText"></span></div>
-      <div class="cv-tip hidden" id="cvHint" role="status"><b>Лучники бьют конвой из-за спин своих.</b> Бойцы догоняют их и бьют в 1,5 раза сильнее.</div>
+      <div class="cv-boss hidden" id="cvBoss"><span class="cv-boss-name">Вождь</span><div class="cv-boss-bar"><i id="cvBossFill"></i></div></div>
+      <div class="cv-tip hidden" id="cvHint" role="status"><b>Камнепад готов!</b> Нажмите на толпу врагов на поле (или Пробел).</div>
+      <!-- окно выбора усиления: поверх замершего поля, HUD остаётся виден -->
+      <div class="cv-pick hidden" id="cvPick">
+        <div class="cv-pick-head">
+          <h2 id="cvPickTitle">Стоянка пройдена!</h2>
+          <p id="cvPickSub"></p>
+        </div>
+        <div class="cv-pick-cards" id="cvPickCards"></div>
+        <div class="cv-pick-actions">
+          <button class="cv-act" id="cvRepair"><span id="cvRepairText">Починить</span><span class="cv-act-cost"><i class="gold-dot"></i><b id="cvRepairCost">48</b></span></button>
+          <button class="cv-act" id="cvReroll"><span>Другие карты</span><span class="cv-act-cost"><i class="gold-dot"></i><b id="cvRerollCost">25</b></span><span class="tool-key">R</span></button>
+        </div>
+      </div>
       <div class="cv-bottom">
-        <div class="cv-gold"><span class="gold-dot"></span><b id="cvGold">60</b><span class="cv-income" id="cvIncome">+6/с</span></div>
-        <div class="cv-cards" id="cvCards"></div>
+        <div class="cv-econ">
+          <div class="cv-gold" id="cvGoldBox"><span class="gold-dot" id="cvGoldDot"></span><b id="cvGold">50</b><span class="cv-income" id="cvIncome">+2/с в бою</span></div>
+          <div class="cv-squad" id="cvSquad">Отряд 2/24</div>
+          <div class="cv-syn" id="cvSyn"></div>
+        </div>
+        <div class="cv-row">
+          <div class="cv-cards" id="cvCards"></div>
+          <button class="cv-rock" id="cvRock" aria-label="Камнепад">
+            <span class="cv-rock-ico"></span>
+            <span class="cv-rock-name">Камнепад</span>
+            <span class="cv-rock-time" id="cvRockTime"></span>
+            <span class="cv-rock-cd" id="cvRockCd"></span>
+            <span class="tool-key">Пробел</span>
+          </button>
+        </div>
       </div>
     </div>
 
@@ -342,43 +363,25 @@
     <div id="cvMenu" class="screen hidden">
       <div class="menu-main">
         <h1 class="logo"><span class="logo-back">ПОСЛЕДНИЙ КОНВОЙ</span><span class="logo-front" aria-hidden="true">ПОСЛЕДНИЙ КОНВОЙ</span></h1>
-        <p class="cv-lead">Короткий поход из двух столкновений. Защитите неподвижный конвой, соберите отряд и выберите одно усиление перед переправой. Потом сравните с другим.</p>
-        <button class="menu-btn primary-big" id="cvMenuPlay">Начать поход</button>
-        <p class="cv-hint">Играть можно мышью или касаниями. Бой на паузу — кнопка вверху справа или клавиша P.</p>
+        <p class="cv-lead">Ведите конвой через 10 стоянок. На каждой — волна врагов. Отбились — выбирайте усиление. Камнепад — нажатием на поле.</p>
+        <button class="menu-btn primary-big" id="cvMenuPlay">В поход</button>
+        <p class="cv-menu-best hidden" id="cvMenuBest"></p>
+        <div class="cv-menu-glory" id="cvMenuGlory"></div>
+        <p class="cv-hint">Бойцы — клавиши 1–6 или кнопки внизу. Камнепад — клик по полю или Пробел. Пауза — P.</p>
       </div>
     </div>
 
-    <div id="cvBrief" class="screen hidden">
-      <div class="panel-card cv-brief-card">
-        <div class="cv-brief-num" id="cvBriefNum">Столкновение 1/2</div>
-        <h2 id="cvBriefTitle">Засада у брода</h2>
-        <p id="cvBriefStory"></p>
-        <p class="cv-brief-waves" id="cvBriefWaves"></p>
-        <div class="cv-threats" id="cvBriefThreats"></div>
-        <p class="cv-brief-boost hidden" id="cvBriefBoost"></p>
-        <div class="cv-brief-classes" id="cvBriefClasses"></div>
-        <button class="menu-btn primary-big" id="cvBriefGo" data-battle="1">В бой</button>
-      </div>
-    </div>
-
-    <div id="cvPick" class="screen hidden">
-      <div class="panel-card cv-pick-card-wrap">
-        <h2>Выберите усиление</h2>
-        <p id="cvPickSub"></p>
-        <div class="cv-pick-cards" id="cvPickCards"></div>
-      </div>
-    </div>
-
-    <div id="cvResult" class="screen hidden">
+    <div id="cvResult" class="screen overlay hidden">
       <div class="popup-card cv-result-card">
         <h2 id="cvResultTitle">Конвой доставлен!</h2>
         <p id="cvResultSub"></p>
-        <p class="cv-result-boost" id="cvResultBoost"></p>
-        <div class="cv-res-rows" id="cvResultRows"></div>
-        <div class="cv-compare hidden" id="cvResultCompare"></div>
+        <div class="cv-res-track" id="cvResultTrack"></div>
+        <div class="cv-res-stats" id="cvResultStats"></div>
+        <div class="cv-res-cards" id="cvResultCards"></div>
+        <p class="cv-res-best" id="cvResultBest"></p>
+        <div class="cv-res-glory" id="cvResultGlory"></div>
         <div class="cv-result-btns">
-          <button class="menu-btn result-main hidden" id="cvResultRetry2">Переправа с другим усилением</button>
-          <button class="menu-btn result-main" id="cvResultAgain">Повторить поход</button>
+          <button class="menu-btn result-main" id="cvResultAgain">Ещё поход</button>
           <button class="menu-btn secondary small" id="cvResultMenu">В меню</button>
         </div>
       </div>

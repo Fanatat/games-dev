@@ -2028,12 +2028,13 @@ const Convoy = (() => {
   // ------------------------------------------------------------ иконки карт
   function drawClassIcon(cv, id) {
     const t = UNIT_TYPES[id], age = match ? match.age : AGES.stone;       // в меню матча ещё нет
-    // новый облик: боец-рисунок; пока картинка грузится — прежний значок, потом перерисовка
+    // новый облик: боец-рисунок в снаряжении отряда; пока картинка грузится — прежний значок, потом перерисовка
     cv._icon = id;
     if (Sprites.artId(id, false)) {
       const c = cv.getContext('2d');
       c.clearRect(0, 0, cv.width, cv.height);
-      if (Sprites.drawIcon(c, id, false, cv.width / 2, cv.height * 0.97, cv.width * 0.96, cv.height * 0.94)) return;
+      const tier = run && match && match.convoy ? run.ageStep || 0 : 0;
+      if (Sprites.drawIcon(c, id, false, cv.width / 2, cv.height * 0.97, cv.width * 0.96, cv.height * 0.94, tier)) return;
       Sprites.onReady(id, false, () => { if (cv._icon === id) drawClassIcon(cv, id); });
     }
     if (!ENEMY_SPECIAL_TYPES[id]) { drawUnitIcon(cv, t, age); return; }
@@ -2142,6 +2143,11 @@ const Convoy = (() => {
         c.fillStyle = g; c.beginPath(); c.arc(48, 40, 40, 0, TAU); c.fill();
         c.strokeStyle = '#ffd35c'; c.lineWidth = 3;
         for (let k = 0; k < 10; k++) { const a = k * TAU / 10; c.beginPath(); c.moveTo(48 + Math.cos(a) * 22, 40 + Math.sin(a) * 22); c.lineTo(48 + Math.cos(a) * 32, 40 + Math.sin(a) * 32); c.stroke(); }
+        // новый облик: Боец в снаряжении, которое даст карта (линейка p1_heroes_tier2/3)
+        const next = 'guard_t' + Math.min(3, (run ? run.ageStep || 0 : 0) + 2);
+        if (window.CONVOY_PROTOTYPE && Sprites.drawPortrait(c, next, 48, H / u - 2, 80, H / u - 6)) break;
+        cv._icon = 'era';
+        Sprites.onPortrait(() => { if (cv._icon === 'era') drawCardIcon(cv, card); });
         for (const dir of [-1, 1]) {
           c.save(); c.translate(48, 58); c.rotate(dir * 0.7);
           c.fillStyle = '#7a5230'; c.strokeStyle = ink; c.lineWidth = 2.2;

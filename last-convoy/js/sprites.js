@@ -18,6 +18,9 @@ const Sprites = (() => {
   // Тяжёлый (240), орк (260) и Вождь (300) крупнее уже в атласе — множитель heavy 1.12 не нужен.
   const PX = 76 / 210;
   const WALK = ['walk1', 'pass', 'walk2', 'pass'];
+  // Снаряжение по эпохам (карта «Новая эпоха»): ступень 1 и 2 — атласы guard_t2, guard_t3 …
+  // Нет атласа или он ещё грузится — боец в первом снаряжении.
+  const TIER = ['', '_t2', '_t3'];
 
   function image(src) {
     let im = images[src];
@@ -27,9 +30,13 @@ const Sprites = (() => {
   const ok = (im) => im.complete && im.naturalWidth > 0;
   function load() {
     if (!D) return;
-    for (const u of Object.values(D.units)) image(u.src);
+    const tiered = (id) => /_t\d$/.test(id);
+    for (const [id, u] of Object.entries(D.units)) if (!tiered(id)) image(u.src);
     for (const b of Object.values(D.bg)) image(b.src);
     image(D.props.src); image(D.wagon.src); image(D.wagon_painted.src);
+    if (D.portraits) image(D.portraits.src);
+    // снаряжение 2–3 нужно не раньше первой «Новой эпохи» — грузим после старта
+    setTimeout(() => { for (const [id, u] of Object.entries(D.units)) if (tiered(id)) image(u.src); }, 4000);
   }
 
   // Силуэт атласа одним цветом (вспышка попадания, контур вожака) — строится один раз, по требованию.
@@ -47,9 +54,16 @@ const Sprites = (() => {
     return (tints[key] = c);
   }
 
-  function artId(typeId, enemy) {
+  // tier — ступень эпохи стороны (0–2); враги без снаряжения по эпохам
+  function artId(typeId, enemy, tier = 0) {
     const id = D && UNIT_ART[enemy ? 'enemy' : 'player'][typeId];
-    return id && D.units[id] ? id : null;
+    if (!id || !D.units[id]) return null;
+    // нет листов этой ступени — лучшая из готовых ниже (t3 → t2 → первое снаряжение)
+    for (let k = enemy ? 0 : Math.min(tier, TIER.length - 1); k > 0; k--) {
+      const t = id + TIER[k];
+      if (D.units[t] && ok(image(D.units[t].src))) return t;
+    }
+    return id;
   }
   function hasUnit(typeId, enemy) {
     const id = artId(typeId, enemy);
@@ -97,7 +111,7 @@ const Sprites = (() => {
 
   // o: x, y (линия земли ряда), k (множитель роста), facing, enemy, elite, buffed, hitFlash, ... — commonPose.
   function drawUnit(ctx, typeId, o) {
-    const a = D.units[artId(typeId, o.enemy)];
+    const a = D.units[artId(typeId, o.enemy, o.tier)];
     const im = image(a.src);
     const P = pickPose(o, a);
     const fr = a.f[P.f] || a.f.idle;
@@ -237,8 +251,8 @@ const Sprites = (() => {
 
   // Значок класса (ряд найма, карты): кадр «покой», вписан в рамку maxW×maxH, ноги — на bottom.
   // Картинка ещё грузится — false и onReady перерисует.
-  function drawIcon(ctx, typeId, enemy, cx, bottom, maxW, maxH) {
-    const id = artId(typeId, enemy);
+  function drawIcon(ctx, typeId, enemy, cx, bottom, maxW, maxH, tier = 0) {
+    const id = artId(typeId, enemy, tier);
     if (!id || !ok(image(D.units[id].src))) return false;
     const a = D.units[id];
     const [fx, fy, fw, fh, ax] = a.f.idle;
@@ -254,7 +268,21 @@ const Sprites = (() => {
     const id = artId(typeId, enemy);
     if (id) image(D.units[id].src).addEventListener('load', cb, { once: true });
   }
+  // Портрет из линейки снаряжения ('guard_t2'): ноги на bottom, вписан в maxW×maxH.
+  function drawPortrait(ctx, name, cx, bottom, maxW, maxH) {
+    const fr = D && D.portraits && D.portraits.f[name];
+    const im = fr && image(D.portraits.src);
+    if (!fr || !ok(im)) return false;
+    const [fx, fy, fw, fh] = fr;
+    const k = Math.min(maxW / fw, maxH / fh);
+    ctx.save();
+    ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(im, fx, fy, fw, fh, cx - fw * k / 2, bottom - fh * k, fw * k, fh * k);
+    ctx.restore();
+    return true;
+  }
+  function onPortrait(cb) { if (D && D.portraits) image(D.portraits.src).addEventListener('load', cb, { once: true }); }
 
   if (typeof window !== 'undefined' && window.CONVOY_PROTOTYPE) load();
-  return { load, hasUnit, drawUnit, drawProp, prop, drawBg, bg, wagonSet, drawWagonBody, drawWheel, drawFlag, drawIcon, onReady, image, artId };
+  return { load, hasUnit, drawUnit, drawProp, prop, drawBg, bg, wagonSet, drawWagonBody, drawWheel, drawFlag, drawIcon, onReady, drawPortrait, onPortrait, image, artId };
 })();

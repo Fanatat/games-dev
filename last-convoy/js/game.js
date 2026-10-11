@@ -4239,6 +4239,7 @@ function render() {
       roleAccent: ROLE_ACCENT[t.role], shade: u.id % 2, // И20: тон тела врага чередуется в строю
       // И6: костюм «роль × эпоха» и вспышка «переодевания» при смене эпохи
       ageId: sideAge.id, outfit: ENEMY_SPECIAL_TYPES[u.typeId] ? u.typeId : t.role,
+      tier: Math.max(0, AGE_ORDER.indexOf(sideAge.id)), // «Последний конвой»: снаряжение по эпохе (js/sprites.js)
       dressFlash: (u.dressT0 !== undefined && !dressing) ? Math.max(0, 1 - (poseTime - u.dressT0) / 0.55) : 0,
     };
     if (match.convoy && Sprites.hasUnit(u.typeId, enemy)) {

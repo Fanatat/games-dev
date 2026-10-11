@@ -2054,6 +2054,31 @@ body.convoy #heroDownFlash, body.convoy #fortEdge { display: none !important; }
 .cv-pips i.on { background: #ffd35c; border-color: var(--ink); }
 .cv-pips i.next { border-color: #ffd35c; animation: glowPulse 1.6s ease-in-out infinite; }
 #cvMenu .cv-menu-best { font-size: max(13px, .85em); }
+/* уровни похода: плитка — край и его враг, номер, рекорд; закрытый — серый с замком */
+.cv-levels { display: flex; gap: .6em; justify-content: center; font-size: max(13px, 2.3vh); }
+.cv-levels:empty { display: none; }
+.cv-level {
+  position: relative; width: 6.4em; aspect-ratio: 7 / 4; max-width: 40vw; padding: 0; border-radius: .7em; overflow: hidden; cursor: pointer;
+  border: 3px solid rgba(26,18,10,.85); background: #3a2810; box-shadow: 0 3px 0 rgba(26,18,10,.6); transition: transform .12s, box-shadow .12s;
+}
+.cv-level canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.cv-level.on { border-color: #ffd35c; box-shadow: 0 0 0 2px var(--ink), 0 0 14px rgba(255,211,92,.65); transform: translateY(-2px); }
+.cv-level.locked { cursor: default; }
+.cv-level.locked canvas { filter: grayscale(.85) brightness(.45); }
+.cv-level.deny { animation: cvDeny .32s ease-out; }
+.cv-level-n {
+  position: absolute; left: .25em; top: .2em; min-width: 1.35em; height: 1.35em; border-radius: 50%; display: grid; place-items: center;
+  font-family: 'Lilita One', sans-serif; font-weight: 400; font-size: 1em; color: #4a2c00; background: linear-gradient(var(--cta-1), var(--cta-2)); border: 2px solid var(--ink);
+}
+.cv-level.locked .cv-level-n { filter: grayscale(1) brightness(.8); }
+.cv-level-rec {
+  position: absolute; left: 0; right: 0; bottom: 0; display: flex; align-items: center; justify-content: center; gap: .15em; padding: .05em 0 .1em;
+  font-family: 'Lilita One', sans-serif; font-size: .82em; color: #fff; text-shadow: var(--cv-outline); background: linear-gradient(transparent, rgba(12,8,4,.75));
+}
+.cv-level-rec svg.ico { width: 1.05em; height: 1.05em; color: #ffd35c; }
+.cv-level.locked .cv-level-rec { top: 0; background: none; }
+.cv-level.locked .cv-level-rec svg.ico { width: 1.7em; height: 1.7em; color: #f2e6cf; }
+.cv-unlock.cv-unlock-level canvas { border-radius: .45em; width: 3.4em; height: 2.2em; }
 
 /* ---------- узкие и низкие экраны ---------- */
 @media (max-height: 520px) {

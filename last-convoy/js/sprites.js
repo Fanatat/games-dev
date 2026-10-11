@@ -14,6 +14,12 @@ const Sprites = (() => {
     player: { infantry: 'guard', archer: 'archer', heavy: 'heavy', spear: 'spear', shieldbearer: 'dwarf', bomber: 'gnome' },
     enemy: { infantry: 'goblin', spear: 'goblin_spear', archer: 'goblin_archer', heavy: 'orc', chief: 'warchief' },
   };
+  // Уровни похода (CONVOY.levels): у каждого свой фон и свои враги в тех же ролях. Нет рисунка уровня —
+  // враг первого уровня (гоблин), чтобы бой не остался без картинки.
+  const REGION_ENEMY = {
+    2: { infantry: 'wolf', spear: 'wolf_spear', archer: 'witch', heavy: 'bear', chief: 'alpha' },
+  };
+  let region = 1;
   // Рост «покоя» обычного бойца в атласе — 210 px, на поле ≈ 76 ед. арены (рост рига ≈ 74).
   // Тяжёлый (240), орк (260) и Вождь (300) крупнее уже в атласе — множитель heavy 1.12 не нужен.
   const PX = 76 / 210;
@@ -30,13 +36,16 @@ const Sprites = (() => {
   const ok = (im) => im.complete && im.naturalWidth > 0;
   function load() {
     if (!D) return;
-    const tiered = (id) => /_t\d$/.test(id);
-    for (const [id, u] of Object.entries(D.units)) if (!tiered(id)) image(u.src);
-    for (const b of Object.values(D.bg)) image(b.src);
+    const later = (id) => /_t\d$/.test(id) || regionOf(id) > 1;
+    for (const [id, u] of Object.entries(D.units)) if (!later(id)) image(u.src);
+    if (D.bg.bg_r1) image(D.bg.bg_r1.src);
     image(D.props.src); image(D.wagon.src); image(D.wagon_painted.src);
     if (D.portraits) image(D.portraits.src);
-    // снаряжение 2–3 нужно не раньше первой «Новой эпохи» — грузим после старта
-    setTimeout(() => { for (const [id, u] of Object.entries(D.units)) if (tiered(id)) image(u.src); }, 4000);
+    // снаряжение 2–3 нужно не раньше первой «Новой эпохи», уровень 2 — не раньше первой доставки: грузим после старта
+    setTimeout(() => {
+      for (const [id, u] of Object.entries(D.units)) if (later(id)) image(u.src);
+      for (const b of Object.values(D.bg)) image(b.src);
+    }, 4000);
   }
 
   // Силуэт атласа одним цветом (вспышка попадания, контур вожака) — строится один раз, по требованию.
@@ -54,8 +63,28 @@ const Sprites = (() => {
     return (tints[key] = c);
   }
 
-  // tier — ступень эпохи стороны (0–2); враги без снаряжения по эпохам
-  function artId(typeId, enemy, tier = 0) {
+  function regionOf(id) {
+    for (const [r, map] of Object.entries(REGION_ENEMY)) if (Object.values(map).includes(id)) return Number(r);
+    return 1;
+  }
+  // Уровень для фона и врагов: бой, меню и значки рисуют выбранный уровень; его рисунки грузятся сразу.
+  function setRegion(n) {
+    region = Number(n) || 1;
+    if (!D) return;
+    const map = REGION_ENEMY[region] || {};
+    for (const id of Object.values(map)) if (D.units[id]) image(D.units[id].src);
+    const b = D.bg['bg_r' + region];
+    if (b) image(b.src);
+  }
+  // Фон уровня; пока картинка грузится (или её нет) — фон первого уровня.
+  function bgId(r = region) { return D && D.bg['bg_r' + r] && ok(image(D.bg['bg_r' + r].src)) ? 'bg_r' + r : 'bg_r1'; }
+
+  // tier — ступень эпохи стороны (0–2); враги без снаряжения по эпохам, зато свои на каждом уровне
+  function artId(typeId, enemy, tier = 0, r = region) {
+    if (enemy && REGION_ENEMY[r] && D) {
+      const rid = REGION_ENEMY[r][typeId];
+      if (rid && D.units[rid] && ok(image(D.units[rid].src))) return rid;
+    }
     const id = D && UNIT_ART[enemy ? 'enemy' : 'player'][typeId];
     if (!id || !D.units[id]) return null;
     // нет листов этой ступени — лучшая из готовых ниже (t3 → t2 → первое снаряжение)
@@ -251,8 +280,8 @@ const Sprites = (() => {
 
   // Значок класса (ряд найма, карты): кадр «покой», вписан в рамку maxW×maxH, ноги — на bottom.
   // Картинка ещё грузится — false и onReady перерисует.
-  function drawIcon(ctx, typeId, enemy, cx, bottom, maxW, maxH, tier = 0) {
-    const id = artId(typeId, enemy, tier);
+  function drawIcon(ctx, typeId, enemy, cx, bottom, maxW, maxH, tier = 0, r = region) {
+    const id = artId(typeId, enemy, tier, r);
     if (!id || !ok(image(D.units[id].src))) return false;
     const a = D.units[id];
     const [fx, fy, fw, fh, ax] = a.f.idle;
@@ -264,10 +293,25 @@ const Sprites = (() => {
     ctx.restore();
     return true;
   }
-  function onReady(typeId, enemy, cb) {
-    const id = artId(typeId, enemy);
+  function onReady(typeId, enemy, cb, r = region) {
+    const rid = enemy && REGION_ENEMY[r] && REGION_ENEMY[r][typeId];
+    const id = rid && D && D.units[rid] ? rid : artId(typeId, enemy);
     if (id) image(D.units[id].src).addEventListener('load', cb, { once: true });
   }
+  // Значок уровня: фон уровня обложкой в рамке w×h (кусок у дороги, где видна местность).
+  function drawBgThumb(ctx, r, x, y, w, h) {
+    const b = D && D.bg['bg_r' + r];
+    const im = b && image(b.src);
+    if (!b || !ok(im)) return false;
+    const sh = b.h * 0.62, sw = Math.min(b.w, sh * w / h);
+    const sy = Math.max(0, b.road * b.h - sh * 0.78);
+    ctx.save();
+    ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(im, (b.w - sw) / 2, sy, sw, sh, x, y, w, h);
+    ctx.restore();
+    return true;
+  }
+  function onBg(r, cb) { const b = D && D.bg['bg_r' + r]; if (b) image(b.src).addEventListener('load', cb, { once: true }); }
   // Портрет из линейки снаряжения ('guard_t2'): ноги на bottom, вписан в maxW×maxH.
   function drawPortrait(ctx, name, cx, bottom, maxW, maxH) {
     const fr = D && D.portraits && D.portraits.f[name];
@@ -284,5 +328,5 @@ const Sprites = (() => {
   function onPortrait(cb) { if (D && D.portraits) image(D.portraits.src).addEventListener('load', cb, { once: true }); }
 
   if (typeof window !== 'undefined' && window.CONVOY_PROTOTYPE) load();
-  return { load, hasUnit, drawUnit, drawProp, prop, drawBg, bg, wagonSet, drawWagonBody, drawWheel, drawFlag, drawIcon, onReady, drawPortrait, onPortrait, image, artId };
+  return { load, setRegion, bgId, drawBgThumb, onBg, get region() { return region; }, hasUnit, drawUnit, drawProp, prop, drawBg, bg, wagonSet, drawWagonBody, drawWheel, drawFlag, drawIcon, onReady, drawPortrait, onPortrait, image, artId };
 })();

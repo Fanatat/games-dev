@@ -4159,7 +4159,7 @@ function render() {
   ctx.save();
   ctx.translate(match.shake.x, match.shake.y);
   // «Последний конвой», новый облик: фон региона — картинка (Sprites.drawBg), без смены суток
-  const artBg = match.convoy && Sprites.drawBg(ctx, 'bg_r1', VIEW, ARENA.groundY, (match.convoy.roll || 0) * 8 * 0.7);
+  const artBg = match.convoy && Sprites.drawBg(ctx, Sprites.bgId(), VIEW, ARENA.groundY, (match.convoy.roll || 0) * 8 * 0.7);
   if (!artBg) {
   drawBgLayer(match.bg, 'sky', 1);
   drawBgLayer(match.bgPrev, 'sky', fadeA);
@@ -4936,7 +4936,7 @@ function drawMenuScene(now) {
   const bg = bakeArenaBackground(age, window.CONVOY_PROTOTYPE ? bgVariantOf({ id: 1 }) : undefined);
   applyViewTransform();
   // «Последний конвой», новый облик: рисованный фон и бойцы-рисунки (пока грузятся — прежняя сцена)
-  const art = window.CONVOY_PROTOTYPE && Sprites.drawBg(ctx, 'bg_r1', VIEW, ARENA.groundY, 0);
+  const art = window.CONVOY_PROTOTYPE && Sprites.drawBg(ctx, Sprites.bgId(), VIEW, ARENA.groundY, 0);
   if (!art) {
   drawBgLayer(bg, 'sky', 1);
   drawSunMoon(age, { sunUp: true, localT: 0.28, alt: 0.72, light: 1 });

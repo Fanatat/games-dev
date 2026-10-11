@@ -84,6 +84,12 @@ const CONVOY = {
     { id: 'freeReroll', at: 290, icon: 'reroll', name: 'Гадальщик', desc: 'Первая смена карт даром' },
     { id: 'banner', at: 350, v: 1.08, icon: 'banner', name: 'Знамя похода', desc: '{dmg}+8% отряду' },
   ],
+  // Уровни похода: доставка конвоя на уровне открывает следующий. Те же 10 стоянок и роли врагов,
+  // другой край (фон bg_rN, враги — js/sprites.js REGION_ENEMY), враги крепче (stat × к волне), слава × glory.
+  levels: [
+    { id: 1, name: 'Тракт', go: 'На тракт', boss: 'Вождь', stat: 1, glory: 1 },
+    { id: 2, name: 'Сумрачный лес', go: 'В Сумрачный лес', boss: 'Вожак стаи', stat: 1.1, glory: 1.5 },
+  ],
   // Волны стоянок. stat — HP и урон врагов (entities.js spawnUnit, world.enemyStatMult);
   // groups — группы внутри волны: at — секунда от начала волны, elite — элитные враги, boss — Вождь.
   waves: [
@@ -283,6 +289,8 @@ const Convoy = (() => {
   const PLAYER_KEY = 'lastconvoy_player_v1'; // номер игрока плейтеста
   const BEST_KEY = 'lastconvoy_best_v1';     // рекорд: { stop, wins, runs }
   const GLORY_KEY = 'lastconvoy_glory_v1';   // слава: { total } — копится между походами, открывает CONVOY.meta
+  const LEVEL_KEY = 'lastconvoy_level_v1';   // выбранный в меню уровень
+  const LEVELS = CONVOY.levels;
   const META = Object.fromEntries(CONVOY.meta.map(u => [u.id, u]));
   const JOURNAL_MAX = 500;
   const STOPS = CONVOY.waves.length;
@@ -328,7 +336,7 @@ const Convoy = (() => {
   function waveText(units) {
     const parts = CONVOY.spawnOrder.filter(t => units[t]).map(t => `${units[t]} ${ruPlural(units[t], ENEMY_NAMES[t])}`);
     if (units.elite) parts.push(`${units.elite} ${ruPlural(units.elite, ['вожак', 'вожака', 'вожаков'])}`);
-    if (units.boss) parts.push('Вождь');
+    if (units.boss) parts.push(level().boss);
     return parts.join(', ');
   }
   function waveTotals(def) {
@@ -380,27 +388,49 @@ const Convoy = (() => {
   function playerNo() {
     try { return Number(localStorage.getItem(PLAYER_KEY)) || 1; } catch (e) { return 1; }
   }
-  function readBest() {
+  // Рекорд уровня: первый — прежний ключ (рекорды плейтеста сохраняются), дальше — BEST_KEY_lN.
+  const bestKey = (lvl) => (lvl > 1 ? `${BEST_KEY}_l${lvl}` : BEST_KEY);
+  function readBest(lvl = 1) {
     try {
-      const v = JSON.parse(localStorage.getItem(BEST_KEY) || 'null');
+      const v = JSON.parse(localStorage.getItem(bestKey(lvl)) || 'null');
       return v && typeof v === 'object' ? v : { stop: 0, wins: 0, runs: 0 };
     } catch (e) { return { stop: 0, wins: 0, runs: 0 }; }
   }
+  // Открыто уровней: первый всегда, каждый следующий — после доставки на предыдущем.
+  function levelsOpen() {
+    let n = 1;
+    while (n < LEVELS.length && readBest(n).wins > 0) n++;
+    return n;
+  }
+  function pickedLevel() {
+    let v = 0;
+    try { v = Number(localStorage.getItem(LEVEL_KEY)) || 0; } catch (e) { /* без хранилища — последний открытый */ }
+    const open = levelsOpen();
+    return v >= 1 && v <= open ? v : open;
+  }
+  function pickLevel(n) {
+    try { localStorage.setItem(LEVEL_KEY, String(n)); } catch (e) { /* выбор живёт до перезагрузки */ }
+    Sprites.setRegion(n);
+  }
+  const level = () => LEVELS[(run ? run.level : 1) - 1] || LEVELS[0];
   function saveRun() {
     const reached = run.win ? STOPS : run.stop;
-    const prev = readBest();
+    const prev = readBest(run.level);
     const best = { stop: Math.max(prev.stop || 0, reached), wins: (prev.wins || 0) + (run.win ? 1 : 0), runs: (prev.runs || 0) + 1 };
     run.record = { prev: prev.stop || 0, isNew: reached > (prev.stop || 0) || (run.win && !prev.wins) };
+    // первая доставка открывает следующий уровень — он же становится выбранным
+    run.unlock = run.win && !prev.wins && LEVELS[run.level] ? LEVELS[run.level] : null;
     const g = gloryOf(), was = readGlory().total;
     run.glory = { ...g, prev: was, total: was + g.gain, fresh: CONVOY.meta.filter(u => u.at > was && u.at <= was + g.gain) };
     try {
-      localStorage.setItem(BEST_KEY, JSON.stringify(best));
+      localStorage.setItem(bestKey(run.level), JSON.stringify(best));
+      if (run.unlock) localStorage.setItem(LEVEL_KEY, String(run.unlock.id));
       localStorage.setItem(GLORY_KEY, JSON.stringify({ total: run.glory.total }));
       const log = readLog();
       log.push({
         ts: Date.now(), player: playerNo(), stop: reached, win: run.win, cards: run.cards.slice(),
         kills: run.stats.kills, gold: Math.round(run.stats.gold), sec: Math.round(match.elapsed), streak: run.stats.bestStreak,
-        rocks: run.stats.rocks, hp: Math.max(0, Math.ceil(match.world.playerCore.hp)), glory: g.gain,
+        rocks: run.stats.rocks, hp: Math.max(0, Math.ceil(match.world.playerCore.hp)), glory: g.gain, level: run.level,
       });
       localStorage.setItem(RUNS_KEY, JSON.stringify(log.slice(-JOURNAL_MAX)));
     } catch (e) { /* без хранилища игра работает, только без рекорда и журнала */ }
@@ -419,9 +449,9 @@ const Convoy = (() => {
     const G = CONVOY.glory, s = run.stats;
     const parts = [
       ['стоянки', (run.win ? STOPS : run.stop - 1) * G.perStop], ['вожаки', s.elites * G.elite],
-      ['Вождь', s.boss ? G.boss : 0], ['доставка', run.win ? G.win : 0],
+      [level().boss, s.boss ? G.boss : 0], ['доставка', run.win ? G.win : 0],
       ['враги', Math.floor(s.kills / G.killsPer)], ['поход', G.run],
-    ].filter(([, v]) => v > 0);
+    ].map(([k, v]) => [k, Math.round(v * level().glory)]).filter(([, v]) => v > 0);
     return { gain: parts.reduce((a, [, v]) => a + v, 0), parts };
   }
 
@@ -436,7 +466,7 @@ const Convoy = (() => {
   }
   function newRun(opts = {}) {
     run = {
-      id: ++runSeq, stop: 1, cards: [], mods: newMods(), seq: 0, log: [],
+      id: ++runSeq, stop: 1, level: opts.level || 1, cards: [], mods: newMods(), seq: 0, log: [],
       tags: {}, unlocked: [], ageStep: 0, syn: {}, // знаки карт, открытые бойцы, эпоха отряда, сочетания
       stats: { kills: 0, gold: 0, lost: 0, bought: 0, bestStreak: 0, rocks: 0, elites: 0, veins: 0, boss: false, countered: 0 },
       finished: false, win: false, record: null, glory: null,
@@ -533,8 +563,9 @@ const Convoy = (() => {
     return m;
   }
 
-  function startRun() {
-    newRun();
+  function startRun(lvl) {
+    newRun({ level: lvl || pickedLevel() });
+    Sprites.setRegion(run.level);
     match = setupMatch();
     startSquad();
     cardKey = '';
@@ -628,11 +659,12 @@ const Convoy = (() => {
     C.counter = ans.into ? { vs: ans.vs, into: ans.into } : null;
     if (C.counter) run.stats.countered++;
     C.groupIdx = 0; C.queue = [];
-    m.world.enemyStatMult = C.def.stat;
+    m.world.enemyStatMult = C.def.stat * level().stat;
     C.waveHp = m.world.playerCore.hp;
     if (C.headless) return;
     const last = run.stop === STOPS;
-    banner(last ? 'Последняя стоянка!' : `Стоянка ${run.stop}`, last ? 'Вождь!' : '', last ? 'red' : 'gold', 2.2);
+    const sub = last ? `${level().boss}!` : run.stop === 1 && run.level > 1 ? level().name : '';
+    banner(last ? 'Последняя стоянка!' : `Стоянка ${run.stop}`, sub, last ? 'red' : 'gold', 2.2);
     SFX.alarm();
   }
   // Ответ врага на перекос отряда (CONVOY.counter): копия волны, где часть пехоты и стрелков — контра
@@ -685,7 +717,7 @@ const Convoy = (() => {
       if (!u) return;
       C.boss = u; C.slamT = CONVOY.boss.slamCd * 0.6; C.summoned = false; C.slam = null;
       if (!C.headless) {
-        banner('Вождь!', '', 'red', 2.4);
+        banner(`${level().boss}!`, '', 'red', 2.4);
         shakeScreen(m, 7);
         SFX.bossRoar();
         VFX.spawn(m, 'ring', u.x, -40, { size: 180, width: 7, life: 0.7, color: ART.enemy.eliteOutline, glow: ART.enemy.eliteGlow, gravity: 0 });
@@ -950,6 +982,18 @@ const Convoy = (() => {
     best.textContent = 'Новый рекорд!';
     best.classList.toggle('hidden', !rec.isNew);
     renderResultGlory();
+    // доставили, и следующий уровень открыт — главная кнопка ведёт туда
+    const next = win && LEVELS[run.level] && levelsOpen() > run.level ? LEVELS[run.level] : null;
+    run.next = next ? next.id : run.level;
+    $('cvResultAgain').textContent = next ? next.go : 'Ещё поход';
+    if (run.unlock) {
+      const row = document.createElement('div');
+      row.className = 'cv-unlock cv-unlock-level';
+      row.style.animationDelay = '0.4s';
+      row.innerHTML = `<canvas width="170" height="110"></canvas><div><b>Открыт уровень ${run.unlock.id}</b><span>${run.unlock.name}</span></div>`;
+      $('cvResultGlory').prepend(row);
+      drawLevelThumb(row.querySelector('canvas'), run.unlock.id);
+    }
     countUp($('cvResultStats'));
     syncOverlays();
   }
@@ -991,7 +1035,7 @@ const Convoy = (() => {
     requestAnimationFrame(() => { void bar.offsetWidth; bar.style.width = `${frac(g.total) * 100}%`; tick(); });
     if (g.fresh.length) setTimeout(() => { if (box.contains(gain)) SFX.gloryUnlock(); }, 700);
   }
-  function toMenu() { match = null; run = null; syncOverlays(); showScreen('cmenu'); }
+  function toMenu() { match = null; run = null; Sprites.setRegion(pickedLevel()); syncOverlays(); showScreen('cmenu'); }
 
   // ------------------------------------------------------------ золото, монеты, серии
   function onDeath(u) {
@@ -1040,7 +1084,7 @@ const Convoy = (() => {
     if (C.headless) return;
     requestHitStop(0.16);
     shakeScreen(m, 14);
-    banner('Вождь повержен!', '', 'gold', 2.2);
+    banner(`${level().boss} повержен!`, '', 'gold', 2.2);
     SFX.bossDown();
     for (let i = 0; i < 3; i++) VFX.spawn(m, 'ring', u.x, -40 * VIEW.fig, { size: 120 + i * 90, width: 6 - i, life: 0.5 + i * 0.15, color: ART.hero.gold, glow: ART.hero.goldGlow, gravity: 0 });
     VFX.burst(m, 'spark', u.x, -50 * VIEW.fig, 30, { speed: 260, life: 0.9, size: 3.6, colors: ART.spark, lift: 80 });
@@ -1427,6 +1471,7 @@ const Convoy = (() => {
     if (boss) {
       const bp = (Math.max(0, boss.hp / boss.maxHp) * 100).toFixed(1) + '%';
       if (hudCache.bossw !== bp) { hudCache.bossw = bp; $('cvBossFill').style.width = bp; }
+      if (hudCache.bossn !== level().boss) { hudCache.bossn = level().boss; $('cvBoss').querySelector('.cv-boss-name').textContent = hudCache.bossn; }
       setCls($('cvBoss'), 'slam', !!C.slam, 'bossslam');
     }
     // собранные сочетания — значки под полосой прочности, имя во всплывающей подсказке
@@ -1572,11 +1617,11 @@ const Convoy = (() => {
   function canPause() { return !(match && match.convoy && match.convoy.phase === 'end'); }
   // Меню: рекорд одной плашкой и следующая награда за славу — иконка, имя, шкала, точки всех наград.
   function renderMenu() {
-    const b = readBest();
+    Sprites.setRegion(pickedLevel());
+    renderLevels();
     const el = $('cvMenuBest');
     if (!el) return;
-    el.classList.toggle('hidden', !b.runs);
-    el.textContent = b.wins ? `Доставлено ×${b.wins}` : `Рекорд ${b.stop}/${STOPS}`;
+    el.classList.add('hidden');   // рекорд — на плитке своего уровня
     const total = readGlory().total, have = metaOf(total);
     menuDeco = { skin: have.includes('skin'), banner: have.includes('banner') };
     const box = $('cvMenuGlory');
@@ -1594,6 +1639,44 @@ const Convoy = (() => {
         : '<b class="cv-next-name">Все награды открыты</b>') +
       `<div class="cv-pips" aria-label="Открыто наград: ${have.length} из ${CONVOY.meta.length}">${pips}</div></div></div>`;
     drawCardIcon(box.querySelector('canvas'), shown);
+  }
+
+  // Плитки уровней в меню: край (фон и его враг), номер, рекорд; закрытый — замок. Нажатие выбирает уровень.
+  function renderLevels() {
+    const box = $('cvMenuLevels');
+    if (!box) return;
+    const open = levelsOpen(), cur = pickedLevel();
+    box.innerHTML = LEVELS.map(L => {
+      const b = readBest(L.id), locked = L.id > open;
+      const rec = locked ? '<svg class="ico"><use href="#i-lock"/></svg>'
+        : b.wins ? `<svg class="ico"><use href="#i-wagon"/></svg>×${b.wins}` : b.runs ? `${b.stop}/${STOPS}` : '';
+      const title = locked ? `${L.name} — доставь конвой: уровень ${L.id - 1}` : L.name;
+      return `<button class="cv-level${L.id === cur ? ' on' : ''}${locked ? ' locked' : ''}" data-l="${L.id}" title="${title}" aria-label="${title}"` +
+        `${locked ? ' aria-disabled="true"' : ''}><canvas width="168" height="96"></canvas><b class="cv-level-n">${L.id}</b>` +
+        `${rec ? `<span class="cv-level-rec">${rec}</span>` : ''}</button>`;
+    }).join('');
+    box.querySelectorAll('.cv-level').forEach(btn => {
+      const n = Number(btn.dataset.l), cv = btn.querySelector('canvas');
+      drawLevelThumb(cv, n);
+      btn.addEventListener('click', () => {
+        if (n > levelsOpen()) {
+          SFX.buyDenied();
+          btn.classList.remove('deny'); void btn.offsetWidth; btn.classList.add('deny');
+          return;
+        }
+        SFX.click();
+        pickLevel(n);
+        renderLevels();
+      });
+    });
+  }
+  // Значок уровня: фон края, его враг (тяжёлый) у правого края; пока картинки грузятся — перерисуется.
+  function drawLevelThumb(cv, n) {
+    const c = cv.getContext('2d'), W = cv.width, H = cv.height;
+    c.clearRect(0, 0, W, H);
+    const bgOk = Sprites.drawBgThumb(c, n, 0, 0, W, H);
+    if (!bgOk) { c.fillStyle = n > 1 ? '#2c3b2a' : '#6f8f4e'; c.fillRect(0, 0, W, H); Sprites.onBg(n, () => drawLevelThumb(cv, n)); }
+    if (!Sprites.drawIcon(c, 'heavy', true, W * 0.74, H - 4, W * 0.42, H * 0.82, 0, n)) Sprites.onReady('heavy', true, () => drawLevelThumb(cv, n), n);
   }
 
   // ------------------------------------------------------------ журнал для наблюдателя (index.html?journal)
@@ -1624,7 +1707,8 @@ const Convoy = (() => {
       try {
         localStorage.setItem(PLAYER_KEY, String(p + 1));
         localStorage.removeItem(GLORY_KEY);
-        localStorage.removeItem(BEST_KEY);
+        LEVELS.forEach(L => localStorage.removeItem(bestKey(L.id)));   // рекорды и открытые уровни
+        localStorage.removeItem(LEVEL_KEY);
       } catch (e) { /* без хранилища — один игрок */ }
       showJournal();
     });
@@ -2304,7 +2388,7 @@ const Convoy = (() => {
   function simulate(policy, opts = {}) {
     const saved = match, savedRun = run, wasMuted = SFX.isMuted();
     SFX.setMuted(true); // звуки боя entities.js (удары, выстрелы) в расчёте не нужны
-    newRun({ headless: true, policy, seed: opts.seed, meta: opts.meta, glory: opts.glory });
+    newRun({ headless: true, policy, seed: opts.seed, meta: opts.meta, glory: opts.glory, level: opts.level });
     match = setupMatch();
     startSquad();
     const maxSteps = (opts.maxSec || 1800) * 60;
@@ -2368,7 +2452,12 @@ const Convoy = (() => {
     }
     syncSound();
     $('cvMenuPlay').addEventListener('click', () => { SFX.unlock(); SFX.click(); startRun(); });
-    $('cvResultAgain').addEventListener('click', () => { SFX.click(); startRun(); });
+    $('cvResultAgain').addEventListener('click', () => {
+      SFX.click();
+      const lvl = run && run.next;
+      if (lvl) pickLevel(lvl);
+      startRun(lvl);
+    });
     $('cvResultMenu').addEventListener('click', () => { SFX.click(); toMenu(); });
     $('cvRepair').addEventListener('click', (e) => { repair(); e.currentTarget.blur(); });
     $('cvReroll').addEventListener('click', (e) => { reroll(); e.currentTarget.blur(); });

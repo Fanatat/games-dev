@@ -211,8 +211,8 @@
       // текстуры на CPU при загрузке. ASTC берём, только если DXT нет, а
       // ASTC есть: ПК с обоими форматами остаётся на основном. ?tex=astc
       // или ?tex=dxt в адресе — выбрать файл вручную (проверки).
-      var dataFile = "dev-20261010-220205.data.unityweb";
-      var astcDataFile = "dev-20261010-220205.astc.data.unityweb";
+      var dataFile = "dev-20261011-085525.data.unityweb";
+      var astcDataFile = "dev-20261011-085525.astc.data.unityweb";
       var texFormat = "dxt";
       if (astcDataFile) {
         var texForce = /[?&]tex=(astc|dxt)(&|$)/.exec(location.search);
@@ -236,16 +236,16 @@
       window.game7TexFormat = texFormat;
 
       var buildUrl = "Build";
-      var loaderUrl = buildUrl + "/dev-20261010-220205.loader.js";
+      var loaderUrl = buildUrl + "/dev-20261011-085525.loader.js";
       var config = {
         arguments: [],
         dataUrl: buildUrl + "/" + dataFile,
-        frameworkUrl: buildUrl + "/dev-20261010-220205.framework.js.unityweb",
-        codeUrl: buildUrl + "/dev-20261010-220205.wasm.unityweb",
+        frameworkUrl: buildUrl + "/dev-20261011-085525.framework.js.unityweb",
+        codeUrl: buildUrl + "/dev-20261011-085525.wasm.unityweb",
         streamingAssetsUrl: "StreamingAssets",
         companyName: "DefaultCompany",
         productName: "unity",
-        productVersion: "dev-20261010-220205",
+        productVersion: "dev-20261011-085525",
         showBanner: unityShowBanner,
         // Экраны с плотностью 3 рисовали бы в 9 раз больше пикселей, чем
         // с плотностью 1: потолок 2 держит 60 FPS на среднем телефоне.

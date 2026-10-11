@@ -51,6 +51,8 @@ button:focus-visible { outline: 3px solid rgba(240, 97, 143, 0.9); outline-offse
 }
 
 .screen { display: none; position: fixed; inset: 0; z-index: 1; }
+/* баннер площадки внизу: экран кончается над ним (--ws-banner-h ставит WSPlatform на <html>) */
+.screen { bottom: var(--ws-banner-h, 0px); }
 .screen.active { display: flex; }
 
 /* ---------- круглые кнопки в золотой оправе ---------- */
@@ -98,6 +100,7 @@ button:focus-visible { outline: 3px solid rgba(240, 97, 143, 0.9); outline-offse
 #btn-again { --pic: url(workshop_assets/ui_replay.webp); }
 #btn-win-menu { background: url(workshop_assets/ui_case.webp) 50% 46% / 62% no-repeat, url(workshop_assets/ui_badge.webp) center / contain no-repeat; }
 #btn-decor { --pic: url(workshop_assets/ui_badge.webp); }
+#btn-noads, #btn-win-noads { --pic: url(workshop_assets/ui_noads.webp); }
 #btn-decor > svg { display: block; width: 58%; height: 58%; }
 
 /* ---------- кнопки-пилюли ---------- */
@@ -261,7 +264,7 @@ button:focus-visible { outline: 3px solid rgba(240, 97, 143, 0.9); outline-offse
 .ws-ped-art { position: absolute; left: 0; top: 0; z-index: 2; width: 112px; height: 68px; }
 .ws-ped::before {
   content: ''; position: absolute; left: 14px; right: 14px; top: 46px; z-index: 1; height: 54px;
-  background: url(workshop_assets/pedestal.webp) 50% 100% / contain no-repeat;
+  background: var(--ws-pedestal, url(workshop_assets/pedestal.webp)) 50% 100% / contain no-repeat;
   filter: drop-shadow(0 5px 6px rgba(90, 30, 50, 0.3));
 }
 
@@ -328,7 +331,7 @@ button:focus-visible { outline: 3px solid rgba(240, 97, 143, 0.9); outline-offse
 }
 .ws-stage {
   position: relative; height: 84px; min-width: 0;
-  background: url(workshop_assets/cushion.webp) 50% 100% / auto 62px no-repeat;
+  background: var(--ws-cushion, url(workshop_assets/cushion.webp)) 50% 100% / auto 62px no-repeat;
 }
 .ws-piece { position: absolute; left: 50%; top: -4px; width: min(100%, 168px); height: 70px; transform: translateX(-50%); display: block; }
 
@@ -518,6 +521,7 @@ body.is-hard .ws-moves.is-low { animation: wsBump 0.5s ease-out; background: lin
   max-width: min(92vw, 420px); padding: 9px 18px; border-radius: 999px; z-index: 26; white-space: nowrap;
   color: var(--ink); font-size: 1.05rem; font-weight: 900; text-align: center;
   background: rgba(255, 250, 241, 0.97); box-shadow: 0 0 0 2.5px #e8b64a, var(--shadow);
+  margin-bottom: var(--ws-banner-h, 0px);   /* над баннером при любой высоте из медиа-запросов */
   animation: wsToast 0.22s cubic-bezier(.2, 1.4, .5, 1);
 }
 @keyframes wsToast { from { transform: translate(-50%, 8px) scale(0.9); opacity: 0; } to { transform: translateX(-50%); opacity: 1; } }
@@ -720,14 +724,105 @@ body.is-hard .ws-moves.is-low { animation: wsBump 0.5s ease-out; background: lin
   font: 9px/1 ui-monospace, monospace; color: rgba(91, 51, 38, 0.45);
 }
 
-/* ---------- убранство: бархатный коврик под стойками ---------- */
-body.cloth-emerald .ws-board-wrap, body.cloth-wine .ws-board-wrap, body.cloth-navy .ws-board-wrap {
+/* ---------- убранство: бархатный коврик под стойками ----------
+   Цвета — из таблицы DECOR (workshop.js, applyDecor): --ws-cloth-1..3 и кант --ws-cloth-rim. */
+body.has-cloth .ws-board-wrap {
   border-radius: 26px;
-  box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.4), inset 0 0 0 3px rgba(255, 220, 130, 0.55), 0 6px 16px rgba(122, 52, 82, 0.3);
+  background: radial-gradient(ellipse 80% 72% at 50% 42%, var(--ws-cloth-1) 0%, var(--ws-cloth-2) 55%, var(--ws-cloth-3) 100%);
+  box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.4), inset 0 0 0 3px var(--ws-cloth-rim, rgba(255, 220, 130, 0.55)), 0 6px 16px rgba(122, 52, 82, 0.3);
 }
-body.cloth-emerald .ws-board-wrap { background: radial-gradient(ellipse 80% 72% at 50% 42%, #3aa27a 0%, #23795a 55%, #144a37 100%); }
-body.cloth-wine .ws-board-wrap { background: radial-gradient(ellipse 80% 72% at 50% 42%, #b8406a 0%, #8a2850 55%, #4e1430 100%); }
-body.cloth-navy .ws-board-wrap { background: radial-gradient(ellipse 80% 72% at 50% 42%, #4a66b8 0%, #2e4485 55%, #18244e 100%); }
+
+/* ---------- пауза площадки (вкладка скрыта, реклама, окно оплаты): анимации стоят ---------- */
+body.ws-paused .screen *, body.ws-paused .ws-win *, body.ws-paused .ws-win { animation-play-state: paused !important; }
+
+/* ---------- видео за награду: пилюля со значком камеры (у владельца «Без рекламы» — корона) ---------- */
+.ws-vbtn {
+  --vh: 52px;
+  position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  height: var(--vh); min-width: 116px; padding: 0 20px 0 7px; border-radius: 999px;
+  color: #fff; font-size: 1.35rem; font-weight: 900; white-space: nowrap; font-variant-numeric: tabular-nums;
+  text-shadow: 0 2px 0 rgba(96, 44, 120, 0.8);
+  border: 3px solid transparent;
+  background: linear-gradient(180deg, #e7c4f6 0%, #b986dc 46%, #8d58b0 100%) padding-box, var(--rim) border-box;
+  box-shadow: 0 5px 10px rgba(96, 44, 120, 0.35), inset 0 2px 3px rgba(255, 255, 255, 0.55);
+  transition: transform 0.1s ease, filter 0.15s ease;
+}
+.ws-vbtn:active { transform: translateY(1px) scale(0.96); }
+.ws-vbtn[disabled] { filter: grayscale(0.7) brightness(0.95); cursor: default; }
+.ws-vid {
+  flex: none; display: block; width: calc(var(--vh) - 12px); height: calc(var(--vh) - 12px);
+  background: url(workshop_assets/ui_video.webp) center / contain no-repeat;
+  filter: drop-shadow(0 2px 2px rgba(70, 20, 90, 0.35));
+}
+body.is-owner .ws-vid { background-image: url(workshop_assets/ui_crown.webp); }
+.ws-win-extra {
+  position: relative; z-index: 1; flex: none; display: flex; align-items: center; justify-content: center; gap: 14px;
+  margin: 2px 0 8px;
+}
+.ws-win-extra #btn-win-noads { width: 58px; height: 58px; }
+.ws-lose .ws-vbtn { --vh: 56px; min-width: 190px; }
+/* подсказка за видео, когда монет не хватает: значок камеры вместо цены */
+.ws-price.is-video { display: inline-flex; width: 32px; height: 32px; padding: 0; right: -12px; bottom: -8px; border-radius: 50%; border: 0; box-shadow: none;
+  background: url(workshop_assets/ui_video.webp) center / contain no-repeat; filter: drop-shadow(0 2px 2px rgba(70, 20, 90, 0.4)); }
+.ws-price.is-video::before { display: none; }
+body.is-owner .ws-price.is-video { background-image: url(workshop_assets/ui_crown.webp); }
+
+/* крестик закрытия окна без подписи */
+.ws-x {
+  position: absolute; right: -12px; top: -12px; z-index: 2; width: 46px; height: 46px; padding: 0; border: 0; border-radius: 50%;
+  background: url(workshop_assets/ui_close.webp) center / contain no-repeat;
+  filter: drop-shadow(0 3px 3px rgba(122, 52, 82, 0.35));
+}
+.ws-x:active { transform: scale(0.94); }
+
+/* ---------- «Без рекламы»: три карточки-кнопки ---------- */
+.ws-noads .ws-win-box { width: min(100%, 384px); padding: 34px 12px 14px; gap: 8px; }
+.ws-tariffs { width: 100%; display: flex; justify-content: center; align-items: flex-end; gap: 8px; padding-top: 10px; }
+.ws-tariff {
+  position: relative; flex: 1 1 0; max-width: 114px; aspect-ratio: 140 / 192; padding: 10px 4px 9px; border: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: space-between;
+  color: var(--plum); background: url(workshop_assets/ui_card.webp) center / 100% 100% no-repeat;
+  filter: drop-shadow(0 4px 6px rgba(122, 52, 82, 0.3));
+  transition: transform 0.1s ease;
+}
+.ws-tariff:active { transform: scale(0.96); }
+.ws-tariff[disabled] { filter: grayscale(0.6); }
+.ws-tariff.is-best { transform: translateY(-6px); padding-top: 19px; }   /* срок — под лентой «Выгодно» */
+.ws-tariff.is-best:active { transform: translateY(-5px) scale(0.96); }
+.ws-tariff-days { font-size: 1.15rem; font-weight: 900; line-height: 1; white-space: nowrap; }
+.ws-tariff-pic { flex: 1 1 auto; width: 74%; min-height: 0; margin: 4px 0; background: url(workshop_assets/ui_noads.webp) center / contain no-repeat; }
+.ws-tariff.is-royal .ws-tariff-pic { background-image: url(workshop_assets/ui_crown.webp); }
+.ws-tariff-price {
+  display: inline-flex; align-items: center; gap: 3px; height: 30px; padding: 0 10px; border-radius: 999px;
+  font-size: 1.15rem; font-weight: 900; color: #fff; text-shadow: 0 1px 0 rgba(30, 100, 30, 0.8);
+  background: linear-gradient(180deg, #8fe06a, #4fb33a 60%, #3a922a); box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.45), 0 2px 3px rgba(40, 90, 30, 0.35);
+}
+.ws-tariff-price small { font-size: 0.78rem; font-weight: 800; }
+.ws-tariff-ribbon {
+  position: absolute; left: 50%; top: -15px; width: 112%; height: 32px; transform: translateX(-50%);
+  display: flex; align-items: center; justify-content: center; padding-bottom: 3px;
+  font-size: 0.82rem; font-weight: 900; color: #fff; text-shadow: 0 1px 0 rgba(150, 30, 70, 0.7); white-space: nowrap;
+  background: url(workshop_assets/ui_ribbon.webp) center / 100% 100% no-repeat;
+}
+.ws-noads-note { font-size: 0.95rem; font-weight: 800; color: var(--plum); }
+.ws-noads-legal { display: flex; gap: 8px; justify-content: center; font-size: 0.78rem; color: var(--ink-soft); }
+.ws-noads-legal a { color: var(--ink-soft); text-decoration: underline; text-underline-offset: 2px; padding: 4px 2px; }
+
+/* ---------- «Спасибо!» после покупки ---------- */
+.ws-thanks-pic { width: 112px; height: 96px; background: url(workshop_assets/ui_crown.webp) center / contain no-repeat;
+  filter: drop-shadow(0 0 14px rgba(255, 214, 90, 0.85)); animation: wsPop 0.5s cubic-bezier(.2, 1.6, .5, 1) both; }
+.ws-thanks-pic.is-heart { background-image: url(workshop_assets/ui_heart.webp); filter: drop-shadow(0 0 12px rgba(255, 140, 180, 0.8)); }
+.ws-thanks .ws-win-text { font-size: 1.2rem; font-weight: 900; color: var(--plum); }
+
+/* ---------- убранство: королевские вещи в окне ---------- */
+.ws-decor-chip .ws-swatch.is-pic { border-radius: 0; box-shadow: none; background: center / contain no-repeat; }
+.ws-decor-ico.is-pic { background: center / contain no-repeat; }
+.ws-decor-crown {   /* корона: вещь из Королевского набора, ещё не куплена */
+  position: absolute; right: -6px; bottom: -6px; width: 26px; height: 22px;
+  background: url(workshop_assets/ui_crown.webp) center / contain no-repeat;
+  filter: drop-shadow(0 0 1.5px #fff) drop-shadow(0 2px 2px rgba(90, 30, 50, 0.35));
+}
+.ws-decor-chip.is-set .ws-swatch { filter: saturate(0.6); opacity: 0.6; }
 
 /* ---------- высокий телефон: изделие на подушке крупнее ---------- */
 @media (min-height: 800px) and (orientation: portrait) {
@@ -754,6 +849,22 @@ body.cloth-navy .ws-board-wrap { background: radial-gradient(ellipse 80% 72% at 
   .ws-win-stars i:nth-child(2) { width: 90px; height: 90px; margin-bottom: 12px; }
   .ws-win-side .ws-round { width: 56px; height: 56px; }
   .ws-play { --ph: 66px; }
+  .ws-vbtn { --vh: 48px; }
+  .ws-win-extra { margin-bottom: 4px; }
+}
+/* ---------- совсем низкий экран уровня (360×640 с баннером: над ним 584 px) ----------
+   Медиазапрос не знает высоты баннера, поэтому меряется сам экран уровня: верх, заказчицы
+   и кнопки чуть плотнее, чтобы поле осталось не меньше 60 % высоты над баннером. */
+#screen-workshop { container: ws-game / size; }
+@container ws-game (max-height: 600px) and (max-width: 600px) and (orientation: portrait) {
+  .ws-header { height: 74px; padding-top: 4px; }
+  .ws-head-side { gap: 3px; }
+  .ws-stage { height: 66px; background-size: auto 48px; }
+  .ws-piece { height: 56px; width: min(100%, 138px); }
+  .ws-orders { --face: 52px; --bubble: 44px; }
+  .ws-orders[data-n="3"] { --face: 48px; --bubble: 40px; }
+  .ws-actions .ws-round { width: 50px; height: 50px; }
+  .ws-actions { padding: 2px 0 7px; }
 }
 @media (max-width: 380px) {
   .ws-header { grid-template-columns: 92px 1fr 92px; }
@@ -810,6 +921,15 @@ body.cloth-navy .ws-board-wrap { background: radial-gradient(ellipse 80% 72% at 
   .ws-modal-art { height: 70px; }
   .ws-chest-big { width: 100px; height: 100px; margin: 0; }
   .ws-chest-prize { width: 38px; height: 38px; margin-left: -19px; }
+  .ws-vbtn { --vh: 46px; font-size: 1.15rem; }
+  .ws-lose .ws-vbtn { --vh: 48px; }
+  .ws-win-extra { margin: 0 0 4px; }
+  .ws-win-extra #btn-win-noads { width: 48px; height: 48px; }
+  .ws-noads .ws-win-box { width: min(100%, 360px); padding-top: 26px; gap: 4px; }
+  .ws-tariff { max-width: 92px; padding: 7px 3px 6px; }
+  .ws-tariff-days { font-size: 1rem; }
+  .ws-tariff-price { height: 26px; font-size: 1rem; }
+  .ws-thanks-pic { width: 84px; height: 64px; }
 }
 
 /* ---------- большой экран ---------- */

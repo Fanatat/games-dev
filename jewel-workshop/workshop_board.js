@@ -904,7 +904,12 @@ const WsBoard = (() => {
   function setWaiting(list) { waiting = list.slice(); request(); }
   function setLock(v) { locked = v; request(); }
   function unlock(v) { if (locked === v) locked = -1; unlockAt = { v, t0: now() }; request(); }
-  function setTube(name) { tube = TUBES[name] || TUBES.clear; request(); }
+  // name — имя из TUBES или готовый вид { tint, rim } из таблицы убранства игры (DECOR.tube)
+  function setTube(name) {
+    if (name && typeof name === 'object' && typeof name.tint === 'string' && typeof name.rim === 'string') tube = { tint: name.tint, rim: name.rim };
+    else tube = TUBES[name] || TUBES.clear;
+    request();
+  }
 
   /* Забрать камни выданной пробирки: координаты на экране (для полёта к
      карточке) и опустошение пробирки на поле. */

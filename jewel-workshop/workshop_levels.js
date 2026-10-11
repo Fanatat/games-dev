@@ -276,6 +276,243 @@
       par: 18, s3: 23, s2: 33,
       hard: true, limit: 25, hidden: [0, 0, 0, 0, 2, 0, 0, 2],
       solution: '1>6 2>1 2>6 4>6 0>6 3>6 5>0 5>2 7>3 7>6 0>7 0>6 0>4 1>0 1>4 1>5 3>0 3>5'
+    },
+    {
+      id: 31, name: 'Кольцо «Полумесяц»', piece: 'ring', slots: 2,
+      orders: 'O P T D S E',
+      vials: ['E D D D', 'D T T O', 'T O T', 'E E E', 'S S O', 'S S P', 'P P P O', '-'],
+      par: 10, s3: 13, s2: 19,
+      solution: '1>4 6>7 5>6 2>1 2>7 1>2 0>1 0>3 4>7 4>5'
+    },
+    {
+      id: 32, name: 'Серьги «Лунный камень»', piece: 'earrings', slots: 3,
+      orders: 'D T E M R S',
+      vials: ['M E E E', '-', 'R S', 'M E D T', 'S M D D', 'S R R R', 'S M', 'T T T D'],
+      par: 13, s3: 17, s2: 25,
+      hidden: [0, 0, 1, 0, 2, 0, 0, 2],
+      solution: '4>1 7>1 3>7 4>6 2>4 5>2 3>1 0>1 0>6 4>5 3>1 6>3 5>6'
+    },
+    {
+      id: 33, name: 'Кулон «Ночная фиалка»', piece: 'pendant', slots: 2,
+      orders: 'T D O M A S P',
+      vials: ['S S S', 'M O D D', 'A M M T', 'M A A O', 'P A T T', '-', 'O O T', 'P P P D', 'S D'],
+      par: 14, s3: 18, s2: 26,
+      urgent: { order: 1, moves: 7 },
+      solution: '1>5 7>5 8>5 2>6 3>1 4>5 6>5 3>4 2>3 4>2 1>6 4>7 0>8 1>3'
+    },
+    {
+      id: 34, name: 'Заколка «Сова»', piece: 'hairpin', slots: 2,
+      orders: 'D T P M E A S',
+      vials: ['S A M M', 'A E T T', 'M M', 'A P P D', 'S S T T', '-', 'E E D', 'A S D D', 'E P P'],
+      par: 15, s3: 19, s2: 28,
+      lock: { vial: 8, order: 3 }, hidden: [0, 0, 0, 0, 0, 0, 1, 2, 0],
+      solution: '1>5 4>5 0>2 3>6 6>5 7>5 3>2 0>3 0>4 8>2 1>6 1>3 7>4 3>7 6>8'
+    },
+    {
+      id: 35, name: 'Колье «Лунная дорожка»', piece: 'necklace', slots: 2,
+      orders: 'P E Z T A O D',
+      vials: ['D D T P', 'D O E E', 'D A Z P', 'O P Z Z', '-', 'T T Z E', 'A A A E', 'O O T P'],
+      par: 17, s3: 22, s2: 31,
+      hard: true, limit: 24,
+      solution: '1>4 5>4 6>4 3>4 2>3 2>4 5>4 0>3 2>6 3>4 7>4 0>7 0>2 1>3 1>2 7>5 3>7'
+    },
+    {
+      id: 36, name: 'Брошь «Гондола»', piece: 'brooch', slots: 2,
+      orders: 'A E D Z S R T',
+      vials: ['S T E E', 'Z Z S', 'T R E E', 'T R Z A', '-', 'S S A A', 'R R', 'D D A', 'T Z D D'],
+      par: 15, s3: 19, s2: 28,
+      urgent: { order: 4, moves: 7 },
+      solution: '3>4 7>4 8>7 5>4 1>5 2>4 2>6 0>4 0>2 3>1 3>6 0>5 2>3 8>1 3>8'
+    },
+    {
+      id: 37, name: 'Запонки «Мост вздохов»', piece: 'cufflinks', slots: 2,
+      orders: 'M E O D P R T',
+      vials: ['E E M', 'P D E', '-', 'R O O O', 'T R D D', 'R E', 'T T T M', 'P P P O', 'R D M M'],
+      par: 15, s3: 19, s2: 28,
+      lock: { vial: 8, order: 1 },
+      solution: '0>2 1>0 5>0 4>1 1>0 6>2 8>2 4>5 7>2 1>7 3>2 4>6 3>5 8>0 5>8'
+    },
+    {
+      id: 38, name: 'Браслет «Карнавал»', piece: 'bracelet', slots: 2,
+      orders: 'S T Z A R P E D',
+      vials: ['-', 'P P P S', 'E E Z Z', 'R R S S', 'E S', 'R R Z T', 'T T', 'D D D Z', 'D E A T', 'P A A A'],
+      par: 15, s3: 19, s2: 28,
+      hidden: [0, 0, 0, 0, 1, 0, 0, 2, 0, 2],
+      solution: '1>0 3>0 4>0 8>6 8>0 9>0 5>6 2>0 5>0 1>9 7>0 8>2 7>8 2>4 3>5'
+    },
+    {
+      id: 39, name: 'Кулон «Муранское стекло»', piece: 'pendant', slots: 1,
+      orders: 'P D E S M R T',
+      vials: ['S S P P', 'R R E D', 'E E E P', 'T T T', 'M M P', '-', 'R M M D', 'S S D D', 'R T'],
+      par: 12, s3: 15, s2: 23,
+      urgent: { order: 1, moves: 7 },
+      solution: '0>5 2>4 4>5 1>5 1>2 6>5 7>5 6>4 1>6 8>3 0>7 6>8'
+    },
+    {
+      id: 40, name: 'Диадема «Палаццо»', piece: 'tiara', slots: 2,
+      orders: 'P E R D M O T',
+      vials: ['D R M E', 'T O R E', 'T T T D', 'M D P P', '-', 'M M R E', 'O O O P', 'D R E P'],
+      par: 18, s3: 23, s2: 33,
+      hard: true, limit: 25, lock: { vial: 2, order: 1 },
+      solution: '3>4 7>4 0>7 6>4 1>4 5>4 1>5 7>4 5>4 0>5 0>4 7>4 1>6 2>3 0>3 3>7 1>2 3>5'
+    },
+    {
+      id: 41, name: 'Серьги «Лепесток»', piece: 'earrings', slots: 3,
+      orders: 'R S D A P E T O',
+      vials: ['E T T S', 'A D D D', 'E E R R', '-', 'T T S S', 'O O O', 'O E A', 'P P S D', 'P P R R', 'A A'],
+      par: 14, s3: 18, s2: 26,
+      hidden: [0, 0, 2, 0, 0, 0, 1, 0, 2, 0],
+      solution: '1>3 1>6 7>3 7>1 8>3 7>8 6>9 0>1 2>3 6>2 5>6 4>1 0>4 0>2'
+    },
+    {
+      id: 42, name: 'Кольцо «Ханами»', piece: 'ring', slots: 2,
+      orders: 'S A E P D Z R',
+      vials: ['-', 'D Z Z A', 'Z D D S', 'E E E A', 'R D S S', 'R R R S', 'P E P A', 'Z P P A', '-'],
+      par: 15, s3: 19, s2: 28,
+      lock: { vial: 8, order: 2 },
+      solution: '1>0 3>0 6>0 7>0 2>0 4>0 2>4 5>0 1>2 4>1 6>7 6>3 4>5 7>6 2>7'
+    },
+    {
+      id: 43, name: 'Заколка «Веер»', piece: 'hairpin', slots: 2,
+      orders: 'S T O E M D A R',
+      vials: ['D M M S', 'E M T', 'A A A E', 'E M T T', 'R E O', '-', 'R R R T', 'A O', 'O O S S', 'D D D S'],
+      par: 17, s3: 22, s2: 31,
+      hidden: [0, 1, 2, 0, 0, 0, 2, 0, 0, 0], urgent: { order: 4, moves: 7 },
+      solution: '0>5 4>7 8>5 7>8 9>5 2>4 6>1 0>5 1>8 3>8 0>9 1>5 4>1 4>6 3>5 2>7 1>3'
+    },
+    {
+      id: 44, name: 'Брошь «Журавль»', piece: 'brooch', slots: 3,
+      orders: 'T A O P D E Z R',
+      vials: ['D D P', '-', 'Z R A A', 'Z P O', 'R E E T', 'R Z O', 'E E A A', 'P T T T', 'D D O O', 'R Z P'],
+      par: 18, s3: 23, s2: 33,
+      solution: '0>9 2>1 3>5 6>1 4>1 4>6 2>4 7>1 3>7 5>1 5>2 9>7 4>5 9>2 5>9 2>3 8>1 0>8'
+    },
+    {
+      id: 45, name: 'Корона «Сакура в цвету»', piece: 'crown', slots: 2,
+      orders: 'E A D P M O T',
+      vials: ['O O A D', 'M M E E', 'T O P A', 'P P P D', 'M O E A', 'T T T A', 'M D D E', '-'],
+      par: 16, s3: 20, s2: 30,
+      hard: true, limit: 22, hidden: [0, 2, 0, 0, 0, 0, 2, 0], urgent: { order: 3, moves: 6 },
+      solution: '1>7 6>7 0>6 4>0 4>7 0>7 2>7 4>0 1>4 5>7 3>1 2>3 2>0 2>5 6>1 4>6'
+    },
+    {
+      id: 46, name: 'Кольцо «Полярная ночь»', piece: 'ring', slots: 2,
+      orders: 'O S M P T R A',
+      vials: ['-', 'R T T O', 'R R P S', 'A A S S', 'M M O O', 'R T M P', '-', 'A A S M', 'T P P O'],
+      par: 16, s3: 20, s2: 30,
+      lock: { vial: 6, order: 3 },
+      solution: '1>0 4>0 7>4 8>0 2>7 5>2 3>0 5>4 1>5 8>4 5>8 7>0 3>7 2>4 1>2 2>5'
+    },
+    {
+      id: 47, name: 'Кулон «Аврора»', piece: 'pendant', slots: 2,
+      orders: 'A E Z S T P R O',
+      vials: ['T P E E', 'O O O S', 'P S', '-', 'S T T S', 'O T E', 'Z Z A A', 'R P Z E', 'R R Z', 'P R A A'],
+      par: 18, s3: 23, s2: 33,
+      hidden: [2, 0, 0, 0, 0, 0, 2, 2, 0, 0],
+      solution: '0>3 1>2 4>2 5>3 7>3 4>5 2>4 0>2 6>3 9>3 7>6 7>2 9>7 2>9 5>0 1>5 8>6 7>8'
+    },
+    {
+      id: 48, name: 'Браслет «Сполохи»', piece: 'bracelet', slots: 2,
+      orders: 'D M E T O R S P',
+      vials: ['-', 'P P T', 'P O M M', 'P O T', 'S R E E', 'R R R D', 'O O D D', 'S T E E', 'S S M M', 'T D'],
+      par: 17, s3: 22, s2: 31,
+      urgent: { order: 2, moves: 8 },
+      solution: '1>3 5>0 6>0 9>0 3>9 7>0 7>9 4>0 3>6 4>5 2>0 2>6 1>2 2>3 8>0 4>8 7>8'
+    },
+    {
+      id: 49, name: 'Запонки «Айсберг»', piece: 'cufflinks', slots: 2,
+      orders: 'P M R D S O E',
+      vials: ['-', 'E E E M', 'O D R', 'S S M M', 'E D', 'R R S P', 'O D M', 'O O S P', 'R D P P'],
+      par: 17, s3: 22, s2: 31,
+      lock: { vial: 2, order: 1 }, urgent: { order: 1, moves: 7 },
+      solution: '1>0 3>0 6>0 5>0 5>3 7>0 8>0 2>5 7>3 8>0 5>8 4>0 1>4 2>0 6>0 2>6 6>7'
+    },
+    {
+      id: 50, name: 'Колье «Небесное сияние»', piece: 'necklace', slots: 2,
+      orders: 'T D S Z P O E A',
+      vials: ['P S D D', 'P P S T', '-', 'O O D D', 'E P Z S', 'A A O T', 'A Z Z S', 'A E E E', 'O Z T T'],
+      par: 19, s3: 24, s2: 35,
+      hard: true, limit: 34, lock: { vial: 7, order: 2 },
+      solution: '1>2 4>1 5>2 8>2 0>2 1>0 4>8 3>2 0>2 0>1 4>1 6>2 5>3 8>0 7>4 6>0 5>6 6>7 3>8'
+    },
+    {
+      id: 51, name: 'Брошь «Снежинка»', piece: 'brooch', slots: 2,
+      orders: 'P R E D T A O S',
+      vials: ['T D D R', 'O O', 'A A D R', '-', 'D T T R', 'A A P P', 'E E', 'O S P P', 'S S S E', 'O T E R'],
+      par: 16, s3: 20, s2: 30,
+      hidden: [0, 1, 0, 0, 0, 2, 1, 0, 0, 0],
+      solution: '0>3 2>3 4>3 9>3 2>0 9>6 4>9 0>4 8>6 5>3 2>5 7>3 7>8 1>7 9>0 7>9'
+    },
+    {
+      id: 52, name: 'Серьги «Сосулька»', piece: 'earrings', slots: 3,
+      orders: 'T A D P Z S O E',
+      vials: ['Z Z Z D', 'Z D A', 'O S T T', '-', 'O S A', 'E O O', 'S P P P', 'E E E', 'A A D D', 'S P T T'],
+      par: 16, s3: 20, s2: 30,
+      urgent: { order: 3, moves: 6 },
+      solution: '2>3 9>3 4>1 2>4 6>3 9>3 4>6 6>9 8>3 1>8 0>3 5>2 5>7 1>3 0>1 2>4'
+    },
+    {
+      id: 53, name: 'Кольцо «Иней»', piece: 'ring', slots: 2,
+      orders: 'R P S T A D O E',
+      vials: ['D D S', 'E E P P', 'E O O P', 'O S', 'E T T R', '-', 'T T R R', 'A A A P', 'O D S R', 'A D S'],
+      par: 18, s3: 23, s2: 33,
+      hidden: [0, 0, 0, 0, 0, 0, 2, 0, 0, 1], urgent: { order: 1, moves: 7 },
+      solution: '1>5 2>5 7>5 0>3 4>5 6>5 4>6 8>5 8>3 8>0 9>5 9>0 3>5 1>4 2>3 2>4 3>8 7>9'
+    },
+    {
+      id: 54, name: 'Кулон «Снегурочка»', piece: 'pendant', slots: 1,
+      orders: 'T A S E Z O D',
+      vials: ['O D A', 'Z Z A', 'D Z A A', 'S S S T', 'E S T T', '-', 'O O O T', 'Z E E E', 'D D'],
+      par: 13, s3: 17, s2: 25,
+      solution: '3>5 4>5 6>5 0>1 4>3 1>5 2>5 0>8 1>2 0>6 7>4 2>7 2>8'
+    },
+    {
+      id: 55, name: 'Диадема «Снежная королева»', piece: 'tiara', slots: 2,
+      orders: 'T R O M E S A D',
+      vials: ['A D O O', 'M O M R', 'D D O T', 'E E M T', 'E M R T', 'S S E R', 'D S S T', '-', 'A A A R'],
+      par: 20, s3: 25, s2: 36,
+      hard: true, limit: 27, lock: { vial: 0, order: 1 }, hidden: [0, 2, 0, 0, 0, 0, 0, 0, 2],
+      solution: '2>7 3>7 4>7 6>7 1>4 4>7 5>7 8>7 1>3 1>2 3>1 4>1 5>3 6>5 0>1 2>1 0>6 2>6 3>4 0>8'
+    },
+    {
+      id: 56, name: 'Заколка «Жемчужная нить»', piece: 'hairpin', slots: 2,
+      orders: 'T D R P O A S E',
+      vials: ['P D D D', 'S S P D', 'A A R R', 'E E T T', 'S O R T', 'O A T', 'O O', '-', 'E E P', 'A S P R'],
+      par: 18, s3: 23, s2: 33,
+      hidden: [0, 0, 2, 0, 0, 0, 1, 0, 0, 2], urgent: { order: 1, moves: 8 },
+      solution: '1>7 1>8 4>5 0>7 8>0 2>7 9>4 9>0 4>7 5>0 2>5 9>1 5>9 3>0 4>6 3>8 1>4 5>6'
+    },
+    {
+      id: 57, name: 'Браслет «Шампанское»', piece: 'bracelet', slots: 2,
+      orders: 'R T P Z D S A',
+      vials: ['-', 'D D P R', '-', 'P P P R', 'Z S D R', 'S D T T', 'A S Z T', 'S Z Z R', 'A A A T'],
+      par: 16, s3: 20, s2: 30,
+      lock: { vial: 2, order: 3 },
+      solution: '1>0 3>0 1>3 4>0 7>0 4>1 5>0 5>1 6>0 8>0 4>5 6>4 6>5 6>8 7>4 5>7'
+    },
+    {
+      id: 58, name: 'Брошь «Вальс»', piece: 'brooch', slots: 3,
+      orders: 'M A S T P E R D',
+      vials: ['E E A', 'P P T M', 'R E A A', 'D T', 'S S S T', 'R R R A', 'E P S M', 'D D D', '-', 'P T M M'],
+      par: 17, s3: 22, s2: 31,
+      hidden: [0, 0, 2, 1, 0, 0, 0, 0, 0, 2], urgent: { order: 1, moves: 7 },
+      solution: '0>8 2>8 0>2 5>8 1>0 4>1 6>0 6>4 1>3 6>1 2>6 9>0 3>0 3>7 9>0 1>9 2>5'
+    },
+    {
+      id: 59, name: 'Серьги «Бриллиантовая капля»', piece: 'earrings', slots: 2,
+      orders: 'S A D R T O Z P',
+      vials: ['T T', 'O R D A', 'R R A', 'Z Z Z D', 'P P S S', 'P T R', 'Z O A A', 'T D S S', '-', 'P O O D'],
+      par: 18, s3: 23, s2: 33,
+      hidden: [1, 2, 0, 0, 0, 0, 0, 0, 0, 0],
+      solution: '1>2 2>8 6>8 5>2 7>8 1>7 1>2 4>8 3>7 6>1 9>2 9>1 7>2 5>0 5>9 4>9 0>7 3>6'
+    },
+    {
+      id: 60, name: 'Корона «Королева бриллиантов»', piece: 'crown', slots: 2,
+      orders: 'A S R E O T Z P',
+      vials: ['O R R A', 'E E E S', 'P Z T A', 'T Z E S', '-', 'T S S A', 'P P P A', 'Z Z O R', 'T O O R'],
+      par: 19, s3: 24, s2: 35,
+      hard: true, limit: 26, hidden: [0, 2, 0, 0, 0, 0, 2, 0, 0],
+      solution: '0>4 2>4 5>4 6>4 1>5 3>4 3>1 5>4 0>1 7>1 7>0 8>1 3>7 2>3 2>7 8>0 3>5 2>6 5>8'
     }
     /* SRC:END */
   ];

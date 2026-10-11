@@ -20,10 +20,17 @@
      шкатулку (монеты и убранство мастерской), уровни открываются по одному;
    - новинки (тайные камни, срочный заказ, запертая пробирка, золотой
      топаз) — с карточкой «Новое!» при первой встрече.
-   Без энергии, рекламы, покупок и таймеров. Сеть не нужна.
-   Сейвы — собственный ключ SAVE_KEY (осознанное исключение из общей
-   абстракции сохранений game3: у форка нет платформенных адаптеров).
-   Аналитика — только журнал window.__wsEvents и сводка __wsMetrics().
+   Без энергии и таймеров; уровни играются без сети.
+
+   Площадка — WSPlatform (workshop_platform.js): старт, сейв, пауза,
+   реклама, покупки. Сейв v4 под ключом SAVE_KEY — формат и проверки в
+   workshop_save.js, читается и пишется только через WSPlatform.
+   Реклама (настройки WS_CONFIG.ads): баннер внизу на карте и поле
+   (телефон, портрет), межстраничная только по «Дальше» после победы,
+   видео за награду — «×2», «+5 ходов», подсказка. «Без рекламы» за голоса
+   и Королевский набор: выдача только по строкам журнала покупок.
+   Аналитика — WSAnalytics (workshop_analytics.js): журнал window.__wsEvents
+   и Метрика; сводка __wsMetrics().
    ============================================================ */
 (() => {
   'use strict';
@@ -45,6 +52,7 @@
   const FREE_HINT_LEVELS = 2;             // на уровнях 1–2 подсказка бесплатна
   const MORE_MOVES = 5;
   const MORE_PRICE = 50;
+  const NOADS_FROM_LEVEL = 7;             // предложение «Без рекламы» в окне победы — с 7-го уровня
   const PER_COLL = 5;
 
   const COLLECTIONS = [
@@ -53,22 +61,52 @@
     { name: 'Сад', coins: 150, decor: ['cloth', 'wine'] },
     { name: 'Звёзды', coins: 200, decor: ['tube', 'rose'] },
     { name: 'Осень', coins: 200, decor: ['cloth', 'navy'] },
-    { name: 'Королевский бал', coins: 300, decor: ['tube', 'royal'] }
+    { name: 'Королевский бал', coins: 300, decor: ['tube', 'royal'] },
+    // глава 2 (уровни 31–60): пока только монеты; убранство назначит B3 (decor: null — без него)
+    { name: 'Лунный свет', coins: 300, decor: null },
+    { name: 'Венеция', coins: 350, decor: null },
+    { name: 'Сакура', coins: 350, decor: null },
+    { name: 'Северное сияние', coins: 400, decor: null },
+    { name: 'Зимняя сказка', coins: 450, decor: null },
+    { name: 'Бриллиантовый юбилей', coins: 500, decor: null }
   ];
+  /* Убранство мастерской — ОДНА таблица на всё (точка расширения лавки).
+     Первый вариант вида — по умолчанию, есть у всех. Остальные — из шкатулки
+     коллекции (COLLECTIONS[].decor), из набора (set: 'royal' — Королевский
+     набор за покупку «Без рекламы» на 30/365 дней) или из Store.data.owned
+     ('<вид>:<id>': 1 — лавка). Как вариант выглядит:
+     cloth    — бархат под стойками: velvet [центр, середина, край] и rim (кант),
+                у ореха velvet нет; на body ставится класс cloth-<id>;
+     tube     — стекло пробирок: tint/rim (r,g,b) для WsBoard.setTube;
+     cushion  — подушка изделия на поле, pedestal — тумба на карте: картинка
+                workshop_assets/<img>.webp (CSS-переменные --ws-cushion/--ws-pedestal).
+     swatch — образец в окне убранства и в шкатулке. */
   const DECOR = {
     cloth: [
-      { id: 'walnut', name: 'Ореховый стол' }, { id: 'emerald', name: 'Изумрудный бархат' },
-      { id: 'wine', name: 'Винный бархат' }, { id: 'navy', name: 'Синий бархат' }
+      { id: 'walnut', name: 'Ореховый стол', swatch: '#5a3a1f' },
+      { id: 'emerald', name: 'Изумрудный бархат', swatch: '#1f6b4d', velvet: ['#3aa27a', '#23795a', '#144a37'] },
+      { id: 'wine', name: 'Винный бархат', swatch: '#74203a', velvet: ['#b8406a', '#8a2850', '#4e1430'] },
+      { id: 'navy', name: 'Синий бархат', swatch: '#22346a', velvet: ['#4a66b8', '#2e4485', '#18244e'] },
+      { id: 'royal', name: 'Королевский бархат', swatch: '#5a2380', set: 'royal',
+        velvet: ['#8e4cc0', '#5f2788', '#2e0f4a'], rim: 'rgba(255, 206, 92, 0.95)' }
     ],
     tube: [
-      { id: 'clear', name: 'Прозрачное стекло' }, { id: 'sea', name: 'Морское стекло' },
-      { id: 'rose', name: 'Розовое стекло' }, { id: 'royal', name: 'Королевское стекло' }
+      { id: 'clear', name: 'Прозрачное стекло', swatch: '#f4ecdc', tint: '255,250,252', rim: '255,255,255' },
+      { id: 'sea', name: 'Морское стекло', swatch: '#8fe0d8', tint: '170,240,230', rim: '215,255,248' },
+      { id: 'rose', name: 'Розовое стекло', swatch: '#f2a7bd', tint: '255,196,214', rim: '255,226,236' },
+      { id: 'royal', name: 'Королевское стекло', swatch: '#b49cf0', tint: '210,184,255', rim: '255,232,170' },
+      { id: 'crystal', name: 'Королевский хрусталь', swatch: '#f3d27a', tint: '255,228,165', rim: '255,198,72', set: 'royal' }
+    ],
+    cushion: [
+      { id: 'classic', name: 'Бархатная подушка', img: 'cushion' },
+      { id: 'royal', name: 'Королевская подушка', img: 'cushion_royal', set: 'royal' }
+    ],
+    pedestal: [
+      { id: 'classic', name: 'Бархатная тумба', img: 'pedestal' },
+      { id: 'royal', name: 'Королевский пьедестал', img: 'pedestal_royal', set: 'royal' }
     ]
   };
-  const SWATCH = {
-    walnut: '#5a3a1f', emerald: '#1f6b4d', wine: '#74203a', navy: '#22346a',
-    clear: '#f4ecdc', sea: '#8fe0d8', rose: '#f2a7bd', royal: '#b49cf0'
-  };
+  const decorItem = (kind, id) => (DECOR[kind] || []).find(d => d.id === id) || null;
   // конфетти в цветах бутика: розовый, золото, сирень, белый, мята
   const CONFETTI = ['#ff8fb1', '#ffd23a', '#e9b4ff', '#ffffff', '#8fe3c8', '#ffb347', '#f0618f'];
 
@@ -99,52 +137,49 @@
   }
 
   /* ---------- сохранение ----------
-     { v: 3, coins, muted, best: { id: ходов }, stars: { id: 1..3 }, cur,
-       seen: { новинка: true }, chests: { коллекция: true },
-       decor: { cloth, tube }, sessions }
-     Убранство во владении не хранится: оно выводится из открытых шкатулок. */
-  function freshData() {
-    return { v: 3, coins: 0, muted: false, best: {}, stars: {}, cur: null, seen: {}, chests: {}, decor: { cloth: 'walnut', tube: 'clear' }, sessions: 0 };
+     Формат v4, проверка каждого поля и миграции — workshop_save.js
+     (WorkshopSave), договор полей — docs/WORKSHOP.md «Сохранение».
+     Сейв читается и пишется только через WSPlatform: loadSave() при старте,
+     writeSave() на каждое изменение, flush() в конце уровня и после выдачи
+     покупки. Убранство из шкатулок не хранится — выводится из chests. */
+  const FTUE_ALL = WSAnalytics.FTUE_STEPS.reduce((m, s) => m | (1 << s[0]), 0);
+  function saveCtx() {
+    return {
+      levels: LEVELS.map(l => l.id), novelty: Object.keys(NOVELTY).concat('hard'), perColl: PER_COLL,
+      collections: COLLECTIONS, decor: DECOR, gems: Object.keys(GEMS),
+      restoreCur: (c) => !!restoreGame(c), today: WSAnalytics.dayNumber(), ftueAll: FTUE_ALL
+    };
   }
   const intIn = (x, lo, hi) => Number.isInteger(x) && x >= lo && x <= hi;
 
+  /* Сейв MVP (ключ OLD_KEY, до слоя площадки) — единственное прямое чтение
+     localStorage: из него берётся только «звук выключен», когда своего сейва
+     ещё нет. Сам ключ не стирается. */
+  function readOldMuted() {
+    try {
+      const old = JSON.parse(window.localStorage.getItem(OLD_KEY) || 'null');
+      return !!(old && typeof old === 'object' && old.muted === true);
+    } catch (e) { return false; }
+  }
+
   const Store = {
-    data: freshData(),
-    load() {
-      try {
-        const raw = window.localStorage.getItem(SAVE_KEY);
-        if (!raw) {
-          const old = JSON.parse(window.localStorage.getItem(OLD_KEY) || 'null');
-          if (old && typeof old === 'object') this.data.muted = !!old.muted;
-          return;
-        }
-        const d = JSON.parse(raw);
-        if (!d || typeof d !== 'object' || d.v !== 3) return;
-        const out = freshData();
-        out.coins = intIn(d.coins, 0, 1e7) ? d.coins : 0;
-        out.muted = !!d.muted;
-        out.sessions = intIn(d.sessions, 0, 1e7) ? d.sessions : 0;
-        LEVELS.forEach(lv => {
-          const k = String(lv.id);
-          const b = d.best && d.best[k], s = d.stars && d.stars[k];
-          if (intIn(b, 1, 1e5) && intIn(s, 1, 3)) { out.best[k] = b; out.stars[k] = s; }
-        });
-        if (d.seen && typeof d.seen === 'object') {
-          for (const k of Object.keys(NOVELTY).concat('hard')) if (d.seen[k]) out.seen[k] = true;
-        }
-        this.data = out;
-        COLLECTIONS.forEach((c, ci) => { if (d.chests && d.chests[ci] && collDone(ci)) out.chests[ci] = true; });
-        if (d.decor && typeof d.decor === 'object') {
-          for (const kind of Object.keys(DECOR)) if (owns(kind, d.decor[kind])) out.decor[kind] = d.decor[kind];
-        }
-        // незаконченная партия хранится упакованной; разворачивается при входе
-        out.cur = restoreGame(d.cur) ? d.cur : null;
-      } catch (e) { /* приватный режим/нет хранилища/битый сейв — играем с чистого листа */ }
+    ctx: saveCtx(),
+    data: null,
+    // raw — ответ WSPlatform.loadSave(): null — нового игрока (или сейва нет)
+    load(raw) {
+      this.ctx = saveCtx();
+      this.data = WorkshopSave.normalize(raw, this.ctx, raw == null ? readOldMuted() : false);
     },
     save() {
-      try { window.localStorage.setItem(SAVE_KEY, JSON.stringify(this.data)); } catch (e) { /* ок */ }
+      try { WSPlatform.writeSave(this.data); } catch (e) { /* сейв не роняет игру */ }
+    },
+    // записать и сразу дописать облако (конец уровня, выдача покупки)
+    flush() {
+      this.save();
+      try { return WSPlatform.flush(); } catch (e) { return Promise.resolve(false); }
     }
   };
+  Store.data = WorkshopSave.fresh(Store.ctx);
 
   function packState(s) {
     return { v: s.vials.map(v => v.join('')), s: s.slots.slice(), n: s.next, d: s.delivered, hd: s.hid.slice(), q: s.seq.slice() };
@@ -251,19 +286,24 @@
   const collLevels = (ci) => LEVELS.slice(ci * PER_COLL, ci * PER_COLL + PER_COLL);
   const collCount = (ci) => collLevels(ci).filter(l => Store.data.stars[l.id]).length;
   function collDone(ci) { const ls = collLevels(ci); return ls.length > 0 && ls.every(l => Store.data.stars[l.id]); }
-  function owns(kind, id) {
-    if (!DECOR[kind] || !DECOR[kind].some(d => d.id === id)) return false;
-    if (DECOR[kind][0].id === id) return true;
-    return COLLECTIONS.some((c, ci) => Store.data.chests[ci] && c.decor[0] === kind && c.decor[1] === id);
-  }
-  function decorName(kind, id) { const d = DECOR[kind].find(x => x.id === id); return d ? d.name : id; }
+  const owns = (kind, id) => WorkshopSave.owns(Store.data, Store.ctx, kind, id);
+  function decorName(kind, id) { const d = decorItem(kind, id); return d ? d.name : id; }
 
-  /* ---------- журнал событий (без сети) ---------- */
-  window.__wsEvents = [];
-  function track(name, data) {
-    const e = Object.assign({ product: PRODUCT_ID, event: name, t: Date.now() }, data || {});
-    window.__wsEvents.push(e);
-    if (window.__wsEvents.length > 2000) window.__wsEvents.shift();
+  /* ---------- аналитика: журнал window.__wsEvents и Метрика (WSAnalytics) ----------
+     Схема событий — docs/WORKSHOP_ANALYTICS.md §5. */
+  function track(name, data) { WSAnalytics.event(name, data); }
+  // секунды текущей попытки: пауза площадки (свернули, реклама, оплата) не считается
+  const levelSec = () => Math.min(3600, Math.max(0, Math.round(((pauseAt || Date.now()) - levelT0) / 1000)));
+  // шаги первых минут: каждый — один раз на игрока (маска flags.ftue в сейве)
+  function ftueStep(step, name) {
+    const bit = 1 << step;
+    if (Store.data.flags.ftue & bit) return;
+    Store.data.flags.ftue |= bit;
+    Store.save();
+    track('ftue_step', { step, name, level: L ? L.id : 0 });
+  }
+  function coinEarn(src, amount, level) {
+    if (amount > 0) track('coin_earn', level ? { src, amount, level } : { src, amount });
   }
 
   /* ---------- состояние ---------- */
@@ -299,6 +339,283 @@
   let justWon = 0;         // id уровня, пройденного последним (значок на карте «выпрыгивает»)
   let modalOpen = false, modalOk = null;
   let winShineTimer = 0;
+  let winShineRun = null;  // перезапуск блеска изделия после паузы площадки
+  let levelT0 = 0;         // начало попытки (секунды уровня для аналитики; пауза площадки не считается)
+  let pauseAt = 0;         // когда площадка поставила игру на паузу (0 — не на паузе)
+  let booted = false;      // площадка готова, сейв прочитан, карта показана
+  let hintOffered = -1;    // уровень, где подсказка за видео уже предложена (ad_offer раз за уровень)
+  let nextBusy = false;    // «Дальше» ждёт межуровневую рекламу — повторное нажатие не считается
+
+  /* ---------- площадка: «Без рекламы», видео за награду, баннер ----------
+     Настройки — WS_CONFIG.ads (WSPlatform.config.ads), договор площадки —
+     docs/WORKSHOP_PLATFORM.md, места и правила — docs/WORKSHOP.md «Реклама». */
+  const VIDEO_NONE = 'Видео сейчас нет';
+  let clockSkew = 0;       // часы сервера платежей минус часы устройства (entitlements().now)
+  const adsCfg = () => (WSPlatform.config && WSPlatform.config.ads) || {};
+  // срок «Без рекламы» идёт (по часам сервера, если он ответил)
+  const isOwner = () => Store.data.pay.noadsUntil > Date.now() + clockSkew;
+  // владельцу награда «за видео» — сразу, без ролика (ads.rewarded.skipForNoAds, по умолчанию да)
+  const ownerSkip = () => isOwner() && (adsCfg().rewarded || {}).skipForNoAds !== false;
+  // кнопки «за видео» видны, только когда награду можно получить
+  const rewardOn = () => booted && (ownerSkip() || WSPlatform.supports('rewarded'));
+
+  const rewardBusy = {};   // место → ролик идёт (повторное нажатие не считается)
+  const rewardLate = {};   // место → выдача ждёт позднего подтверждения сторожа (onLateReward)
+
+  /* Видео за награду на месте place (win_x2, lose_moves, hint). grant() выдаёт
+     награду и возвращает её размер. Ровно одна выдача на запрос: по ответу
+     {rewarded:true}, по позднему подтверждению после таймаута или сразу —
+     владельцу «Без рекламы». Нет ролика, таймаут, ошибка — «Видео сейчас нет»;
+     закрыл сам — ничего. ad_request/ad_result пишет onPlatformEvent. */
+  function rewardAd(place, grant) {
+    if (rewardBusy[place]) return;
+    const level = L ? L.id : 0;
+    const owner = ownerSkip();
+    track('ad_click', { place, format: owner ? 'owner' : 'reward', level });
+    if (owner) {
+      const amount = grant();
+      track('ad_reward', { place, format: 'owner', ms: 0, late: 0, amount, level });
+      return;
+    }
+    rewardBusy[place] = true;
+    delete rewardLate[place];
+    const t0 = Date.now();
+    refreshAdButtons();
+    WSPlatform.showRewarded(place).then((res) => {
+      rewardBusy[place] = false;
+      if (res.rewarded) {
+        const amount = grant();
+        track('ad_reward', { place, format: 'reward', ms: Date.now() - t0, late: 0, amount, level });
+      } else {
+        if (res.reason === 'timeout') rewardLate[place] = { grant, t0, level };
+        if (res.reason === 'no_ads' || res.reason === 'timeout' || res.reason === 'error') toast(VIDEO_NONE, 1800);
+      }
+      refreshAdButtons();
+    });
+  }
+
+  // ролик досмотрен после таймаута сторожа: награда того же запроса, один раз
+  function onLateReward(place) {
+    const job = rewardLate[place];
+    if (!job) return;
+    delete rewardLate[place];
+    const amount = job.grant();
+    track('ad_reward', { place, format: 'reward', ms: Date.now() - job.t0, late: 1, amount, level: job.level });
+  }
+
+  // награда монетами, когда её повод уже прошёл (позднее подтверждение)
+  function giveCoins(n) {
+    Store.data.coins += n;
+    shownCoins = Store.data.coins;
+    renderCoins(true);
+    Store.save();
+    toast('+' + coinsWord(n), 1800);
+  }
+
+  function refreshAdButtons() {
+    if (L && st && screen === 'game') updateButtons();
+    $('btn-x2').disabled = !!rewardBusy.win_x2;
+    $('btn-more-video').disabled = !!rewardBusy.lose_moves;
+  }
+
+  // события площадки → схема аналитики (ad_request / ad_result, баннер)
+  const AD_FORMAT = { rewarded: 'reward', interstitial: 'interstitial' };
+  const AD_OUTCOME = { ok: 'shown', closed: 'declined', no_ads: 'no_ad', timeout: 'timeout' };
+  function onPlatformEvent(ev) {
+    if (!ev || typeof ev !== 'object') return;
+    const level = L ? L.id : 0;
+    if (ev.type === 'ad_request' && AD_FORMAT[ev.format]) {
+      track('ad_request', { place: ev.placement, format: AD_FORMAT[ev.format], level });
+    } else if (ev.type === 'ad_result' && AD_FORMAT[ev.format]) {
+      track('ad_result', { place: ev.placement, format: AD_FORMAT[ev.format], outcome: AD_OUTCOME[ev.reason] || 'error', ms: ev.ms || 0, late: 0, level });
+    } else if (ev.type === 'banner') bannerStat();
+  }
+
+  /* Баннер: только телефон стоя (решает площадка), внизу, на карте и на
+     поле. Поле и карта кончаются над ним (--ws-banner-h). Прячется под всеми
+     окнами (победа, «Ходы кончились», карточки, убранство, покупка); закрытый
+     игроком не возвращается до перезапуска (площадка). */
+  const OVERLAYS = ['win-overlay', 'lose-overlay', 'modal-overlay', 'decor-overlay', 'noads-overlay', 'thanks-overlay'];
+  let bannerWanted = null;
+  let tapped = false;      // первое касание закончилось: баннер не сдвигает экран под пальцем
+  function syncBanner() {
+    if (!booted) return;
+    const want = tapped && !isOwner() && WSPlatform.supports('banner') &&
+      OVERLAYS.every(id => $(id).classList.contains('hidden'));
+    if (want !== bannerWanted) {
+      bannerWanted = want;
+      if (want) WSPlatform.banner.show(); else WSPlatform.banner.hide();
+    }
+    bannerStat();
+    if (want) setTimeout(bannerStat, 2500);
+  }
+  // ad_result баннера — раз за сессию на исход: shown, closed, no_ad (площадка отказала)
+  const bannerSeen = {};
+  function bannerStat() {
+    let b = null;
+    try { const s = WSPlatform.state(); b = s.impl && s.impl.banner; } catch (e) { b = null; }
+    if (!b) return;
+    const out = (o) => {
+      if (bannerSeen[o]) return;
+      bannerSeen[o] = true;
+      track('ad_result', { place: 'banner', format: 'banner', outcome: o, level: L ? L.id : 0 });
+    };
+    if (b.on) out('shown');
+    if (b.closed) out('closed');
+    if (b.failures > 0) out('no_ad');
+  }
+
+  /* Пауза площадки (свернули, вкладка скрыта, реклама, окно оплаты): звук,
+     блеск в окне победы, CSS-анимации и время уровня стоят. */
+  function onPause() {
+    if (pauseAt) return;
+    pauseAt = Date.now();
+    try { Sound.suspend('pause'); } catch (e) { /* без звука */ }
+    document.body.classList.add('ws-paused');
+    clearInterval(winShineTimer);
+  }
+  function onResume() {
+    if (!pauseAt) return;
+    levelT0 += Date.now() - pauseAt;
+    pauseAt = 0;
+    try { Sound.resume('pause'); } catch (e) { /* без звука */ }
+    document.body.classList.remove('ws-paused');
+    if (winShineRun && !$('win-overlay').classList.contains('hidden')) winShineRun();
+  }
+
+  /* ---------- «Без рекламы» и Королевский набор ----------
+     Тарифы — WSPlatform.catalog(). Выдача только по журналу сервера:
+     purchases(cursor) → выдача (WorkshopSave.applyRows) → сейв → flush() →
+     confirm(ids). buy() сам ничего не выдаёт: после «paid» — waitPurchases()
+     и тот же порядок. Права сверяются с entitlements() (источник истины,
+     возврат снимает права), копия — в Store.data.pay. */
+  let catalog = [];
+  let payChain = Promise.resolve();
+  let noadsFrom = 'map';
+  let buyBusy = false;
+  let paySyncs = 0;        // завершённых сверок покупок (для проверок: __ws.state().paySyncs)
+  const payOn = () => booted && catalog.length > 0 && WSPlatform.supports('payments');
+
+  function paySync(source, fetch) {
+    const job = payChain.then(async () => {
+      const res = await fetch(Store.data.pay.cursor);
+      const rows = res && Array.isArray(res.purchases) ? res.purchases : [];
+      const out = WorkshopSave.applyRows(Store.data, rows, Store.ctx);
+      if (out.ids.length) {
+        await Store.flush();               // курсор и права записаны до подтверждения
+        await WSPlatform.confirm(out.ids);
+        out.grants.forEach(g => track('grant', { product: g.item, days: g.days, royal: g.royal ? 1 : 0, source }));
+      }
+      const ent = await WSPlatform.entitlements();
+      if (ent) {
+        clockSkew = ent.now - Date.now();
+        if (WorkshopSave.reconcile(Store.data, ent, Store.ctx).changed) await Store.flush();
+      }
+      applyDecor();
+      refreshOwner();
+      return out;
+    }).catch((e) => {
+      try { console.warn('[workshop] покупки: ' + e); } catch (x) { /* нет консоли */ }
+      return { ids: [], grants: [], refund: false, royalNew: false };
+    }).then((out) => { paySyncs++; return out; });
+    payChain = job;
+    return job;
+  }
+
+  function refreshOwner() {
+    document.body.classList.toggle('is-owner', isOwner());
+    $('btn-noads').classList.toggle('hidden', !payOn());
+    refreshAdButtons();
+    syncBanner();
+  }
+
+  const daysWord = (n) => n + ' ' + plural(n, 'день', 'дня', 'дней');
+  const votesWord = (n) => n + ' ' + plural(n, 'голос', 'голоса', 'голосов');
+
+  function renderTariffs() {
+    const box = $('ws-tariffs');
+    box.innerHTML = '';
+    const best = catalog.length > 1 ? catalog.reduce((m, p) => (p.days > m.days ? p : m), catalog[0]) : null;
+    catalog.forEach((p) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'ws-tariff' + (p.royal ? ' is-royal' : '') + (p === best ? ' is-best' : '');
+      b.dataset.id = p.id;
+      b.setAttribute('aria-label', 'Без рекламы ' + daysWord(p.days) + ' за ' + votesWord(p.votes) +
+        (p.royal ? ', Королевский набор навсегда' : '') + '. Повторная покупка продлевает срок');
+      b.innerHTML = (p === best ? '<span class="ws-tariff-ribbon">Выгодно</span>' : '') +
+        '<span class="ws-tariff-days">' + daysWord(p.days) + '</span><span class="ws-tariff-pic"></span>' +
+        '<span class="ws-tariff-price">' + p.votes + ' <small>' + plural(p.votes, 'голос', 'голоса', 'голосов') + '</small></span>';
+      b.addEventListener('click', () => buyTariff(p));
+      box.appendChild(b);
+    });
+    const royal = catalog.some(p => p.royal);
+    $('ws-noads-note').classList.toggle('hidden', !royal);
+    $('ws-noads-sr').textContent = 'Без рекламы. ' + catalog.map(p => daysWord(p.days) + ' за ' + votesWord(p.votes) +
+      (p.royal ? ' и Королевский набор' : '')).join('. ') + '. Повторная покупка продлевает срок, само не продлевается.' +
+      (royal ? ' Королевский набор остаётся навсегда.' : '') + (isOwner() ? ' Реклама уже отключена до ' + dateWord(Store.data.pay.noadsUntil) + '.' : '');
+  }
+
+  const dateWord = (ms) => {
+    try { return new Date(ms).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' }); } catch (e) { return ''; }
+  };
+
+  function openNoads(from) {
+    if (!payOn()) return;
+    sfx('click');
+    noadsFrom = from;
+    renderTariffs();
+    $('noads-overlay').classList.remove('hidden');
+    sel = -1; if (st) WsBoard.select(-1);
+    track('noads_offer', { from, level: L ? L.id : 0, owner: isOwner() ? 1 : 0 });
+    syncBanner();
+    setTimeout(() => { const t = $('ws-tariffs').firstChild; if (t && !$('noads-overlay').classList.contains('hidden')) t.focus(); }, 60);
+  }
+  function closeNoads() {
+    $('noads-overlay').classList.add('hidden');
+    syncBanner();
+  }
+
+  async function buyTariff(p) {
+    if (buyBusy) return;
+    buyBusy = true;
+    sfx('click');
+    const btns = Array.from($('ws-tariffs').children);
+    btns.forEach(b => { b.disabled = true; });
+    track('buy_click', { product: p.id, price: p.votes, from: noadsFrom });
+    const t0 = Date.now();
+    let r = { status: 'error', reason: 'error' };
+    try { r = await WSPlatform.buy(p.id); } catch (e) { /* buy() не бросает */ }
+    const reason = String(r.reason || '');
+    // fail — площадка отказала в оплате; error — мост, сеть, таймаут
+    const result = r.status === 'paid' ? 'ok' : r.status === 'cancel' ? 'cancel' : /^vk_\d+$|_fail$/.test(reason) ? 'fail' : 'error';
+    track('buy_result', { product: p.id, price: p.votes, result, code: result === 'ok' ? '' : reason, ms: Date.now() - t0 });
+    if (r.status === 'paid') {
+      const out = await paySync('purchase', (c) => WSPlatform.waitPurchases(c));
+      if (out.grants.length) { closeNoads(); showThanks(out); }
+      else toast('Зачислим чуть позже', 2600);
+    } else if (r.status === 'error') toast('Оплата не прошла', 2000);
+    btns.forEach(b => { b.disabled = false; });
+    buyBusy = false;
+  }
+
+  function showThanks(out) {
+    const royal = out.grants.some(g => g.royal) || out.royalNew;
+    $('ws-thanks-pic').classList.toggle('is-heart', !royal);
+    $('ws-thanks-line2').classList.toggle('hidden', !royal);
+    $('ws-thanks-sr').textContent = 'Спасибо за покупку! Реклама отключена до ' + dateWord(Store.data.pay.noadsUntil) + '.' +
+      (royal ? ' Королевский набор теперь ваш навсегда.' : '');
+    $('thanks-overlay').classList.remove('hidden');
+    sfx('reward'); buzz([20, 40, 20]);
+    try { Confetti.burst({ count: 50, durationMs: 1800, colors: CONFETTI }); } catch (e) { /* без конфетти */ }
+    syncBanner();
+    setTimeout(() => { if (!$('thanks-overlay').classList.contains('hidden')) $('btn-thanks-ok').focus(); }, 60);
+  }
+  function closeThanks() {
+    sfx('click');
+    $('thanks-overlay').classList.add('hidden');
+    syncBanner();
+  }
 
   /* ---------- экраны ---------- */
   function showScreen(id) {
@@ -866,8 +1183,14 @@
     $('btn-undo').disabled = hist.length === 0 || won;
     $('btn-restart').disabled = won || (moves === 0 && st.delivered === 0);
     const p = hintPrice();
-    $('ws-hint-label').textContent = p && !hintMv ? String(p) : '';
-    $('btn-hint').setAttribute('aria-label', p && !hintMv ? 'Подсказка за ' + coinsWord(p) : 'Подсказка');
+    // монет меньше цены — подсказка за видео: вместо цены значок камеры (у владельца — корона)
+    const vid = !hintMv && !won && p > 0 && Store.data.coins < p && rewardOn();
+    const lbl = $('ws-hint-label');
+    lbl.classList.toggle('is-video', vid);
+    lbl.textContent = p && !hintMv && !vid ? String(p) : '';
+    $('btn-hint').setAttribute('aria-label', vid ? (ownerSkip() ? 'Подсказка бесплатно' : 'Подсказка за видео')
+      : p && !hintMv ? 'Подсказка за ' + coinsWord(p) : 'Подсказка');
+    if (vid && hintOffered !== L.id) { hintOffered = L.id; track('ad_offer', { place: 'hint', format: 'reward', level: L.id }); }
   }
 
   /* ---------- спасение: победа стала недостижимой ---------- */
@@ -917,8 +1240,9 @@
     if (on) {
       sel = -1; WsBoard.select(-1);
       sfx('lose'); buzz(80);
-      track('lose', { level: L.id, moves, limit: limitNow(), delivered: st.delivered });
+      track('level_lose', { level: L.id, moves, limit: limitNow(), delivered: st.delivered, sec: levelSec() });
       renderLose();
+      if (rewardOn()) track('ad_offer', { place: 'lose_moves', format: 'reward', level: L.id });
     }
   }
 
@@ -934,6 +1258,11 @@
     b.setAttribute('aria-label', 'Ещё ' + movesWord(MORE_MOVES) + ' за ' + coinsWord(MORE_PRICE));
     b.disabled = Store.data.coins < MORE_PRICE;
     $('ws-lose-coins').textContent = 'У вас ' + coinsWord(Store.data.coins);
+    // те же +5 ходов за видео — рядом с покупкой за монеты
+    const v = $('btn-more-video');
+    v.classList.toggle('hidden', !rewardOn());
+    v.disabled = !!rewardBusy.lose_moves;
+    v.setAttribute('aria-label', ownerSkip() ? 'Пять ходов бесплатно' : 'Пять ходов за видео');
   }
 
   function buyMoves() {
@@ -944,10 +1273,32 @@
     bonusMoves += MORE_MOVES;
     sfx('reward'); buzz(20);
     track('buy_moves', { level: L.id, moves, price: MORE_PRICE });
+    track('coin_spend', { what: 'moves', amount: MORE_PRICE, balance: Store.data.coins, level: L.id });
     setLost(false);
     updateHud();
     bump($('ws-moves'));
     saveGame();
+  }
+
+  /* +5 ходов за видео. Позднее подтверждение, когда окно уже закрыто или
+     уровень другой, — те же 50 монет, что стоят ходы: награда не теряется. */
+  function moreByVideo() {
+    if (!lost) return;
+    sfx('click');
+    const lvl = L.id, e0 = epoch;
+    rewardAd('lose_moves', () => {
+      if (lost && L && L.id === lvl && epoch === e0 && screen === 'game') {
+        bonusMoves += MORE_MOVES;
+        sfx('reward'); buzz(20);
+        setLost(false);
+        updateHud();
+        bump($('ws-moves'));
+        saveGame();
+        return MORE_MOVES;
+      }
+      giveCoins(MORE_PRICE);
+      return MORE_PRICE;
+    });
   }
 
   /* ---------- уровень ---------- */
@@ -956,6 +1307,10 @@
   function loadLevel(i, resume) {
     epoch++;
     levelIdx = i;
+    levelT0 = Date.now();
+    if (pauseAt) pauseAt = levelT0;
+    nextBusy = false;
+    hintOffered = -1;
     L = LEVELS[i];
     if (resume) {
       st = resume.st; moves = resume.moves; hist = resume.hist; paid = resume.paid;
@@ -993,7 +1348,8 @@
     updateGuide();
     saveGame();
     requestAnimationFrame(() => { WsBoard.resize(); Piece.resize(); updateGuide(); });
-    track('level_start', { level: L.id, resumed: !!resume, moves });
+    track('level_start', { level: L.id, hard: L.hard ? 1 : 0, resumed: !!resume, moves });
+    syncBanner();
     if (!resume) introduce();
   }
 
@@ -1131,6 +1487,8 @@
       track('delivery', { level: L.id, gem: ev.gem, order: ev.order, chain: k + 1, move: moves, gap: k === 0 ? moves - lastDeliv : 0 });
     });
     if (res.deliveries.length) lastDeliv = moves;
+    ftueStep(1, 'first_move');
+    if (res.deliveries.length) ftueStep(2, 'first_delivery');
     const left = urgentLeft();
     if (left !== null && left >= 1 && left <= 2) sfx('tick', { delay: 0.25 });
     saveGame();
@@ -1332,20 +1690,27 @@
     if (hintMv) { WsBoard.showHint(hintMv.from, hintMv.to); return; }   // уже оплачена
     const price = hintPrice();
     if (price > Store.data.coins) {
+      if (rewardOn()) { hintByVideo(); return; }
       sfx('invalid');
       toast('Мало монет', 1600);
       return;
     }
+    giveHint(price, false);
+  }
+
+  // Показать подсказку от текущей позиции; price — списать монеты. false — подсказки нет.
+  function giveHint(price, video) {
     const step = R.hint(st);
     stats.hints++;
-    track('hint', { level: L.id, from: step && step.from, to: step && step.to, moves, price: step ? price : 0 });
-    if (!step) return;
+    track('hint', { level: L.id, from: step && step.from, to: step && step.to, moves, price: step ? price : 0, video: video ? 1 : 0 });
+    if (!step) return false;
     if (price) {
       Store.data.coins -= price;
       shownCoins -= price;
       renderCoins(true);
       const r = $('btn-hint').getBoundingClientRect();
       Fx.text(r.left + r.width / 2, r.top - 6, '−' + price, { color: '#f3c46b', size: 18 });
+      track('coin_spend', { what: 'hint', amount: price, balance: Store.data.coins, level: L.id });
       saveGame();
     }
     sfx('click');
@@ -1354,6 +1719,20 @@
     WsBoard.select(-1);
     WsBoard.showHint(step.from, step.to);
     updateGuide();
+    updateButtons();
+    return true;
+  }
+
+  /* Подсказка за видео (монет меньше цены). Позднее подтверждение, когда
+     подсказка уже не к месту (другой уровень, победа), — цена подсказки монетами. */
+  function hintByVideo() {
+    sfx('click');
+    const lvl = L.id;
+    rewardAd('hint', () => {
+      if (L && L.id === lvl && screen === 'game' && !won && !lost && !busy && !modalOpen && !hintMv && rescueK === null && giveHint(0, true)) return 1;
+      giveCoins(HINT_PRICE);
+      return HINT_PRICE;
+    });
   }
 
   /* ---------- победа ---------- */
@@ -1372,6 +1751,7 @@
     let bonus = (prevStars ? 0 : PAY.firstWin) + Math.max(0, stars - prevStars) * PAY.star;
     if (L.hard) bonus *= 2;
     addCoins(bonus);
+    coinEarn('win_bonus', bonus, L.id);
     justWon = L.id;
     const ci = collOfIdx(levelIdx);
     const collNew = !prevStars && collDone(ci) && !Store.data.chests[ci];
@@ -1382,10 +1762,14 @@
   function win() {
     if (won) return;                            // ровно один раз
     const r = recordWin();
-    track('win', {
-      level: L.id, moves, stars: r.stars, best: Store.data.best[String(L.id)], par: L.par, hard: L.hard,
-      hints: stats.hints, undos: stats.undos, restarts: stats.restarts, coins: attemptCoins
+    track('level_win', {
+      level: L.id, moves, stars: r.stars, best: Store.data.best[String(L.id)], par: L.par, hard: L.hard ? 1 : 0,
+      hints: stats.hints, undos: stats.undos, restarts: stats.restarts, coins: attemptCoins, sec: levelSec(), first: r.prevStars ? 0 : 1
     });
+    coinEarn('orders', attemptCoins - r.bonus, L.id);
+    ftueStep(3, 'first_win');
+    if (Object.keys(Store.data.stars).length >= 3) ftueStep(5, 'third_win');
+    Store.flush();          // конец уровня: облако дописывается сразу
     hideToast();
     setLost(false);
     WsBoard.setTutorial(-1);
@@ -1406,7 +1790,7 @@
     const e = epoch;
     Confetti.burst({ count: r.collNew ? 80 : 55, durationMs: 2400, colors: CONFETTI });
     $('ws-win-kicker').textContent = 'Уровень ' + L.id + (L.hard ? ' · Сложный заказ' : '');
-    $('ws-win-title').textContent = levelIdx === LEVELS.length - 1 ? 'Корона готова!' : 'Готово!';
+    $('ws-win-title').textContent = L.piece === 'crown' ? 'Корона готова!' : 'Готово!';
     $('ws-win-name').textContent = L.name;
     const starEls = $('ws-win-stars').querySelectorAll('i');
     starEls.forEach(el => el.classList.remove('on'));
@@ -1446,6 +1830,7 @@
     let bank = shownCoins;
     $('ws-win-bank-n').textContent = String(Math.max(0, bank));
     $('ws-win-hero').className = 'ws-win-hero h-' + (HERO[L.piece] || 'curly');
+    renderWinExtra();
     ov.classList.remove('hidden');
     drawWinJewel(0);
     // звёзды по одной
@@ -1488,16 +1873,67 @@
     }, t0);
     // блик по изделию, пока открыта церемония
     clearInterval(winShineTimer);
+    winShineRun = null;
     if (!REDUCED) {
       let k0 = performance.now();
       const run = () => {
-        if (e !== epoch || $('win-overlay').classList.contains('hidden')) return;
+        if (e !== epoch || pauseAt || $('win-overlay').classList.contains('hidden')) return;
         const k = (performance.now() - k0) / 1000;
         if (k <= 1) { drawWinJewel(k); requestAnimationFrame(run); } else drawWinJewel(0);
       };
+      // пауза площадки останавливает блеск, продолжение запускает заново
+      winShineRun = () => {
+        clearInterval(winShineTimer);
+        if (e !== epoch || $('win-overlay').classList.contains('hidden')) return;
+        winShineTimer = setInterval(() => { k0 = performance.now(); run(); }, 3200);
+      };
       setTimeout(() => { k0 = performance.now(); run(); }, 450);
-      winShineTimer = setInterval(() => { k0 = performance.now(); run(); }, 3200);
+      if (!pauseAt) winShineRun();
     }
+  }
+
+  /* Под изделием в окне победы: «×2 за видео» (монеты попытки ещё раз, один
+     раз за победу) и значок «Без рекламы» (с 7-го уровня, не чаще раза в день). */
+  let winTok = null;
+  function renderWinExtra() {
+    const amount = attemptCoins;
+    winTok = { done: false, amount, level: L.id };
+    const x2 = $('btn-x2');
+    const canX2 = amount > 0 && rewardOn();
+    x2.classList.toggle('hidden', !canX2);
+    x2.disabled = !!rewardBusy.win_x2;
+    x2.setAttribute('aria-label', ownerSkip() ? 'Удвоить монеты бесплатно' : 'Удвоить монеты за видео');
+    if (canX2) track('ad_offer', { place: 'win_x2', format: 'reward', level: L.id });
+    const today = WSAnalytics.dayNumber();
+    const offer = L.id >= NOADS_FROM_LEVEL && payOn() && !isOwner() && Store.data.flags.noadsOfferDay !== today;
+    $('btn-win-noads').classList.toggle('hidden', !offer);
+    if (offer) { Store.data.flags.noadsOfferDay = today; Store.save(); }
+    $('ws-win-extra').classList.toggle('hidden', !canX2 && !offer);
+  }
+
+  function onX2() {
+    const tok = winTok;
+    if (!tok || tok.done || $('win-overlay').classList.contains('hidden')) return;
+    sfx('click');
+    rewardAd('win_x2', () => {
+      if (tok.done) return 0;
+      tok.done = true;
+      Store.data.coins += tok.amount;
+      track('coin_earn', { src: 'ad_x2', amount: tok.amount, level: tok.level });
+      Store.save();
+      if (winTok === tok && !$('win-overlay').classList.contains('hidden')) {
+        $('btn-x2').classList.add('hidden');
+        $('ws-win-extra').classList.toggle('hidden', $('btn-win-noads').classList.contains('hidden'));
+        $('ws-win-coins').textContent = '+' + (tok.amount * 2);
+        bump($('ws-win-coins').parentElement);
+        $('ws-win-bank-n').textContent = String(Store.data.coins);
+        bump($('ws-win-bank'));
+        sfx('reward'); buzz(20);
+      }
+      shownCoins = Store.data.coins;
+      renderCoins(false);
+      return tok.amount;
+    });
   }
 
   function sizeCanvas(cv) {
@@ -1518,7 +1954,8 @@
     if (k > 0 && k < 1) WsJewel.shine(g, box, k);
   }
 
-  function nextFromWin() {
+  async function nextFromWin() {
+    if (nextBusy) return;
     sfx('click');
     const mode = $('btn-next').dataset.mode;
     if (mode === 'chest') {
@@ -1526,15 +1963,52 @@
       leaveToMenu();
       setTimeout(() => openChest(ci), REDUCED ? 0 : 350);
     } else if (mode === 'next' && levelIdx < LEVELS.length - 1) {
-      track('next', { level: L.id });
-      loadLevel(levelIdx + 1);
+      track('next_click', { level: L.id, stars: Store.data.stars[String(L.id)] || 0, moves });
+      ftueStep(4, 'first_next');
+      const from = levelIdx, e0 = epoch;
+      nextBusy = true;
+      try { await interstitialOnNext(); } catch (err) { /* без рекламы — дальше */ }
+      nextBusy = false;
+      if (levelIdx === from && epoch === e0 && screen === 'game') loadLevel(from + 1);
     } else leaveToMenu();
+  }
+
+  /* Межуровневая реклама — только здесь, по «Дальше» после победы, и только
+     когда пройдено не меньше ads.interstitial.minLevels (6) уровней. После
+     поражения, «Заново» и выхода в меню её нет. Нет ролика — сразу дальше. */
+  async function interstitialOnNext() {
+    const level = L.id;
+    const ic = adsCfg().interstitial || {};
+    const skip = (reason, wait) => track('ad_skip', { place: 'next', format: 'interstitial', reason, wait: wait || 0, level });
+    if (isOwner()) { skip('owner'); return; }
+    if (Object.keys(Store.data.stars).length < (Number.isFinite(ic.minLevels) ? ic.minLevels : 6)) { skip('early'); return; }
+    if (!WSPlatform.supports('interstitial')) return;
+    const res = await WSPlatform.showInterstitial('next');
+    if (res.reason === 'interval' || res.reason === 'after_rewarded') {
+      const ps = WSPlatform.state(), now = Date.now();
+      const left = res.reason === 'interval'
+        ? ps.lastInterstitialAt + (ic.intervalSec || 0) * 1000 - now
+        : ps.lastRewardedAt + (ic.afterRewardedSec || 0) * 1000 - now;
+      skip(res.reason === 'interval' ? 'interval' : 'near_reward', Math.max(0, Math.ceil(left / 1000)));
+    }
   }
 
   function leaveToMenu() {
     if (L && !won && screen === 'game') {
-      if (R.isWon(st)) { recordWin(); track('win', { level: L.id, moves, par: L.par, left: true }); }
-      else track('quit', { level: L.id, moves, delivered: st.delivered });
+      if (R.isWon(st)) {
+        const r = recordWin();
+        track('level_win', {
+          level: L.id, moves, stars: r.stars, best: Store.data.best[String(L.id)], par: L.par, hard: L.hard ? 1 : 0,
+          hints: stats.hints, undos: stats.undos, restarts: stats.restarts, coins: attemptCoins, sec: levelSec(),
+          first: r.prevStars ? 0 : 1, left: 1
+        });
+        coinEarn('orders', attemptCoins - r.bonus, L.id);
+        ftueStep(3, 'first_win');
+        if (Object.keys(Store.data.stars).length >= 3) ftueStep(5, 'third_win');
+      } else {
+        track('level_quit', { level: L.id, moves, delivered: st.delivered, sec: levelSec(), lost: lost ? 1 : 0 });
+        coinEarn('orders', attemptCoins, L.id);
+      }
     }
     epoch++;
     busy = false;
@@ -1549,11 +2023,14 @@
     closeModal(true);
     WsBoard.setTutorial(-1);
     if (L) saveGame();
+    Store.flush();          // конец уровня: облако дописывается сразу
+    nextBusy = false;
     $('win-overlay').classList.add('hidden');
     $('lose-overlay').classList.add('hidden');
     document.body.classList.remove('is-hard');
     showScreen('screen-menu');
     renderMenu();
+    syncBanner();
   }
 
   /* ---------- окно-карточка (новинка, «Сложный заказ», шкатулка) ---------- */
@@ -1691,9 +2168,10 @@
   }
 
   // картинка окна шкатулки: открытая шкатулка (chest_open), из неё поднимается образец нового убранства
-  function chestPic(id) {
+  function chestPic(kind, id) {
+    const d = decorItem(kind, id);
     return '<div class="ws-chest is-open ws-chest-big">' +
-      '<span class="ws-chest-prize" style="background:' + (SWATCH[id] || '#fff') + '"></span></div>';
+      (d ? '<span class="ws-chest-prize" style="background:' + (d.swatch || '#fff') + '"></span>' : '') + '</div>';
   }
 
 
@@ -1841,7 +2319,7 @@
       }
       if (lv.hard) b.insertAdjacentHTML('beforeend', '<span class="ws-node-hard" aria-hidden="true">' + HARD_SVG + '</span>');
       b.setAttribute('aria-label', 'Уровень ' + lv.id + ': ' + lv.name +
-        (done ? ', пройден, звёзд ' + Store.data.stars[lv.id] + ', лучший результат ' + movesWord(Store.data.best[lv.id]) : open ? ', открыт' : ', закрыт') +
+        (done ? ', пройден, звёзд ' + Store.data.stars[lv.id] + (Store.data.best[lv.id] ? ', лучший результат ' + movesWord(Store.data.best[lv.id]) : '') : open ? ', открыт' : ', закрыт') +
         (lv.hard ? ', сложный заказ' : ''));
       b.addEventListener('click', () => {
         if (!isOpen(i)) { sfx('invalid'); toast('Сначала уровень ' + LEVELS[Math.max(0, firstOpen)].id, 1800); return; }
@@ -1872,7 +2350,7 @@
     const done = collDone(ci), opened = !!Store.data.chests[ci];
     b.className = 'ws-chest' + (opened ? ' is-open' : done ? ' is-ready' : ' is-locked');
     const c = COLLECTIONS[ci];
-    b.setAttribute('aria-label', 'Шкатулка коллекции «' + c.name + '»: ' + (opened ? 'открыта, в ней было «' + decorName(c.decor[0], c.decor[1]) + '»' : done ? 'можно открыть' : 'пройдите все пять уровней коллекции'));
+    b.setAttribute('aria-label', 'Шкатулка коллекции «' + c.name + '»: ' + (opened ? 'открыта' + (c.decor ? ', в ней было «' + decorName(c.decor[0], c.decor[1]) + '»' : '') : done ? 'можно открыть' : 'пройдите все пять уровней коллекции'));
     b.addEventListener('click', () => {
       if (opened) { sfx('click'); openDecor(); return; }
       if (!done) {
@@ -1889,21 +2367,22 @@
   function openChest(ci) {
     if (!collDone(ci) || Store.data.chests[ci]) return;
     const c = COLLECTIONS[ci];
-    const [kind, id] = c.decor;
+    const [kind, id] = c.decor || [null, null];   // decor: null — в шкатулке только монеты
     Store.data.chests[ci] = true;
     Store.data.coins += c.coins;
-    Store.data.decor[kind] = id;           // новое убранство сразу на столе
+    if (kind) Store.data.decor[kind] = id;           // новое убранство сразу на столе
     Store.save();
     applyDecor();
     sfx('reward');
     buzz([30, 40, 30]);
     Confetti.burst({ count: 80, durationMs: 2600, colors: CONFETTI });
     track('chest', { collection: ci, coins: c.coins, decor: id });
+    coinEarn('chest', c.coins);
     renderMenu();
     showModal({
       kicker: '«' + c.name + '»', title: 'Шкатулка открыта!', coins: c.coins,
-      sr: coinsWord(c.coins) + ' и новое убранство «' + decorName(kind, id) + '»',
-      pic: chestPic(id), ok: 'Красота!', okIcon: true
+      sr: coinsWord(c.coins) + (kind ? ' и новое убранство «' + decorName(kind, id) + '»' : ''),
+      pic: chestPic(kind, id), ok: 'Красота!', okIcon: true
     });
     bump($('ws-menu-coins'));
   }
@@ -1912,12 +2391,20 @@
     cloth: '<svg viewBox="0 0 24 24"><path d="M2.5 9.5h19l-1.6 3.2H4.1z" fill="#d79a5a" stroke="#8a4a1c" stroke-width="1.3" stroke-linejoin="round"/><path d="M6 12.7v7.3M18 12.7v7.3" stroke="#8a4a1c" stroke-width="2.2" stroke-linecap="round"/><path d="M5 9.5c1-2.6 2.6-3.6 7-3.6s6 1 7 3.6" fill="#f2a7bd" stroke="#b5527a" stroke-width="1.2"/></svg>',
     tube: '<svg viewBox="0 0 24 24"><path d="M8.5 2.8h7" stroke="#b98226" stroke-width="2.4" stroke-linecap="round"/><path d="M9.6 3.6v14.2a2.4 2.4 0 0 0 4.8 0V3.6" fill="rgba(255,255,255,0.75)" stroke="#9a6a8a" stroke-width="1.5"/><path d="M9.6 12.6h4.8v5.2a2.4 2.4 0 0 1-4.8 0z" fill="#f0507f"/></svg>'
   };
+  // строки окна «Убранство»: вид и подпись для чтецов; подушка и тумба — картинками
+  const DECOR_ROWS = [['cloth', 'Стол'], ['tube', 'Стекло'], ['cushion', 'Подушка'], ['pedestal', 'Тумба']];
+  const decorPic = (d) => 'url(workshop_assets/' + d.img + '.webp)';
   let decorOpen = false;
+
+  // вариант виден в окне: свой, из шкатулки (с замочком) или из набора, пока покупки есть (с короной)
+  function decorVisible(kind, d) { return !d.set || owns(kind, d.id) || payOn(); }
 
   function renderDecor() {
     const box = $('ws-decor');
     box.innerHTML = '';
-    [['cloth', 'Стол'], ['tube', 'Стекло']].forEach(([kind, label]) => {
+    DECOR_ROWS.forEach(([kind, label]) => {
+      const list = DECOR[kind].filter(d => decorVisible(kind, d));
+      if (list.length < 2) return;           // выбирать не из чего (подушка и тумба — только с набором)
       const row = document.createElement('div');
       row.className = 'ws-decor-row';
       row.setAttribute('role', 'group');
@@ -1925,23 +2412,25 @@
       const ico = document.createElement('span');
       ico.className = 'ws-decor-ico';
       ico.setAttribute('aria-hidden', 'true');
-      ico.innerHTML = DECOR_ICON[kind];
+      if (DECOR_ICON[kind]) ico.innerHTML = DECOR_ICON[kind];
+      else { ico.classList.add('is-pic'); ico.style.backgroundImage = decorPic(DECOR[kind][0]); }
       row.appendChild(ico);
-      DECOR[kind].forEach(d => {
+      list.forEach(d => {
         const b = document.createElement('button');
         b.type = 'button';
         const own = owns(kind, d.id), on = Store.data.decor[kind] === d.id;
-        b.className = 'ws-decor-chip' + (on ? ' is-on' : '') + (own ? '' : ' is-locked');
+        b.className = 'ws-decor-chip' + (on ? ' is-on' : '') + (own ? '' : d.set ? ' is-set' : ' is-locked');
         const sw = document.createElement('span');
         sw.className = 'ws-swatch';
-        sw.style.background = SWATCH[d.id];
+        if (d.img) { sw.classList.add('is-pic'); sw.style.backgroundImage = decorPic(d); } else sw.style.background = d.swatch;
         b.appendChild(sw);
-        if (!own) b.insertAdjacentHTML('beforeend', '<span class="ws-decor-lock" aria-hidden="true"></span>');
+        if (!own) b.insertAdjacentHTML('beforeend', d.set ? '<span class="ws-decor-crown" aria-hidden="true"></span>' : '<span class="ws-decor-lock" aria-hidden="true"></span>');
         b.title = d.name;
-        const src = COLLECTIONS.find(c => c.decor[0] === kind && c.decor[1] === d.id);
-        b.setAttribute('aria-label', d.name + (on ? ', выбрано' : own ? '' : ', в шкатулке «' + (src ? src.name : '') + '»'));
+        const src = COLLECTIONS.find(c => c.decor && c.decor[0] === kind && c.decor[1] === d.id);
+        b.setAttribute('aria-label', d.name + (on ? ', выбрано' : own ? '' : d.set ? ', в Королевском наборе' : ', в шкатулке «' + (src ? src.name : '') + '»'));
         b.setAttribute('aria-pressed', on ? 'true' : 'false');
         b.addEventListener('click', () => {
+          if (!own && d.set) { closeDecor(); openNoads('map'); return; }
           if (!own) { sfx('invalid'); toast('В шкатулке «' + (src ? src.name : '') + '»', 2000); return; }
           sfx('click');
           Store.data.decor[kind] = d.id;
@@ -1969,10 +2458,25 @@
     $('btn-decor').focus();
   }
 
+  /* Надеть убранство из Store.data.decor (точка расширения лавки: таблица DECOR):
+     бархат — класс cloth-<id> и has-cloth с цветами в --ws-cloth-*, стекло —
+     WsBoard.setTube({ tint, rim }), подушка и тумба — картинки в --ws-cushion
+     и --ws-pedestal (по умолчанию — из workshop.css). */
   function applyDecor() {
     const b = document.body;
-    DECOR.cloth.forEach(d => b.classList.toggle('cloth-' + d.id, d.id !== 'walnut' && Store.data.decor.cloth === d.id));
-    WsBoard.setTube(Store.data.decor.tube);
+    const cloth = decorItem('cloth', Store.data.decor.cloth) || DECOR.cloth[0];
+    DECOR.cloth.forEach(d => b.classList.toggle('cloth-' + d.id, !!d.velvet && d === cloth));
+    b.classList.toggle('has-cloth', !!cloth.velvet);
+    ['1', '2', '3'].forEach((k, i) => {
+      if (cloth.velvet) b.style.setProperty('--ws-cloth-' + k, cloth.velvet[i]); else b.style.removeProperty('--ws-cloth-' + k);
+    });
+    if (cloth.rim) b.style.setProperty('--ws-cloth-rim', cloth.rim); else b.style.removeProperty('--ws-cloth-rim');
+    const tube = decorItem('tube', Store.data.decor.tube) || DECOR.tube[0];
+    WsBoard.setTube({ tint: tube.tint, rim: tube.rim });
+    ['cushion', 'pedestal'].forEach(kind => {
+      const d = decorItem(kind, Store.data.decor[kind]) || DECOR[kind][0];
+      if (d === DECOR[kind][0]) b.style.removeProperty('--ws-' + kind); else b.style.setProperty('--ws-' + kind, decorPic(d));
+    });
   }
 
   /* Открыть уровень: если именно он сохранён незаконченным — продолжить. */
@@ -1987,11 +2491,10 @@
   }
 
   /* ---------- запуск ---------- */
-  function init() {
-    Store.load();
-    Store.data.sessions++;
-    Store.save();
-    track('session_start', { sessions: Store.data.sessions, coins: Store.data.coins, passed: Object.keys(Store.data.stars).length });
+  /* Порядок запуска: интерфейс и обработчики → WSPlatform.init() → сейв →
+     карта (новый игрок тоже начинает с карты) → тарифы и восстановление
+     покупок по журналу сервера (не задерживают карту). */
+  async function init() {
     // атлас камней, картинки изделий и руки приходят после запуска: перерисовать то, что на виду
     let artRaf = 0;
     const redrawArt = () => {
@@ -2019,7 +2522,6 @@
     Fx.init($('fx-canvas'));
     Piece.init($('ws-piece'));
     Confetti.init($('confetti-canvas'));
-    applyDecor();
 
     // ввод по полю: pointer-события покрывают мышь и касания
     const cv = $('board-canvas');
@@ -2030,6 +2532,14 @@
       tapVial(WsBoard.hitTest(ev.clientX, ev.clientY));
     });
     document.addEventListener('keydown', (ev) => {
+      if (!$('thanks-overlay').classList.contains('hidden')) {
+        if (ev.key === 'Escape' || ev.key === 'Enter') { ev.preventDefault(); closeThanks(); }
+        return;
+      }
+      if (!$('noads-overlay').classList.contains('hidden')) {
+        if (ev.key === 'Escape') { ev.preventDefault(); sfx('click'); closeNoads(); }
+        return;
+      }
       if (decorOpen && !modalOpen) {
         if (ev.key === 'Escape') { ev.preventDefault(); sfx('click'); closeDecor(); }
         return;
@@ -2068,6 +2578,13 @@
     $('btn-decor').addEventListener('click', () => { sfx('click'); openDecor(); });
     $('btn-decor-ok').addEventListener('click', () => { sfx('click'); closeDecor(); });
     $('decor-overlay').addEventListener('click', (ev) => { if (ev.target === $('decor-overlay')) { sfx('click'); closeDecor(); } });
+    $('btn-noads').addEventListener('click', () => openNoads('map'));
+    $('btn-win-noads').addEventListener('click', () => openNoads('win'));
+    $('btn-noads-close').addEventListener('click', () => { sfx('click'); closeNoads(); });
+    $('noads-overlay').addEventListener('click', (ev) => { if (ev.target === $('noads-overlay')) { sfx('click'); closeNoads(); } });
+    $('btn-thanks-ok').addEventListener('click', closeThanks);
+    $('btn-x2').addEventListener('click', onX2);
+    $('btn-more-video').addEventListener('click', moreByVideo);
     $('ws-menu-coins').addEventListener('click', () => toast('Монеты — за заказы', 1800));
     $('ws-coins').addEventListener('click', () => toast('Монеты — за заказы', 1800));
     ['btn-sound', 'btn-sound-game'].filter(id => $(id)).forEach(id => $(id).addEventListener('click', () => {
@@ -2076,11 +2593,18 @@
       applyMute();
       sfx('click');
     }));
-    document.addEventListener('visibilitychange', () => {
-      if (document.hidden) Sound.suspend('hidden'); else Sound.resume('hidden');
-    });
+    // пауза — от площадки (вкладка скрыта, свернули, реклама, оплата)
+    WSPlatform.onPause(onPause);
+    WSPlatform.onResume(onResume);
+    WSPlatform.onLateReward(onLateReward);
+    WSPlatform.onEvent(onPlatformEvent);
+    // любое окно открылось или закрылось — баннер прячется или возвращается
+    if (typeof MutationObserver !== 'undefined') {
+      const mo = new MutationObserver(() => syncBanner());
+      OVERLAYS.forEach(id => mo.observe($(id), { attributes: true, attributeFilter: ['class'] }));
+    }
     let resizeRaf = 0;
-    window.addEventListener('resize', () => {
+    const relayout = () => {
       if (resizeRaf) return;
       resizeRaf = requestAnimationFrame(() => {
         resizeRaf = 0;
@@ -2089,7 +2613,16 @@
         if (screen === 'menu') renderMap();
         if (!$('win-overlay').classList.contains('hidden')) drawWinJewel(0);
       });
-    });
+    };
+    window.addEventListener('resize', relayout);
+    // баннер появился или ушёл: экран стал ниже или выше (--ws-banner-h)
+    WSPlatform.banner.onChange(() => { bannerStat(); relayout(); });
+    // баннер — только после первого касания, когда оно уже сработало
+    document.addEventListener('click', () => {
+      if (tapped) return;
+      tapped = true;
+      setTimeout(syncBanner, 0);
+    }, true);
 
     // штамп сборки (build_workshop.py подставляет значение в meta)
     const meta = document.querySelector('meta[name="ws-build"]');
@@ -2100,18 +2633,34 @@
       document.body.appendChild(b);
     }
 
+    try { await WSPlatform.init({ saveKey: SAVE_KEY }); } catch (e) { /* площадка не роняет запуск */ }
+    let raw = null;
+    try { raw = await WSPlatform.loadSave(); } catch (e) { raw = null; }
+    Store.load(raw);
+    Store.data.sessions++;
+    Store.save();
+    WSAnalytics.init({ install: Store.data.install, sessions: Store.data.sessions });
+    track('session_start', { coins: Store.data.coins, passed: Object.keys(Store.data.stars).length });
+    document.body.classList.toggle('is-owner', isOwner());
+    applyDecor();
     applyMute();
     showScreen('screen-menu');
     renderMenu();
+    booted = true;
+    syncBanner();
     // ?level=N — открыть уровень сразу (проверки и отладка; замок не действует)
     const q = /[?&]level=(\d+)/.exec(location.search);
     if (q && LEVELS[+q[1] - 1]) loadLevel(+q[1] - 1);
+    try { catalog = (await WSPlatform.catalog()) || []; } catch (e) { catalog = []; }
+    refreshOwner();
+    const out = await paySync('restore', (c) => WSPlatform.purchases(c));
+    if (out.grants.length) toast('Покупка зачислена', 2400);
   }
 
   /* Сводка ритма по журналу событий: пауза между выдачами (в ходах),
      доля «Дальше» после победы, каскады. */
   window.__wsMetrics = () => {
-    const ev = window.__wsEvents;
+    const ev = window.__wsEvents || [];
     const del = ev.filter(e => e.event === 'delivery');
     const gaps = del.filter(e => e.chain === 1).map(e => e.gap).sort((a, b) => a - b);
     const wins = ev.filter(e => e.event === 'win').length;
@@ -2149,7 +2698,14 @@
         pieceGems: pieceGems.slice(), modal: modalOpen,
         modalTitle: modalOpen ? $('ws-modal-title').textContent : '',
         passed: Object.keys(Store.data.stars).length, chests: Object.keys(Store.data.chests).map(Number),
-        decor: Object.assign({}, Store.data.decor)
+        decor: Object.assign({}, Store.data.decor),
+        booted, owner: isOwner(), noadsUntil: Store.data.pay.noadsUntil, royal: Store.data.pay.royal,
+        pay: Object.assign({}, Store.data.pay), owned: Object.assign({}, Store.data.owned),
+        flags: Object.assign({}, Store.data.flags), sessions: Store.data.sessions, v: WorkshopSave.VERSION,
+        catalog: catalog.length, payOn: payOn(), rewardOn: rewardOn(), paused: !!pauseAt,
+        banner: (() => { try { return WSPlatform.state().bannerHeight; } catch (e) { return 0; } })(),
+        bannerWanted, rewardBusy: Object.keys(rewardBusy).filter(k => rewardBusy[k]),
+        rewardLate: Object.keys(rewardLate), paySyncs
       };
     },
     vialCenter(i) {

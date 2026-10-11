@@ -147,12 +147,14 @@
   };
 
   function packState(s) {
-    return { v: s.vials.map(v => v.join('')), s: s.slots.slice(), n: s.next, d: s.delivered, hd: s.hid.slice() };
+    return { v: s.vials.map(v => v.join('')), s: s.slots.slice(), n: s.next, d: s.delivered, hd: s.hid.slice(), q: s.seq.slice() };
   }
 
   /* Проверка сохранённого состояния: те же камни, что в уровне, ровно по
      четыре на каждый невыданный заказ, карточки и очередь согласованы,
-     тайных камней не больше, чем камней под верхним. */
+     тайных камней не больше, чем камней под верхним. Порядок выдач q
+     (какой камень встал в изделие первым) — перестановка выданных заказов;
+     в старом сейве его нет — тогда выданные по порядку очереди. */
   function unpackState(p, lv) {
     if (!p || !Array.isArray(p.v) || !Array.isArray(p.s)) return null;
     const total = lv.orders.length;
@@ -186,9 +188,17 @@
       if (p.hd.some((h, i) => !intIn(h, 0, Math.max(0, vials[i].length - 1)))) return null;
       hid = p.hd.slice();
     }
+    const done = [];
+    for (let o = 0; o < p.n; o++) if (!active.has(o)) done.push(o);
+    let seq = done;
+    if (p.q !== undefined) {
+      if (!Array.isArray(p.q) || p.q.length !== done.length) return null;
+      if (p.q.some(o => !Number.isInteger(o) || done.indexOf(o) === -1) || new Set(p.q).size !== p.q.length) return null;
+      seq = p.q.slice();
+    }
     const s = {
       vials, orders: lv.orders.slice(), slots: p.s.slice(), next: p.n, delivered: p.d, hid,
-      lock: lv.lock ? { vial: lv.lock.vial, order: lv.lock.order } : null
+      lock: lv.lock ? { vial: lv.lock.vial, order: lv.lock.order } : null, seq
     };
     if (R.findDelivery(s)) return null;      // невыданная готовая ёмкость — сейв не от этой игры
     return s;
@@ -284,7 +294,7 @@
   let shownCoins = 0;      // монеты на счётчике (догоняют Store.data.coins по мере полёта)
   let attemptCoins = 0;    // заработано в этой попытке (церемония победы)
   let cardTimer = null, cardJob = null;   // отложенная смена карточки после последней выдачи
-  let pieceGems = [];      // камни в гнёздах изделия (по заказам)
+  let pieceGems = [];      // камни в изделии по порядку выдачи (длина — число заказов, null — ещё нет)
   let pendingUnlock = -1;  // ключ летит к этой пробирке — замок ещё виден
   let justWon = 0;         // id уровня, пройденного последним (значок на карте «выпрыгивает»)
   let modalOpen = false, modalOk = null;
@@ -547,7 +557,7 @@
 
   const gemItem = (gem, x, y, size) => ({ x, y, size, draw: (g, px, py, s) => WsBoard.drawGem(g, gem, px, py, s) });
 
-  /* ---------- изделие над заказами: гнездо на каждый заказ ---------- */
+  /* ---------- изделие над заказами: камни встают по порядку выдачи ---------- */
   const Piece = (() => {
     let cv = null, g = null, dpr = 1, W = 0, H = 0, raf = 0;
     let pop = null, shineAt = 0;
@@ -573,14 +583,14 @@
         const k = (t - pop.t0) / 520;
         if (k >= 1) pop = null; else p = { i: pop.i, k };
       }
-      WsJewel.draw(g, L.piece, L.orders.length, pieceGems, box(), { ghost: L.orders, drawGem: WsBoard.drawGem, pop: p });
+      WsJewel.draw(g, L.piece, L.orders.length, pieceGems, box(), { drawGem: WsBoard.drawGem, pop: p });
       if (shineAt) {
         const k = (t - shineAt) / 900;
         if (k >= 1) shineAt = 0; else WsJewel.shine(g, box(), k);
       }
       if (pop || shineAt) request();
     }
-    /* Гнездо заказа i в координатах окна (куда летит камень). */
+    /* Куда в изделии встаёт i-й выданный камень, в координатах окна. */
     function socket(i) {
       const r = cv.getBoundingClientRect();
       const s = L && WsJewel.sockets(L.piece, L.orders.length, box())[i];
@@ -592,8 +602,9 @@
     return { init, resize, request, socket, set, shine, reset };
   })();
 
+  const seqGems = (s) => s.orders.map((_, k) => (k < s.seq.length ? s.orders[s.seq[k]] : null));
   function resetPiece() {
-    pieceGems = st.orders.map((t, i) => (R.isDelivered(st, i) ? t : null));
+    pieceGems = seqGems(st);
     Piece.reset();
   }
 
@@ -1204,11 +1215,12 @@
       cx = r.left + r.width / 2; cy = r.top + r.height / 2;
       Fx.ring(cx, cy, r.width * 0.7);
     }
-    // камень заказа встаёт в своё гнездо изделия
-    const s = Piece.socket(ev.order);
+    // камень встаёт в изделие по порядку выдачи: первый — в главное место
+    const at = Math.max(0, st.seq.indexOf(ev.order));
+    const s = Piece.socket(at);
     Fx.fly([gemItem(ev.gem, cx, cy, 30)], s, () => {
       if (e !== epoch) return;
-      Piece.set(ev.order, ev.gem);
+      Piece.set(at, ev.gem);
       sfx('gem', { semis: 12 + 2 * Math.min(k, 3) });
     }, { dur: 460, lift: 36 });
     if (pay.coins) {
@@ -1502,7 +1514,7 @@
   function drawWinJewel(k) {
     const { g, w, h } = sizeCanvas($('ws-win-jewel'));
     const box = { x: 4, y: 4, w: w - 8, h: h - 8 };
-    WsJewel.draw(g, L.piece, L.orders.length, L.orders, box, { drawGem: WsBoard.drawGem, closeup: true });
+    WsJewel.draw(g, L.piece, L.orders.length, seqGems(st), box, { drawGem: WsBoard.drawGem, closeup: true });
     if (k > 0 && k < 1) WsJewel.shine(g, box, k);
   }
 
@@ -1844,8 +1856,8 @@
         const me = document.createElement('span');
         me.className = 'ws-map-me ' + (side < 0 ? 'is-left' : 'is-right');
         me.setAttribute('aria-hidden', 'true');
-        me.style.left = (p.x + side * 64) + 'px';   // остриё булавки — у края значка
-        me.style.top = (p.y + 10) + 'px';
+        me.style.left = (p.x + side * 27) + 'px';   // остриё воткнуто в «плечо» монеты (радиус ~47)
+        me.style.top = (p.y - 27) + 'px';
         track.appendChild(me);
       }
     });

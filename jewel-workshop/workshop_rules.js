@@ -84,14 +84,15 @@
     const hid = level.vials.map((v, i) => Math.max(0, Math.min((level.hidden && level.hidden[i]) | 0, v.length - 1)));
     return {
       vials: level.vials.map(v => v.slice()), orders: level.orders.slice(), slots, next: n, delivered: 0,
-      hid, lock: level.lock ? { vial: level.lock.vial, order: level.lock.order } : null
+      hid, lock: level.lock ? { vial: level.lock.vial, order: level.lock.order } : null, seq: []
     };
   }
 
   function cloneState(s) {
     return {
       vials: s.vials.map(v => v.slice()), orders: s.orders, slots: s.slots.slice(), next: s.next,
-      delivered: s.delivered, hid: s.hid ? s.hid.slice() : s.vials.map(() => 0), lock: s.lock || null
+      delivered: s.delivered, hid: s.hid ? s.hid.slice() : s.vials.map(() => 0), lock: s.lock || null,
+      seq: s.seq ? s.seq.slice() : []
     };
   }
 
@@ -136,6 +137,7 @@
       else s.vials[d.vial].length = 0;
       if (s.hid) s.hid[d.vial] = 0;
       s.delivered++;
+      if (s.seq) s.seq.push(d.order);   // порядок выдач: какой камень встаёт в изделие первым
       const incoming = s.next < s.orders.length ? s.next++ : -1;
       s.slots[d.slot] = incoming;
       const unlocked = wasLocked >= 0 && lockedVial(s) === -1 ? wasLocked : -1;

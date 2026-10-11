@@ -223,15 +223,19 @@ button:focus-visible { outline: 3px solid rgba(240, 97, 143, 0.9); outline-offse
 .ws-node-hard svg { width: 15px; height: 15px; }
 .ws-node.is-locked .ws-node-hard { filter: saturate(0.55); opacity: 0.85; }
 
-/* героиня у текущего уровня */
-/* героиня у текущего уровня: булавка-портрет, остриё (низ картинки) — в точке left/top */
+/* героиня у текущего уровня: булавка-портрет, остриё (низ картинки) — в точке left/top,
+   то есть воткнуто в край монеты; булавка наклонена наружу и покачивается вокруг острия,
+   не отрываясь от монеты */
 .ws-map-me {
+  --tilt: 14deg;
   position: absolute; z-index: 4; width: 62px; height: 76px; margin: -76px 0 0 -31px; pointer-events: none;
   background: url(workshop_assets/pin_jeweler.webp) 50% 100% / contain no-repeat;
   filter: drop-shadow(0 4px 4px rgba(122, 52, 82, 0.35));
-  animation: wsMeBob 1.6s ease-in-out infinite alternate;
+  transform-origin: 50% 100%; transform: rotate(var(--tilt));
+  animation: wsMeSway 1.6s ease-in-out infinite alternate;
 }
-@keyframes wsMeBob { from { transform: translateY(0); } to { transform: translateY(-5px); } }
+.ws-map-me.is-left { --tilt: -14deg; }
+@keyframes wsMeSway { from { transform: rotate(var(--tilt)); } to { transform: rotate(calc(var(--tilt) * 0.55)); } }
 
 /* шкатулка коллекции на дорожке */
 /* шкатулка коллекции на дорожке: chest — закрыта, chest_open — открыта (крышка выше, картинка выше) */
@@ -543,6 +547,9 @@ body.is-hard .ws-moves.is-low { animation: wsBump 0.5s ease-out; background: lin
   display: flex; flex-direction: column; align-items: center; text-align: center;
   padding: var(--win-top, 108px) 12px calc(env(safe-area-inset-bottom, 0px) + 14px);
 }
+/* сверху и снизу лучи режутся (иначе лёжа появляется прокрутка), а по бокам — нет:
+   на широком экране героиня и лучи выходят за коробку, по краю экрана режет само окно */
+@supports (overflow: clip) { .ws-celebrate .ws-win-box { overflow: visible clip; } }
 .ws-win-bank { position: fixed; top: var(--bank-t, 10px); right: var(--bank-r, 10px); z-index: 2; pointer-events: none; }
 .ws-win-bank.bump { animation: wsCoinBump 0.3s ease-out; }
 .ws-win-pay {

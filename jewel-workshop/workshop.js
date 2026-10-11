@@ -62,13 +62,13 @@
     { name: 'Звёзды', coins: 200, decor: ['tube', 'rose'] },
     { name: 'Осень', coins: 200, decor: ['cloth', 'navy'] },
     { name: 'Королевский бал', coins: 300, decor: ['tube', 'royal'] },
-    // глава 2 (уровни 31–60): пока только монеты; убранство назначит B3 (decor: null — без него)
+    // глава 2 (уровни 31–60): монеты (их тратят в лавке); вещь — только в последней шкатулке (B3, docs/WORKSHOP.md «Экономика»)
     { name: 'Лунный свет', coins: 300, decor: null },
     { name: 'Венеция', coins: 350, decor: null },
     { name: 'Сакура', coins: 350, decor: null },
     { name: 'Северное сияние', coins: 400, decor: null },
     { name: 'Зимняя сказка', coins: 450, decor: null },
-    { name: 'Бриллиантовый юбилей', coins: 500, decor: null }
+    { name: 'Бриллиантовый юбилей', coins: 500, decor: ['pedestal', 'marble'] }
   ];
   /* Убранство мастерской — ОДНА таблица на всё (точка расширения лавки).
      Первый вариант вида — по умолчанию, есть у всех. Остальные — из шкатулки
@@ -80,13 +80,17 @@
      tube     — стекло пробирок: tint/rim (r,g,b) для WsBoard.setTube;
      cushion  — подушка изделия на поле, pedestal — тумба на карте: картинка
                 workshop_assets/<img>.webp (CSS-переменные --ws-cushion/--ws-pedestal).
-     swatch — образец в окне убранства и в шкатулке. */
+     swatch — образец в окне убранства и в шкатулке.
+     price  — цена в лавке (монеты, 300–1500, workshop_shop.js). У каждой вещи ровно
+              один источник: шкатулка, лавка (price) или набор (set). */
   const DECOR = {
     cloth: [
       { id: 'walnut', name: 'Ореховый стол', swatch: '#5a3a1f' },
       { id: 'emerald', name: 'Изумрудный бархат', swatch: '#1f6b4d', velvet: ['#3aa27a', '#23795a', '#144a37'] },
       { id: 'wine', name: 'Винный бархат', swatch: '#74203a', velvet: ['#b8406a', '#8a2850', '#4e1430'] },
       { id: 'navy', name: 'Синий бархат', swatch: '#22346a', velvet: ['#4a66b8', '#2e4485', '#18244e'] },
+      { id: 'blush', name: 'Пудровый бархат', swatch: '#c26f8c', velvet: ['#eaa6bc', '#c97391', '#8a3c5a'], price: 800 },
+      { id: 'noir', name: 'Чёрный бархат', swatch: '#2b2631', velvet: ['#55505e', '#2f2a36', '#121016'], price: 1000 },
       { id: 'royal', name: 'Королевский бархат', swatch: '#5a2380', set: 'royal',
         velvet: ['#8e4cc0', '#5f2788', '#2e0f4a'], rim: 'rgba(255, 206, 92, 0.95)' }
     ],
@@ -95,14 +99,22 @@
       { id: 'sea', name: 'Морское стекло', swatch: '#8fe0d8', tint: '170,240,230', rim: '215,255,248' },
       { id: 'rose', name: 'Розовое стекло', swatch: '#f2a7bd', tint: '255,196,214', rim: '255,226,236' },
       { id: 'royal', name: 'Королевское стекло', swatch: '#b49cf0', tint: '210,184,255', rim: '255,232,170' },
+      { id: 'sky', name: 'Голубое стекло', swatch: '#b4d4fa', tint: '186,216,255', rim: '226,240,255', price: 400 },
+      { id: 'mint', name: 'Мятное стекло', swatch: '#b4eec4', tint: '196,248,212', rim: '230,255,236', price: 600 },
       { id: 'crystal', name: 'Королевский хрусталь', swatch: '#f3d27a', tint: '255,228,165', rim: '255,198,72', set: 'royal' }
     ],
     cushion: [
       { id: 'classic', name: 'Бархатная подушка', img: 'cushion' },
+      { id: 'lavender', name: 'Лавандовая подушка', img: 'cushion_lavender', price: 1000 },
+      { id: 'peach', name: 'Персиковая подушка', img: 'cushion_peach', price: 1200 },
+      { id: 'mint', name: 'Мятная подушка', img: 'cushion_mint', price: 1300 },
+      { id: 'black', name: 'Чёрная подушка', img: 'cushion_black', price: 1500 },
       { id: 'royal', name: 'Королевская подушка', img: 'cushion_royal', set: 'royal' }
     ],
     pedestal: [
       { id: 'classic', name: 'Бархатная тумба', img: 'pedestal' },
+      { id: 'marble', name: 'Мраморная тумба', img: 'pedestal_marble' },
+      { id: 'mint', name: 'Мятная тумба', img: 'pedestal_mint', price: 1400 },
       { id: 'royal', name: 'Королевский пьедестал', img: 'pedestal_royal', set: 'royal' }
     ]
   };
@@ -147,7 +159,8 @@
     return {
       levels: LEVELS.map(l => l.id), novelty: Object.keys(NOVELTY).concat('hard'), perColl: PER_COLL,
       collections: COLLECTIONS, decor: DECOR, gems: Object.keys(GEMS),
-      restoreCur: (c) => !!restoreGame(c), today: WSAnalytics.dayNumber(), ftueAll: FTUE_ALL
+      restoreCur: (c) => !!restoreGame(c), today: WSAnalytics.dayNumber(), ftueAll: FTUE_ALL,
+      metals: WsJewel.METALS, shapes: shapesCtx()   // B2: металлы и формы выбора (pieces, choice)
     };
   }
   const intIn = (x, lo, hi) => Number.isInteger(x) && x >= lo && x <= hi;
@@ -435,7 +448,8 @@
      поле. Поле и карта кончаются над ним (--ws-banner-h). Прячется под всеми
      окнами (победа, «Ходы кончились», карточки, убранство, покупка); закрытый
      игроком не возвращается до перезапуска (площадка). */
-  const OVERLAYS = ['win-overlay', 'lose-overlay', 'modal-overlay', 'decor-overlay', 'noads-overlay', 'thanks-overlay'];
+  const OVERLAYS = ['win-overlay', 'lose-overlay', 'modal-overlay', 'decor-overlay', 'noads-overlay', 'thanks-overlay']
+    .concat(window.WsCase ? WsCase.OVERLAYS : []);   // B2: выбор оправы, шкатулка, «В избранное»
   let bannerWanted = null;
   let tapped = false;      // первое касание закончилось: баннер не сдвигает экран под пальцем
   function syncBanner() {
@@ -847,7 +861,7 @@
         return true;
       });
       landed.forEach(j => j.done());
-      if (jobs.length || sparks.length || texts.length || rings.length || drops.length) request();
+      if (jobs.length || sparks.length || texts.length || rings.length || drops.length || landed.length) request();   // долетевшее стирается следующим кадром
     }
     /* Монеты от точки к счётчику: n монет делится между 1–8 летящими
        (o.count — сколько именно, o.size, o.lift, o.dur — для церемонии). */
@@ -900,7 +914,9 @@
         const k = (t - pop.t0) / 520;
         if (k >= 1) pop = null; else p = { i: pop.i, k };
       }
-      WsJewel.draw(g, L.piece, L.orders.length, pieceGems, box(), { drawGem: WsBoard.drawGem, pop: p });
+      const lk = playLook();
+      WsJewel.draw(g, lk.shape, L.orders.length, pieceGems, box(), { drawGem: WsBoard.drawGem, pop: p, metal: lk.metal });
+      b2('piece');
       if (shineAt) {
         const k = (t - shineAt) / 900;
         if (k >= 1) shineAt = 0; else WsJewel.shine(g, box(), k);
@@ -910,7 +926,7 @@
     /* Куда в изделии встаёт i-й выданный камень, в координатах окна. */
     function socket(i) {
       const r = cv.getBoundingClientRect();
-      const s = L && WsJewel.sockets(L.piece, L.orders.length, box())[i];
+      const s = L && WsJewel.sockets(playLook().shape, L.orders.length, box())[i];
       return s ? { x: r.left + s.x, y: r.top + s.y, size: s.r * 2.35 } : { x: r.left + W / 2, y: r.top + H / 2, size: 20 };
     }
     function set(i, gem) { pieceGems[i] = gem; pop = REDUCED ? null : { i, t0: performance.now() }; request(); }
@@ -948,8 +964,11 @@
     return 'Соберите 4 камня';
   }
 
-  /* Лица заказчиц: у заказа своё лицо на весь уровень, на виду — без повторов. */
-  const FACES = ['bride', 'grandma', 'curly', 'lady', 'redhead', 'blonde'];
+  /* Лица заказчиц: у заказа своё лицо на весь уровень, на виду — без повторов.
+     Первые шесть — глава 1 (как было); jade и silver — новые заказчицы главы 2 (уровни 31–60, B3):
+     там они встречают первые два заказа, дальше идут прежние. */
+  const FACES = ['bride', 'grandma', 'curly', 'lady', 'redhead', 'blonde', 'jade', 'silver'];
+  const FACES_CH1 = 6, CH1_LEVELS = 30;
   // героиня окна победы по изделию: невеста — кольца, колье, диадемы и короны; кудрявая —
   // серьги, браслеты и заколки; бабушка — кулоны, броши и запонки
   const HERO = { ring: 'bride', necklace: 'bride', tiara: 'bride', crown: 'bride', earrings: 'curly',
@@ -962,10 +981,11 @@
       if (faces[o] !== undefined && used.indexOf(faces[o]) === -1) used.push(faces[o]);
       else delete faces[o];
     });
+    const pool = L && L.id > CH1_LEVELS ? FACES.length : FACES_CH1, shift = pool > FACES_CH1 ? FACES_CH1 : 0;
     vis.forEach(o => {
       if (faces[o] !== undefined) return;
-      let f = o % FACES.length;
-      for (let k = 0; k < FACES.length && used.indexOf(f) !== -1; k++) f = (f + 1) % FACES.length;
+      let f = (o + shift) % pool;
+      for (let k = 0; k < pool && used.indexOf(f) !== -1; k++) f = (f + 1) % pool;
       faces[o] = f;
       used.push(f);
     });
@@ -1043,6 +1063,7 @@
     $('ws-queue').setAttribute('aria-label', queue.length ? 'Далее: ' + queue.map(o => gemName(st.orders[o])).join(', ') : 'Очередь пуста');
     updateCounter(false);
     renderUrgent();
+    b2('orders');
   }
 
   function urgentLeft() {
@@ -1350,7 +1371,8 @@
     requestAnimationFrame(() => { WsBoard.resize(); Piece.resize(); updateGuide(); });
     track('level_start', { level: L.id, hard: L.hard ? 1 : 0, resumed: !!resume, moves });
     syncBanner();
-    if (!resume) introduce();
+    // B2: перед первым запуском уровня (с 4-го) — окно выбора оправы; «Новое!» — после выбора
+    if (!b2('levelStart', !!resume) && !resume) introduce();
   }
 
   /* Карточка «Новое!» при первой встрече с новинкой; на «Сложном заказе» —
@@ -1576,11 +1598,13 @@
     // камень встаёт в изделие по порядку выдачи: первый — в главное место
     const at = Math.max(0, st.seq.indexOf(ev.order));
     const s = Piece.socket(at);
-    Fx.fly([gemItem(ev.gem, cx, cy, 30)], s, () => {
+    const main = at === 0;   // B2: главный камень — крупнее, выше и со своим звуком (b2 mainGem)
+    Fx.fly([gemItem(ev.gem, cx, cy, main ? 38 : 30)], s, () => {
       if (e !== epoch) return;
       Piece.set(at, ev.gem);
       sfx('gem', { semis: 12 + 2 * Math.min(k, 3) });
-    }, { dur: 460, lift: 36 });
+      if (main) b2('mainGem', s);
+    }, main ? { dur: 680, lift: 96 } : { dur: 460, lift: 36 });
     if (pay.coins) {
       Fx.text(cx, cy - 8, '+' + pay.coins, { color: '#ffe08a', size: 22 });
       coinsTo(cx, cy, pay.coins, e);
@@ -1755,6 +1779,9 @@
     justWon = L.id;
     const ci = collOfIdx(levelIdx);
     const collNew = !prevStars && collDone(ci) && !Store.data.chests[ci];
+    // B2: готовое изделие — в шкатулку: металл и форма выбора, камни в порядке выдачи
+    const lk = playLook();
+    Store.data.pieces[id] = { metal: lk.metal, shape: lk.shape, gems: seqGems(st).filter(Boolean).slice(0, 16) };
     saveGame();
     return { prevBest, prevStars, stars, bonus, collNew, ci };
   }
@@ -1833,6 +1860,7 @@
     renderWinExtra();
     ov.classList.remove('hidden');
     drawWinJewel(0);
+    b2('win', r);   // B2: кнопка шкатулки, полёт изделия в неё (первые три победы), «В избранное»
     // звёзды по одной
     for (let i = 0; i < r.stars; i++) {
       setTimeout(() => {
@@ -1950,7 +1978,8 @@
   function drawWinJewel(k) {
     const { g, w, h } = sizeCanvas($('ws-win-jewel'));
     const box = { x: 4, y: 4, w: w - 8, h: h - 8 };
-    WsJewel.draw(g, L.piece, L.orders.length, seqGems(st), box, { drawGem: WsBoard.drawGem, closeup: true });
+    const lk = playLook();
+    WsJewel.draw(g, lk.shape, L.orders.length, seqGems(st), box, { drawGem: WsBoard.drawGem, closeup: true, metal: lk.metal });
     if (k > 0 && k < 1) WsJewel.shine(g, box, k);
   }
 
@@ -2018,6 +2047,7 @@
     clearTimeout(cardTimer); cardJob = null;
     clearInterval(winShineTimer);
     Fx.clear();
+    b2('leave');
     shownCoins = Store.data.coins;
     hideToast();
     closeModal(true);
@@ -2171,7 +2201,8 @@
   function chestPic(kind, id) {
     const d = decorItem(kind, id);
     return '<div class="ws-chest is-open ws-chest-big">' +
-      (d ? '<span class="ws-chest-prize" style="background:' + (d.swatch || '#fff') + '"></span>' : '') + '</div>';
+      (d ? (d.img ? '<span class="ws-chest-prize is-pic" style="background-image:' + decorPic(d) + '"></span>'   // B3: подушка/тумба — картинкой
+        : '<span class="ws-chest-prize" style="background:' + (d.swatch || '#fff') + '"></span>') : '') + '</div>';
   }
 
 
@@ -2206,13 +2237,14 @@
     $('btn-play').setAttribute('aria-label', word + ': уровень ' + LEVELS[idx].id);
     renderMap(idx);
     renderDecor();
+    b2('menu');   // B2: кнопка шкатулки, любимое на пьедестале, следующая цель
   }
 
   /* ---------- карта (образ — ref/workshop/concept/03_map.jpeg) ----------
      Места на дорожке снизу вверх: пять уровней коллекции, затем её шкатулка.
      Дорожка — синусоида через места; у каждой начатой коллекции на пьедестале
      стоит последнее готовое изделие; героиня — рядом с уровнем кнопки «Играть». */
-  const MAP = { step: 80, top: 132, bottom: 150, k: 0.8, phase: 0.6 };
+  const MAP = { step: 80, top: 132, bottom: 150, k: 0.8, phase: 0.6, chGap: 96 };   // chGap — промежуток у границы глав (B3)
   const HARD_SVG = '<svg viewBox="0 0 24 24"><path d="M6 3h12M6 21h12" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/><path d="M7.5 3.8c0 4.4 4.5 5.6 4.5 8.2s-4.5 3.8-4.5 8.2h9c0-4.4-4.5-5.6-4.5-8.2s4.5-3.8 4.5-8.2z" fill="#fff4f6"/></svg>';
   let mapIdx = 0;          // уровень у героини (перерисовка карты при повороте экрана)
 
@@ -2238,11 +2270,13 @@
       slots.push({ ci });
     });
     const W = track.clientWidth || Math.min(innerWidth, 480);
-    const H = MAP.top + (slots.length - 1) * MAP.step + MAP.bottom;
+    const ch2 = slots.findIndex(sl => sl.i === CH1_LEVELS);   // первое место главы 2 (B3): выше него — второй зал
+    const gap = ch2 > 0 ? MAP.chGap : 0;
+    const H = MAP.top + (slots.length - 1) * MAP.step + MAP.bottom + gap;
     track.style.height = H + 'px';
     const amp = Math.min(W * 0.27, 140);
     const wave = (s) => Math.sin(s * MAP.k + MAP.phase);
-    const at = (s) => ({ x: W / 2 + amp * wave(s), y: H - MAP.bottom - s * MAP.step });
+    const at = (s) => ({ x: W / 2 + amp * wave(s), y: H - MAP.bottom - s * MAP.step - (gap && s >= ch2 ? gap : 0) });
     const curSlot = Math.max(0, slots.findIndex(sl => sl.i === playIdx));
     const firstOpen = LEVELS.findIndex((l, i) => !isPassed(i));
     const draws = [];
@@ -2284,7 +2318,8 @@
       track.appendChild(ped);
       draws.push(() => {
         const { g, w, h } = sizeCanvas(cv);
-        WsJewel.draw(g, lv.piece, lv.orders.length, lv.orders, { x: 2, y: 2, w: w - 4, h: h - 4 }, { drawGem: WsBoard.drawGem, closeup: 3.2 });
+        const lk = look(lv);   // B2: как изделие лежит в шкатулке
+        WsJewel.draw(g, lk.shape, lv.orders.length, lk.gems, { x: 2, y: 2, w: w - 4, h: h - 4 }, { drawGem: WsBoard.drawGem, closeup: 3.2, metal: lk.metal });
       });
     });
 
@@ -2339,9 +2374,42 @@
         track.appendChild(me);
       }
     });
+    if (gap) mapChapterLine((at(ch2 - 1).y + at(ch2).y) / 2);
     draws.forEach(d => d());
     justWon = 0;
     map.scrollTop = Math.max(0, at(curSlot).y - map.clientHeight * 0.58);
+    mapChapterBg();
+    b2('mapDrawn');   // B2: цель над шкатулкой живёт в дорожке — после перерисовки ставится заново
+  }
+
+  /* ---------- B3: глава 2 на карте ----------
+     Граница глав — золотая нить с лентой «Глава 2» на дорожке; выше неё под дорожкой
+     второй зал (#ws-map-bg2, bg_map2): слой стоит, как комната главы 1, а его нижний край
+     (--cut, workshop_shop.css) идёт за границей при прокрутке. */
+  function mapChapterLine(y) {
+    const line = document.createElement('div');
+    line.className = 'ws-map-ch';
+    line.id = 'ws-map-ch';
+    line.style.top = y + 'px';
+    line.setAttribute('role', 'separator');
+    line.setAttribute('aria-label', 'Глава 2');
+    line.innerHTML = '<span class="ws-map-ch-label" aria-hidden="true">Глава 2</span>';
+    $('ws-map-track').appendChild(line);
+  }
+  function mapChapterBg() {
+    const menu = $('screen-menu'), map = $('ws-map');
+    let bg = $('ws-map-bg2');
+    if (!bg) {
+      bg = document.createElement('div');
+      bg.id = 'ws-map-bg2';
+      bg.className = 'ws-map-bg2';
+      bg.setAttribute('aria-hidden', 'true');
+      menu.insertBefore(bg, menu.firstChild);
+      map.addEventListener('scroll', mapChapterBg, { passive: true });
+    }
+    const line = $('ws-map-ch');
+    bg.classList.toggle('is-off', !line);
+    if (line) bg.style.setProperty('--cut', Math.round(line.getBoundingClientRect().top - menu.getBoundingClientRect().top) + 'px');
   }
 
   function chestButton(ci) {
@@ -2352,7 +2420,7 @@
     const c = COLLECTIONS[ci];
     b.setAttribute('aria-label', 'Шкатулка коллекции «' + c.name + '»: ' + (opened ? 'открыта' + (c.decor ? ', в ней было «' + decorName(c.decor[0], c.decor[1]) + '»' : '') : done ? 'можно открыть' : 'пройдите все пять уровней коллекции'));
     b.addEventListener('click', () => {
-      if (opened) { sfx('click'); openDecor(); return; }
+      if (opened) { sfx('click'); openDecor('chest'); return; }
       if (!done) {
         sfx('invalid');
         const left = PER_COLL - collCount(ci);
@@ -2387,76 +2455,27 @@
     bump($('ws-menu-coins'));
   }
 
-  const DECOR_ICON = {
-    cloth: '<svg viewBox="0 0 24 24"><path d="M2.5 9.5h19l-1.6 3.2H4.1z" fill="#d79a5a" stroke="#8a4a1c" stroke-width="1.3" stroke-linejoin="round"/><path d="M6 12.7v7.3M18 12.7v7.3" stroke="#8a4a1c" stroke-width="2.2" stroke-linecap="round"/><path d="M5 9.5c1-2.6 2.6-3.6 7-3.6s6 1 7 3.6" fill="#f2a7bd" stroke="#b5527a" stroke-width="1.2"/></svg>',
-    tube: '<svg viewBox="0 0 24 24"><path d="M8.5 2.8h7" stroke="#b98226" stroke-width="2.4" stroke-linecap="round"/><path d="M9.6 3.6v14.2a2.4 2.4 0 0 0 4.8 0V3.6" fill="rgba(255,255,255,0.75)" stroke="#9a6a8a" stroke-width="1.5"/><path d="M9.6 12.6h4.8v5.2a2.4 2.4 0 0 1-4.8 0z" fill="#f0507f"/></svg>'
-  };
-  // строки окна «Убранство»: вид и подпись для чтецов; подушка и тумба — картинками
-  const DECOR_ROWS = [['cloth', 'Стол'], ['tube', 'Стекло'], ['cushion', 'Подушка'], ['pedestal', 'Тумба']];
+  /* ---------- B3: лавка — единственное окно убранства (workshop_shop.js) ----------
+     Выбрать своё и купить за монеты — одно окно «Лавка» (decor-overlay). Здесь только
+     связка с игрой: что окну можно трогать (сейв — только через Store). */
   const decorPic = (d) => 'url(workshop_assets/' + d.img + '.webp)';
-  let decorOpen = false;
-
-  // вариант виден в окне: свой, из шкатулки (с замочком) или из набора, пока покупки есть (с короной)
-  function decorVisible(kind, d) { return !d.set || owns(kind, d.id) || payOn(); }
-
-  function renderDecor() {
-    const box = $('ws-decor');
-    box.innerHTML = '';
-    DECOR_ROWS.forEach(([kind, label]) => {
-      const list = DECOR[kind].filter(d => decorVisible(kind, d));
-      if (list.length < 2) return;           // выбирать не из чего (подушка и тумба — только с набором)
-      const row = document.createElement('div');
-      row.className = 'ws-decor-row';
-      row.setAttribute('role', 'group');
-      row.setAttribute('aria-label', label);
-      const ico = document.createElement('span');
-      ico.className = 'ws-decor-ico';
-      ico.setAttribute('aria-hidden', 'true');
-      if (DECOR_ICON[kind]) ico.innerHTML = DECOR_ICON[kind];
-      else { ico.classList.add('is-pic'); ico.style.backgroundImage = decorPic(DECOR[kind][0]); }
-      row.appendChild(ico);
-      list.forEach(d => {
-        const b = document.createElement('button');
-        b.type = 'button';
-        const own = owns(kind, d.id), on = Store.data.decor[kind] === d.id;
-        b.className = 'ws-decor-chip' + (on ? ' is-on' : '') + (own ? '' : d.set ? ' is-set' : ' is-locked');
-        const sw = document.createElement('span');
-        sw.className = 'ws-swatch';
-        if (d.img) { sw.classList.add('is-pic'); sw.style.backgroundImage = decorPic(d); } else sw.style.background = d.swatch;
-        b.appendChild(sw);
-        if (!own) b.insertAdjacentHTML('beforeend', d.set ? '<span class="ws-decor-crown" aria-hidden="true"></span>' : '<span class="ws-decor-lock" aria-hidden="true"></span>');
-        b.title = d.name;
-        const src = COLLECTIONS.find(c => c.decor && c.decor[0] === kind && c.decor[1] === d.id);
-        b.setAttribute('aria-label', d.name + (on ? ', выбрано' : own ? '' : d.set ? ', в Королевском наборе' : ', в шкатулке «' + (src ? src.name : '') + '»'));
-        b.setAttribute('aria-pressed', on ? 'true' : 'false');
-        b.addEventListener('click', () => {
-          if (!own && d.set) { closeDecor(); openNoads('map'); return; }
-          if (!own) { sfx('invalid'); toast('В шкатулке «' + (src ? src.name : '') + '»', 2000); return; }
-          sfx('click');
-          Store.data.decor[kind] = d.id;
-          Store.save();
-          applyDecor();
-          renderDecor();
-          toast(d.name, 1200);
-        });
-        row.appendChild(b);
-      });
-      box.appendChild(row);
-    });
-  }
-
-  function openDecor() {
-    renderDecor();
-    $('decor-overlay').classList.remove('hidden');
-    decorOpen = true;
-    setTimeout(() => { if (decorOpen) $('btn-decor-ok').focus(); }, 60);
-  }
-  function closeDecor() {
-    if (!decorOpen) return;
-    decorOpen = false;
-    $('decor-overlay').classList.add('hidden');
-    $('btn-decor').focus();
-  }
+  const Shop = WsShop.create({
+    $, Store, DECOR, COLLECTIONS, decorItem, decorPic,
+    owns: (kind, id) => owns(kind, id),
+    payOn: () => payOn(),
+    openNoads: (from) => openNoads(from),
+    applyDecor: () => applyDecor(),
+    track: (name, data) => track(name, data),
+    toast: (msg, ms) => toast(msg, ms),
+    sfx: (name) => sfx(name),
+    buzz: (p) => buzz(p),
+    confetti: () => Confetti.burst({ count: 60, durationMs: 2000, colors: CONFETTI }),
+    coinsChanged: () => { shownCoins = Store.data.coins; renderCoins(true); },
+    focusBack: () => $('btn-decor').focus()
+  });
+  function renderDecor() { Shop.render(); }
+  function openDecor(from) { Shop.open(from || 'map'); }
+  function closeDecor() { Shop.close(); }
 
   /* Надеть убранство из Store.data.decor (точка расширения лавки: таблица DECOR):
      бархат — класс cloth-<id> и has-cloth с цветами в --ws-cloth-*, стекло —
@@ -2490,11 +2509,60 @@
     ['btn-sound', 'btn-sound-game'].forEach(id => { if ($(id)) $(id).setAttribute('aria-pressed', Store.data.muted ? 'true' : 'false'); });
   }
 
+  /* ---------- B2: выбор оправы, шкатулка, первые минуты ----------
+     Окна, кнопки и события выбора и шкатулки — workshop_case.js (WsCase);
+     здесь только вид изделия и узкий интерфейс к игре (b2Api, отдаётся WsCase.attach).
+     Вид изделия: { metal, shape, gems }. look(lv) — как оно лежит в шкатулке
+     (pieces, иначе выбор, иначе золото и первая форма, камни заказов);
+     playLook() — как его собирают сейчас (выбор, иначе прежнее изделие).
+     Сбой WsCase не ломает игру: b2() ловит и пишет console.error. */
+  function shapesCtx() {
+    const out = {};
+    LEVELS.forEach(l => { out[String(l.id)] = [l.piece, l.piece + '2'].filter(p => WsJewel.ART[p]); });
+    return out;
+  }
+  function look(lv) {
+    const id = String(lv.id), p = Store.data.pieces[id], c = Store.data.choice[id];
+    return {
+      metal: (p && p.metal) || (c && c.metal) || 'gold',
+      shape: (p && p.shape) || (c && c.shape) || lv.piece,
+      gems: p && p.gems && p.gems.length ? p.gems : lv.orders
+    };
+  }
+  function playLook() {
+    if (!L) return { metal: 'gold', shape: 'ring' };
+    const id = String(L.id), c = Store.data.choice[id], p = Store.data.pieces[id];
+    return { metal: (c && c.metal) || (p && p.metal) || 'gold', shape: (c && c.shape) || (p && p.shape) || L.piece };
+  }
+  function b2(name, a, b) {
+    const C = window.WsCase;
+    if (!C || typeof C[name] !== 'function') return undefined;
+    try { return C[name](a, b); } catch (e) { console.error('B2 ' + name, e); return undefined; }
+  }
+  function b2Api() {
+    const api = {
+      Store, LEVELS, COLLECTIONS, PER_COLL, REDUCED, Fx,
+      collLevels, collDone, collCount, isPassed, isOpen, track, ftueStep, sfx, buzz, toast, bump,
+      gemItem, drawGem: (g, gem, x, y, s, a) => WsBoard.drawGem(g, gem, x, y, s, a), look, playLook,
+      sizeCanvas, introduce, decorItem, decorName, chestPic, seqGems, syncBanner, startLevel,
+      socket: (i) => Piece.socket(i), redrawPiece: () => Piece.request(), drawWinJewel, renderMenu,
+      levelName: (lv) => lv.name
+    };
+    Object.defineProperties(api, {
+      L: { get: () => L }, levelIdx: { get: () => levelIdx }, screen: { get: () => screen },
+      won: { get: () => won }, epoch: { get: () => epoch }, view: { get: () => view },
+      pieceGems: { get: () => pieceGems }, st: { get: () => st }, modalOpen: { get: () => modalOpen },
+      paused: { get: () => !!pauseAt }
+    });
+    return api;
+  }
+
   /* ---------- запуск ---------- */
   /* Порядок запуска: интерфейс и обработчики → WSPlatform.init() → сейв →
      карта (новый игрок тоже начинает с карты) → тарифы и восстановление
      покупок по журналу сервера (не задерживают карту). */
   async function init() {
+    b2('attach', b2Api());   // B2: workshop_case.js строит окна и кнопки
     // атлас камней, картинки изделий и руки приходят после запуска: перерисовать то, что на виду
     let artRaf = 0;
     const redrawArt = () => {
@@ -2532,6 +2600,7 @@
       tapVial(WsBoard.hitTest(ev.clientX, ev.clientY));
     });
     document.addEventListener('keydown', (ev) => {
+      if (b2('key', ev)) return;   // B2: окна выбора, шкатулки, «В избранное»
       if (!$('thanks-overlay').classList.contains('hidden')) {
         if (ev.key === 'Escape' || ev.key === 'Enter') { ev.preventDefault(); closeThanks(); }
         return;
@@ -2540,7 +2609,7 @@
         if (ev.key === 'Escape') { ev.preventDefault(); sfx('click'); closeNoads(); }
         return;
       }
-      if (decorOpen && !modalOpen) {
+      if (Shop.isOpen() && !modalOpen) {
         if (ev.key === 'Escape') { ev.preventDefault(); sfx('click'); closeDecor(); }
         return;
       }
@@ -2576,8 +2645,7 @@
     $('btn-lose-again').addEventListener('click', () => { lost && restart(); });
     $('btn-modal-ok').addEventListener('click', () => closeModal());
     $('btn-decor').addEventListener('click', () => { sfx('click'); openDecor(); });
-    $('btn-decor-ok').addEventListener('click', () => { sfx('click'); closeDecor(); });
-    $('decor-overlay').addEventListener('click', (ev) => { if (ev.target === $('decor-overlay')) { sfx('click'); closeDecor(); } });
+    // кнопки окна лавки (главная, крестик, вкладки, фон) — в workshop_shop.js (B3)
     $('btn-noads').addEventListener('click', () => openNoads('map'));
     $('btn-win-noads').addEventListener('click', () => openNoads('win'));
     $('btn-noads-close').addEventListener('click', () => { sfx('click'); closeNoads(); });
@@ -2705,7 +2773,8 @@
         catalog: catalog.length, payOn: payOn(), rewardOn: rewardOn(), paused: !!pauseAt,
         banner: (() => { try { return WSPlatform.state().bannerHeight; } catch (e) { return 0; } })(),
         bannerWanted, rewardBusy: Object.keys(rewardBusy).filter(k => rewardBusy[k]),
-        rewardLate: Object.keys(rewardLate), paySyncs
+        rewardLate: Object.keys(rewardLate), paySyncs,
+        b2: b2('state') || null
       };
     },
     vialCenter(i) {

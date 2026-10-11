@@ -51,7 +51,7 @@
   var GOAL_EVENTS = [
     'session_start', 'ftue_step',
     'level_start', 'level_win', 'level_lose', 'level_quit', 'next_click', 'rescue', 'unwinnable',
-    'choice_shown', 'choice_pick', 'case_open', 'piece_view', 'fav_set', 'chest',
+    'choice_shown', 'choice_pick', 'case_open', 'piece_view', 'fav_set', 'chest', 'fav_ask', 'fav_result',
     'ad_offer', 'ad_click', 'ad_request', 'ad_result', 'ad_reward', 'ad_skip',
     'shop_open', 'noads_offer', 'buy_click', 'buy_result', 'grant',
     'coin_earn', 'coin_spend'
@@ -133,7 +133,8 @@
     return Object.keys(set);
   }
 
-  var FTUE_STEPS = [[1, 'first_move'], [2, 'first_delivery'], [3, 'first_win'], [4, 'first_next'], [5, 'third_win']];
+  var FTUE_STEPS = [[1, 'first_move'], [2, 'first_delivery'], [3, 'first_win'], [4, 'first_next'], [5, 'third_win'],
+    [6, 'first_choice'], [7, 'first_case'], [8, 'first_fav']];   // B2: первый выбор оправы, первая шкатулка, первое любимое
 
   /* ---------- окружение ---------- */
 

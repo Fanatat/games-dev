@@ -24,7 +24,11 @@
      gems        — буквы камней (для pieces.gems);
      restoreCur  — function(cur) -> true, если незаконченная партия цела;
      today       — номер дня установки для нового игрока (WSAnalytics.dayNumber());
-     ftueAll     — маска всех шагов первых минут (для игроков из v3 с победами).
+     ftueAll     — маска всех шагов первых минут (для игроков из v3 с победами);
+     metals      — металлы оправы (B2, необязательно): pieces/choice с другим
+                   металлом получают null (золото);
+     shapes      — { id уровня: [форма 1, форма 2] } (B2, необязательно):
+                   форма не из списка уровня — null (первая форма).
    ============================================================ */
 (function (root) {
   'use strict';
@@ -42,6 +46,12 @@
   function numIn(x, lo, hi) { return typeof x === 'number' && isFinite(x) && x >= lo && x <= hi; }
   function has(o, k) { return Object.prototype.hasOwnProperty.call(o, k); }
   function idOrNull(x) { return typeof x === 'string' && ID.test(x) ? x : null; }
+  // B2: металл и форма изделия; при ctx.metals / ctx.shapes — только из списка, иначе null
+  function metalOf(x, ctx) { var m = idOrNull(x); return m && (!ctx.metals || ctx.metals.indexOf(m) >= 0) ? m : null; }
+  function shapeOf(x, ctx, k) {
+    var f = idOrNull(x);
+    return f && (!ctx.shapes || (isObj(ctx.shapes) && Array.isArray(ctx.shapes[k]) && ctx.shapes[k].indexOf(f) >= 0)) ? f : null;
+  }
 
   function fresh(ctx) {
     var decor = {};
@@ -126,9 +136,9 @@
       if (!isObj(d.pieces)) return;
       keys.forEach(function (k) {
         var p = d.pieces[k];
-        if (!isObj(p)) return;
+        if (!isObj(p) || !out.stars[k]) return;      // изделие в шкатулке — только у пройденного уровня
         var gems = Array.isArray(p.gems) ? p.gems.filter(function (g) { return ctx.gems.indexOf(g) >= 0; }).slice(0, MAX_GEMS) : [];
-        out.pieces[k] = { metal: idOrNull(p.metal), shape: idOrNull(p.shape), gems: gems };
+        out.pieces[k] = { metal: metalOf(p.metal, ctx), shape: shapeOf(p.shape, ctx, k), gems: gems };
       });
     });
     field(function () {
@@ -136,11 +146,12 @@
       keys.forEach(function (k) {
         var c = d.choice[k];
         if (!isObj(c)) return;
-        var metal = idOrNull(c.metal), shape = idOrNull(c.shape);
+        var metal = metalOf(c.metal, ctx), shape = shapeOf(c.shape, ctx, k);
         if (metal || shape) out.choice[k] = { metal: metal, shape: shape };
       });
     });
-    field(function () { if (intIn(d.fav, 1, 1e6) && keys.indexOf(String(d.fav)) >= 0) out.fav = d.fav; });
+    // любимое — только пройденный уровень (его изделие лежит в шкатулке)
+    field(function () { if (intIn(d.fav, 1, 1e6) && keys.indexOf(String(d.fav)) >= 0 && out.stars[String(d.fav)]) out.fav = d.fav; });
     field(function () {
       if (!isObj(d.pay)) return;
       if (numIn(d.pay.cursor, 0, BIG)) out.pay.cursor = d.pay.cursor;

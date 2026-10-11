@@ -5,14 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="theme-color" content="#e8b4c2">
   <title>Мастерская украшений</title>
-  <meta name="ws-build" content="w42-87a1a52-20261011">
+  <meta name="ws-build" content="w43-fd11a68-20261011">
   <!-- Форк game3 «Мастерская украшений». Отдельная точка входа:
        main.js/board.js/style.css/платформенные адаптеры game3 НЕ подключены —
        ни рекламы, ни энергии, ни магазина, ни сейвов исходной игры.
        Поле — workshop_board.js, изделия — workshop_jewelry.js, правила —
        workshop_rules.js, звуки — workshop_sfx.js через sound.js game3. -->
-  <link rel="preload" href="workshop_assets/gems.webp?v=42" as="image" type="image/webp">
-  <link rel="stylesheet" href="workshop.css?v=42">
+  <link rel="preload" href="workshop_assets/gems.webp?v=43" as="image" type="image/webp">
+  <link rel="stylesheet" href="workshop.css?v=43">
+  <link rel="stylesheet" href="workshop_shop.css?v=43">
+  <link rel="stylesheet" href="workshop_case.css?v=43">
 </head>
 <body>
 
@@ -34,7 +36,7 @@
       <button id="ws-menu-coins" class="ws-coins" type="button" aria-label="Монеты"><span class="ws-coin-ico" aria-hidden="true"></span><span id="ws-menu-coins-n">0</span></button>
       <div class="ws-map-knobs">
         <button id="btn-noads" class="ws-round ws-pic ws-round-cream ws-map-knob hidden" aria-label="Без рекламы"></button>
-        <button id="btn-decor" class="ws-round ws-pic ws-round-cream ws-map-knob" aria-label="Убранство мастерской"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8c-5.2 0-9.3 3.9-9.3 9 0 5 4 9.3 9 9.3 1.3 0 2-.8 2-1.8 0-.5-.2-.9-.5-1.2-.3-.4-.5-.8-.5-1.3 0-1 .8-1.8 1.8-1.8h2.1c2.9 0 5.1-2.3 5.1-5.2 0-3.9-4-7-9.7-7z" fill="#e8b4c6" stroke="#9a4f74" stroke-width="1.6"/><circle cx="7.4" cy="11.6" r="1.7" fill="#f0507f"/><circle cx="10" cy="7.3" r="1.7" fill="#ffc83a"/><circle cx="15" cy="7.2" r="1.7" fill="#3ab88f"/><circle cx="18" cy="11" r="1.7" fill="#7f8cf0"/></svg></button>
+        <button id="btn-decor" class="ws-round ws-pic ws-round-cream ws-map-knob" aria-label="Лавка"></button>
         <button id="btn-sound" class="ws-round ws-pic ws-round-cream ws-map-knob" aria-label="Звук" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 9.2h3.6l5-4.2v14l-5-4.2H3.5z" fill="#c2733a" stroke="#8a4a1c" stroke-width="1.3" stroke-linejoin="round"/><path d="M15.2 8.8a4.6 4.6 0 0 1 0 6.4M17.9 6.2a8.3 8.3 0 0 1 0 11.6" fill="none" stroke="#8a4a1c" stroke-width="2.2" stroke-linecap="round"/></svg></button>
       </div>
     </div>
@@ -179,12 +181,16 @@
       <button id="btn-modal-ok" class="ws-btn ws-btn-primary">Понятно</button>
     </div>
   </div>
-  <!-- Убранство: стол и стекло (выдаются шкатулками коллекций) -->
-  <div id="decor-overlay" class="ws-win ws-modal hidden" role="dialog" aria-modal="true" aria-labelledby="ws-decor-kicker">
+  <!-- Лавка (B3, workshop_shop.js): единственное окно убранства — выбрать своё и купить за монеты.
+       Вкладки по видам, карточки-кнопки, одна главная кнопка: «готово» или «купить за N» -->
+  <div id="decor-overlay" class="ws-win ws-modal ws-shop hidden" role="dialog" aria-modal="true" aria-labelledby="ws-decor-kicker">
     <div class="ws-win-box">
-      <div class="ws-win-kicker" id="ws-decor-kicker">Убранство</div>
+      <div class="ws-win-kicker" id="ws-decor-kicker">Лавка</div>
+      <button id="btn-shop-x" class="ws-x" type="button" aria-label="Закрыть"></button>
+      <div class="ws-shop-coins" id="ws-shop-coins" role="status" aria-label="Монеты"><span class="ws-coin-ico" aria-hidden="true"></span><span id="ws-shop-coins-n">0</span></div>
+      <div class="ws-shop-tabs" id="ws-shop-tabs" role="tablist" aria-label="Что украсить"></div>
       <section class="ws-decor" id="ws-decor" aria-label="Убранство мастерской"></section>
-      <button id="btn-decor-ok" class="ws-play ws-decor-ok" aria-label="Готово"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.6 4.6L19 7.6" fill="none" stroke="#fff" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <button id="btn-decor-ok" class="ws-play ws-decor-ok" aria-label="Готово"><svg class="ws-shop-ok" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.6 4.6L19 7.6" fill="none" stroke="#fff" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="ws-shop-buy" aria-hidden="true"><span class="ws-coin-ico"></span><span id="ws-shop-price"></span></span></button>
     </div>
   </div>
   <!-- «Без рекламы»: три тарифа из каталога площадки (карточка и есть кнопка), крестик, срок и условия до покупки -->
@@ -211,17 +217,19 @@
   </div>
   <canvas id="confetti-canvas" class="ws-confetti" aria-hidden="true"></canvas>
 
-  <script>window.WS_CONFIG={"target":"web","platform":"mock","build":"w42-87a1a52-20261011","payServer":"","vkAppId":"","metrikaId":"","timeouts":{"bridgeMs":8000,"initMs":8000,"dialogMs":60000},"ads":{"preload":true,"banner":{"enabled":true,"phoneOnly":true,"portraitOnly":true,"location":"bottom","layout":"","heightType":"","fallbackHeight":60,"maxFailures":3},"interstitial":{"enabled":true,"minLevels":6,"intervalSec":180,"afterRewardedSec":180,"waitSec":30},"rewarded":{"enabled":true,"waitSec":30,"skipForNoAds":true}},"pay":{"pollSec":30,"orderWaitSec":600}};</script>
-  <script src="workshop_sfx.js?v=42"></script>
-  <script src="sound.js?v=42"></script>
-  <script src="confetti.js?v=42"></script>
-  <script src="workshop_rules.js?v=42"></script>
-  <script src="workshop_levels.js?v=42"></script>
-  <script src="workshop_board.js?v=42"></script>
-  <script src="workshop_jewelry.js?v=42"></script>
-  <script src="workshop_analytics.js?v=42"></script>
-  <script src="workshop_platform.js?v=42"></script>
-  <script src="workshop_save.js?v=42"></script>
-  <script src="workshop.js?v=42"></script>
+  <script>window.WS_CONFIG={"target":"web","platform":"mock","build":"w43-fd11a68-20261011","payServer":"","vkAppId":"","metrikaId":"","timeouts":{"bridgeMs":8000,"initMs":8000,"dialogMs":60000},"ads":{"preload":true,"banner":{"enabled":true,"phoneOnly":true,"portraitOnly":true,"location":"bottom","layout":"","heightType":"","fallbackHeight":60,"maxFailures":3},"interstitial":{"enabled":true,"minLevels":6,"intervalSec":180,"afterRewardedSec":180,"waitSec":30},"rewarded":{"enabled":true,"waitSec":30,"skipForNoAds":true}},"pay":{"pollSec":30,"orderWaitSec":600}};</script>
+  <script src="workshop_sfx.js?v=43"></script>
+  <script src="sound.js?v=43"></script>
+  <script src="confetti.js?v=43"></script>
+  <script src="workshop_rules.js?v=43"></script>
+  <script src="workshop_levels.js?v=43"></script>
+  <script src="workshop_board.js?v=43"></script>
+  <script src="workshop_jewelry.js?v=43"></script>
+  <script src="workshop_analytics.js?v=43"></script>
+  <script src="workshop_platform.js?v=43"></script>
+  <script src="workshop_save.js?v=43"></script>
+  <script src="workshop_shop.js?v=43"></script>
+  <script src="workshop_case.js?v=43"></script>
+  <script src="workshop.js?v=43"></script>
 </body>
 </html>

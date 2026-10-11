@@ -251,6 +251,104 @@ const WsJewel = (() => {
   /* Какое изделие рисуется на самом деле: вторая форма без загруженной картинки — первая форма. */
   const shown = (piece) => (ART[piece] && !SPRITE[piece] ? baseOf(piece) : piece);
 
+  /* ---------- металл (релиз 1.0, B2) ----------
+     Картинки нарисованы в жёлтом золоте. Розовое и белое золото — перекраска
+     кодом: пиксели золота (оттенок 5–70°, есть насыщенность) переносятся по
+     яркости на палитру металла, остальное (камни рисуются потом, тёмные
+     выемки, блики без цвета) остаётся как есть. Готовая картинка кэшируется на
+     пару изделие + металл. Где нет canvas (тесты в node) или картинку нельзя
+     прочитать — рисуется золото. */
+  const METALS = ['gold', 'rose', 'white'];
+  const PAL = {
+    rose: [[0, 52, 20, 18], [0.3, 122, 58, 48], [0.55, 196, 116, 98], [0.75, 236, 168, 150], [0.9, 255, 214, 200], [1, 255, 242, 236]],
+    white: [[0, 36, 40, 48], [0.3, 104, 110, 122], [0.55, 168, 175, 188], [0.75, 214, 219, 228], [0.9, 240, 243, 248], [1, 255, 255, 255]]
+  };
+  // крапаны и оправа кодом: светлое, среднее, тёмное
+  const TRIM = {
+    gold: ['#fff6d2', '#e6b552', '#8a561a'],
+    rose: ['#ffe9e0', '#e0a08c', '#7c3e30'],
+    white: ['#ffffff', '#c9ced8', '#5c6270']
+  };
+  let trim = TRIM.gold;
+  const LUT = {};
+  function lut(m) {
+    if (LUT[m]) return LUT[m];
+    const P = PAL[m], out = new Uint8ClampedArray(256 * 3);
+    for (let i = 0; i < 256; i++) {
+      const l = i / 255;
+      let k = 1;
+      while (k < P.length - 1 && P[k][0] < l) k++;
+      const a = P[k - 1], b = P[k], t = Math.max(0, Math.min(1, (l - a[0]) / ((b[0] - a[0]) || 1)));
+      for (let c = 0; c < 3; c++) out[i * 3 + c] = a[c + 1] + (b[c + 1] - a[c + 1]) * t;
+    }
+    return (LUT[m] = out);
+  }
+  /* Перекрасить пиксели RGBA (data) из золота в металл m. */
+  function recolor(data, m) {
+    const T = lut(m);
+    for (let i = 0; i < data.length; i += 4) {
+      if (!data[i + 3]) continue;
+      const r = data[i], gg = data[i + 1], b = data[i + 2];
+      const mx = Math.max(r, gg, b), mn = Math.min(r, gg, b);
+      if (mx === 0) continue;
+      const sat = (mx - mn) / mx;
+      let h = 0;
+      if (mx !== mn) {
+        const d = mx - mn;
+        h = mx === r ? ((gg - b) / d) % 6 : mx === gg ? (b - r) / d + 2 : (r - gg) / d + 4;
+        h *= 60; if (h < 0) h += 360;
+      }
+      // вес «золотости»: полный на 15–60° (тёмный красно-коричневый контур — тоже металл),
+      // нарастает с 5° и гаснет к 70°; бесцветные блики — наполовину
+      const wh = h < 15 ? Math.max(0, (h - 5) / 10) : h <= 60 ? 1 : Math.max(0, (70 - h) / 10);
+      const w = mx === mn ? 0.5 : wh * Math.min(1, sat / 0.12 + 0.5);
+      if (w <= 0) continue;
+      const l = Math.round(0.299 * r + 0.587 * gg + 0.114 * b), j = l * 3;
+      data[i] = r + (T[j] - r) * w;
+      data[i + 1] = gg + (T[j + 1] - gg) * w;
+      data[i + 2] = b + (T[j + 2] - b) * w;
+    }
+  }
+  const TINT = {};
+  function offscreen(img) {
+    if (typeof document === 'undefined' || !document.createElement) return null;
+    const c = document.createElement('canvas');
+    c.width = img.naturalWidth || img.width; c.height = img.naturalHeight || img.height;
+    const x = c.getContext && c.getContext('2d');
+    if (!x) return null;
+    x.drawImage(img, 0, 0);
+    return { c, x };
+  }
+  /* Картинка изделия в металле m (кэш); золото и неудача — исходная. */
+  function tinted(piece, img, m) {
+    if (!m || m === 'gold' || !PAL[m]) return img;
+    const key = piece + ':' + m;
+    if (!(key in TINT)) {
+      try {
+        const o = offscreen(img);
+        if (o) {
+          const d = o.x.getImageData(0, 0, o.c.width, o.c.height);
+          recolor(d.data, m);
+          o.x.putImageData(d, 0, 0);
+        }
+        TINT[key] = o ? o.c : null;
+      } catch (e) { TINT[key] = null; }
+    }
+    return TINT[key] || img;
+  }
+  /* Силуэт изделия: та же картинка, залитая цветом (кэш на пару изделие + цвет). */
+  function shadowed(piece, img, color) {
+    const key = piece + '#' + color;
+    if (!(key in TINT)) {
+      try {
+        const o = offscreen(img);
+        if (o) { o.x.globalCompositeOperation = 'source-in'; o.x.fillStyle = color; o.x.fillRect(0, 0, o.c.width, o.c.height); }
+        TINT[key] = o ? o.c : null;
+      } catch (e) { TINT[key] = null; }
+    }
+    return TINT[key];
+  }
+
   /* Загрузить картинки изделий; cb(piece) — после каждой (перерисовать). */
   function load(base, cb) {
     if (typeof Image === 'undefined') return;
@@ -276,6 +374,10 @@ const WsJewel = (() => {
   function gold(g, y0, y1, dim) {
     const grd = g.createLinearGradient(0, y0, 0, y1);
     if (dim) { grd.addColorStop(0, 'rgba(255,235,190,0.22)'); grd.addColorStop(1, 'rgba(255,235,190,0.12)'); return grd; }
+    if (trim !== TRIM.gold) {
+      grd.addColorStop(0, trim[0]); grd.addColorStop(0.35, trim[1]); grd.addColorStop(0.7, trim[2]); grd.addColorStop(1, trim[1]);
+      return grd;
+    }
     grd.addColorStop(0, '#fff1bf');
     grd.addColorStop(0.35, '#e6b95c');
     grd.addColorStop(0.7, '#a8742b');
@@ -327,7 +429,7 @@ const WsJewel = (() => {
     [[-1, -1], [1, -1], [1, 1], [-1, 1]].forEach(([sx, sy]) => {
       const px = sx * d, py = sy * d;
       const grd = g.createRadialGradient(px - pr * 0.4, py - pr * 0.45, pr * 0.1, px, py, pr);
-      grd.addColorStop(0, '#fff6d2'); grd.addColorStop(0.5, '#e6b552'); grd.addColorStop(1, '#8a561a');
+      grd.addColorStop(0, trim[0]); grd.addColorStop(0.5, trim[1]); grd.addColorStop(1, trim[2]);
       g.fillStyle = grd;
       g.beginPath(); g.arc(px, py, pr, 0, Math.PI * 2); g.fill();
     });
@@ -383,18 +485,32 @@ const WsJewel = (() => {
      изделие на витрине); opts.drawGem(g, type, x, y, size, alpha);
      opts.pop — { i, k }: i-й выданный камень только что встал (k 0..1);
      opts.closeup — крупный план (окно победы, холст только под изделие); число — предел
-     увеличения (по умолчанию 1,9). */
+     увеличения (по умолчанию 1,9);
+     opts.metal — 'gold' | 'rose' | 'white' (перекраска картинки, крапаны в цвет);
+     opts.shadow — цвет: силуэт по рисунку (та же картинка, залитая цветом, без камней). */
   function draw(g, piece, K, gems, box, opts) {
     opts = opts || {};
+    trim = TRIM[opts.metal] || TRIM.gold;
+    try { paint(g, piece, K, gems, box, opts); } finally { trim = TRIM.gold; }
+  }
+  function paint(g, piece, K, gems, box, opts) {
     piece = shown(piece);
-    const sil = !!opts.silhouette, img = !sil && artOf(piece);
+    const sil = !!opts.silhouette || (!!opts.shadow && !artOf(piece)), img = !sil && artOf(piece);
+    if (img && opts.shadow) {   // силуэт по рисунку: без камней и тени
+      const sh = shadowed(piece, img, opts.shadow);
+      if (sh) {
+        const f = place(piece, box, opts.closeup ? ART_CAP : 0);
+        g.drawImage(sh, f.x0, f.y0, f.w, f.h);
+        return;
+      }
+    }
     if (img) {
       const f = place(piece, box, opts.closeup ? ART_CAP : 0);
       g.save();
       g.imageSmoothingEnabled = true;
       g.imageSmoothingQuality = 'high';
       g.shadowColor = 'rgba(70,24,40,0.35)'; g.shadowBlur = Math.max(2, f.s * 9); g.shadowOffsetY = Math.max(1, f.s * 3);
-      g.drawImage(img, f.x0, f.y0, f.w, f.h);
+      g.drawImage(tinted(piece, img, opts.metal), f.x0, f.y0, f.w, f.h);
       g.shadowColor = 'rgba(0,0,0,0)'; g.shadowBlur = 0; g.shadowOffsetY = 0;
       setStones(g, artGroups(piece, K, f), groupsOf(piece).sy || 1, gems, opts);
       g.restore();
@@ -462,5 +578,8 @@ const WsJewel = (() => {
     g.restore();
   }
 
-  return { PIECES, ART, GROUPS, design, sockets, draw, shine, load };
+  /* Сколько камней изделия видно (групп мест) при K заказах. */
+  const visible = (piece, K) => Math.max(1, Math.min(K, groupsOf(ART[piece] ? piece : baseOf(piece)).g.length));
+
+  return { PIECES, ART, GROUPS, METALS, design, sockets, draw, shine, load, recolor, visible, ready: (p) => !!SPRITE[p] };
 })();

@@ -99,9 +99,8 @@ button:focus-visible { outline: 3px solid rgba(240, 97, 143, 0.9); outline-offse
 #btn-restart, #btn-lose-again { --pic: url(workshop_assets/ui_restart.webp); }
 #btn-again { --pic: url(workshop_assets/ui_replay.webp); }
 #btn-win-menu { background: url(workshop_assets/ui_case.webp) 50% 46% / 62% no-repeat, url(workshop_assets/ui_badge.webp) center / contain no-repeat; }
-#btn-decor { --pic: url(workshop_assets/ui_badge.webp); }
+#btn-decor { --pic: url(workshop_assets/ui_shop.webp); }   /* лавка (B3): окно убранства и покупки */
 #btn-noads, #btn-win-noads { --pic: url(workshop_assets/ui_noads.webp); }
-#btn-decor > svg { display: block; width: 58%; height: 58%; }
 
 /* ---------- кнопки-пилюли ---------- */
 .ws-btn {
@@ -865,6 +864,7 @@ body.is-owner .ws-price.is-video { background-image: url(workshop_assets/ui_crow
   .ws-orders[data-n="3"] { --face: 48px; --bubble: 40px; }
   .ws-actions .ws-round { width: 50px; height: 50px; }
   .ws-actions { padding: 2px 0 7px; }
+  .ws-price.is-video { bottom: -5px; }   /* значок видео у подсказки (монет < 25) не заходит на баннер (B3) */
 }
 @media (max-width: 380px) {
   .ws-header { grid-template-columns: 92px 1fr 92px; }

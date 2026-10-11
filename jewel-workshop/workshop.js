@@ -81,7 +81,7 @@
      cushion  — подушка изделия на поле, pedestal — тумба на карте: картинка
                 workshop_assets/<img>.webp (CSS-переменные --ws-cushion/--ws-pedestal).
      swatch — образец в окне убранства и в шкатулке.
-     price  — цена в лавке (монеты, 300–1500, workshop_shop.js). У каждой вещи ровно
+     price  — цена в лавке (монеты, 1000–3000, workshop_shop.js). У каждой вещи ровно
               один источник: шкатулка, лавка (price) или набор (set). */
   const DECOR = {
     cloth: [
@@ -89,8 +89,8 @@
       { id: 'emerald', name: 'Изумрудный бархат', swatch: '#1f6b4d', velvet: ['#3aa27a', '#23795a', '#144a37'] },
       { id: 'wine', name: 'Винный бархат', swatch: '#74203a', velvet: ['#b8406a', '#8a2850', '#4e1430'] },
       { id: 'navy', name: 'Синий бархат', swatch: '#22346a', velvet: ['#4a66b8', '#2e4485', '#18244e'] },
-      { id: 'blush', name: 'Пудровый бархат', swatch: '#c26f8c', velvet: ['#eaa6bc', '#c97391', '#8a3c5a'], price: 800 },
-      { id: 'noir', name: 'Чёрный бархат', swatch: '#2b2631', velvet: ['#55505e', '#2f2a36', '#121016'], price: 1000 },
+      { id: 'blush', name: 'Пудровый бархат', swatch: '#c26f8c', velvet: ['#eaa6bc', '#c97391', '#8a3c5a'], price: 1400 },
+      { id: 'noir', name: 'Чёрный бархат', swatch: '#2b2631', velvet: ['#55505e', '#2f2a36', '#121016'], price: 1800 },
       { id: 'royal', name: 'Королевский бархат', swatch: '#5a2380', set: 'royal',
         velvet: ['#8e4cc0', '#5f2788', '#2e0f4a'], rim: 'rgba(255, 206, 92, 0.95)' }
     ],
@@ -99,22 +99,22 @@
       { id: 'sea', name: 'Морское стекло', swatch: '#8fe0d8', tint: '170,240,230', rim: '215,255,248' },
       { id: 'rose', name: 'Розовое стекло', swatch: '#f2a7bd', tint: '255,196,214', rim: '255,226,236' },
       { id: 'royal', name: 'Королевское стекло', swatch: '#b49cf0', tint: '210,184,255', rim: '255,232,170' },
-      { id: 'sky', name: 'Голубое стекло', swatch: '#b4d4fa', tint: '186,216,255', rim: '226,240,255', price: 400 },
-      { id: 'mint', name: 'Мятное стекло', swatch: '#b4eec4', tint: '196,248,212', rim: '230,255,236', price: 600 },
+      { id: 'sky', name: 'Голубое стекло', swatch: '#b4d4fa', tint: '186,216,255', rim: '226,240,255', price: 1000 },
+      { id: 'mint', name: 'Мятное стекло', swatch: '#b4eec4', tint: '196,248,212', rim: '230,255,236', price: 1200 },
       { id: 'crystal', name: 'Королевский хрусталь', swatch: '#f3d27a', tint: '255,228,165', rim: '255,198,72', set: 'royal' }
     ],
     cushion: [
       { id: 'classic', name: 'Бархатная подушка', img: 'cushion' },
-      { id: 'lavender', name: 'Лавандовая подушка', img: 'cushion_lavender', price: 1000 },
-      { id: 'peach', name: 'Персиковая подушка', img: 'cushion_peach', price: 1200 },
-      { id: 'mint', name: 'Мятная подушка', img: 'cushion_mint', price: 1300 },
-      { id: 'black', name: 'Чёрная подушка', img: 'cushion_black', price: 1500 },
+      { id: 'lavender', name: 'Лавандовая подушка', img: 'cushion_lavender', price: 1500 },
+      { id: 'peach', name: 'Персиковая подушка', img: 'cushion_peach', price: 1600 },
+      { id: 'mint', name: 'Мятная подушка', img: 'cushion_mint', price: 1700 },
+      { id: 'black', name: 'Чёрная подушка', img: 'cushion_black', price: 2500 },
       { id: 'royal', name: 'Королевская подушка', img: 'cushion_royal', set: 'royal' }
     ],
     pedestal: [
       { id: 'classic', name: 'Бархатная тумба', img: 'pedestal' },
       { id: 'marble', name: 'Мраморная тумба', img: 'pedestal_marble' },
-      { id: 'mint', name: 'Мятная тумба', img: 'pedestal_mint', price: 1400 },
+      { id: 'mint', name: 'Мятная тумба', img: 'pedestal_mint', price: 3000 },
       { id: 'royal', name: 'Королевский пьедестал', img: 'pedestal_royal', set: 'royal' }
     ]
   };
@@ -373,13 +373,15 @@
   const rewardOn = () => booted && (ownerSkip() || WSPlatform.supports('rewarded'));
 
   const rewardBusy = {};   // место → ролик идёт (повторное нажатие не считается)
-  const rewardLate = {};   // место → выдача ждёт позднего подтверждения сторожа (onLateReward)
+  const rewardLate = {};   // место → [{ id, grant, t0, level }]: выдачи ждут позднего подтверждения сторожа (onLateReward)
 
   /* Видео за награду на месте place (win_x2, lose_moves, hint). grant() выдаёт
      награду и возвращает её размер. Ровно одна выдача на запрос: по ответу
      {rewarded:true}, по позднему подтверждению после таймаута или сразу —
      владельцу «Без рекламы». Нет ролика, таймаут, ошибка — «Видео сейчас нет»;
-     закрыл сам — ничего. ad_request/ad_result пишет onPlatformEvent. */
+     закрыл сам — ничего; занято (ждём ответ на прошлый ролик) — ничего.
+     Ожидание поздней награды не стирается новым нажатием: каждое — по своему
+     id запроса и ровно один раз (ревью 1.0, P1-1). ad_request/ad_result пишет onPlatformEvent. */
   function rewardAd(place, grant) {
     if (rewardBusy[place]) return;
     const level = L ? L.id : 0;
@@ -391,7 +393,6 @@
       return;
     }
     rewardBusy[place] = true;
-    delete rewardLate[place];
     const t0 = Date.now();
     refreshAdButtons();
     WSPlatform.showRewarded(place).then((res) => {
@@ -400,18 +401,21 @@
         const amount = grant();
         track('ad_reward', { place, format: 'reward', ms: Date.now() - t0, late: 0, amount, level });
       } else {
-        if (res.reason === 'timeout') rewardLate[place] = { grant, t0, level };
+        if (res.reason === 'timeout') (rewardLate[place] = rewardLate[place] || []).push({ id: res.id, grant, t0, level });
         if (res.reason === 'no_ads' || res.reason === 'timeout' || res.reason === 'error') toast(VIDEO_NONE, 1800);
       }
       refreshAdButtons();
     });
   }
 
-  // ролик досмотрен после таймаута сторожа: награда того же запроса, один раз
-  function onLateReward(place) {
-    const job = rewardLate[place];
-    if (!job) return;
-    delete rewardLate[place];
+  // ролик досмотрен после таймаута сторожа: награда того же запроса (по id), один раз
+  function onLateReward(place, id) {
+    const jobs = rewardLate[place];
+    if (!jobs || !jobs.length) return;
+    const i = id == null ? 0 : jobs.findIndex(j => j.id === id);
+    if (i < 0) return;
+    const job = jobs.splice(i, 1)[0];
+    if (!jobs.length) delete rewardLate[place];
     const amount = job.grant();
     track('ad_reward', { place, format: 'reward', ms: Date.now() - job.t0, late: 1, amount, level: job.level });
   }
@@ -508,6 +512,13 @@
   let noadsFrom = 'map';
   let buyBusy = false;
   let paySyncs = 0;        // завершённых сверок покупок (для проверок: __ws.state().paySyncs)
+  /* Оплата прошла, а зачисления ещё нет (ВК сообщил серверу позже опроса): повторная сверка при возврате
+     из сворачивания и раз в PAY_RETRY_MS, пока покупка не зачислится (ревью 1.0, P2-1). 401 от сервера —
+     подпись запуска истекла (живёт 24 ч): «Перезапустите игру», покупка сохранена на сервере (P2-6). */
+  const PAY_RETRY_MS = 3 * 60 * 1000;
+  const RESTART_TEXT = 'Перезапустите игру';
+  let payPending = false;
+  let payRetryTimer = 0;
   const payOn = () => booted && catalog.length > 0 && WSPlatform.supports('payments');
 
   function paySync(source, fetch) {
@@ -515,6 +526,7 @@
       const res = await fetch(Store.data.pay.cursor);
       const rows = res && Array.isArray(res.purchases) ? res.purchases : [];
       const out = WorkshopSave.applyRows(Store.data, rows, Store.ctx);
+      out.authLost = !!(res && res.error === 'http_401');
       if (out.ids.length) {
         await Store.flush();               // курсор и права записаны до подтверждения
         await WSPlatform.confirm(out.ids);
@@ -534,6 +546,24 @@
     }).then((out) => { paySyncs++; return out; });
     payChain = job;
     return job;
+  }
+
+  // ждём зачисления: повтор по таймеру (и по возврату в игру — onPlatformResume)
+  function payWait() {
+    payPending = true;
+    if (!payRetryTimer) payRetryTimer = setInterval(() => payRetry(), PAY_RETRY_MS);
+  }
+  function payDone() {
+    payPending = false;
+    if (payRetryTimer) { clearInterval(payRetryTimer); payRetryTimer = 0; }
+  }
+  function payRetry() {
+    if (!payPending || buyBusy) return;
+    paySync('restore', (c) => WSPlatform.purchases(c)).then((out) => {
+      if (!payPending) return;
+      if (out.grants.length) { payDone(); toast('Покупка зачислена', 2400); }
+      else if (out.authLost) { payDone(); toast(RESTART_TEXT, 3200); }
+    });
   }
 
   function refreshOwner() {
@@ -606,8 +636,9 @@
     track('buy_result', { product: p.id, price: p.votes, result, code: result === 'ok' ? '' : reason, ms: Date.now() - t0 });
     if (r.status === 'paid') {
       const out = await paySync('purchase', (c) => WSPlatform.waitPurchases(c));
-      if (out.grants.length) { closeNoads(); showThanks(out); }
-      else toast('Зачислим чуть позже', 2600);
+      if (out.grants.length) { payDone(); closeNoads(); showThanks(out); }
+      else if (out.authLost) toast(RESTART_TEXT, 3200);   // покупка в журнале сервера, придёт при запуске
+      else { toast('Зачислим чуть позже', 2600); payWait(); }
     } else if (r.status === 'error') toast('Оплата не прошла', 2000);
     btns.forEach(b => { b.disabled = false; });
     buyBusy = false;
@@ -637,10 +668,72 @@
     ['screen-menu', 'screen-workshop'].forEach(s => $(s).classList.toggle('active', s === id));
   }
 
+  /* Место тоста (D-2). Тост не закрывает главную кнопку открытого окна (лавка, шкатулка, тарифы, выбор оправы):
+     он встаёт над окном, под окном или у верхнего края — где нет кнопок окна. На экране уровня тост встаёт в верхний
+     ряд, между кнопкой «назад» с подписью и монетами со звёздами: поле и кнопки внизу он не закрывает. На карте
+     остаётся место из CSS (над кнопкой «Играть»). */
+  function placeToast(el) {
+    ['top', 'bottom', 'left', 'maxWidth', 'marginBottom', 'whiteSpace', 'width'].forEach(k => { el.style[k] = ''; });
+    el.classList.remove('is-tight');
+    const vw = innerWidth, vh = innerHeight;
+    const R = (e) => e.getBoundingClientRect();
+    const shown = (e) => { const r = R(e); return !!e && r.width > 0 && r.height > 0; };
+    const meet = (a, b, pad) => a.left < b.right + pad && b.left < a.right + pad && a.top < b.bottom + pad && b.top < a.bottom + pad;
+    const h = el.offsetHeight, w = el.offsetWidth;   // без масштаба появления
+    const banner = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ws-banner-h')) || 0;
+    const open = [...document.querySelectorAll('.ws-win:not(.hidden)')].filter(shown).pop();
+    if (open) {
+      const box = open.querySelector('.ws-win-box') || open, bb = R(box);
+      const btns = [...open.querySelectorAll('button, a')].filter(shown).map(R);
+      const cands = [bb.top - h - 8, bb.bottom + 8, 8];
+      const fits = (t) => t >= 4 && t + h <= vh - banner - 4;
+      const free = (t) => { const r = { left: (vw - w) / 2, right: (vw + w) / 2, top: t, bottom: t + h }; return !btns.some(b => meet(r, b, 4)); };
+      const top = cands.find(t => fits(t) && free(t));
+      el.style.bottom = 'auto'; el.style.marginBottom = '0';
+      el.style.top = Math.round(top !== undefined ? top : 8) + 'px';
+      return;
+    }
+    if (screen !== 'game') return;
+    const head = document.querySelector('.ws-header');
+    if (!head) return;
+    const hr = R(head), top = Math.max(4, hr.top + 4);
+    if (innerWidth > innerHeight && innerHeight <= 520) {         // телефон лёжа: поле справа, слева заказчицы — тост под ними
+      const op = R(document.querySelector('.ws-orders-panel'));
+      el.style.bottom = 'auto'; el.style.marginBottom = '0';
+      el.style.top = Math.round(op.bottom + 8) + 'px'; el.style.left = Math.round((op.left + op.right) / 2) + 'px';
+      el.style.maxWidth = Math.round(op.width) + 'px'; el.style.whiteSpace = 'normal'; el.style.width = 'max-content';
+      return;
+    }
+    // верхний ряд между кнопкой «назад» с подписью и монетами со звёздами; высота тоста зависит от ширины ряда,
+    // поэтому ряд пересчитывается по настоящей высоте (до трёх заходов)
+    el.style.bottom = 'auto'; el.style.marginBottom = '0';
+    el.style.top = Math.round(top) + 'px';
+    el.style.whiteSpace = 'normal'; el.style.width = 'max-content';
+    let hh = 60;
+    for (let pass = 0; pass < 3; pass++) {
+      let left = hr.left, right = hr.right;
+      ['btn-back', 'ws-level-title', 'ws-moves', 'ws-coins', 'ws-stars'].forEach(id => {
+        const e = $(id);
+        if (!e || !shown(e)) return;
+        const r = R(e);
+        if (r.top >= top + hh || r.bottom <= top) return;
+        if ((r.left + r.right) / 2 < vw / 2) left = Math.max(left, r.right + 6); else right = Math.min(right, r.left - 6);
+      });
+      const width = Math.max(96, Math.round(right - left));
+      el.classList.toggle('is-tight', width < 170);
+      el.style.left = Math.round((left + right) / 2) + 'px';
+      el.style.maxWidth = width + 'px';
+      const now = el.offsetHeight;
+      if (now <= hh) break;
+      hh = now;
+    }
+  }
+
   function toast(msg, ms) {
     const el = $('hint-toast');
     el.textContent = msg;
     el.classList.remove('hidden');
+    placeToast(el);
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => el.classList.add('hidden'), ms || 2600);
   }
@@ -1352,7 +1445,7 @@
     hideToast();
     $('win-overlay').classList.add('hidden');
     $('lose-overlay').classList.add('hidden');
-    $('ws-level-title').textContent = 'Уровень ' + L.id;
+    $('ws-level-n').textContent = String(L.id);
     $('ws-level-name').textContent = L.name;
     document.body.classList.toggle('is-hard', !!L.hard);
     showScreen('screen-workshop');
@@ -2664,6 +2757,7 @@
     // пауза — от площадки (вкладка скрыта, свернули, реклама, оплата)
     WSPlatform.onPause(onPause);
     WSPlatform.onResume(onResume);
+    WSPlatform.onResume((src) => { if (src === 'view' || src === 'doc') payRetry(); });
     WSPlatform.onLateReward(onLateReward);
     WSPlatform.onEvent(onPlatformEvent);
     // любое окно открылось или закрылось — баннер прячется или возвращается
@@ -2707,6 +2801,10 @@
     Store.load(raw);
     Store.data.sessions++;
     Store.save();
+    /* ?level=N — открыть уровень сразу (проверки и отладка; замок не действует). Только вне пакета ВК
+       (ревью 1.0, P2-2): игрок ВК не обходит замок уровней адресом. Читается до WSAnalytics.init — та
+       очищает адрес от параметров запуска ВК (P0-2). */
+    const startLevel = (window.WS_CONFIG || {}).target === 'vk' ? null : /[?&]level=(\d+)/.exec(location.search);
     WSAnalytics.init({ install: Store.data.install, sessions: Store.data.sessions });
     track('session_start', { coins: Store.data.coins, passed: Object.keys(Store.data.stars).length });
     document.body.classList.toggle('is-owner', isOwner());
@@ -2716,9 +2814,7 @@
     renderMenu();
     booted = true;
     syncBanner();
-    // ?level=N — открыть уровень сразу (проверки и отладка; замок не действует)
-    const q = /[?&]level=(\d+)/.exec(location.search);
-    if (q && LEVELS[+q[1] - 1]) loadLevel(+q[1] - 1);
+    if (startLevel && LEVELS[+startLevel[1] - 1]) loadLevel(+startLevel[1] - 1);
     try { catalog = (await WSPlatform.catalog()) || []; } catch (e) { catalog = []; }
     refreshOwner();
     const out = await paySync('restore', (c) => WSPlatform.purchases(c));
@@ -2773,7 +2869,7 @@
         catalog: catalog.length, payOn: payOn(), rewardOn: rewardOn(), paused: !!pauseAt,
         banner: (() => { try { return WSPlatform.state().bannerHeight; } catch (e) { return 0; } })(),
         bannerWanted, rewardBusy: Object.keys(rewardBusy).filter(k => rewardBusy[k]),
-        rewardLate: Object.keys(rewardLate), paySyncs,
+        rewardLate: Object.keys(rewardLate), paySyncs, payPending,
         b2: b2('state') || null
       };
     },

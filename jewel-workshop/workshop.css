@@ -523,6 +523,7 @@ body.is-hard .ws-moves.is-low { animation: wsBump 0.5s ease-out; background: lin
   margin-bottom: var(--ws-banner-h, 0px);   /* над баннером при любой высоте из медиа-запросов */
   animation: wsToast 0.22s cubic-bezier(.2, 1.4, .5, 1);
 }
+.ws-toast.is-tight { padding: 6px 12px; font-size: 0.88rem; line-height: 1.2; border-radius: 16px; }   /* узкий верхний ряд (320 px) */
 @keyframes wsToast { from { transform: translate(-50%, 8px) scale(0.9); opacity: 0; } to { transform: translateX(-50%); opacity: 1; } }
 
 /* ---------- окна: победа (образ 02), «ходы кончились», карточки ---------- */
@@ -930,6 +931,23 @@ body.is-owner .ws-price.is-video { background-image: url(workshop_assets/ui_crow
   .ws-tariff-days { font-size: 1rem; }
   .ws-tariff-price { height: 26px; font-size: 1rem; }
   .ws-thanks-pic { width: 84px; height: 64px; }
+}
+
+/* ---------- подпись уровня на низком экране (D-1) ----------
+   Под кнопкой «назад» подпись «Уровень N» наезжала на портрет и корону первой заказчицы (360×640 с баннером, 320×568,
+   лёжа). На низком экране вместо неё — только «N» в плашке справа от кнопки «назад»; на «Сложном заказе» там же — плашка
+   ходов. Слово «Уровень» остаётся для чтения с экрана. Выше и шире — прежняя подпись под кнопкой: там заказчицы ниже. */
+@media (max-height: 700px) and (orientation: portrait), (orientation: landscape) and (max-height: 520px) {
+  .ws-head-side:not(.ws-head-right) { position: relative; --lv-left: 60px; --lv-top: 14px; }
+  .ws-level-pill {
+    position: absolute; left: var(--lv-left); top: var(--lv-top); box-sizing: border-box; min-width: 28px; height: 26px; padding: 0 7px;
+    display: flex; align-items: center; justify-content: center; border-radius: 13px; font-size: 1rem; line-height: 1;
+  }
+  .ws-lv-w { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); }
+  body.is-hard .ws-moves { position: absolute; left: var(--lv-left); top: var(--lv-top); }
+}
+@media (orientation: landscape) and (max-height: 520px) {
+  .ws-head-side:not(.ws-head-right) { --lv-left: 54px; --lv-top: 11px; }
 }
 
 /* ---------- большой экран ---------- */

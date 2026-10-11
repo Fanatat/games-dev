@@ -24,7 +24,7 @@
  *   onPause(cb(reason)) / onResume(cb(reason))   reason: view | doc | ad | buy
  *   banner: { show(), hide(), height() -> px, onChange(cb(px)) }
  *   showInterstitial(placement) -> Promise<{shown, reason}>
- *   showRewarded(placement) -> Promise<{rewarded, reason}>; onLateReward(cb(placement))
+ *   showRewarded(placement) -> Promise<{rewarded, reason, id}>; onLateReward(cb(placement, id))
  *   catalog() -> Promise<[{id, votes, days, royal, title}]>   ([] — покупок нет)
  *   buy(id) -> Promise<{status: 'paid'|'cancel'|'error', reason}>  НЕ выдача!
  *   purchases(after) -> Promise<{purchases: [...], more}>      журнал сервера
@@ -44,6 +44,7 @@
   var VERSION = 1;
   var DEFAULT_SAVE_KEY = 'jewel_workshop.v2';
   var MAX_PAGES = 10;                 // страниц журнала покупок за один purchases()
+  var CONFIRM_CHUNK = 100;            // строк в одном подтверждении: сервер принимает не больше 100 (CONFIRM_MAX)
   var POLL_STEPS = [0, 2000, 3000, 5000, 8000, 12000];   // паузы опроса после окна покупки (сумма 30 с)
 
   // Значения по умолчанию; workshop_config.json (через WS_CONFIG) их перекрывает.
@@ -60,7 +61,7 @@
       banner: { enabled: true, phoneOnly: true, portraitOnly: true, location: 'bottom', layout: '',
                 heightType: '', fallbackHeight: 60, maxFailures: 3 },
       interstitial: { enabled: true, minLevels: 6, intervalSec: 180, afterRewardedSec: 180, waitSec: 30 },
-      rewarded: { enabled: true, waitSec: 30 }
+      rewarded: { enabled: true, waitSec: 180 }   // ролик ВК 30 с + загрузка; сторож с запасом (ревью 1.0, P1-1)
     },
     pay: { pollSec: 30, orderWaitSec: 600 }
   };
@@ -204,6 +205,7 @@
     var bannerH = 0;
     var lastInterstitialAt = 0, lastRewardedAt = 0;
     var rewardedReq = null, interstitialBusy = false, rwSeq = 0;
+    var rewardedLate = null;   // запрос, отпущенный сторожем, а ответ площадки ещё не пришёл (ролик может идти)
     var buying = null;
 
     function warn(msg) { try { if (root.console) root.console.warn('[ws-platform] ' + msg); } catch (e) { /* нет консоли */ } }
@@ -216,8 +218,8 @@
       listeners[name].push(cb);
       return function off() { var i = listeners[name].indexOf(cb); if (i >= 0) listeners[name].splice(i, 1); };
     }
-    function emit(name, arg) {
-      listeners[name].slice().forEach(function (cb) { try { cb(arg); } catch (e) { warn(name + ': ' + e); } });
+    function emit(name, arg, arg2) {
+      listeners[name].slice().forEach(function (cb) { try { cb(arg, arg2); } catch (e) { warn(name + ': ' + e); } });
     }
     function event(e) { emit('event', e); }
     // Обёртка с таймаутом: промис не висит дольше ms. Ответ, пришедший после
@@ -349,7 +351,7 @@
 
     function runInterstitial(placement) {
       var ic = cfg.ads.interstitial;
-      if (interstitialBusy || rewardedReq) return Promise.resolve({ shown: false, reason: 'busy' });
+      if (interstitialBusy || rewardedReq || rewardedLate) return Promise.resolve({ shown: false, reason: 'busy' });
       if (!ic.enabled || !impl.requestInterstitial || !impl.supports('interstitial')) return Promise.resolve({ shown: false, reason: 'off' });
       var t = now();
       if (lastInterstitialAt && t - lastInterstitialAt < num(ic.intervalSec, 180) * 1000) return Promise.resolve({ shown: false, reason: 'interval' });
@@ -371,36 +373,59 @@
       });
     }
 
-    // Видео за награду со сторожем: игра ждёт не дольше rewarded.waitSec;
+    // Видео за награду со сторожем: игра ждёт не дольше rewarded.waitSec (180 с);
     // поздний result:true того же запроса засчитывается ровно один раз через
-    // onLateReward(placement). Повторный клик по тому же месту — тот же промис.
+    // onLateReward(placement, id), id — тот же, что в ответе. Повторный клик по
+    // тому же месту — тот же промис. После сторожа, пока площадка не ответила
+    // (ролик может ещё идти, не дольше rewarded.lateSec, по умолчанию = waitSec),
+    // пауза и спрятанный баннер держатся, а новые ролики отвечают busy — второй
+    // запрос в ВК не уходит (ревью 1.0, P1-1).
     function runRewarded(placement) {
       var rc = cfg.ads.rewarded;
       if (rewardedReq) return rewardedReq.placement === placement ? rewardedReq.promise : Promise.resolve({ rewarded: false, reason: 'busy' });
-      if (interstitialBusy) return Promise.resolve({ rewarded: false, reason: 'busy' });
+      if (interstitialBusy || rewardedLate) return Promise.resolve({ rewarded: false, reason: 'busy' });
       if (!rc.enabled || !impl.requestRewarded || !impl.supports('rewarded')) return Promise.resolve({ rewarded: false, reason: 'off' });
       var id = ++rwSeq;
       var t = now();
-      var lateDone = false;
+      var lateDone = false, settled = false, holding = false, lateT = null;
+      var waitMs = num(rc.waitSec, 180) * 1000;
       var req = { placement: placement, id: id };
+      function release() {                       // ответ после сторожа пришёл или вышел срок ожидания
+        if (!holding) return;
+        holding = false;
+        cancel(lateT);
+        if (rewardedLate === req) rewardedLate = null;
+        endFullscreen('ad');
+      }
       event({ type: 'ad_request', format: 'rewarded', placement: placement });
       req.promise = fullscreen('ad').then(function () {
-        return withTimeout(impl.requestRewarded(placement), num(rc.waitSec, 30) * 1000, function (d) {
-          if (lateDone || !d || d.result !== true) return;
-          lateDone = true;
-          lastRewardedAt = now();
-          event({ type: 'ad_late_reward', format: 'rewarded', placement: placement, ms: now() - t });
-          emit('late', placement);
+        return withTimeout(impl.requestRewarded(placement), waitMs, function (d) {
+          settled = true;
+          if (!lateDone && d && d.result === true) {
+            lateDone = true;
+            lastRewardedAt = now();
+            event({ type: 'ad_late_reward', format: 'rewarded', placement: placement, ms: now() - t });
+            emit('late', placement, id);
+          }
+          release();
         });
       }).then(function (d) {
+        settled = true;
         if (d && d.result === true) { lastRewardedAt = now(); return { rewarded: true, reason: 'ok' }; }
         return { rewarded: false, reason: 'closed' };
       }, function (e) {
-        return { rewarded: false, reason: adReason(e) };
+        var reason = adReason(e);
+        if (reason === 'timeout' && !settled) {
+          holding = true;
+          rewardedLate = req;
+          lateT = later(release, num(rc.lateSec, num(rc.waitSec, 180)) * 1000);
+        } else settled = true;
+        return { rewarded: false, reason: reason };
       }).then(function (res) {
         if (rewardedReq === req) rewardedReq = null;
-        endFullscreen('ad');
+        if (!holding) endFullscreen('ad');
         event({ type: 'ad_result', format: 'rewarded', placement: placement, ok: res.rewarded, reason: res.reason, ms: now() - t });
+        res.id = id;
         return res;
       });
       rewardedReq = req;
@@ -502,7 +527,7 @@
         var i = 0;
         function step() {
           return purchases(after).then(function (res) {
-            if (res.purchases.length) return res;
+            if (res.purchases.length || res.error === 'http_401') return res;   // 401: подпись запуска истекла — ждать нечего
             i++;
             if (i >= POLL_STEPS.length || now() - t0 + POLL_STEPS[i] > limit) return res;
             return delay(POLL_STEPS[i]).then(step);
@@ -510,12 +535,21 @@
         }
         return step();
       },
+      // Порциями по CONFIRM_CHUNK по очереди (ревью 1.0, P2-3); true — все порции приняты.
       confirm: function (ids) {
         var list = (Array.isArray(ids) ? ids : []).map(Number).filter(function (x) { return isFinite(x); });
         if (!list.length) return Promise.resolve(true);
         return init().then(function () {
           if (!impl.confirm || !impl.supports('payments')) return false;
-          return impl.confirm(list);
+          var all = true, i = 0;
+          function next() {
+            if (i >= list.length) return all;
+            var part = list.slice(i, i + CONFIRM_CHUNK);
+            i += CONFIRM_CHUNK;
+            return Promise.resolve().then(function () { return impl.confirm(part); })
+              .then(function (ok) { if (ok === false) all = false; }, function () { all = false; }).then(next);
+          }
+          return next();
         }).then(function (ok) { return ok !== false; }, function () { return false; });
       },
       entitlements: function () {
@@ -537,7 +571,8 @@
         return {
           kind: kind, initDone: initDone, info: initInfo, paused: anyPaused(), pause: merge(pauseSrc, {}),
           firstAction: firstAction, bannerHeight: bannerH, lastInterstitialAt: lastInterstitialAt,
-          lastRewardedAt: lastRewardedAt, rewardedBusy: !!rewardedReq, interstitialBusy: interstitialBusy,
+          lastRewardedAt: lastRewardedAt, rewardedBusy: !!rewardedReq, rewardedLate: !!rewardedLate,
+          interstitialBusy: interstitialBusy,
           impl: impl.state ? impl.state() : null, save: impl.store ? impl.store.info() : null
         };
       },
@@ -662,7 +697,7 @@
     var DAY = 86400000;
 
     function adsOn() { return adsMode !== '0'; }
-    function slowMs() { return num(cfg.ads.rewarded.waitSec, 30) * 1000 + 3000; }
+    function slowMs() { return num(cfg.ads.rewarded.waitSec, 180) * 1000 + 3000; }
     function journal() {
       try {
         var o = JSON.parse(core.lsGet(MOCK_PAY_KEY) || 'null');

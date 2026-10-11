@@ -30,6 +30,22 @@
    нет: ID пользователя ВК и любые ключи, похожие на ID/имя, не
    отправляются.
 
+   Адрес страницы (ревью 1.0, P0-2). ВК открывает игру по адресу
+   index.html?vk_user_id=…&vk_ts=…&sign=… — это ID игрока и подпись запуска.
+   Метрика сама берёт адрес страницы (просмотр) и шлёт его адресом-источником
+   в каждой цели, поэтому перед init() адрес чистится:
+     1. если в адресе (запрос или #) есть параметры запуска (vk_*, sign, sig,
+        viewer_id, auth_key, access_token…), history.replaceState оставляет
+        только путь страницы. Платформа (workshop_platform.js) свою строку
+        запуска к этому моменту уже забрала: она читает её при загрузке
+        скрипта, раньше любого init(). Остальным частям игры адрес не нужен
+        (?level= читается до init() и только вне сборки vk);
+     2. referrer с такими параметрами подменяется на адрес без запроса;
+     3. init идёт с defer:true, просмотр — ручной hit с адресом и referrer
+        без запроса и #;
+     4. если адрес почистить не удалось (нет history, ошибка), Метрика в этом
+        запуске выключается: только журнал. Утечка хуже потери визита.
+
    Скрипт Метрики грузится асинхронно из init(). До готовности тега цели
    копятся в очереди (не больше QUEUE_LIMIT, лишние отбрасываются) и
    уходят после загрузки. Не загрузился (адблок, нет сети) — очередь
@@ -159,8 +175,54 @@
     try { return String(loc().pathname || '').indexOf('/games-dev/') !== -1; } catch (e) { return false; }
   }
 
+  // ?debug=1 читается до очистки адреса и запоминается.
+  var debugFlag = null;
   function isDebug() {
+    if (debugFlag !== null) return debugFlag;
     try { return /[?&]debug=1(&|$)/.test(String(loc().search || '')); } catch (e) { return false; }
+  }
+
+  // Параметры запуска ВК и подобные — личные данные и подпись игрока: в Метрику не уходят.
+  var LAUNCH_PARAM = /(?:^|[?&#;])(?:vk_[A-Za-z0-9_]*|sign|sig|viewer_id|user_id|auth_key|access_token|api_id|api_settings|secret)=/i;
+
+  function hasLaunchParams(text) {
+    return LAUNCH_PARAM.test(String(text || ''));
+  }
+
+  function bareUrl(u) {
+    return String(u || '').split(/[?#]/)[0];
+  }
+
+  // Адрес страницы без запроса и # (так его видит Метрика).
+  function pageUrl() {
+    var l = loc();
+    var host = String(l.host || l.hostname || '');
+    return String(l.protocol || 'https:') + '//' + host + String(l.pathname || '/');
+  }
+
+  function docReferrer() {
+    try { return String((document && document.referrer) || ''); } catch (e) { return ''; }
+  }
+
+  // Убирает параметры запуска из адреса и referrer. true — в них больше нет
+  // ничего личного (или и не было); false — почистить не удалось.
+  function scrubLocation() {
+    try {
+      var l = loc();
+      if (hasLaunchParams(l.search) || hasLaunchParams(l.hash)) {
+        var h = window.history;
+        if (h && typeof h.replaceState === 'function') h.replaceState(h.state === undefined ? null : h.state, '', String(l.pathname || '/'));
+      }
+      l = loc();
+      if (hasLaunchParams(l.search) || hasLaunchParams(l.hash) || hasLaunchParams(l.href)) return false;
+      var ref = docReferrer();
+      if (hasLaunchParams(ref)) {
+        var clean = bareUrl(ref);
+        try { Object.defineProperty(document, 'referrer', { configurable: true, get: function () { return clean; } }); } catch (e) { /* ниже проверка */ }
+        if (hasLaunchParams(docReferrer())) return false;
+      }
+      return true;
+    } catch (e) { return false; }
   }
 
   function log(kind, name, params) {
@@ -279,10 +341,17 @@
       var sess = Number(cfg.sessions);
       if (isFinite(sess) && sess >= 1) visit.session = Math.floor(sess);
 
+      debugFlag = isDebug();
       enabled = counterId > 0 && !isLocalRun();
+      var why = counterId ? 'локальный запуск: в Метрику не шлём' : 'нет номера счётчика: только журнал';
+      // Адрес чистится только когда Метрика правда включена: иначе он никуда не уходит.
+      if (enabled && !scrubLocation()) {
+        enabled = false;
+        why = 'адрес с параметрами запуска не очищен: в Метрику не шлём';
+      }
       if (!enabled) {
         queue = [];
-        log('off', counterId ? 'локальный запуск: в Метрику не шлём' : 'нет номера счётчика: только журнал', visit);
+        log('off', why, visit);
         return;
       }
       tag = 'loading';
@@ -304,9 +373,13 @@
       document.head.appendChild(s);
       var vp = {};
       Object.keys(visit).forEach(function (k) { if (visit[k] !== null) vp[k] = visit[k]; });
+      // defer: просмотр не уходит сам с адресом из location — его шлёт hit ниже
+      // с адресом и referrer без запроса и # (параметры запуска туда не попадут).
       ym(counterId, 'init', {
-        clickmap: false, trackLinks: false, accurateTrackBounce: true, webvisor: false, params: vp
+        defer: true, clickmap: false, trackLinks: false, accurateTrackBounce: true, webvisor: false, params: vp
       });
+      var ref = bareUrl(docReferrer());
+      ym(counterId, 'hit', pageUrl(), ref ? { referer: ref } : {});
       log('start', 'визит', vp);
     } catch (e) {
       tag = 'failed';

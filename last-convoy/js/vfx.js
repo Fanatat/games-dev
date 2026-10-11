@@ -332,6 +332,7 @@ const VFX = (() => {
     return 'arrow';
   }
 
+  const convoyArt = () => typeof Sprites !== 'undefined' && typeof match !== 'undefined' && match && !!match.convoy;
   function drawProjectile(ctx, p, age, groundY) {
     const kind = projectileKind(p, age);
     const dir = p.vx >= 0 ? 1 : -1;
@@ -348,6 +349,9 @@ const VFX = (() => {
     }
     const arc = projectileArc(p);
     ctx.translate(p.x, groundY + arc.y);
+    // «Последний конвой», новый облик: стрела и бомба — рисунки (js/sprites.js)
+    if (convoyArt() && kind === 'arrow' && Sprites.drawProp(ctx, dark ? 'arrow_goblin' : 'arrow', 0, 0, 26, arc.angle, dir)) { ctx.restore(); return; }
+    if (convoyArt() && kind === 'bomb' && Sprites.drawProp(ctx, 'bomb', 0, 0, 13, arc.prog * Math.PI * 3 * dir)) { ctx.restore(); return; }
     if (kind === 'arrow') {
       ctx.rotate(arc.angle);
       ctx.scale(dir, 1);
@@ -512,6 +516,9 @@ const VFX = (() => {
         ctx.fillStyle = pal.fire; ctx.globalAlpha = fl;
         ctx.beginPath(); ctx.arc(-Math.cos(ang) * 6.5, -Math.sin(ang) * 6.5, 2.6 * fl, 0, Math.PI * 2); ctx.fill();
         ctx.globalAlpha = 1;
+      } else if (convoyArt() && Sprites.prop('rock1')) {
+        // камнепад конвоя: валун-рисунок (один из четырёх), катится в полёте
+        Sprites.drawProp(ctx, 'rock' + (1 + (Math.floor(s.x * 7.3) & 3)), 0, 0, 11, p * Math.PI * 3);
       } else {
         // огненный камень: пламя-корона, сам камень, светлая сердцевина
         // пламя «кометой» назад по траектории + ореол вокруг камня

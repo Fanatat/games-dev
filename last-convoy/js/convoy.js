@@ -710,7 +710,7 @@ const Convoy = (() => {
       let i = 0;
       for (const [t, n] of Object.entries(B.adds)) for (let k = 0; k < n; k++) C.queue.push({ at: C.waveT + 0.4 + (i++) * CONVOY.spawnGap, type: t });
       C.queue.sort((a, b) => a.at - b.at);
-      if (!C.headless) { banner('Подмога!', '', 'red', 1.6); SFX.bossRoar(); shakeScreen(m, 5); }
+      if (!C.headless) { banner('Подмога!', '', 'red', 1.6); SFX.bossRoar(); shakeScreen(m, 5); C.roarAt = m.elapsed; }
     }
     if (C.slam) {
       C.slam.t += dt;
@@ -725,6 +725,7 @@ const Convoy = (() => {
           f.x = Math.max(ARENA.laneMin, f.x - 18);
         }
         if (!C.headless) {
+          C.smashAt = m.elapsed; // только рисунок: поза «удар по земле» (bossPose)
           requestHitStop(0.08);
           shakeScreen(m, 11);
           SFX.slam();
@@ -741,6 +742,15 @@ const Convoy = (() => {
       C.slam = { t: 0, x: u.x - 40 };
       if (!C.headless) SFX.alarm();
     }
+  }
+  // Поза рисунка Вождя (js/sprites.js): замах удара по земле, сам удар, рык подмоги; иначе обычные позы.
+  function bossPose(u, t) {
+    const C = match.convoy;
+    if (!C || C.boss !== u) return null;
+    if (C.slam) return 'raise';
+    if (C.smashAt !== undefined && t - C.smashAt < 0.45) return 'smash';
+    if (C.roarAt !== undefined && t - C.roarAt < 1.4) return 'roar';
+    return null;
   }
   function clearWave() {
     const m = match, C = m.convoy, w = m.world;
@@ -1647,7 +1657,9 @@ const Convoy = (() => {
   function drawProps(age) {
     const C = match.convoy;
     const ink = 'rgba(26,18,10,.8)';
+    const art = Sprites.bg('bg_r1');                     // на рисованном фоне столбики и кусты чужие
     for (const p of C.props) {
+      if (art && p.kind !== 'tuft' && p.kind !== 'stone') continue;
       ctx.save();
       ctx.translate(p.x, ARENA.groundY + p.y);
       ctx.scale(p.s, p.s);
@@ -1680,6 +1692,12 @@ const Convoy = (() => {
     ctx.scale(s, s);
     ctx.lineJoin = 'round'; ctx.lineCap = 'round';
     const ink = 'rgba(26,18,10,.85)';
+    // новый облик: кузов и колёса — рисунки (js/sprites.js); знаки карт ниже рисуются поверх, как раньше
+    const art = Sprites.wagonSet(deco.skin);
+    if (art) ctx.scale(1.1, 1.1);                          // рисунок повозки чуть выше бойца, вместе со знаками карт
+    const state = art ? drawWagonArt(i, hpFrac, roll, bob / s, deco) : null;
+    if (state === 'wreck') { ctx.restore(); return; }    // от обломков остаются только обломки
+    if (!art) {
     for (const dx of [-13, 13]) {
       ctx.fillStyle = age.woodDark; ctx.strokeStyle = ink; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.arc(dx, -8 + bob / s, 8, 0, TAU); ctx.fill(); ctx.stroke();
@@ -1693,13 +1711,21 @@ const Convoy = (() => {
     ctx.beginPath(); ctx.rect(-23, -26, 46, 13); ctx.fill(); ctx.stroke();
     ctx.strokeStyle = 'rgba(0,0,0,.3)'; ctx.lineWidth = 1;
     for (let x = -14; x < 23; x += 12) { ctx.beginPath(); ctx.moveTo(x, -26); ctx.lineTo(x, -13); ctx.stroke(); }
-    if (deco.plating) {
+    }
+    if (deco.plating && art) {
+      // «Обшивка» на рисунке: железная полоса с заклёпками по верху кузова
+      ctx.fillStyle = '#8e99a4'; ctx.strokeStyle = '#2c3138'; ctx.lineWidth = 0.9;
+      ctx.beginPath(); ctx.rect(-24, -23.5, 44, 3); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#e4e8ec';
+      for (let x = -20; x <= 16; x += 6) { ctx.beginPath(); ctx.arc(x, -22, 0.8, 0, TAU); ctx.fill(); }
+    } else if (deco.plating && !art) {
       ctx.fillStyle = age.stone; ctx.strokeStyle = ink; ctx.lineWidth = 1.6;
       ctx.beginPath(); ctx.rect(-25, -28, 50, 5); ctx.fill(); ctx.stroke();
       ctx.beginPath(); ctx.rect(-25, -17, 50, 4); ctx.fill(); ctx.stroke();
       ctx.fillStyle = '#e8e2d0';
       for (let x = -21; x <= 21; x += 14) { ctx.beginPath(); ctx.arc(x, -25.5, 1.3, 0, TAU); ctx.fill(); }
     }
+    if (!art) {
     const torn = hpFrac < 0.5;
     const skin = deco.skin;   // «Расписной полог» (CONVOY.meta): красный полог с золотым узором
     ctx.fillStyle = skin ? (hpFrac < 0.3 ? '#8e3a2a' : '#c0442e') : hpFrac < 0.3 ? '#bba98a' : '#d9c9a3'; ctx.strokeStyle = ink; ctx.lineWidth = 2;
@@ -1718,16 +1744,35 @@ const Convoy = (() => {
     ctx.strokeStyle = 'rgba(80,60,30,.35)'; ctx.lineWidth = 1.2;
     for (const x of [-9, 0, 9]) { ctx.beginPath(); ctx.moveTo(x * 0.9, -26); ctx.quadraticCurveTo(x * 1.05, -44, x * 0.7, -49); ctx.stroke(); }
     if (torn) { ctx.fillStyle = 'rgba(26,18,10,.75)'; ctx.beginPath(); ctx.moveTo(4, -46); ctx.lineTo(11, -38); ctx.lineTo(6, -36); ctx.closePath(); ctx.fill(); }
-    if (deco.shields) {
+    }
+    if (deco.shields && art) {
+      // щиты на борту: дерево, железный обод и умбон — как у стражи
+      for (const x of [-11, 4]) {
+        ctx.fillStyle = '#9a6634'; ctx.strokeStyle = '#2c3138'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.arc(x, -17, 5.2, 0, TAU); ctx.fill(); ctx.stroke();
+        ctx.strokeStyle = '#a7b0b9'; ctx.lineWidth = 1.3; ctx.beginPath(); ctx.arc(x, -17, 4.3, 0, TAU); ctx.stroke();
+        ctx.fillStyle = '#cfd6dc'; ctx.beginPath(); ctx.arc(x, -17, 1.5, 0, TAU); ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,.25)'; ctx.beginPath(); ctx.arc(x - 1.6, -18.6, 1.4, 0, TAU); ctx.fill();
+      }
+    } else if (deco.shields) {
       ctx.fillStyle = '#8a6a3c'; ctx.strokeStyle = ink; ctx.lineWidth = 1.5;
       for (const y of [-40, -30]) { ctx.beginPath(); ctx.ellipse(22, y, 4.5, 6, 0, 0, TAU); ctx.fill(); ctx.stroke(); }
     }
-    if (deco.sacks) {
+    if (deco.sacks && art) {
+      // мешки с добычей у задка, перевязаны
+      for (const [x, y, r] of [[-27, -11, 4.6], [-22, -9, 4]]) {
+        ctx.fillStyle = '#c9a66a'; ctx.strokeStyle = '#3a2814'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.ellipse(x, y, r * 0.85, r, 0, 0, TAU); ctx.fill(); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(x - 1.6, y - r + 0.4); ctx.lineTo(x, y - r - 2.4); ctx.lineTo(x + 1.6, y - r + 0.4); ctx.fill(); ctx.stroke();
+        ctx.strokeStyle = '#7a5a2a'; ctx.beginPath(); ctx.moveTo(x - 1.8, y - r + 0.8); ctx.lineTo(x + 1.8, y - r + 0.8); ctx.stroke();
+        ctx.fillStyle = 'rgba(255,255,255,.22)'; ctx.beginPath(); ctx.ellipse(x - 1.3, y - 1, 1.3, 2, 0, 0, TAU); ctx.fill();
+      }
+    } else if (deco.sacks) {
       ctx.fillStyle = '#e0c27a'; ctx.strokeStyle = ink; ctx.lineWidth = 1.5;
       for (const [x, y] of [[-15, -29], [-8, -30]]) { ctx.beginPath(); ctx.ellipse(x, y, 5, 4, 0, 0, TAU); ctx.fill(); ctx.stroke(); }
     }
     ctx.strokeStyle = '#6a4a28'; ctx.lineWidth = 1.6;
-    const arrows = hpFrac < 0.8 ? (hpFrac < 0.55 ? (hpFrac < 0.3 ? 3 : 2) : 1) : 0;
+    const arrows = art ? 0 : hpFrac < 0.8 ? (hpFrac < 0.55 ? (hpFrac < 0.3 ? 3 : 2) : 1) : 0; // у рисунка стрелы — в кадре «битая»
     for (let a = 0; a < arrows; a++) {
       const ax = 6 + a * 7 + i * 3, ay = -22 - (a % 2) * 4;
       ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(ax + 11, ay - 8); ctx.stroke();
@@ -1747,7 +1792,11 @@ const Convoy = (() => {
         ctx.beginPath(); ctx.moveTo(-6, -53.5); ctx.lineTo(26, -53.5); ctx.stroke();
       }
     }
-    if (i === 0) {
+    if (i === 0 && art) {
+      // флаг конвоя (или золотое «Знамя похода») на древке у задней повозки, полотно колышется
+      const wave = Math.sin(t * (deco.marching ? 7 : 3.2));
+      Sprites.drawFlag(ctx, deco.banner ? 'banner' : 'flag', -18, -44, deco.banner ? 40 : 32, wave);
+    } else if (i === 0) {
       ctx.strokeStyle = age.woodDark; ctx.lineWidth = 2.4;
       ctx.beginPath(); ctx.moveTo(-17, -26); ctx.lineTo(-17, -66); ctx.stroke();
       const wave = Math.sin(t * (deco.marching ? 7 : 3.2)) * 3;
@@ -1765,6 +1814,18 @@ const Convoy = (() => {
       }
     }
     ctx.restore();
+  }
+  // Рисунок повозки в единицах drawWagon (как у прежней: ширина ≈ 58, верх полога ≈ −50).
+  // Задняя (i = 0) бьётся позже передней: целая → битая → обломки; колёса крутятся на ходу.
+  function drawWagonArt(i, hpFrac, roll, lift, deco) {
+    const L = 58, r = 9.5;
+    const state = i === 1 ? (hpFrac >= 0.6 ? 'whole' : hpFrac >= 0.15 ? 'damaged' : 'wreck')
+      : (hpFrac >= 0.4 ? 'whole' : hpFrac > 0 ? 'damaged' : 'wreck');
+    const flash = match.world.playerCore.hitFlash || 0;
+    if (state === 'wreck') { Sprites.drawWagonBody(ctx, deco.skin, 'wreck', 0, lift, L * 0.95, flash); return state; }
+    Sprites.drawWagonBody(ctx, deco.skin, state, 0, -r * 0.85, L, flash);
+    for (const dx of [-L * 0.27, L * 0.27]) Sprites.drawWheel(ctx, dx, -r + lift, r, roll);
+    return state;
   }
   function wagonScale() { return Math.max(1.35, Math.min(1.9, VIEW.fig * 1.4)); }
   function drawStructures() {
@@ -1786,7 +1847,7 @@ const Convoy = (() => {
       const bob = marching ? Math.abs(Math.sin(t * 11 + i * 1.7)) * 1.6 * (C.speed / CONVOY.marchSpeed) : 0;
       drawWagon(wx, i, s, hpFrac, t, C.roll, bob, deco);
     });
-    if (flash > 0) { ctx.save(); ctx.globalAlpha = flash * 0.5; ctx.fillStyle = '#fff'; ctx.fillRect(WAGON_X[0] - 32 * s, ARENA.groundY - 56 * s, WAGON_X[1] - WAGON_X[0] + 64 * s, 56 * s); ctx.restore(); }
+    if (flash > 0 && !Sprites.wagonSet(deco.skin)) { ctx.save(); ctx.globalAlpha = flash * 0.5; ctx.fillStyle = '#fff'; ctx.fillRect(WAGON_X[0] - 32 * s, ARENA.groundY - 56 * s, WAGON_X[1] - WAGON_X[0] + 64 * s, 56 * s); ctx.restore(); }
     // повреждения видны издалека: дымок над передней повозкой с половины прочности, густой дым над обеими — с трети
     if (core.hp > 0 && hpFrac < 0.55) drawSmoke(WAGON_X[1] + 6 * s, ARENA.groundY - 36 * s, performance.now(), 2, 'rgba(70,62,55,.4)');
     if (core.hp > 0 && hpFrac < 0.3) drawSmoke(WAGON_X[0], ARENA.groundY - 40 * s, performance.now() + 700, 3, 'rgba(50,42,38,.6)');
@@ -1803,6 +1864,11 @@ const Convoy = (() => {
   // ------------------------------------------------------------ отрисовка поверх боя
   function drawCoin(x, y, r, spin) {
     const sx = Math.max(0.2, Math.abs(Math.cos(spin)));
+    // новый облик: монета-рисунок, вращение — сжатием по ширине
+    if (Sprites.prop('coin')) {
+      ctx.save(); ctx.translate(x, y); ctx.scale(sx, 1); Sprites.drawProp(ctx, 'coin', 0, 0, r * 2.3); ctx.restore();
+      return;
+    }
     ctx.save();
     ctx.translate(x, y);
     ctx.scale(sx, 1);
@@ -1962,6 +2028,14 @@ const Convoy = (() => {
   // ------------------------------------------------------------ иконки карт
   function drawClassIcon(cv, id) {
     const t = UNIT_TYPES[id], age = match ? match.age : AGES.stone;       // в меню матча ещё нет
+    // новый облик: боец-рисунок; пока картинка грузится — прежний значок, потом перерисовка
+    cv._icon = id;
+    if (Sprites.artId(id, false)) {
+      const c = cv.getContext('2d');
+      c.clearRect(0, 0, cv.width, cv.height);
+      if (Sprites.drawIcon(c, id, false, cv.width / 2, cv.height * 0.97, cv.width * 0.96, cv.height * 0.94)) return;
+      Sprites.onReady(id, false, () => { if (cv._icon === id) drawClassIcon(cv, id); });
+    }
     if (!ENEMY_SPECIAL_TYPES[id]) { drawUnitIcon(cv, t, age); return; }
     const c = cv.getContext('2d'), u = cv.height / 44;
     c.clearRect(0, 0, cv.width, cv.height);
@@ -1973,6 +2047,7 @@ const Convoy = (() => {
     });
   }
   function drawCardIcon(cv, card) {
+    cv._icon = null;
     const c = cv.getContext('2d');
     const W = cv.width, H = cv.height, u = W / 96;
     c.clearRect(0, 0, W, H);
@@ -2312,7 +2387,7 @@ const Convoy = (() => {
   return {
     boot, startRun, newRun, setupMatch, update, updateHud, buy, buyIndex, key, choose, repair, reroll,
     rockAt, rockAuto, rockReady, toMenu, onScreen, canPause, drawStructures, drawMenuWagons, drawOverlay, dayT,
-    showJournal, readLog, readBest, simulate, api, waveText, drawCardIcon,
+    showJournal, readLog, readBest, simulate, api, waveText, drawCardIcon, bossPose,
     get run() { return run; },
   };
 })();

@@ -4158,6 +4158,9 @@ function render() {
   if (fadeA <= 0) match.bgPrev = null;
   ctx.save();
   ctx.translate(match.shake.x, match.shake.y);
+  // «Последний конвой», новый облик: фон региона — картинка (Sprites.drawBg), без смены суток
+  const artBg = match.convoy && Sprites.drawBg(ctx, 'bg_r1', VIEW, ARENA.groundY, (match.convoy.roll || 0) * 8 * 0.7);
+  if (!artBg) {
   drawBgLayer(match.bg, 'sky', 1);
   drawBgLayer(match.bgPrev, 'sky', fadeA);
   // солнце/луна по дуге неба; ореол у горизонта — большой и тёплый
@@ -4173,6 +4176,7 @@ function render() {
   // ночное затемнение — только фон/окружение (постройки, юниты и HUD
   // рисуются после и остаются читаемыми в любое время суток), синеватое
   drawNightShade(dn);
+  }
 
   const fortTrans = match.fortTrans || {}; // И6: перестройка крепости при смене эпохи
   if (match.convoy) {
@@ -4237,7 +4241,13 @@ function render() {
       ageId: sideAge.id, outfit: ENEMY_SPECIAL_TYPES[u.typeId] ? u.typeId : t.role,
       dressFlash: (u.dressT0 !== undefined && !dressing) ? Math.max(0, 1 - (poseTime - u.dressT0) / 0.55) : 0,
     };
-    if (t.role === 'rider') {
+    if (match.convoy && Sprites.hasUnit(u.typeId, enemy)) {
+      // «Последний конвой», новый облик: боец — рисунок (js/sprites.js); рост атласа уже учитывает тяжёлых
+      Sprites.drawUnit(ctx, u.typeId, {
+        ...commonPose, k: (u.elite ? 1.35 : 1) * (t.heightMult || 1) * UNIT_LANES.scale[lane] * VIEW.fig,
+        special: dead ? null : Convoy.bossPose(u, poseTime),
+      });
+    } else if (t.role === 'rider') {
       drawRiderPair(ctx, commonPose);
     } else if (t.role === 'breaker') {
       drawStickman(ctx, {
@@ -4924,12 +4934,16 @@ function drawMenuScene(now) {
   const age = menuSceneAge();
   const bg = bakeArenaBackground(age, window.CONVOY_PROTOTYPE ? bgVariantOf({ id: 1 }) : undefined);
   applyViewTransform();
+  // «Последний конвой», новый облик: рисованный фон и бойцы-рисунки (пока грузятся — прежняя сцена)
+  const art = window.CONVOY_PROTOTYPE && Sprites.drawBg(ctx, 'bg_r1', VIEW, ARENA.groundY, 0);
+  if (!art) {
   drawBgLayer(bg, 'sky', 1);
   drawSunMoon(age, { sunUp: true, localT: 0.28, alt: 0.72, light: 1 });
   drawHighClouds(t);
   for (const c of menuScene.clouds) drawCloud(((c.x + t * c.sp) % 1200) - 100, c.y, c.s);
   drawBgLayer(bg, 'land', 1);
   drawMotes(age, t);
+  }
   if (window.CONVOY_PROTOTYPE) Convoy.drawMenuWagons(t); // «Последний конвой»: повозки вместо крепостей
   else {
   drawCore(menuScene.cores[0], 1, age);
@@ -4937,6 +4951,14 @@ function drawMenuScene(now) {
   drawFarm(16, 2, 0, age);
   }
   const gy = ARENA.groundY;
+  if (art && Sprites.hasUnit('heavy', true)) {
+    const ROLE_UNIT = { ranged: 'archer', spear: 'spear', melee: 'infantry', heavy: 'heavy' };
+    const pose = (x, i, enemy) => ({ x, y: gy, facing: enemy ? -1 : 1, enemy, k: VIEW.fig, time: t + i * 0.9,
+      walkPhase: 0, moving: false, attackPhase: null, deathSec: null, hitFlash: 0 });
+    menuScene.allies.forEach((a, i) => Sprites.drawUnit(ctx, ROLE_UNIT[a.role], pose(a.x, i, false)));
+    menuScene.foes.forEach((f, i) => Sprites.drawUnit(ctx, ROLE_UNIT[f.role], pose(f.x, i + 3, true)));
+    return;
+  }
   menuScene.allies.forEach((a, i) => drawStickman(ctx, {
     x: a.x, y: gy, color: ART.player.fill, outline: ART.player.outline, facing: 1, scale: VIEW.fig, // И7: тот же крупный план, что в бою
     weapon: age.weapon[a.role] || null, roleAccent: ROLE_ACCENT[a.role], time: t + i * 0.9,

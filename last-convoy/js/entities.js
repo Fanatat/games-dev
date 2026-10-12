@@ -363,7 +363,7 @@ function dealDamage(world, targetInfo, dmg, onKillTeamGold, attackerRole = 'mele
     ref.hp = 0;
     ref.state = 'dead';
     ref.deathT = 0.0001;
-    SFX.death();
+    SFX.death(ref.team);
     const t = UNIT_TYPES[ref.typeId];
     const killerTeam = ref.team === 'player' ? 'enemy' : 'player';
     const unitCost = ref.cost || t.cost; // раунд 15: цена в эпохе, в которой юнит родился
@@ -475,6 +475,7 @@ function updateUnits(world, dt, onKillTeamGold) {
         // Бомбардир (раунд 8) — сплэш только по юнитам, не по герою/ядру
         // (см. КОНЦЕПТ_ГДД.md, «Допущения») — иначе неожиданный урон по
         // площади прилетал бы игроку, просто стоящему рядом с юнитом.
+        SFX.bomb();
         const enemyTeam = p.team === 'player' ? 'enemy' : 'player';
         for (const u2 of world.units) {
           if (u2.team !== enemyTeam || u2.state === 'dead') continue;

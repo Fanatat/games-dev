@@ -912,6 +912,21 @@ const EVENT_TRACKS = {
   campaign_victory: { name: 'Финал кампании', file: 'assets/audio/campaign_victory.mp3' },
 };
 const MUSIC_ORDER_DEFAULT = ['battle_theme', 'battle_march', 'battle_pulse'];
+// «Последний конвой» (сборка 12): своя музыка — меню, по треку на каждый
+// край (весь поход одним лупом), вожак, итоги. Треки генерирует основатель
+// в Suno по промтам МУЗЫКА_SUNO_КОНВОЙ.md. file: null — трек ещё не готов:
+// MUSIC.play() сразу берёт fallback (без запроса к серверу), цепочка
+// заканчивается старыми треками «Двух крепостей». fallback: null у вожака —
+// не готов, значит продолжает звучать трек края.
+const CONVOY_MUSIC = {
+  cv_menu: { name: 'Конвой: меню', file: null, loop: true, gate: true, fallback: 'menu' },
+  cv_boss: { name: 'Конвой: вожак', file: null, loop: true, fallback: null },
+  cv_victory: { name: 'Конвой доставлен', file: null, fallback: 'victory_sting' },
+  cv_defeat: { name: 'Конвой пал', file: null, fallback: 'defeat_sting' },
+};
+for (let i = 1; i <= 8; i++) {
+  CONVOY_MUSIC['cv_land_' + i] = { name: 'Конвой: край ' + i, file: null, loop: true, fallback: i > 1 ? 'cv_land_1' : 'battle_theme' };
+}
 
 // Микс музыки (раунд 10, числа основателя): громкость растёт с числом
 // живых юнитов на поле (+30% на 30+, плавно от 0), кроссфейд между

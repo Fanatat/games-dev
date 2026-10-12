@@ -726,7 +726,8 @@ const Convoy = (() => {
     $('cvPick').classList.add('hidden');
     updateHud();
     showScreen('match');
-    match.currentBattleTrack = pickNextBattleTrack(null);
+    // у каждого края свой трек на весь поход (луп); пока не готов — трек Тракта или старый боевой
+    match.currentBattleTrack = 'cv_land_' + run.level;
     MUSIC.play(match.currentBattleTrack, { force: true });
     // ВК грузит ролик по проверке: заранее, чтобы к «Второму шансу» он успел прийти
     if (PLATFORM.rewardedPossible()) PLATFORM.checkRewardedAvailable();
@@ -888,6 +889,7 @@ const Convoy = (() => {
         banner(`${level().boss}!`, land() ? land().boss.name : '', 'red', 2.4);
         shakeScreen(m, 7);
         SFX.bossRoar();
+        MUSIC.play('cv_boss');
         VFX.spawn(m, 'ring', u.x, -40, { size: 180, width: 7, life: 0.7, color: ART.enemy.eliteOutline, glow: ART.enemy.eliteGlow, gravity: 0 });
       }
     } else if (q.elite) {
@@ -1233,8 +1235,7 @@ const Convoy = (() => {
     shakeScreen(m, 9);
     m.ageFlash = 1;
     banner('Новая эпоха!', m.age.name, 'gold', 2.2);
-    SFX.upgrade();
-    SFX.heroSpecial();
+    SFX.era();
   }
   function repair() {
     const m = match, C = m && m.convoy;
@@ -1244,7 +1245,7 @@ const Convoy = (() => {
     m.gold -= cost;
     C.repaired = true;
     healConvoy(CONVOY.repair.heal);
-    if (!C.headless) SFX.upgrade();
+    if (!C.headless) SFX.repair();
     return true;
   }
   function reroll() {
@@ -1346,6 +1347,7 @@ const Convoy = (() => {
     shakeScreen(m, 5);
     banner('Второй шанс!', '', 'gold', 1.8);
     SFX.unlock();
+    SFX.revive();
     syncOverlays();
     updateHud();
   }
@@ -1395,7 +1397,7 @@ const Convoy = (() => {
     saveRun();
     syncOverlays();
     banner(win ? 'Конвой доставлен!' : 'Конвой пал', '', win ? 'gold' : 'red', CONVOY.endSec + 1);
-    MUSIC.play(win ? 'victory_sting' : 'defeat_sting');
+    MUSIC.play(win ? 'cv_victory' : 'cv_defeat');
     if (!win) shakeScreen(m, 8);
   }
   // Итог похода: маршрут с отметкой, три значка-цифры, иконки взятых карт, слава до следующей награды.
@@ -2065,7 +2067,7 @@ const Convoy = (() => {
     renderDaily();
     if (name === 'cmenu') {
       renderMenu();
-      if (MUSIC.current() !== 'menu') MUSIC.play('menu');
+      MUSIC.play('cv_menu'); // тот же трек уже звучит — play() ничего не делает
     }
   }
   function syncOverlays() {

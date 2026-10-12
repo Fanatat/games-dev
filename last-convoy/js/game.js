@@ -1821,6 +1821,13 @@ function pickNextNonPulseTrack(afterId) {
 MUSIC.onEnded((endedId) => {
   if (screen !== 'match' && screen !== 'paused' && screen !== 'result') return;
   if (endedId === 'menu') return; // меню/пауза лупится само (audio.loop=true)
+  // «Последний конвой»: треки краёв и вожака лупятся сами; после стинга
+  // итога — спокойный трек меню под экран итога
+  if (window.CONVOY_PROTOTYPE) {
+    if (/sting|victory|defeat/.test(endedId)) MUSIC.play('cv_menu');
+    else MUSIC.play(endedId, { force: true });
+    return;
+  }
   if (match && match.musicPulseOverride) {
     // Правка основателя: раньше "Пульс сражения" гасился МГНОВЕННО, как
     // только число юнитов падало ниже нижнего порога гистерезиса (проверка

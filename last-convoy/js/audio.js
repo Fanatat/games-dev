@@ -1,8 +1,11 @@
-// SFX — записанные сэмплы (CC0: Kenney.nl, OpenGameArt), 24.09.2026.
-// Прежний синтез осцилляторами (square/sawtooth + шум) основатель назвал
-// «режет уши» — заменён целиком, API объекта SFX прежний. Источники и
-// лицензии — tools/SFX_ИСТОЧНИКИ.md, подготовка файлов —
-// tools/make_sfx.py.
+// SFX — записанные сэмплы (CC0: Kenney.nl, Freesound), набор «Последнего
+// конвоя» 12.10.2026 (сборка 12). Прежний набор 24.09 был общим с «Двумя
+// крепостями»: электронные щелчки, колокол на всё подряд и синтез
+// осцилляторами для сердца и рыка. Здесь у каждого события свой звук:
+// рог на волну, рык вожака, гоблины визжат, свои вскрикивают, молот на
+// починку, деревянные щелчки интерфейса. API объекта SFX прежний плюс
+// bomb/repair/era/revive. Источники и лицензии — tools/SFX_ИСТОЧНИКИ.md,
+// подготовка файлов — tools/make_sfx.py.
 'use strict';
 
 const SFX = (() => {
@@ -10,9 +13,15 @@ const SFX = (() => {
   // чередуются случайно, без повтора подряд, плюс лёгкий разброс высоты —
   // сотня одинаковых ударов за бой не звучит «пулемётом».
   const BANK = {
-    hit_melee: 5, hit_spear: 4, hit_heavy: 5, hit_hero: 3, hit_hero_special: 2,
-    hit_ranged: 5, shoot: 4, death: 5, spawn: 4, deny: 2, upgrade: 1, coins: 1,
-    mine: 4, swing: 3, bell: 1, click: 2, core_hit: 5,
+    // бой
+    hit_melee: 4, hit_spear: 4, hit_heavy: 4, hit_ranged: 4, shoot: 3,
+    death_enemy: 4, death_ally: 3, spawn: 3, core_hit: 6, bomb: 2,
+    // события похода
+    horn: 1, horn_big: 1, roar: 2, boss_death: 1, slam: 1, rock_launch: 1,
+    rock_hit: 3, volley: 1, ballista: 1, heart: 1, coins: 2, vein: 1,
+    fanfare: 1, sparkle: 2, flourish: 1, card: 1, hammer: 2,
+    // интерфейс
+    click: 2, deny: 1,
   };
   const SFX_DIR = 'assets/audio/sfx/';
   // В большой битве (45+ юнитов) удары сыплются десятками в секунду: без
@@ -53,7 +62,7 @@ const SFX = (() => {
     return ctx;
   }
 
-  // Загрузка ~270 КБ (56 файлов) после показа первого экрана, не блокирует старт; пока
+  // Загрузка ~470 КБ (63 файла) после показа первого экрана, не блокирует старт; пока
   // файл не пришёл, его звук просто пропускается.
   function preload() {
     if (loadStarted) return;
@@ -97,25 +106,6 @@ const SFX = (() => {
     src.start(now + delay);
   }
 
-  // Мягкий синусовый «удар» без сэмпла (стук сердца, гул): частота f0 → f1 за dur секунд.
-  function thump(f0, f1, at, vol, dur) {
-    if (muted || platformMuted) return;
-    const c = ensure();
-    const t0 = c.currentTime + at;
-    const o = c.createOscillator();
-    o.type = 'sine';
-    o.frequency.setValueAtTime(f0, t0);
-    o.frequency.exponentialRampToValueAtTime(f1, t0 + dur);
-    const g = c.createGain();
-    g.gain.setValueAtTime(0.0001, t0);
-    g.gain.exponentialRampToValueAtTime(vol, t0 + 0.015);
-    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-    o.connect(g).connect(master);
-    o.onended = () => g.disconnect();
-    o.start(t0);
-    o.stop(t0 + dur + 0.03);
-  }
-
   return {
     setMuted(v) { muted = v; },
     isMuted() { return muted; },
@@ -132,52 +122,63 @@ const SFX = (() => {
     // в фоне.
     suspend() { if (ctx) ctx.suspend().catch(() => {}); },
     resume() { if (ctx) ctx.resume().catch(() => {}); },
-    // роль атакующего задаёт тембр удара — тяжёлый глухой, копьё деревянное,
-    // герой — металл (см. ГДД, «Аудио: звук на все события мира»)
+    // роль атакующего задаёт тембр удара: пехота — удар со звоном клинка,
+    // копьё — древко и укол, латник и герой — тяжёлый глухой
     hitMelee(role) {
       const cfg = {
-        melee: ['hit_melee', 0.42],
-        spear: ['hit_spear', 0.5],
+        melee: ['hit_melee', 0.4],
+        spear: ['hit_spear', 0.45],
         heavy: ['hit_heavy', 0.5],
-        hero: ['hit_hero', 0.55],
-        hero_special: ['hit_hero_special', 0.65],
-      }[role] || ['hit_melee', 0.42];
-      play(cfg[0], { vol: cfg[1], gap: 0.05 });
+        hero: ['hit_heavy', 0.52],
+        hero_special: ['hit_heavy', 0.62],
+      }[role] || ['hit_melee', 0.4];
+      play(cfg[0], { vol: cfg[1], rate: role === 'hero_special' ? 0.85 : 1, gap: 0.05 });
     },
     hitRanged() { play('hit_ranged', { vol: 0.32, gap: 0.05 }); },
     shoot() { play('shoot', { vol: 0.22, gap: 0.07 }); },
-    death() { play('death', { vol: 0.38, rate: 0.9, gap: 0.08 }); },
-    spawn() { play('spawn', { vol: 0.28, gap: 0.12 }); },
-    buyDenied() { play('deny', { vol: 0.4, gap: 0.1 }); },
-    upgrade() { play('upgrade', { vol: 0.4 }); play('coins', { vol: 0.4, delay: 0.05 }); },
-    mine() { play('mine', { vol: 0.45, gap: 0.1 }); },
-    heroSpecial() { play('swing', { vol: 0.55 }); play('hit_heavy', { vol: 0.6, rate: 0.85, delay: 0.07 }); },
+    // гибель: team === 'player' — вскрик своего, иначе рык/визг врага
+    death(team) {
+      if (team === 'player') play('death_ally', { vol: 0.3, gap: 0.15 });
+      else play('death_enemy', { vol: 0.3, gap: 0.1 });
+    },
+    spawn() { play('spawn', { vol: 0.3, gap: 0.12 }); },
+    bomb() { play('bomb', { vol: 0.45, gap: 0.08 }); },
+    buyDenied() { play('deny', { vol: 0.45, gap: 0.1 }); },
+    upgrade() { play('card', { vol: 0.45 }); play('sparkle', { vol: 0.25, delay: 0.06 }); },
+    mine() { play('rock_hit', { vol: 0.4, rate: 1.2, gap: 0.1 }); },
+    heroSpecial() { play('rock_launch', { vol: 0.4, rate: 1.3 }); play('hit_heavy', { vol: 0.6, rate: 0.85, delay: 0.07 }); },
     heroHurt() { play('hit_heavy', { vol: 0.35, rate: 1.1, gap: 0.15 }); },
     // Отдельный, более тревожный сигнал именно на смерть героя (не просто
     // урон) — стадия 2, баг-репорт: игрок должен заметить это, даже глядя
     // в другой конец арены, не только по надписи в углу HUD.
-    heroDown() { play('death', { vol: 0.6, rate: 0.8 }); play('bell', { vol: 0.45, delay: 0.08 }); },
+    heroDown() { play('death_ally', { vol: 0.55, rate: 0.85 }); play('horn', { vol: 0.4, delay: 0.1 }); },
     click() { play('click', { vol: 0.4, gap: 0.03 }); },
-    alarm() { play('bell', { vol: 0.5, gap: 0.5 }); }, // «Последний конвой»: предупреждение о волне
+    alarm() { play('horn', { vol: 0.45, gap: 0.5 }); }, // «Последний конвой»: волна идёт
     coreHit() { play('core_hit', { vol: 0.45, gap: 0.08 }); },
     // «Последний конвой»: монета долетела (тон растёт с цепочкой), камнепад, серия, волна отбита
     coin(extra = 0) { play('coins', { vol: 0.2, rate: 1.1 + extra, gap: 0.045 }); },
-    rockLaunch() { play('swing', { vol: 0.5, rate: 0.8 }); },
-    rockHit() { play('hit_heavy', { vol: 0.5, rate: 0.7, gap: 0.06 }); },
-    streak() { play('bell', { vol: 0.35, rate: 1.5 }); play('coins', { vol: 0.35, rate: 1.3, delay: 0.06 }); },
-    waveClear() { play('upgrade', { vol: 0.45, rate: 1.1 }); play('bell', { vol: 0.3, rate: 1.25, delay: 0.12 }); },
-    // этап 2: стук сердца (конвой при смерти), Вождь, вожак, сочетания
-    heartbeat() { thump(70, 42, 0, 0.32, 0.16); thump(62, 38, 0.17, 0.22, 0.14); },
-    elite() { play('bell', { vol: 0.4, rate: 0.75, gap: 0.6 }); },
-    bossRoar() { play('hit_hero_special', { vol: 0.6, rate: 0.6 }); play('death', { vol: 0.45, rate: 0.5, delay: 0.05 }); thump(55, 30, 0, 0.35, 0.5); },
-    slam() { play('hit_heavy', { vol: 0.75, rate: 0.55 }); play('core_hit', { vol: 0.4, rate: 0.6, delay: 0.03 }); thump(60, 28, 0, 0.4, 0.35); },
-    bossDown() { play('hit_hero_special', { vol: 0.6, rate: 0.75 }); play('upgrade', { vol: 0.5, rate: 0.9, delay: 0.15 }); play('coins', { vol: 0.5, delay: 0.25 }); play('bell', { vol: 0.35, rate: 1.2, delay: 0.3 }); },
+    rockLaunch() { play('rock_launch', { vol: 0.5 }); },
+    rockHit() { play('rock_hit', { vol: 0.55, gap: 0.06 }); },
+    streak() { play('sparkle', { vol: 0.35 }); play('coins', { vol: 0.3, rate: 1.3, delay: 0.06 }); },
+    waveClear() { play('fanfare', { vol: 0.4 }); },
+    // стук сердца (конвой при смерти) — в сэмпле уже «тук-тук»
+    heartbeat() { play('heart', { vol: 0.5, gap: 0.4 }); },
+    elite() { play('horn_big', { vol: 0.4, gap: 0.6 }); },
+    bossRoar() { play('roar', { vol: 0.65, gap: 0.8 }); },
+    slam() { play('slam', { vol: 0.7, gap: 0.2 }); },
+    bossDown() { play('boss_death', { vol: 0.6 }); play('fanfare', { vol: 0.4, delay: 0.35 }); play('coins', { vol: 0.4, delay: 0.5 }); },
     // «Последний конвой»: открыта награда за славу (экран итога)
-    gloryUnlock() { play('bell', { vol: 0.45, rate: 1.1 }); play('upgrade', { vol: 0.5, rate: 1.05, delay: 0.12 }); play('bell', { vol: 0.4, rate: 1.5, delay: 0.3 }); play('coins', { vol: 0.4, rate: 1.2, delay: 0.34 }); },
-    synergy() { play('upgrade', { vol: 0.5, rate: 1.2 }); play('bell', { vol: 0.4, rate: 1.6, delay: 0.1 }); play('coins', { vol: 0.45, rate: 1.4, delay: 0.18 }); },
-    vein() { play('coins', { vol: 0.55, rate: 0.9 }); play('coins', { vol: 0.45, rate: 1.3, delay: 0.08 }); play('bell', { vol: 0.25, rate: 1.8, delay: 0.1, gap: 0.3 }); },
-    ballista() { play('swing', { vol: 0.35, rate: 1.4, gap: 0.2 }); play('shoot', { vol: 0.35, rate: 0.6, gap: 0.2 }); },
-    hail() { play('shoot', { vol: 0.3, rate: 1.3 }); play('shoot', { vol: 0.25, rate: 1.5, delay: 0.08 }); play('shoot', { vol: 0.2, rate: 1.2, delay: 0.16 }); },
+    gloryUnlock() { play('flourish', { vol: 0.5 }); play('coins', { vol: 0.35, rate: 1.2, delay: 0.3 }); },
+    synergy() { play('sparkle', { vol: 0.45, rate: 1.1 }); play('card', { vol: 0.4, delay: 0.05 }); },
+    vein() { play('vein', { vol: 0.5 }); },
+    ballista() { play('ballista', { vol: 0.4, gap: 0.2 }); },
+    hail() { play('volley', { vol: 0.4, gap: 0.5 }); },
+    // починка повозки: два удара молотка и монеты
+    repair() { play('hammer', { vol: 0.45 }); play('hammer', { vol: 0.4, delay: 0.18 }); play('coins', { vol: 0.25, delay: 0.3 }); },
+    // новая эпоха войска: большой рог и искры
+    era() { play('horn_big', { vol: 0.45 }); play('sparkle', { vol: 0.35, delay: 0.25 }); },
+    // «Второй шанс!» — повозки поднялись
+    revive() { play('flourish', { vol: 0.5 }); play('horn', { vol: 0.35, delay: 0.2 }); },
   };
 })();
 
@@ -276,7 +277,20 @@ const MUSIC = (() => {
 
   function trackMeta(trackId) {
     if (trackId === 'menu') return MENU_MUSIC_TRACK;
-    return MUSIC_TRACKS[trackId] || EVENT_TRACKS[trackId];
+    return MUSIC_TRACKS[trackId] || EVENT_TRACKS[trackId] ||
+      (typeof CONVOY_MUSIC !== 'undefined' ? CONVOY_MUSIC[trackId] : undefined);
+  }
+  // Трек без файла (file: null — ещё не сделан) заменяется своим fallback,
+  // по цепочке. null — заменить нечем, пусть звучит то, что звучит.
+  function resolveTrack(trackId) {
+    const seen = new Set();
+    let id = trackId, meta = trackMeta(id);
+    while (meta && !meta.file && meta.fallback && !seen.has(id)) {
+      seen.add(id);
+      id = meta.fallback;
+      meta = trackMeta(id);
+    }
+    return meta && meta.file ? { id, meta } : null;
   }
   function effectiveVolume() {
     return (musicMuted || platformMuted) ? 0 : baseVolume * unitVolumeMult;
@@ -340,6 +354,19 @@ const MUSIC = (() => {
     const source = c.createBufferSource();
     source.buffer = entry.buffer;
     source.loop = entry.loop;
+    // mp3 добавляет тишину-заглушку в начало и конец файла: на лупе она
+    // слышна щелчком на стыке (треки «Конвоя» сведены в петлю без шва,
+    // tools/make_music.py) — петля идёт от первого до последнего звучащего сэмпла.
+    if (entry.loop) {
+      const d = entry.buffer.getChannelData(0), n = d.length, lim = Math.min(n, 8192);
+      let a = 0, b = n;
+      while (a < lim && Math.abs(d[a]) < 1e-4) a++;
+      while (b > n - lim && Math.abs(d[b - 1]) < 1e-4) b--;
+      if (a < lim && b > n - lim) {
+        source.loopStart = a / entry.buffer.sampleRate;
+        source.loopEnd = b / entry.buffer.sampleRate;
+      }
+    }
     source.connect(entry.gain);
     source.addEventListener('ended', () => {
       if (entry.manualStop) { entry.manualStop = false; return; } // сами остановили (кроссфейд на новый трек) — не событие "трек доиграл"
@@ -377,16 +404,19 @@ const MUSIC = (() => {
       unitVolumeMult = mult;
       if (current && !current.fading && masterGain) fadeGain(masterGain, effectiveVolume(), 0.4);
     },
-    play(trackId, opts = {}) {
-      const meta = trackMeta(trackId);
-      if (!meta) return;
+    play(reqId, opts = {}) {
+      const req = trackMeta(reqId);
+      const resolved = req && resolveTrack(reqId);
+      if (!resolved) return;
+      const trackId = resolved.id, meta = resolved.meta;
       if (current && current.trackId === trackId && !opts.force) return;
       const dur = opts.instant ? 0.05 : MUSIC_MIX.crossfadeSec;
       const c = ensureCtx();
       armResumeOnGesture();
       const entry = {
         trackId,
-        loop: trackId === 'menu', // меню/пауза — простой луп, без плейлиста
+        // меню/пауза и треки краёв «Конвоя» — простой луп, без плейлиста
+        loop: trackId === 'menu' || !!req.loop || !!meta.loop,
         buffer: null,
         source: null,
         gain: c.createGain(),
@@ -413,7 +443,7 @@ const MUSIC = (() => {
       }
       const handOver = () => { const a = entry.audible; entry.audible = null; if (a) retire(a, dur); };
       setTimeout(handOver, HANDOVER_WAIT_MS);
-      (trackId === 'menu' ? whenGateOpen() : Promise.resolve())
+      (trackId === 'menu' || req.gate || meta.gate ? whenGateOpen() : Promise.resolve())
         .then(() => (current === entry ? loadBuffer(meta.file) : null))
         .then((buffer) => {
           if (!buffer || current !== entry) return; // успели переключиться на другой трек, пока этот грузился
@@ -431,11 +461,14 @@ const MUSIC = (() => {
         })
         .catch((e) => {
           console.warn('[music] трек не загружен', meta.file, e);
-          if (current === entry) handOver();
+          if (current !== entry) return;
+          // запасной трек вместо тишины (новый трек «Конвоя» не дошёл)
+          if (meta.fallback) MUSIC.play(meta.fallback, { force: true });
+          else handOver();
         });
     },
     // Фоновая докачка трека заранее (только байты, без декодирования).
-    prefetch(trackId) { const meta = trackMeta(trackId); if (meta) prefetch(meta.file); },
+    prefetch(trackId) { const r = resolveTrack(trackId); if (r) prefetch(r.meta.file); },
     current() { return current ? current.trackId : null; },
     // Для живой диагностики (утренняя проверка баг-репортов) — реальное
     // состояние текущего трека, не только "назначенный" trackId.

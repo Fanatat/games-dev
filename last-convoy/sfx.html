@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Звуки конвоя</title>
+<!-- Страница прослушивания SFX «Последнего конвоя» для основателя. Только для
+     тестового стенда: кладётся в корень сборки как sfx.html, в выпуск не идёт.
+     Кнопки событий зовут тот же SFX из js/audio.js, что и игра, — с той же
+     громкостью и наложением слоёв; ниже — каждый файл отдельно. -->
+<style>
+  :root { --bg: #f4efe4; --fg: #2b241b; --card: #fffaf0; --line: #d9ccb4; --accent: #8a5a1f; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #1d1a16; --fg: #eee4d2; --card: #2a251f; --line: #4a4033; --accent: #e0a85a; } }
+  body { margin: 0; padding: 16px; background: var(--bg); color: var(--fg); font: 15px/1.4 system-ui, sans-serif; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  h2 { font-size: 16px; margin: 20px 0 8px; }
+  p { margin: 0 0 12px; opacity: .8; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+  button { padding: 10px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--fg);
+    font: inherit; cursor: pointer; text-align: left; }
+  button:active { border-color: var(--accent); }
+  button small { display: block; opacity: .6; font-size: 12px; }
+</style>
+</head>
+<body>
+<h1>Звуки «Последнего конвоя»</h1>
+<p>Нажмите кнопку — звук сыграет так же, как в игре. Первое нажатие включает звук (так требует браузер).</p>
+<h2>События игры</h2>
+<div class="grid" id="events"></div>
+<h2>Каждый файл отдельно</h2>
+<div class="grid" id="files"></div>
+<script src="js/data.js"></script>
+<script src="js/audio.js"></script>
+<script>
+  const EVENTS = [
+    ['Удар стражи', () => SFX.hitMelee('melee')], ['Удар копейщика', () => SFX.hitMelee('spear')],
+    ['Удар латника', () => SFX.hitMelee('heavy')], ['Выстрел лучницы', () => SFX.shoot()],
+    ['Стрела попала', () => SFX.hitRanged()], ['Гибель врага', () => SFX.death('enemy')],
+    ['Гибель своего', () => SFX.death('player')], ['Найм бойца', () => SFX.spawn()],
+    ['Бомба', () => SFX.bomb()], ['Удар по повозке', () => SFX.coreHit()],
+    ['Волна идёт', () => SFX.alarm()], ['Элита / подмога', () => SFX.elite()],
+    ['Вожак рычит', () => SFX.bossRoar()], ['Вожак бьёт о землю', () => SFX.slam()],
+    ['Вожак повержен', () => SFX.bossDown()], ['Камнепад: бросок', () => SFX.rockLaunch()],
+    ['Камнепад: удар', () => SFX.rockHit()], ['Град стрел', () => SFX.hail()],
+    ['Баллиста', () => SFX.ballista()], ['Повозки при смерти', () => SFX.heartbeat()],
+    ['Монета', () => SFX.coin(0)], ['Серия монет', () => SFX.streak()], ['Жила золота', () => SFX.vein()],
+    ['Волна отбита', () => SFX.waveClear()], ['Карта взята', () => SFX.upgrade()],
+    ['Сочетание карт', () => SFX.synergy()], ['Новая эпоха', () => SFX.era()],
+    ['Починка повозки', () => SFX.repair()], ['Второй шанс', () => SFX.revive()],
+    ['Награда за славу', () => SFX.gloryUnlock()], ['Кнопка', () => SFX.click()], ['Нельзя', () => SFX.buyDenied()],
+    ['Бой: 2 секунды', () => {
+      const acts = [() => SFX.hitMelee('melee'), () => SFX.hitMelee('spear'), () => SFX.shoot(), () => SFX.hitRanged(),
+        () => SFX.hitMelee('heavy'), () => SFX.death(Math.random() < 0.7 ? 'enemy' : 'player'), () => SFX.coin(Math.random() * 0.3)];
+      for (let i = 0; i < 40; i++) setTimeout(() => acts[Math.floor(Math.random() * acts.length)](), Math.random() * 2000);
+    }],
+  ];
+  const ev = document.getElementById('events');
+  for (const [name, fn] of EVENTS) {
+    const b = document.createElement('button');
+    b.textContent = name;
+    b.onclick = () => { SFX.unlock(); setTimeout(fn, 30); };
+    ev.appendChild(b);
+  }
+  // список файлов — из того же банка, что грузит игра (имя_1 … имя_N)
+  const FILES = { hit_melee: 4, hit_spear: 4, hit_heavy: 4, hit_ranged: 4, shoot: 3, death_enemy: 4, death_ally: 3,
+    spawn: 3, core_hit: 6, bomb: 2, horn: 1, horn_big: 1, roar: 2, boss_death: 1, slam: 1, rock_launch: 1, rock_hit: 3,
+    volley: 1, ballista: 1, heart: 1, coins: 2, vein: 1, fanfare: 1, sparkle: 2, flourish: 1, card: 1, hammer: 2, click: 2, deny: 1 };
+  const fl = document.getElementById('files');
+  for (const [name, n] of Object.entries(FILES)) {
+    for (let i = 1; i <= n; i++) {
+      const b = document.createElement('button');
+      b.innerHTML = `${name}_${i}<small>assets/audio/sfx</small>`;
+      b.onclick = () => new Audio(`assets/audio/sfx/${name}_${i}.mp3`).play();
+      fl.appendChild(b);
+    }
+  }
+</script>
+</body>
+</html>

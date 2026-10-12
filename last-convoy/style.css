@@ -1699,7 +1699,7 @@ body.convoy #heroDownFlash, body.convoy #fortEdge { display: none !important; }
 /* Сборка 4 (макет UI_МАКЕТЫ/КОНВОЙ_UI.md). Три семейства элементов и больше ничего:
    сводка — тёмная плашка (не нажимается), действие — деревянная плитка, главная кнопка — золотая (.menu-btn).
    Слов в бою нет: значки и числа; обучение — указатель над плиткой (.cv-point). */
-#cvHud, #cvMenu, #cvResult, #cvRevive, #screenPause {
+#cvHud, #cvMenu, #cvResult, #cvRevive, #cvDaily, #screenPause {
   --cv-sum-bg: rgba(28,19,11,.8);
   --cv-sum-edge: rgba(8,5,2,.85);
   --cv-r: .75em;
@@ -2234,3 +2234,24 @@ body.convoy #screenPause .popup-card { min-width: 0; gap: max(10px, 1em); paddin
 .cv-unlock span svg.ico, .cv-unlock span .gold-dot, .cv-next-desc svg.ico, .cv-next-desc .gold-dot { width: 1.15em; height: 1.15em; vertical-align: -.22em; margin-right: .15em; color: #f2e6cf; }
 .cv-unlock span .gold-dot, .cv-next-desc .gold-dot { width: .92em; height: .92em; vertical-align: -.1em; border-width: 1.5px; }
 @media (prefers-reduced-motion: reduce) { #cvResult.celebrate .cv-res-rays { animation: none; } .cv-gold-gain.show { animation-duration: .01s; } }
+
+/* ---------------------------------------------------------------- сборка 11: награда за вход и «Рассказать друзьям» */
+#cvDaily { background: rgba(20,12,4,.55); }
+.cv-daily-card { align-items: center; width: min(26em, 94vw); gap: .55em; padding: 1em 1.2em 1.1em; text-align: center; animation: cvUnlockIn .35s cubic-bezier(.34,1.56,.64,1); }
+.cv-daily-card h2 { margin: 0; font-size: 1.5em; line-height: 1.1; color: #ffd35c; }
+.cv-daily-card p { margin: 0; font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: max(12px, .78em); letter-spacing: 0; line-height: 1.3; color: var(--paper); }
+.cv-daily-track { display: flex; gap: .3em; justify-content: center; width: 100%; }
+.cv-daily-track > div {
+  flex: 1 1 0; min-width: 0; max-width: 3.2em; padding: .25em .1em .3em; border-radius: .5em; background: var(--cv-sum-bg);
+  border: 2px solid var(--cv-sum-edge); display: flex; flex-direction: column; align-items: center; gap: .1em;
+  font-family: 'Fredoka', sans-serif; font-weight: 700; color: var(--paper); font-size: max(11px, .7em); line-height: 1.1;
+}
+.cv-daily-track > div small { font-size: .85em; opacity: .75; font-weight: 600; }
+.cv-daily-track > div b { display: inline-flex; align-items: center; gap: .1em; font-size: 1.15em; color: #ffd35c; }
+.cv-daily-track svg.ico { width: .9em; height: .9em; vertical-align: 0; color: #ffd35c; }
+.cv-daily-track > div.done { opacity: .55; }
+.cv-daily-track > div.now { border-color: #ffd35c; background: rgba(120,82,20,.85); box-shadow: 0 0 .6em rgba(255,211,92,.55); transform: scale(1.08); }
+.cv-daily-track > div.big b { color: #ffb14a; }
+#cvDailyTake { min-width: 8em; }
+.cv-menu-share { position: absolute; top: max(10px, 1.6vh); left: max(10px, 1.2vw); z-index: 2; }
+body:not(.convoy) .cv-menu-share, .cv-share.hidden { display: none; }

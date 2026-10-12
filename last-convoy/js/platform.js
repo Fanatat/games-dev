@@ -781,6 +781,20 @@ const PLATFORM = (() => {
       if (DEV_ADS && window.CONVOY_PROTOTYPE) return showTestInterstitial();
       return Promise.resolve(false);
     },
+    // «Рассказать друзьям» («Последний конвой», сборка 11): окно «Поделиться» ВК со ссылкой на игру
+    // (без link ВК подставляет ссылку на само приложение). Вне ВК кнопки нет; на стенде — заглушка.
+    canShare() { return kind === 'vk' || DEV_ADS; },
+    share() {
+      if (kind === 'vk' && vkBridge) return vkBridge.send('VKWebAppShare', {}).then(() => true).catch(() => false);
+      if (!DEV_ADS) return Promise.resolve(false);
+      return new Promise((resolve) => {
+        const overlay = document.createElement('div');
+        overlay.className = 'ad-test-overlay';
+        overlay.innerHTML = '<div class="ad-test-box"><div class="ad-test-badge">«Поделиться» (тест)</div><p>Здесь ВК откроет окно, чтобы рассказать друзьям об игре.</p></div>';
+        document.body.appendChild(overlay);
+        setTimeout(() => { overlay.remove(); resolve(true); }, 1200);
+      });
+    },
     // Есть ли вообще чем показать ролик за награду: SDK площадки или заглушка стенда/локалки.
     // Без этого кнопку рекламы не показываем (бесплатной награды нет).
     rewardedPossible() { return kind === 'vk' || kind === 'yandex' || kind === 'crazygames' || DEV_ADS; },

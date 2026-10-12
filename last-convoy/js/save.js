@@ -74,6 +74,9 @@ function defaultProgress() {
     // календаря, см. convoy.js). Живут в облаке ВК вместе с остальным.
     cvGlory: 0,
     cvBest: {},
+    // Сборка 11: награда за вход — последний день, когда забрана (номер дня по Москве), и дней подряд.
+    cvDayLast: 0,
+    cvDayStreak: 0,
   };
 }
 
@@ -137,6 +140,8 @@ const SAVE_NUM_RANGES = {
   gearSword: [0, 3, true], gearShield: [0, 3, true], gearArmor: [0, 3, true], gearLongBlade: [0, 3, true],
   missionsStarted: [0, 1e6, true],
   cvGlory: [0, 1e7, true],
+  cvDayLast: [0, 1e6, true],
+  cvDayStreak: [0, 1e6, true],
 };
 const SAVE_STRING_ENUMS = {
   cosmeticTime: ['cycle', 'day', 'night'],

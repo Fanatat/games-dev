@@ -95,19 +95,42 @@ const CONVOY = {
   // tint — цвет плитки, пока фона края нет или он грузится.
   levels: [
     { id: 1, name: 'Тракт', go: 'На тракт', boss: 'Вождь', stat: 1, glory: 1, tint: '#6f8f4e' },
-    { id: 2, name: 'Сумрачный лес', go: 'В Сумрачный лес', boss: 'Вожак стаи', stat: 1.05, glory: 1.5, tint: '#2c3b2a' },
-    { id: 3, name: 'Гнилые топи', go: 'В Гнилые топи', boss: 'Король-жаба', stat: 1.1, glory: 2, tint: '#3d4a2c' },
+    { id: 2, name: 'Сумрачный лес', go: 'В Сумрачный лес', boss: 'Вожак стаи', stat: 1.02, glory: 1.5, tint: '#2c3b2a' },
+    { id: 3, name: 'Гнилые топи', go: 'В Гнилые топи', boss: 'Король-жаба', stat: 1.07, glory: 2, tint: '#3d4a2c' },
     { id: 4, name: 'Горный перевал', go: 'На Горный перевал', boss: 'Горный великан', stat: 1.1, glory: 2.5, tint: '#6b6458' },
     { id: 5, name: 'Красные пески', go: 'В Красные пески', boss: 'Чёрный скорпион', stat: 1.15, glory: 3, tint: '#a5683a' },
     { id: 6, name: 'Ледяной перевал', go: 'На Ледяной перевал', boss: 'Ледяной великан', stat: 1.2, glory: 3.5, tint: '#7f98aa' },
-    { id: 7, name: 'Огненные земли', go: 'В Огненные земли', boss: 'Огненный демон', stat: 1.25, glory: 4, tint: '#6b2a1c' },
-    { id: 8, name: 'Проклятые руины', go: 'В Проклятые руины', boss: 'Король-лич', stat: 1.3, glory: 4.5, tint: '#3a3446' },
+    { id: 7, name: 'Огненные земли', go: 'В Огненные земли', boss: 'Огненный демон', stat: 1.22, glory: 4, tint: '#6b2a1c' },
+    { id: 8, name: 'Проклятые руины', go: 'В Проклятые руины', boss: 'Король-лич', stat: 1.18, glory: 4.5, tint: '#3a3446' },
   ],
+  // Особенности краёв (сборка 11, вариант «А» основателя 12.10): у врагов края своё свойство (trait), у вожака —
+  // свой особый удар (boss) сверх удара по земле и подмоги. trait.units — роли врагов, которые его несут
+  // (кто они на рисунке — js/sprites.js REGION_ENEMY). Урон яда, огня и особых ударов — × силе врага (dmgMult).
+  // Особый удар: замах wind с (видно, куда ляжет), потом раз в cd с; оглушили на замахе — сорван.
+  lands: {
+    2: { trait: { id: 'pack', desc: 'волки бегут быстрее', units: ['infantry', 'spear'], speed: 1.15 },
+      boss: { id: 'howl', name: 'Вой', cd: 11, wind: 0.7, sec: 3, speed: 1.25, dmg: 1.1 } },
+    3: { trait: { id: 'venom', desc: 'жабы плюются ядом', units: ['archer'], dps: 2, sec: 3 },
+      boss: { id: 'spit', name: 'Ядовитый плевок', cd: 8, wind: 0.9, r: 70, sec: 4, dps: 5 } },
+    4: { trait: { id: 'stun', desc: 'голем оглушает ударом', units: ['heavy'], stun: 0.7 },
+      boss: { id: 'boulder', name: 'Валун', cd: 8, wind: 1, r: 60, dmg: 30, stun: 1.2 } },
+    5: { trait: { id: 'leech', desc: 'гноллы лечатся ударами', units: ['infantry', 'spear', 'heavy'], share: 0.4 },
+      boss: { id: 'burrow', name: 'Подкоп', cd: 10, wind: 1.1, r: 75, dmg: 26 } },
+    6: { trait: { id: 'frost', desc: 'йети замедляют', units: ['archer', 'heavy'], sec: 1.8 },
+      boss: { id: 'breath', name: 'Ледяное дыхание', cd: 9, wind: 0.9, len: 230, stun: 1.6, dmg: 10 } },
+    7: { trait: { id: 'burn', desc: 'бесы поджигают', units: ['archer'], dps: 2.5, sec: 3 },
+      boss: { id: 'meteor', name: 'Огненный дождь', cd: 11, wind: 1, n: 4, r: 42, dmg: 18, dps: 4, sec: 3 } },
+    8: { trait: { id: 'undead', desc: 'скелеты встают снова', units: ['infantry', 'spear'], chance: 0.15, hp: 0.4, delay: 1.4 },
+      boss: { id: 'raise', name: 'Поднять мёртвых', cd: 13, wind: 0.9, n: 2 } },
+  },
   // Календарь: на выходе открыты уровни 1..open, следующий — в первую пятницу (weekday 5) не раньше чем
   // через gap дней после выхода, дальше по одному каждые gap дней; полночь по Москве (tz +3).
   // Играть уровень можно, когда он открыт календарём и конвой доставлен на предыдущем.
   // release — день выхода в ВК: поставить при выпуске (до него на стенде считается от этой даты).
   calendar: { release: '2026-10-12', open: 2, gap: 7, weekday: 5, tz: 3 },
+  // Награда за вход (сборка 11): слава за первый заход в меню в новые сутки (полночь по Москве).
+  // Дни подряд идут по кругу из семи; пропуск суток начинает круг заново. Окно — после первой славы.
+  daily: [3, 4, 5, 6, 8, 10, 15],
   // Волны стоянок. stat — HP и урон врагов (entities.js spawnUnit, world.enemyStatMult);
   // groups — группы внутри волны: at — секунда от начала волны, elite — элитные враги, boss — Вождь.
   waves: [
@@ -441,6 +464,7 @@ const Convoy = (() => {
   // Время: в ВК — vk_ts из параметров запуска (часы устройства не открывают уровни раньше), иначе часы
   // устройства. На стенде ?day=9 сдвигает «сегодня» на 9 дней вперёд — проверить, как откроется уровень.
   const DAY = 864e5, HOUR = 36e5;
+  const plural = (n, one, few, many) => n % 10 === 1 && n % 100 !== 11 ? one : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? few : many;
   const clock = (() => {
     let at = Date.now();
     try {
@@ -467,7 +491,7 @@ const Convoy = (() => {
     if (ms < HOUR) return 'совсем скоро';
     if (ms < DAY) return `через ${Math.ceil(ms / HOUR)} ч`;
     const n = Math.ceil(ms / DAY);
-    return `через ${n} ${n % 10 === 1 && n % 100 !== 11 ? 'день' : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? 'дня' : 'дней'}`;
+    return `через ${n} ${plural(n, 'день', 'дня', 'дней')}`;
   }
   const openDate = (id) => new Date(levelOpenAt(id) + CONVOY.calendar.tz * HOUR)
     .toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', timeZone: 'UTC' });
@@ -523,6 +547,39 @@ const Convoy = (() => {
     const p = prog();
     return { total: p && Number.isFinite(p.cvGlory) ? p.cvGlory : 0 };
   }
+  // ------------------------------------------------------------ награда за вход (сборка 11)
+  const dayNo = () => Math.floor((nowMs() + CONVOY.calendar.tz * HOUR) / DAY);
+  // Что дать сегодня: null — уже забрано (или ещё ни одного похода); иначе день круга и слава.
+  function dailyOffer() {
+    const p = prog(), today = dayNo();
+    if (!p || !(readGlory().total > 0) || (p.cvDayLast || 0) >= today) return null;
+    const streak = p.cvDayLast === today - 1 ? (p.cvDayStreak || 0) + 1 : 1;
+    const D = CONVOY.daily, i = (streak - 1) % D.length;
+    return { today, streak, i, glory: D[i] };
+  }
+  function renderDaily() {
+    const o = screen === 'cmenu' ? dailyOffer() : null, el = $('cvDaily');
+    if (!el) return;
+    el.classList.toggle('hidden', !o);
+    if (!o) return;
+    const D = CONVOY.daily, star = '<svg class="ico"><use href="#i-star"/></svg>';
+    $('cvDailyTrack').innerHTML = D.map((g, k) =>
+      `<div class="${k < o.i ? 'done' : k === o.i ? 'now' : ''}${k === D.length - 1 ? ' big' : ''}"><small>День ${k + 1}</small><b>+${g}${star}</b></div>`).join('');
+    setText('cvDailyText', o.streak > 1 ? `Ты заходишь ${o.streak} ${plural(o.streak, 'день', 'дня', 'дней')} подряд — награда растёт.` : 'Заходи каждый день — награда растёт. Пропуск начнёт круг заново.');
+    $('cvDailyTake').innerHTML = `Забрать +${o.glory} ${star}`;
+  }
+  function takeDaily() {
+    const o = dailyOffer(), p = prog();
+    if (!o || !p) { renderDaily(); return; }
+    p.cvGlory = (p.cvGlory || 0) + o.glory;
+    p.cvDayLast = o.today;
+    p.cvDayStreak = o.streak;
+    saveProgress(p);
+    SFX.coin(0.3);
+    renderDaily();
+    renderMenu();
+  }
+
   function metaOf(total) { return CONVOY.meta.filter(u => total >= u.at).map(u => u.id); }
   // Ступень «Доблести» по всей славе: n — сколько ступеней, floor/next — слава начала текущей и следующей.
   function valorOf(total) {
@@ -617,6 +674,7 @@ const Convoy = (() => {
         offer: null, rerolls: 0, repaired: false, chosen: false, shown: false, win: false,
         props: headless ? [] : makeProps(), dustT: 0,
         boss: null, slam: null, slamT: 0, summoned: false,     // Вождь (updateBoss)
+        spec: null, specT: 0, pools: [], risers: [], tipAt: -9, // особенности края (land): особый удар вожака, лужи, встающие
         hailT: 0, ballT: 0, bolts: [], rage: 0, beatT: 0,      // сочетания (tickSynergies), стук сердца
         eraFx: false, vignette: 0, counter: null,               // counter — ответ врага на перекос отряда
         headless,
@@ -630,10 +688,11 @@ const Convoy = (() => {
     world.onCoreDestroyed = () => { if (match && match.world === world) coreDown(); };
     world.onUnitDeath = (u) => { if (match && match.world === world) onDeath(u); };
     world.onImpact = (x) => { if (!headless) VFX.impact(match, x); };
+    world.onStrike = (a, ref, kind) => { if (match && match.world === world) onStrike(a, ref, kind); };
     world.onHit = (ref, role) => {
       ref.lastHitRole = role;
       if (headless) return;
-      if (role !== 'ranged') VFX.meleeHit(match, ref.x, -34, ref.team !== 'player');
+      if (role !== 'ranged' && role !== 'dot') VFX.meleeHit(match, ref.x, -34, ref.team !== 'player');
       if (role === 'heavy') VFX.burst(match, 'dust', ref.x, -2, 5, { speed: 90, spread: Math.PI * 0.8, dir: -Math.PI / 2, life: 0.5, size: 4, color: ART.dust, gravity: 40, jitter: 10 });
     };
     // камень лёг: убитые им падают «полётом», а не на колени (render: deathKind)
@@ -669,6 +728,8 @@ const Convoy = (() => {
     showScreen('match');
     match.currentBattleTrack = pickNextBattleTrack(null);
     MUSIC.play(match.currentBattleTrack, { force: true });
+    // ВК грузит ролик по проверке: заранее, чтобы к «Второму шансу» он успел прийти
+    if (PLATFORM.rewardedPossible()) PLATFORM.checkRewardedAvailable();
     return match;
   }
   function startSquad() {
@@ -700,13 +761,25 @@ const Convoy = (() => {
       if (C.phase === 'wave' || C.phase === 'march' || C.phase === 'clear') C.rockCd = Math.max(0, C.rockCd - dt);
       for (const q of C.rockQueue) { q.t -= dt; if (q.t <= 0) dropRocks(q.x); }
       C.rockQueue = C.rockQueue.filter(q => q.t > 0);
+      // Конвой пал — бой замирает: раньше за итогом враги продолжали бить отряд, который тянуло «домой» (как в тире).
+      const lost = C.phase === 'end' && !C.win;
+      if (lost) {
+        for (const u of w.units) {
+          if (u.state === 'dead') u.deathT = Math.min(1, u.deathT + dt / 0.6);
+          else { u.state = 'idle'; u.attackTimer = 0; }
+        }
+        w.projectiles.length = 0;
+        C.bolts && (C.bolts.length = 0);
+      } else {
       updateVolley(w, dt, () => {});
       // свои всегда смотрят на врага в логике боя; разворот «домой» — только на шаг ниже
       for (const u of w.units) if (u.team === 'player' && u.state !== 'dead') u.dir = 1;
       if (C.phase === 'wave') tickSynergies(dt);
+      tickStatus(dt);
       updateBolts(dt);
       updateUnits(w, dt, () => {});
-      if (C.phase !== 'wave' || alive('enemy') === 0) {
+      }
+      if (!lost && (C.phase !== 'wave' || alive('enemy') === 0)) {
         for (const u of w.units) if (u.team === 'player' && u.state !== 'dead') homeStep(u, dt, C.phase === 'march');
       }
     }
@@ -757,7 +830,7 @@ const Convoy = (() => {
     C.waveHp = m.world.playerCore.hp;
     if (C.headless) return;
     const last = run.stop === STOPS;
-    const sub = last ? `${level().boss}!` : run.stop === 1 && run.level > 1 ? level().name : '';
+    const sub = last ? `${level().boss}!` : run.stop === 1 && land() ? `${level().name}: ${land().trait.desc}` : run.stop === 1 && run.level > 1 ? level().name : '';
     banner(last ? 'Последняя стоянка!' : `Стоянка ${run.stop}`, sub, last ? 'red' : 'gold', 2.2);
     SFX.alarm();
   }
@@ -801,7 +874,7 @@ const Convoy = (() => {
     const inc = incomeRate() * dt;
     m.gold += inc;
     run.stats.gold += inc;
-    if (C.groupIdx >= def.groups.length && !C.queue.length && alive('enemy') === 0 && w.playerCore.hp > 0) clearWave();
+    if (C.groupIdx >= def.groups.length && !C.queue.length && !C.risers.length && alive('enemy') === 0 && w.playerCore.hp > 0) clearWave();
   }
   function spawnFoe(q) {
     const m = match, C = m.convoy, w = m.world;
@@ -810,8 +883,9 @@ const Convoy = (() => {
       u = spawnEliteUnit(w, 'enemy', q.type, 1);
       if (!u) return;
       C.boss = u; C.slamT = CONVOY.boss.slamCd * 0.6; C.summoned = false; C.slam = null;
+      C.spec = null; C.specT = land() ? land().boss.cd * 0.45 : 0;
       if (!C.headless) {
-        banner(`${level().boss}!`, '', 'red', 2.4);
+        banner(`${level().boss}!`, land() ? land().boss.name : '', 'red', 2.4);
         shakeScreen(m, 7);
         SFX.bossRoar();
         VFX.spawn(m, 'ring', u.x, -40, { size: 180, width: 7, life: 0.7, color: ART.enemy.eliteOutline, glow: ART.enemy.eliteGlow, gravity: 0 });
@@ -825,12 +899,12 @@ const Convoy = (() => {
         SFX.elite();
       }
     } else u = spawnUnit(w, 'enemy', q.type);
-    if (u) u.speedMult = CONVOY.enemySpeed;
+    if (u) u.speedMult = CONVOY.enemySpeed * traitSpeed(u);
   }
   // Вождь: удар по земле с замахом (круг на земле), на половине здоровья — подмога.
   function updateBoss(dt) {
     const m = match, C = m.convoy, w = m.world, B = CONVOY.boss, u = C.boss;
-    if (!u || u.state === 'dead') { C.boss = null; C.slam = null; return; }
+    if (!u || u.state === 'dead') { C.boss = null; C.slam = null; C.spec = null; return; }
     if (!C.summoned && u.hp <= u.maxHp * B.summonAt) {
       C.summoned = true;
       let i = 0;
@@ -863,7 +937,11 @@ const Convoy = (() => {
       }
       return;
     }
+    if (C.spec) { tickSpec(u, dt); return; }
     C.slamT -= dt;
+    C.specT -= dt;
+    const L = land();
+    if (L && C.specT <= 0 && C.slamT > 0.8 && !(u.stunT > 0) && u.x < ARENA.laneMax - 120) { startSpec(u, L.boss); return; }
     if (C.slamT <= 0 && u.state === 'attack' && !(u.stunT > 0)) {
       C.slam = { t: 0, x: u.x - 40 };
       if (!C.headless) SFX.alarm();
@@ -873,14 +951,177 @@ const Convoy = (() => {
   function bossPose(u, t) {
     const C = match.convoy;
     if (!C || C.boss !== u) return null;
-    if (C.slam) return 'raise';
+    if (C.slam || C.spec) return 'raise';
     if (C.smashAt !== undefined && t - C.smashAt < 0.45) return 'smash';
     if (C.roarAt !== undefined && t - C.roarAt < 1.4) return 'roar';
     return null;
   }
+  // ------------------------------------------------------------ особенности краёв (CONVOY.lands)
+  function land() { return run && CONVOY.lands[run.level] || null; }
+  function traitSpeed(u) {
+    const T = land() && land().trait;
+    return T && T.id === 'pack' && T.units.includes(u.typeId) && u !== match.convoy.boss ? T.speed : 1;
+  }
+  // Подпись над бойцом при эффекте края — не чаще раза в 1,2 с, чтобы было понятно, что с ним.
+  function landTip(u, text, color) {
+    const m = match, C = m.convoy;
+    if (C.headless || m.elapsed - C.tipAt < 1.2) return;
+    C.tipAt = m.elapsed;
+    VFX.floater(m, u.x, -92 * VIEW.fig, text, color);
+  }
+  // Удар врага дошёл (entities.js world.onStrike): свойство края.
+  function onStrike(a, ref, kind) {
+    const T = land() && land().trait;
+    if (!T || a.team !== 'enemy' || kind !== 'unit' || ref.team !== 'player' || ref.state === 'dead') return;
+    if (!T.units.includes(a.typeId) || a === match.convoy.boss) return;
+    if (T.id === 'venom' || T.id === 'burn') {
+      addDot(ref, T.id, T.dps * (a.dmgMult || 1), T.sec);
+      landTip(ref, T.id === 'venom' ? 'Яд!' : 'Горит!', T.id === 'venom' ? '#9be35a' : '#ff9a3c');
+    } else if (T.id === 'stun') {
+      ref.stunT = Math.max(ref.stunT || 0, T.stun);
+      landTip(ref, 'Оглушён!', '#ffe066');
+    } else if (T.id === 'frost') {
+      ref.slowT = Math.max(ref.slowT || 0, T.sec);
+      landTip(ref, 'Холод!', '#9fd8ff');
+    } else if (T.id === 'leech' && a.hp < a.maxHp) {
+      a.hp = Math.min(a.maxHp, a.hp + UNIT_TYPES[a.typeId].dmg * (a.dmgMult || 1) * T.share);
+      landTip(a, '+жизнь', '#ff6b6b');
+    }
+  }
+  // Яд и огонь: урон по чуть-чуть, раз в 0,5 с (dealDamage с ролью 'dot' — без звука удара).
+  function addDot(u, kind, dps, sec) {
+    const d = u.dot;
+    if (d && d.kind === kind) { d.t = Math.max(d.t, sec); d.dps = Math.max(d.dps, dps); return; }
+    u.dot = { kind, dps, t: sec, acc: 0, tick: 0 };
+  }
+  function tickStatus(dt) {
+    const m = match, C = m.convoy, w = m.world;
+    for (const p of C.pools) {
+      p.t -= dt;
+      for (const u of w.units) if (u.team === 'player' && u.state !== 'dead' && Math.abs(u.x - p.x) <= p.r) addDot(u, p.kind, p.dps, 0.6);
+    }
+    if (C.pools.length) C.pools = C.pools.filter(p => p.t > 0);
+    for (const u of w.units) {
+      if (u.state === 'dead') continue;
+      if (u.slowT > 0) u.slowT = Math.max(0, u.slowT - dt);
+      if (u.frozeT > 0) u.frozeT = Math.max(0, u.frozeT - dt);
+      if (u.howl && (u.howlT -= dt) <= 0) { u.speedMult /= u.howl.speed; u.dmgMult /= u.howl.dmg; u.howl = null; }
+      const d = u.dot;
+      if (!d) continue;
+      d.t -= dt; d.acc += d.dps * dt; d.tick += dt;
+      if (d.tick >= 0.5 || d.t <= 0) {
+        const n = d.acc;
+        d.tick = 0; d.acc = 0;
+        if (n > 0) dealDamage(w, { kind: 'unit', ref: u }, n, () => {}, 'dot');
+      }
+      if (d.t <= 0) u.dot = null;
+    }
+    if (!C.risers.length) return;
+    for (const r of C.risers) if ((r.t -= dt) <= 0) raiseFoe(r);
+    C.risers = C.risers.filter(r => r.t > 0);
+  }
+  // Встающий скелет: там, где упал, с долей здоровья; золота за него почти нет.
+  function raiseFoe(r) {
+    const m = match, C = m.convoy;
+    if (C.phase !== 'wave') return;
+    const u = spawnUnit(m.world, 'enemy', r.type);
+    if (!u) return;
+    u.x = Math.max(ARENA.laneMin + 40, Math.min(ARENA.laneMax - 6, r.x));
+    u.risen = true; u.cost = 1;
+    u.hp = Math.max(1, Math.round(u.maxHp * r.hp));
+    u.speedMult = CONVOY.enemySpeed;
+    if (C.headless) return;
+    VFX.burst(m, 'spark', u.x, -20 * VIEW.fig, 10, { speed: 120, life: 0.7, size: 3, colors: ['#c9a7ff', '#8a6bd6', '#e8e0ff'], lift: 50, gravity: -10 });
+    landTip(u, 'Встал!', '#c9a7ff');
+  }
+
+  // Особый удар вожака края: цель выбирается на замахе и видна на земле, потом удар.
+  function specTarget(u, S) {
+    const w = match.world;
+    const mine = w.units.filter(f => f.team === 'player' && f.state !== 'dead');
+    if (S.id === 'howl' || S.id === 'raise' || S.id === 'breath') return u.x;
+    if (!mine.length) return null;
+    if (S.id === 'boulder' || S.id === 'burrow') return Math.min(...mine.map(f => f.x));   // по задним — стрелкам у повозок
+    // плевок и огненный дождь — по самой густой кучке своих
+    let best = mine[0].x, bn = -1;
+    for (const f of mine) {
+      const n = mine.filter(g => Math.abs(g.x - f.x) <= (S.r || 60)).length;
+      if (n > bn) { bn = n; best = f.x; }
+    }
+    return best;
+  }
+  function startSpec(u, S) {
+    const m = match, C = m.convoy, w = m.world;
+    const x = specTarget(u, S);
+    if (x == null) { C.specT = 1.5; return; }
+    let xs = null;
+    if (S.id === 'meteor') {
+      const mine = w.units.filter(f => f.team === 'player' && f.state !== 'dead').map(f => f.x);
+      xs = Array.from({ length: S.n }, (_, i) => i === 0 ? x : mine[Math.floor(rnd() * mine.length)] + (rnd() - 0.5) * 60);
+    }
+    C.spec = { S, t: 0, x, xs, from: u.x };
+    if (C.headless) return;
+    VFX.floater(m, u.x, -150 * VIEW.fig, `${S.name}!`, '#ffd0a0');
+    SFX.alarm();
+  }
+  function hurtArea(x, r, dmg, fn) {
+    const w = match.world;
+    for (const f of w.units) {
+      if (f.team !== 'player' || f.state === 'dead' || Math.abs(f.x - x) > r) continue;
+      if (dmg > 0) dealDamage(w, { kind: 'unit', ref: f }, dmg, () => {}, 'heavy', null);
+      if (fn && f.state !== 'dead') fn(f);
+    }
+  }
+  function tickSpec(u, dt) {
+    const m = match, C = m.convoy, w = m.world, sp = C.spec, S = sp.S, k = u.dmgMult || 1;
+    sp.t += dt;
+    u.attackTimer = Math.max(u.attackTimer, 0.2);       // на замахе обычным ударом не бьёт
+    if (u.stunT > 0) { C.spec = null; C.specT = S.cd * 0.5; return; }  // оглушили — сорван
+    if (sp.t < S.wind) return;
+    const fx = !C.headless;
+    if (S.id === 'howl') {
+      for (const e of w.units) {
+        if (e.team !== 'enemy' || e.state === 'dead') continue;
+        if (!e.howl) { e.howl = S; e.speedMult = (e.speedMult || 1) * S.speed; e.dmgMult = (e.dmgMult || 1) * S.dmg; }
+        e.howlT = S.sec;
+      }
+      C.roarAt = m.elapsed;
+      if (fx) { SFX.bossRoar(); shakeScreen(m, 6); VFX.spawn(m, 'ring', u.x, -40, { size: 260, width: 6, life: 0.6, color: '#ff6a4a', gravity: 0 }); }
+    } else if (S.id === 'spit') {
+      C.pools.push({ x: sp.x, r: S.r, t: S.sec, life: S.sec, dps: S.dps * k, kind: 'venom' });
+      if (fx) { SFX.hitRanged(); VFX.burst(m, 'spark', sp.x, -6, 14, { speed: 140, spread: Math.PI * 0.9, dir: -Math.PI / 2, life: 0.6, size: 3.4, colors: ['#9be35a', '#5fa83a', '#d8ff9a'], gravity: 260 }); }
+    } else if (S.id === 'boulder') {
+      hurtArea(sp.x, S.r, S.dmg * k, (f) => { f.stunT = Math.max(f.stunT || 0, S.stun); });
+      if (fx) { SFX.slam(); shakeScreen(m, 9); requestHitStop(0.06); VFX.spawn(m, 'ring', sp.x, -4, { size: S.r * 2.2, width: 6, life: 0.45, color: '#c9b79a', gravity: 0 }); VFX.burst(m, 'dust', sp.x, -2, 16, { speed: 200, spread: Math.PI * 0.9, dir: -Math.PI / 2, life: 0.7, size: 6, color: ART.dust, gravity: 160, jitter: S.r * 0.6 }); }
+    } else if (S.id === 'burrow') {
+      u.x = Math.max(w.playerCore.x + 70, sp.x + 14);
+      hurtArea(u.x, S.r, S.dmg * k, (f) => { f.x = Math.max(ARENA.laneMin, f.x - 16); });
+      if (fx) { SFX.slam(); shakeScreen(m, 9); VFX.burst(m, 'dust', u.x, -2, 22, { speed: 240, spread: Math.PI * 0.9, dir: -Math.PI / 2, life: 0.8, size: 7, color: '#c99a5a', gravity: 160, jitter: 30 }); }
+    } else if (S.id === 'breath') {
+      for (const f of w.units) {
+        if (f.team !== 'player' || f.state === 'dead' || f.x > u.x || f.x < u.x - S.len) continue;
+        dealDamage(w, { kind: 'unit', ref: f }, S.dmg * k, () => {}, 'dot', null);
+        if (f.state !== 'dead') { f.stunT = Math.max(f.stunT || 0, S.stun); f.frozeT = S.stun; }
+      }
+      if (fx) { SFX.hitRanged(); VFX.burst(m, 'spark', u.x - S.len / 2, -40, 22, { speed: 160, life: 0.8, size: 3.4, colors: ['#e8f6ff', '#9fd8ff', '#ffffff'], jitter: S.len / 2, gravity: 30 }); }
+    } else if (S.id === 'meteor') {
+      for (const x of sp.xs) {
+        hurtArea(x, S.r, S.dmg * k, (f) => addDot(f, 'burn', S.dps * k, S.sec));
+        if (fx) VFX.burst(m, 'spark', x, -6, 12, { speed: 170, spread: Math.PI * 0.9, dir: -Math.PI / 2, life: 0.6, size: 3.6, colors: ['#ffb347', '#ff6a2a', '#ffe08a'], gravity: 260 });
+      }
+      if (fx) { SFX.slam(); shakeScreen(m, 8); }
+    } else if (S.id === 'raise') {
+      for (let i = 0; i < S.n; i++) raiseFoe({ x: u.x - 60 - i * 26, type: 'infantry', hp: 1 });
+      C.roarAt = m.elapsed;
+      if (fx) { SFX.bossRoar(); VFX.spawn(m, 'ring', u.x, -40, { size: 220, width: 6, life: 0.6, color: '#b48aff', gravity: 0 }); }
+    }
+    C.spec = null;
+    C.specT = S.cd;
+  }
+
   function clearWave() {
     const m = match, C = m.convoy, w = m.world;
-    C.boss = null; C.slam = null; C.bolts = [];
+    C.boss = null; C.slam = null; C.bolts = []; C.spec = null; C.pools = []; C.risers = [];
     run.log.push({ stop: run.stop, hp: Math.ceil(w.playerCore.hp), lostHp: Math.round(C.waveHp - w.playerCore.hp), squad: alive('player'), gold: Math.floor(m.gold), sec: Math.round(m.elapsed) });
     if (run.stop >= STOPS) { finish(true); return; }
     C.phase = 'clear'; C.phaseT = 0;
@@ -889,6 +1130,7 @@ const Convoy = (() => {
     for (const u of w.units) {
       if (u.team !== 'player' || u.state === 'dead') continue;
       u.hp = Math.min(u.maxHp, u.hp + u.maxHp * CONVOY.squadHeal);
+      u.dot = null; u.slowT = 0;                 // яд, огонь и холод края сходят вместе с ранами
       if (!C.headless) VFX.burst(m, 'spark', u.x, -30 * VIEW.fig, 4, { speed: 70, life: 0.7, size: 2.6, colors: ['#b8f5a0', '#6fd46a', '#fff6c0'], lift: 40, gravity: -20 });
     }
     if (C.headless) return;
@@ -1049,9 +1291,12 @@ const Convoy = (() => {
     renderRevive();
     syncOverlays();
     SFX.alarm();
-    PLATFORM.checkRewardedAvailable().then((ok) => {
+    // Сборка 11 (тест основателя в ВК 12.10): ВК ответил «ролика нет» — игра молча ушла на итог, и
+    // предложения никто не увидел. Проверка заодно грузит ролик, поэтому спрашиваем второй раз; предложение
+    // показываем в любом случае, а если ролик так и не придёт — по нажатию пишем «Реклама недоступна».
+    const ask = () => PLATFORM.checkRewardedAvailable();
+    ask().then((ok) => ok === false ? new Promise((res) => setTimeout(res, 1200)).then(ask) : ok).then(() => {
       if (!match || match.convoy !== C || !C.revive) return;
-      if (ok === false) { declineRevive(); return; }
       C.revive.state = 'offer';
       renderRevive();
     });
@@ -1060,7 +1305,7 @@ const Convoy = (() => {
     const C = match && match.convoy, r = C && C.revive, btn = $('cvReviveAd');
     if (!r || !btn) return;
     btn.disabled = r.state !== 'offer';
-    btn.querySelector('span').textContent = r.state === 'check' ? 'Готовим…' : r.state === 'ad' ? 'Реклама…' : 'Второй шанс';
+    btn.querySelector('span').textContent = r.state === 'check' ? 'Готовим…' : r.state === 'ad' ? 'Реклама…' : r.state === 'none' ? 'Реклама недоступна' : 'Второй шанс';
   }
   function declineRevive() {
     const C = match && match.convoy;
@@ -1076,7 +1321,12 @@ const Convoy = (() => {
     renderRevive();
     PLATFORM.showBonusAd().then((r) => {
       if (!match || match.convoy !== C || !C.revive) return;
-      if (!r.shown) { declineRevive(); return; }
+      if (!r.shown) {
+        C.revive.state = 'none';
+        renderRevive();
+        setTimeout(() => { if (match && match.convoy === C) declineRevive(); }, 1400);
+        return;
+      }
       lastAdAt = performance.now();
       revive();
     });
@@ -1114,7 +1364,11 @@ const Convoy = (() => {
     btn.querySelector('span').textContent = 'Реклама…';
     PLATFORM.showBonusAd().then((r) => {
       if (!run || run.glory !== g) return;
-      if (!r.shown) { btn.disabled = false; btn.querySelector('span').textContent = 'Слава ×2'; return; }
+      if (!r.shown) {
+        btn.querySelector('span').textContent = 'Реклама недоступна';
+        setTimeout(() => { btn.disabled = false; btn.querySelector('span').textContent = 'Слава ×2'; }, 1600);
+        return;
+      }
       lastAdAt = performance.now();
       run.doubled = true;
       const was = g.total;
@@ -1247,6 +1501,8 @@ const Convoy = (() => {
     if (!C.headless) VFX.unitDeath(m, u.x);
     if (u.team !== 'enemy') { run.stats.lost++; return; }
     run.stats.kills++;
+    const T = land() && land().trait;   // «Нежить»: скелет встаёт снова (раз), если не вожак
+    if (T && T.id === 'undead' && !u.risen && !u.elite && T.units.includes(u.typeId) && rnd() < T.chance) C.risers.push({ x: u.x, type: u.typeId, t: T.delay, hp: T.hp });
     const boss = u === C.boss;
     if (u.elite && !boss) run.stats.elites++;
     let reward = Math.max(1, Math.round((u.cost || UNIT_TYPES[u.typeId].cost) * CONVOY.killShare * (1 + CONVOY.killGrowth * (run.stop - 1)) * run.mods.goldKill * (u.elite ? 2 : 1)));
@@ -1806,6 +2062,7 @@ const Convoy = (() => {
     $('cvMenu').classList.toggle('hidden', name !== 'cmenu');
     $('cvHud').classList.toggle('hidden', !(name === 'match' || name === 'paused'));
     syncOverlays();
+    renderDaily();
     if (name === 'cmenu') {
       renderMenu();
       if (MUSIC.current() !== 'menu') MUSIC.play('menu');
@@ -1875,7 +2132,7 @@ const Convoy = (() => {
         : locked ? '<svg class="ico"><use href="#i-lock"/></svg>'
           : b.wins ? `<svg class="ico"><use href="#i-wagon"/></svg>×${b.wins}` : b.runs ? `${b.stop}/${STOPS}` : fresh ? 'Новый!' : '';
       const title = soon ? `${L.name} — откроется ${untilText(L.id)}, ${openDate(L.id)}`
-        : locked ? `${L.name} — доставь конвой: уровень ${L.id - 1}` : L.name;
+        : locked ? `${L.name} — доставь конвой: уровень ${L.id - 1}` : CONVOY.lands[L.id] ? `${L.name} — ${CONVOY.lands[L.id].trait.desc}` : L.name;
       return `<button class="cv-level${L.id === cur ? ' on' : ''}${locked ? ' locked' : ''}${soon ? ' soon' : ''}${fresh ? ' fresh' : ''}" data-l="${L.id}" title="${title}" aria-label="${title}"` +
         `${locked ? ' aria-disabled="true"' : ''}><canvas width="168" height="96"></canvas><b class="cv-level-n">${L.id}</b>` +
         `${rec ? `<span class="cv-level-rec">${rec}</span>` : ''}</button>`;
@@ -2300,6 +2557,7 @@ const Convoy = (() => {
       ctx.beginPath(); ctx.ellipse(C.slam.x, ARENA.groundY + 8, R * k, 15 * k, 0, 0, TAU); ctx.fill();
       ctx.restore();
     }
+    drawLandFx(m, C, now);
     // болты баллисты
     for (const b of C.bolts) {
       const y = ARENA.groundY + b.y;
@@ -2334,6 +2592,81 @@ const Convoy = (() => {
       g.addColorStop(0, 'rgba(200,20,10,0)');
       g.addColorStop(1, `rgba(200,20,10,${a})`);
       ctx.save(); ctx.fillStyle = g; ctx.fillRect(VIEW.x0, VIEW.y0, VIEW.w, VIEW.h); ctx.restore();
+    }
+  }
+
+  // Особенности краёв: лужи яда, замах особого удара вожака, яд/огонь/холод на своих.
+  const SPEC_COLOR = { spit: '120,220,80', boulder: '200,180,150', burrow: '210,150,80', meteor: '255,130,40', breath: '160,215,255', howl: '255,90,60', raise: '180,140,255' };
+  function groundRing(x, R, k, rgb, now) {
+    ctx.save();
+    ctx.fillStyle = `rgba(${rgb},${0.12 + 0.22 * k})`;
+    ctx.strokeStyle = `rgba(${rgb},${0.6 + 0.4 * Math.sin(now / 50)})`;
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.ellipse(x, ARENA.groundY + 8, R, 15, 0, 0, TAU); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(x, ARENA.groundY + 8, R * k, 15 * k, 0, 0, TAU); ctx.fill();
+    ctx.restore();
+  }
+  function drawLandFx(m, C, now) {
+    for (const p of C.pools) {
+      const a = Math.min(1, p.t / 0.6) * 0.55;
+      ctx.save();
+      ctx.fillStyle = `rgba(110,190,60,${a})`;
+      ctx.beginPath(); ctx.ellipse(p.x, ARENA.groundY + 8, p.r, 14, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = `rgba(200,255,140,${a * 0.8})`;
+      for (let i = 0; i < 4; i++) {
+        const bx = p.x + Math.sin(i * 2.1 + now / 400) * p.r * 0.6, by = ARENA.groundY + 6 - ((now / 9 + i * 40) % 22);
+        ctx.beginPath(); ctx.arc(bx, by, 2.4, 0, TAU); ctx.fill();
+      }
+      ctx.restore();
+    }
+    const sp = C.spec;
+    if (sp) {
+      const S = sp.S, k = clamp01(sp.t / S.wind), rgb = SPEC_COLOR[S.id];
+      if (S.id === 'breath') {
+        ctx.save();
+        ctx.fillStyle = `rgba(${rgb},${0.1 + 0.25 * k})`;
+        ctx.fillRect(sp.x - S.len, ARENA.groundY - 90 * VIEW.fig, S.len * k, 96 * VIEW.fig);
+        ctx.restore();
+      } else if (S.id === 'howl' || S.id === 'raise') {
+        groundRing(sp.from, 60 + 60 * k, k, rgb, now);
+      } else {
+        for (const x of sp.xs || [sp.x]) groundRing(x, S.r, k, rgb, now);
+        if (S.id === 'boulder' || S.id === 'meteor') {   // падает с неба к концу замаха
+          for (const x of sp.xs || [sp.x]) {
+            const y = ARENA.groundY - 340 * (1 - k) - 14;
+            ctx.save();
+            ctx.fillStyle = S.id === 'boulder' ? '#8b7d6b' : '#ff8a2a';
+            ctx.strokeStyle = S.id === 'boulder' ? 'rgba(40,30,20,.9)' : 'rgba(255,230,140,.9)';
+            ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.arc(x, y, S.id === 'boulder' ? 16 : 10, 0, TAU); ctx.fill(); ctx.stroke();
+            ctx.restore();
+          }
+        }
+      }
+    }
+    // на своих: яд — зелёные пузырьки, огонь — искры, холод — голубой налёт, вой — красные отблески у врагов
+    for (const u of m.world.units) {
+      if (u.state === 'dead') continue;
+      const h = 74 * VIEW.fig * (UNIT_TYPES[u.typeId].heightMult || 1);
+      if (u.frozeT > 0) {
+        ctx.save();
+        ctx.fillStyle = 'rgba(170,220,255,.35)'; ctx.strokeStyle = 'rgba(230,248,255,.8)'; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.roundRect ? ctx.roundRect(u.x - 16, ARENA.groundY - h, 32, h, 6) : ctx.rect(u.x - 16, ARENA.groundY - h, 32, h);
+        ctx.fill(); ctx.stroke();
+        ctx.restore();
+      }
+      const d = u.dot, cold = u.slowT > 0, howl = !!u.howl;
+      if (!d && !cold && !howl) continue;
+      const col = d ? (d.kind === 'venom' ? '#9be35a' : '#ffa23c') : cold ? '#a8dcff' : '#ff6a4a';
+      ctx.save();
+      ctx.fillStyle = col;
+      for (let i = 0; i < 3; i++) {
+        const ph = ((now / 700) + i / 3) % 1;
+        const x = u.x + Math.sin(i * 2.4 + now / 300) * 9, y = ARENA.groundY - h * (0.35 + 0.6 * ph);
+        ctx.globalAlpha = 0.85 * (1 - ph);
+        ctx.beginPath(); ctx.arc(x, y, 2.6, 0, TAU); ctx.fill();
+      }
+      ctx.restore();
     }
   }
 
@@ -2670,6 +3003,10 @@ const Convoy = (() => {
     $('cvPause').addEventListener('click', () => { SFX.click(); togglePause(); });
     $('cvResume').addEventListener('click', () => { SFX.click(); togglePause(); });
     $('cvPauseHome').addEventListener('click', () => { SFX.click(); $('btnToMenuFromPause').click(); });
+    $('cvDailyTake').addEventListener('click', (e) => { SFX.click(); takeDaily(); e.currentTarget.blur(); });
+    const share = $('cvShare');
+    share.classList.toggle('hidden', !PLATFORM.canShare());
+    share.addEventListener('click', (e) => { SFX.click(); e.currentTarget.blur(); PLATFORM.share(); });
     for (const b of document.querySelectorAll('.cv-snd')) {
       b.addEventListener('click', (e) => {
         SFX.unlock();
@@ -2716,7 +3053,7 @@ const Convoy = (() => {
     if (new URLSearchParams(location.search).has('journal')) showJournal();
   }
   // Облако прочиталось позже (resync в save.js) — меню перерисовывается со свежей славой и уровнями.
-  function refreshMenu() { if (screen === 'cmenu') renderMenu(); }
+  function refreshMenu() { if (screen === 'cmenu') { renderMenu(); renderDaily(); } }
 
   return {
     boot, startRun, newRun, setupMatch, update, updateHud, buy, buyIndex, key, choose, repair, reroll,

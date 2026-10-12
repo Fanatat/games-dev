@@ -376,12 +376,17 @@ function dealDamage(world, targetInfo, dmg, onKillTeamGold, attackerRole = 'mele
       world.onHeroKill && world.onHeroKill(ref.x);
     }
     world.onUnitDeath && world.onUnitDeath(ref);
+  } else if (attackerRole === 'dot') {
+    // «Последний конвой»: яд и огонь краёв (convoy.js tickStatus) — тихо, без звука удара
   } else if (attackerRole === 'ranged') {
     SFX.hitRanged();
   } else {
     SFX.hitMelee(attackerRole);
   }
 }
+
+// «Последний конвой»: холод (u.slowT) — доля скорости хода и ударов
+const CONVOY_SLOW = 0.6;
 
 function updateUnits(world, dt, onKillTeamGold) {
   for (const u of world.units) {
@@ -403,7 +408,8 @@ function updateUnits(world, dt, onKillTeamGold) {
     // DLC «Усилить врага» (u.dmgMult, см. spawnUnit) перемножается с
     // Боевым кличем — оба канала независимы, оба могут быть активны разом.
     const cryDmg = (buffed ? SHOP.heroAbilityCry.dmgMult : 1) * (u.dmgMult || 1);
-    const crySpeed = buffed ? SHOP.heroAbilityCry.speedMult : 1;
+    // «Последний конвой»: холод Ледяного перевала (u.slowT, convoy.js) — медленнее ходит и бьёт
+    const crySpeed = (buffed ? SHOP.heroAbilityCry.speedMult : 1) * (u.slowT > 0 ? CONVOY_SLOW : 1);
     // r15 И13: «поджигатели» (world.enemySiege, px) — стрелок врага бьёт
     // крепость игрока с дальности t.range + enemySiege (навесом через строй).
     const range = (world.enemySiege && u.team === 'enemy' && target.kind === 'core') ? t.range + world.enemySiege : t.range;
@@ -411,7 +417,7 @@ function updateUnits(world, dt, onKillTeamGold) {
       u.state = 'attack';
       u.attackTimer -= dt;
       if (u.attackTimer <= 0) {
-        u.attackTimer = t.atkInterval * (u.atkMult || 1); // «Последний конвой»: карта «Быстрая тетива»
+        u.attackTimer = t.atkInterval * (u.atkMult || 1) / (u.slowT > 0 ? CONVOY_SLOW : 1); // «Последний конвой»: карта «Быстрая тетива», холод
         if (t.role === 'ranged' || t.role === 'rider') {
           world.projectiles.push({
             team: u.team, x: u.x, y: -30, targetKind: target.kind, targetRef: target.ref,
@@ -420,10 +426,12 @@ function updateUnits(world, dt, onKillTeamGold) {
             // снаряда по роли), в логике попадания не участвует.
             x0: u.x, tx: target.ref.x, role: t.role,
             cRole: t.role, // r15 И17: контры ролей
+            src: u,        // «Последний конвой»: кто стрелял — особенности краёв (world.onStrike)
           });
           SFX.shoot();
         } else {
           dealDamage(world, target, t.dmg * cryDmg, onKillTeamGold, t.role, t.role);
+          world.onStrike && world.onStrike(u, target.ref, target.kind);
         }
       }
     } else if (world.holdLine && u.team === 'player' && u.x >= (world.holdLine[t.role] || world.holdLine.default) - (u.holdOff || 0) &&
@@ -478,6 +486,7 @@ function updateUnits(world, dt, onKillTeamGold) {
       } else {
         dealDamage(world, { kind: p.targetKind, ref }, p.dmg, onKillTeamGold, 'ranged', p.cRole);
       }
+      if (p.src && world.onStrike) world.onStrike(p.src, ref, p.targetKind);
       world.onImpact && world.onImpact(ref.x);
       return false;
     }

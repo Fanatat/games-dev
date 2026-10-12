@@ -1,4 +1,4 @@
-/* Мастерская украшений — выбор оправы, шкатулка, первые минуты (релиз 1.0, волна B2).
+/* Ювелир Ленд — выбор оправы, шкатулка, первые минуты (релиз 1.0, волна B2).
 
    Подключается ДО workshop.js: окна и кнопки строятся сразу при загрузке (их id
    нужны списку OVERLAYS, по которому прячется баннер), а игра потом передаёт
@@ -73,7 +73,7 @@ window.WsCase = (function () {
         '<button id="btn-fav" class="ws-fav" type="button" aria-pressed="false" aria-label="Любимое изделие"></button>', 'ws-view') +
       box('favask-overlay', 'В избранное',
         '<button id="btn-favask-close" class="ws-x" type="button" aria-label="Закрыть"></button>' +
-        '<p class="ws-sr">Добавьте игру в избранное — мастерская всегда будет под рукой.</p>' +
+        '<p class="ws-sr">Добавьте игру в избранное — Ювелир Ленд всегда будет под рукой.</p>' +
         '<div class="ws-favask-pic" aria-hidden="true"></div>' +
         '<button id="btn-favask-ok" class="ws-play ws-favask-ok" type="button" aria-label="Добавить в избранное">' + HEART_SVG + '</button>', 'ws-favask'));
 
@@ -351,7 +351,7 @@ window.WsCase = (function () {
       if (f.done) return;
       f.done = true;
       api.track('fav_result', { level: f.level, result: res });
-      if (res === 'added') api.toast('Мастерская в избранном', 1800);
+      if (res === 'added') api.toast('Ювелир Ленд в избранном', 1800);
     };
     if (!yes) { api.sfx('click'); result('closed'); return; }
     api.sfx('click');

@@ -247,9 +247,32 @@ const WsJewel = (() => {
     if (cap) s = Math.min(s, cap);
     return { s, w: a[0] * s, h: a[1] * s, x0: box.x + (box.w - a[0] * s) / 2, y0: box.y + (box.h - a[1] * s) / 2 };
   }
-  const artOf = (piece) => SPRITE[ART[piece] ? piece : 'ring'] || null;
-  /* Какое изделие рисуется на самом деле: вторая форма без загруженной картинки — первая форма. */
-  const shown = (piece) => (ART[piece] && !SPRITE[piece] ? baseOf(piece) : piece);
+  /* Картинки изделий грузятся по требованию (перф 1.0): первая отрисовка или
+     prefetch() запрашивает файл, после загрузки — cb(piece) из load(). */
+  let imageBase = '', imageReady = null;
+  const loading = new Set();
+  function requestArt(piece) {
+    if (!imageBase || !ART[piece] || loading.has(piece) || SPRITE[piece] || typeof Image === 'undefined') return;
+    loading.add(piece);
+    const im = new Image();
+    im.decoding = 'async';
+    im.onload = () => { SPRITE[piece] = im; if (imageReady) imageReady(piece); };
+    im.onerror = () => { loading.delete(piece); };
+    im.src = imageBase + 'jw_' + piece + '.webp';
+  }
+  const artOf = (piece) => {
+    const p = ART[piece] ? piece : 'ring';
+    requestArt(p);
+    return SPRITE[p] || null;
+  };
+  /* Какое изделие рисуется на самом деле: вторая форма без загруженной картинки — первая форма
+     (и запрос её картинки: после загрузки перерисуется уже второй формой). */
+  const shown = (piece) => {
+    if (ART[piece]) requestArt(piece);
+    return ART[piece] && !SPRITE[piece] ? baseOf(piece) : piece;
+  };
+  /* Заранее запросить картинки (уровень скоро начнётся). */
+  const prefetch = (list) => { (list || []).forEach(p => requestArt(p)); };
 
   /* ---------- металл (релиз 1.0, B2) ----------
      Картинки нарисованы в жёлтом золоте. Розовое и белое золото — перекраска
@@ -351,12 +374,7 @@ const WsJewel = (() => {
 
   /* Загрузить картинки изделий; cb(piece) — после каждой (перерисовать). */
   function load(base, cb) {
-    if (typeof Image === 'undefined') return;
-    Object.keys(ART).forEach(p => {
-      const im = new Image();
-      im.onload = () => { SPRITE[p] = im; if (cb) cb(p); };
-      im.src = base + 'jw_' + p + '.webp';
-    });
+    imageBase = base || ''; imageReady = cb || null;
   }
 
   /* Куда встаёт k-й выданный камень (k = 0..K-1), в координатах canvas:
@@ -581,5 +599,5 @@ const WsJewel = (() => {
   /* Сколько камней изделия видно (групп мест) при K заказах. */
   const visible = (piece, K) => Math.max(1, Math.min(K, groupsOf(ART[piece] ? piece : baseOf(piece)).g.length));
 
-  return { PIECES, ART, GROUPS, METALS, design, sockets, draw, shine, load, recolor, visible, ready: (p) => !!SPRITE[p] };
+  return { PIECES, ART, GROUPS, METALS, design, sockets, draw, shine, load, prefetch, recolor, visible, ready: (p) => { requestArt(p); return !!SPRITE[p]; } };
 })();

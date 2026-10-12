@@ -1012,3 +1012,71 @@ body.is-owner .ws-price.is-video { background-image: url(workshop_assets/ui_crow
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
+
+/* ---------- «Как играть» (модерация ВК: VK-03) и поддержка (VK-R1) ----------
+   «?» на карте — кремовая круглая кнопка под монетами; на уровне — маленький значок у правого края
+   полосы кнопок: полю места не берёт, слов не добавляет. Окно — карточка с розовой плашкой, крестик,
+   список с картинками; на 320×568 список прокручивается внутри окна. */
+.ws-map-left { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; pointer-events: none !important; }
+.ws-map-left > * { pointer-events: auto; }
+.ws-help-knob span, .ws-help-mini span {
+  position: relative; z-index: 1; font-family: var(--font); font-weight: 900; line-height: 1; color: #7b3f6c;
+  text-shadow: 0 1.5px 0 #fff;
+}
+.ws-map-top .ws-help-knob { width: 46px; height: 46px; margin-left: 4px; }
+.ws-help-knob span { font-size: 1.65rem; }
+.ws-actions { position: relative; }
+.ws-help-mini {
+  position: absolute; right: max(4px, env(safe-area-inset-right, 0px)); top: 50%; margin-top: -24px; width: 40px; height: 40px; padding: 0;
+  display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; cursor: pointer;
+  border: 2.5px solid transparent;
+  background: radial-gradient(circle at 40% 30%, #ffffff 0%, #fff6e4 45%, #f0dcbc 100%) padding-box, var(--rim) border-box;
+  box-shadow: 0 2px 5px rgba(122, 52, 82, 0.3);
+}
+.ws-help-mini span { font-size: 1.35rem; }
+.ws-help-mini:active { transform: scale(0.94); }
+
+.ws-help .ws-win-box { width: min(100%, 400px); max-height: calc(100% - 8px); padding: 30px 10px 12px; gap: 8px; }
+.ws-help-list {
+  list-style: none; margin: 0; padding: 2px 6px; width: 100%; box-sizing: border-box;
+  display: flex; flex-direction: column; gap: 6px; overflow-y: auto; overscroll-behavior: contain; min-height: 0; flex: 1 1 auto;
+  text-align: left;
+}
+.ws-help-list li {
+  display: flex; align-items: center; gap: 10px; padding: 5px 8px 5px 4px; border-radius: 14px;
+  background: rgba(255, 255, 255, 0.55); box-shadow: inset 0 0 0 1.5px rgba(233, 194, 122, 0.55);
+  font-size: 0.95rem; line-height: 1.25; font-weight: 800; color: var(--ink);
+}
+.ws-help-pic { flex: none; width: 72px; height: 48px; }
+.ws-help-ico { flex: none; width: 72px; height: 44px; display: flex; align-items: center; justify-content: center; }
+.ws-help-stars img { width: 24px; height: 24px; margin: 0 -1px; }
+.ws-help-stars img:nth-child(2) { width: 30px; height: 30px; margin-bottom: 8px; }
+.ws-help-btn svg { width: 40px; height: 40px; padding: 7px; box-sizing: border-box; border-radius: 50%; color: #fff;
+  background: radial-gradient(circle at 40% 30%, #f8e8fd 0%, #dcb3ef 34%, #b07fd0 72%, #8d58b0 100%);
+  box-shadow: 0 0 0 2.5px #e9c27a, 0 2px 4px rgba(122, 52, 82, 0.3); }
+.ws-help-hard svg { width: 34px; height: 34px; padding: 6px; box-sizing: border-box; border-radius: 50%;
+  background: radial-gradient(circle at 40% 30%, #ff8a9a, #e0284f 60%, #a3123a); box-shadow: 0 0 0 2px #fff1b5, 0 2px 4px rgba(120, 20, 40, 0.4); }
+.ws-help-support { flex: none; display: flex; flex-direction: column; align-items: center; gap: 2px; width: 100%; padding-top: 4px;
+  border-top: 1.5px dashed rgba(185, 138, 163, 0.6); }
+.ws-help-mail { font-size: 1rem; font-weight: 900; color: var(--plum); text-decoration: underline; text-underline-offset: 3px; padding: 4px 6px; }
+.ws-help-addr { font-size: 0.8rem; font-weight: 800; color: var(--ink-soft); -webkit-user-select: text; user-select: text; }
+.ws-help-legal { margin-top: 0; }
+@media (max-height: 640px) {
+  .ws-help-list li { font-size: 0.86rem; padding-top: 3px; padding-bottom: 3px; }
+  .ws-help-pic { width: 60px; height: 40px; }
+  .ws-help-ico { width: 60px; height: 38px; }
+}
+@media (orientation: landscape) and (max-height: 520px) {
+  .ws-help { padding-top: 30px; padding-bottom: 8px; }
+  .ws-help .ws-win-box { width: min(100%, 560px); padding-top: 24px; }
+  .ws-help-list { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+  .ws-help-list li { font-size: 0.82rem; }
+  .ws-help-pic { width: 54px; height: 36px; }
+  .ws-help-ico { width: 54px; height: 36px; }
+  .ws-help-btn svg { width: 32px; height: 32px; padding: 5px; }
+  .ws-map-top .ws-help-knob { width: 40px; height: 40px; }
+  .ws-help-mini { width: 36px; height: 36px; margin-top: -21px; }
+}
+
+/* Hidden tabs must not keep decorative CSS animations running. */
+body.ws-background *, body.ws-background *::before, body.ws-background *::after { animation-play-state: paused !important; }

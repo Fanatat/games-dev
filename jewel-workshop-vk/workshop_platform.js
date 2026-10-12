@@ -561,6 +561,15 @@
           return impl.favorites();
         }).then(function (ok) { return ok === true; }, function () { return false; });
       },
+      // Лёгкий виброотклик (только победа, решение основателя 12.10.2026): площадка —
+      // своим откликом (impl.vibrate); не вышло или площадки нет — Vibration API.
+      vibrate: function () {
+        function nav() {
+          try { var n = (core.env.win() || {}).navigator; if (n && typeof n.vibrate === 'function') n.vibrate(30); } catch (e) { /* нет вибрации */ }
+        }
+        Promise.resolve().then(function () { return impl.vibrate ? impl.vibrate() : false; })
+          .then(function (ok) { if (ok !== true) nav(); }, nav);
+      },
       supports: function (name) { try { return !!(impl.supports && impl.supports(String(name))); } catch (e) { return false; } },
       onEvent: function (cb) { return on('event', cb); },
       adReady: function (format) { return impl.adReady ? impl.adReady(format) : null; },
@@ -953,6 +962,11 @@
         return send('VKWebAppAddToFavorites', {}, num(cfg.timeouts.dialogMs, 60000))
           .then(function (d) { return !!(d && d.result); }, function () { return false; });
       },
+      vibrate: function () {
+        if (!initOk) return false;
+        return send('VKWebAppTapticImpactOccurred', { style: 'light' })
+          .then(function (d) { return !!(d && d.result); }, function () { return false; });
+      },
       state: function () {
         return { initOk: initOk, userId: userId, appId: appId, vkPlatform: vkPlatform, phone: isPhone,
                  ready: { reward: ready.reward, interstitial: ready.interstitial }, banner: impl.banner ? impl.banner.state() : null };
@@ -983,11 +997,19 @@
     }
 
     // Реклама: показ строго по одному; предзагрузка (VKWebAppCheckNativeAds) —
-    // по одной, не во время показа; отказ — повтор через 30 с, не больше 5 раз.
+    // по одной, не во время показа; отказ — повтор через 30 с (5 раз), дальше
+    // раз в 2 минуты, пока ролик не появится. Смена готовности — событие
+    // ad_ready: игра прячет кнопки «за видео», когда ролика нет, и
+    // возвращает их, когда он готов (как в game7, ADS-15/16).
+    function setReady(fmt, v) {
+      if (ready[fmt] === v) return;
+      ready[fmt] = v;
+      core.event({ type: 'ad_ready', format: fmt === 'reward' ? 'rewarded' : fmt, ready: v });
+    }
     function showAd(fmt, params) {
       showing = true;
       var p = raw('VKWebAppShowNativeAds', params);
-      p.then(function () { ready[fmt] = null; }, function () { ready[fmt] = null; }).then(function () {
+      p.then(function () { setReady(fmt, null); }, function () { setReady(fmt, null); }).then(function () {
         showing = false;
         preload(fmt);
       });
@@ -1004,12 +1026,13 @@
       preloadBusy = true;
       var params = fmt === 'reward' ? { ad_format: 'reward', use_waterfall: true } : { ad_format: fmt };
       send('VKWebAppCheckNativeAds', params).then(function (d) {
-        ready[fmt] = !!(d && d.result);
-      }, function () { ready[fmt] = false; }).then(function () {
+        setReady(fmt, !!(d && d.result));
+      }, function () { setReady(fmt, false); }).then(function () {
         preloadBusy = false;
-        if (ready[fmt] === false && preloadTries[fmt] < 5) {
+        if (ready[fmt] === false) {
+          var wait = preloadTries[fmt] < 5 ? 30000 : 120000;
           preloadTries[fmt]++;
-          core.later(function () { preload(fmt); }, 30000);
+          core.later(function () { if (ready[fmt] === false) preload(fmt); }, wait);
         } else if (ready[fmt]) preloadTries[fmt] = 0;
         pump();
       });

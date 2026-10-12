@@ -206,7 +206,6 @@ window.WsCase = (function () {
     hide('choice-overlay');
     api.syncBanner();
     api.sfx('reveal');
-    api.buzz(15);
     if (c.epoch !== api.epoch || api.screen !== 'game') return;
     api.redrawPiece();
     const cv = $('ws-piece');
@@ -264,7 +263,6 @@ window.WsCase = (function () {
     api.Fx.ring(s.x, s.y, s.size * 1.5);
     api.Fx.sparkle(s.x, s.y, s.size * 1.6);
     api.sfx('star', { semis: 12 });
-    api.buzz([20, 30, 20]);
   }
 
   /* ---------- уровень: начало и уход ---------- */
@@ -321,7 +319,6 @@ window.WsCase = (function () {
       if (e !== api.epoch) return;
       api.bump(dst);
       api.sfx('reveal');
-      api.buzz(20);
     }, { dur: 700, lift: 60, step: 0 });
   }
 
@@ -598,7 +595,6 @@ window.WsCase = (function () {
       api.track('fav_set', { level: id, prev });
       api.ftueStep(8, 'first_fav');
       api.sfx('reward');
-      api.buzz(20);
       const r = $('btn-fav').getBoundingClientRect();
       api.Fx.sparkle(r.left + r.width / 2, r.top + r.height / 2, r.width * 0.8);
     }

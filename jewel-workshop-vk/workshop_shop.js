@@ -172,7 +172,6 @@
       h.coinsChanged();
       h.track('coin_spend', { what: 'decor', item: key, amount: d.price, balance: h.Store.data.coins });
       h.sfx('reward');
-      h.buzz([20, 30, 20]);
       h.confetti();
       pick = null;
       render();

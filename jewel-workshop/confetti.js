@@ -27,7 +27,7 @@ const Confetti = (() => {
   function burst(opts) {
     if (!canvas || reduceMotion) return;
     const count = (opts && opts.count) || 44;
-    const colors = (opts && opts.colors) || COLORS;   // свои цвета — у «Мастерской»
+    const colors = (opts && opts.colors) || COLORS;   // свои цвета — у «Ювелир Ленд»
     const durationMs = (opts && opts.durationMs) || 2600;
     const dpr = window.devicePixelRatio || 1;
     const cssW = canvas.clientWidth, cssH = canvas.clientHeight;

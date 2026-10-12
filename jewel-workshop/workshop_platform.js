@@ -1,5 +1,5 @@
 /*
- * workshop_platform.js — платформенный слой «Мастерской украшений»: window.WSPlatform.
+ * workshop_platform.js — платформенный слой «Ювелир Ленд»: window.WSPlatform.
  *
  * Один файл без зависимостей. Реализация выбирается по window.WS_CONFIG
  * (его вставляет build_workshop.py перед скриптами игры):

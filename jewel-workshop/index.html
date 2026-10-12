@@ -5,18 +5,31 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="theme-color" content="#e8b4c2">
   <title>Мастерская украшений</title>
-  <meta name="ws-build" content="w47-6ae0522-20261012">
+  <meta name="ws-build" content="w53-9a50c71-20261012">
   <!-- Форк game3 «Мастерская украшений». Отдельная точка входа:
        main.js/board.js/style.css/платформенные адаптеры game3 НЕ подключены —
        ни рекламы, ни энергии, ни магазина, ни сейвов исходной игры.
        Поле — workshop_board.js, изделия — workshop_jewelry.js, правила —
        workshop_rules.js, звуки — workshop_sfx.js через sound.js game3. -->
-  <link rel="preload" href="workshop_assets/gems.webp?v=47" as="image" type="image/webp">
-  <link rel="stylesheet" href="workshop.css?v=47">
-  <link rel="stylesheet" href="workshop_shop.css?v=47">
-  <link rel="stylesheet" href="workshop_case.css?v=47">
+  <link rel="preload" href="workshop_assets/gems.webp?v=53" as="image" type="image/webp">
+  <link rel="stylesheet" href="workshop.css?v=53">
+  <link rel="stylesheet" href="workshop_shop.css?v=53">
+  <link rel="stylesheet" href="workshop_case.css?v=53">
 </head>
 <body>
+
+  <!-- Стартовый экран (п. 4.2.10 правил ВК, решение основателя 12.10.2026): при каждом запуске
+       название, героиня и большая «Играть»; «Играть» ведёт на карту. Слов — два. -->
+  <div id="screen-start" class="screen">
+    <div class="ws-start">
+      <div class="ws-start-head">
+        <img class="ws-start-crown" src="workshop_assets/jw_tiara2.webp" alt="" aria-hidden="true">
+        <h1 class="ws-start-title">Мастерская<br>украшений</h1>
+      </div>
+      <img class="ws-start-hero" src="workshop_assets/hero_bride.webp" alt="" aria-hidden="true">
+      <button id="btn-start" class="ws-play ws-start-play" aria-label="Играть"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.6v14.8c0 .8.9 1.3 1.6.8l11-7.4c.6-.4.6-1.2 0-1.6l-11-7.4C7.9 3.3 7 3.8 7 4.6z" fill="#fff"/></svg><span>Играть</span></button>
+    </div>
+  </div>
 
   <!-- Меню — карта бутика (образ — ref/workshop/concept/03_map.jpeg): комната
        стоит на месте, по ней снизу вверх вьётся дорожка из 30 значков; после
@@ -37,7 +50,10 @@
       <div class="ws-map-knobs">
         <button id="btn-noads" class="ws-round ws-pic ws-round-cream ws-map-knob hidden" aria-label="Без рекламы"></button>
         <button id="btn-decor" class="ws-round ws-pic ws-round-cream ws-map-knob" aria-label="Лавка"></button>
-        <button id="btn-sound" class="ws-round ws-pic ws-round-cream ws-map-knob" aria-label="Звук" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 9.2h3.6l5-4.2v14l-5-4.2H3.5z" fill="#c2733a" stroke="#8a4a1c" stroke-width="1.3" stroke-linejoin="round"/><path d="M15.2 8.8a4.6 4.6 0 0 1 0 6.4M17.9 6.2a8.3 8.3 0 0 1 0 11.6" fill="none" stroke="#8a4a1c" stroke-width="2.2" stroke-linecap="round"/></svg></button>
+        <div class="ws-knob-stack">
+          <button id="btn-sound" class="ws-round ws-pic ws-round-cream ws-map-knob" aria-label="Звук" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 9.2h3.6l5-4.2v14l-5-4.2H3.5z" fill="#c2733a" stroke="#8a4a1c" stroke-width="1.3" stroke-linejoin="round"/><path d="M15.2 8.8a4.6 4.6 0 0 1 0 6.4M17.9 6.2a8.3 8.3 0 0 1 0 11.6" fill="none" stroke="#8a4a1c" stroke-width="2.2" stroke-linecap="round"/></svg></button>
+          <button id="btn-vibro" class="ws-round ws-round-cream ws-map-knob hidden" aria-label="Вибрация включена" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="3.5" width="8" height="17" rx="2.2" fill="#fff6e4" stroke="#8a4a1c" stroke-width="1.8"/><path d="M4.6 8.5v7M2.4 10.2v3.6M19.4 8.5v7M21.6 10.2v3.6" stroke="#c2733a" stroke-width="1.9" stroke-linecap="round"/><path class="v-off" d="M3.5 3.5l17 17" stroke="#b0566e" stroke-width="2.4" stroke-linecap="round"/></svg></button>
+        </div>
       </div>
     </div>
     <div class="ws-map-foot">
@@ -218,19 +234,19 @@
   </div>
   <canvas id="confetti-canvas" class="ws-confetti" aria-hidden="true"></canvas>
 
-  <script>window.WS_CONFIG={"target":"web","platform":"mock","build":"w47-6ae0522-20261012","payServer":"","vkAppId":"","metrikaId":"","timeouts":{"bridgeMs":8000,"initMs":8000,"dialogMs":60000},"ads":{"preload":true,"banner":{"enabled":true,"phoneOnly":true,"portraitOnly":true,"location":"bottom","layout":"","heightType":"","fallbackHeight":60,"maxFailures":3},"interstitial":{"enabled":true,"minLevels":6,"intervalSec":180,"afterRewardedSec":180,"waitSec":30},"rewarded":{"enabled":true,"waitSec":180,"skipForNoAds":true}},"pay":{"pollSec":30,"orderWaitSec":600}};</script>
-  <script src="workshop_sfx.js?v=47"></script>
-  <script src="sound.js?v=47"></script>
-  <script src="confetti.js?v=47"></script>
-  <script src="workshop_rules.js?v=47"></script>
-  <script src="workshop_levels.js?v=47"></script>
-  <script src="workshop_board.js?v=47"></script>
-  <script src="workshop_jewelry.js?v=47"></script>
-  <script src="workshop_analytics.js?v=47"></script>
-  <script src="workshop_platform.js?v=47"></script>
-  <script src="workshop_save.js?v=47"></script>
-  <script src="workshop_shop.js?v=47"></script>
-  <script src="workshop_case.js?v=47"></script>
-  <script src="workshop.js?v=47"></script>
+  <script>window.WS_CONFIG={"target":"web","platform":"mock","build":"w53-9a50c71-20261012","payServer":"","vkAppId":"","metrikaId":"","timeouts":{"bridgeMs":8000,"initMs":8000,"dialogMs":60000},"ads":{"preload":true,"banner":{"enabled":true,"phoneOnly":true,"portraitOnly":true,"location":"bottom","layout":"","heightType":"","fallbackHeight":60,"maxFailures":3},"interstitial":{"enabled":true,"minLevels":6,"intervalSec":180,"afterRewardedSec":180,"waitSec":30},"rewarded":{"enabled":true,"waitSec":180,"skipForNoAds":true}},"pay":{"pollSec":30,"orderWaitSec":600}};</script>
+  <script src="workshop_sfx.js?v=53"></script>
+  <script src="sound.js?v=53"></script>
+  <script src="confetti.js?v=53"></script>
+  <script src="workshop_rules.js?v=53"></script>
+  <script src="workshop_levels.js?v=53"></script>
+  <script src="workshop_board.js?v=53"></script>
+  <script src="workshop_jewelry.js?v=53"></script>
+  <script src="workshop_analytics.js?v=53"></script>
+  <script src="workshop_platform.js?v=53"></script>
+  <script src="workshop_save.js?v=53"></script>
+  <script src="workshop_shop.js?v=53"></script>
+  <script src="workshop_case.js?v=53"></script>
+  <script src="workshop.js?v=53"></script>
 </body>
 </html>

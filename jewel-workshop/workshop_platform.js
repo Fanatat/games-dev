@@ -564,6 +564,15 @@
           return impl.favorites();
         }).then(function (ok) { return ok === true; }, function () { return false; });
       },
+      // Лёгкий виброотклик (только победа, решение основателя 12.10.2026): площадка —
+      // своим откликом (impl.vibrate); не вышло или площадки нет — Vibration API.
+      vibrate: function () {
+        function nav() {
+          try { var n = (core.env.win() || {}).navigator; if (n && typeof n.vibrate === 'function') n.vibrate(30); } catch (e) { /* нет вибрации */ }
+        }
+        Promise.resolve().then(function () { return impl.vibrate ? impl.vibrate() : false; })
+          .then(function (ok) { if (ok !== true) nav(); }, nav);
+      },
       supports: function (name) { try { return !!(impl.supports && impl.supports(String(name))); } catch (e) { return false; } },
       onEvent: function (cb) { return on('event', cb); },
       adReady: function (format) { return impl.adReady ? impl.adReady(format) : null; },

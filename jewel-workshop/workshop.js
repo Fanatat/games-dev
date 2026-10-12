@@ -141,12 +141,17 @@
   const movesWord = (n) => n + ' ' + plural(n, 'ход', 'хода', 'ходов');
   const coinsWord = (n) => n + ' ' + plural(n, 'монета', 'монеты', 'монет');
 
-  /* Звук и вибрация: сбой не должен ломать игру. */
+  /* Звук и вибрация: сбой не должен ломать игру. Вибрация — только лёгкий
+     отклик на победу (решение основателя 12.10.2026), выключается кнопкой на
+     карте (Store.data.novibe); кнопка видна на сенсорных экранах. */
   function sfx(id, opts) { try { Sound.play(id, opts); } catch (e) { /* без звука */ } }
-  function buzz(pattern) {
-    if (REDUCED || Store.data.muted) return;
-    try { if (navigator.vibrate) navigator.vibrate(pattern); } catch (e) { /* нет вибрации */ }
+  function vibrateWin() {
+    if (Store.data.novibe) return;
+    try { WSPlatform.vibrate(); } catch (e) { /* нет вибрации */ }
   }
+  const canVibrate = (() => {
+    try { return matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0; } catch (e) { return false; }
+  })();
 
   /* ---------- сохранение ----------
      Формат v4, проверка каждого поля и миграции — workshop_save.js
@@ -380,8 +385,9 @@
   const isOwner = () => Store.data.pay.noadsUntil > Date.now() + clockSkew;
   // владельцу награда «за видео» — сразу, без ролика (ads.rewarded.skipForNoAds, по умолчанию да)
   const ownerSkip = () => isOwner() && (adsCfg().rewarded || {}).skipForNoAds !== false;
-  // кнопки «за видео» видны, только когда награду можно получить
-  const rewardOn = () => booted && (ownerSkip() || WSPlatform.supports('rewarded'));
+  // кнопки «за видео» видны, только когда награду можно получить: ролика нет (площадка
+  // проверила заранее, adReady === false) — кнопки нет, появится ролик — вернётся (ADS-15/16)
+  const rewardOn = () => booted && (ownerSkip() || (WSPlatform.supports('rewarded') && WSPlatform.adReady('rewarded') !== false));
 
   const rewardBusy = {};   // место → ролик идёт (повторное нажатие не считается)
   const rewardLate = {};   // место → [{ id, grant, t0, level }]: выдачи ждут позднего подтверждения сторожа (onLateReward)
@@ -446,6 +452,18 @@
     $('btn-more-video').disabled = !!rewardBusy.lose_moves;
   }
 
+  // ролик появился или пропал (событие площадки ad_ready): кнопки «за видео» на виду — по готовности
+  function onAdReady() {
+    if (!booted) return;
+    refreshAdButtons();
+    if (lost) $('btn-more-video').classList.toggle('hidden', !rewardOn());
+    if (winTok && !winTok.done && !$('win-overlay').classList.contains('hidden')) {
+      const on = winTok.amount > 0 && rewardOn();
+      $('btn-x2').classList.toggle('hidden', !on);
+      $('ws-win-extra').classList.toggle('hidden', !on && $('btn-win-noads').classList.contains('hidden'));
+    }
+  }
+
   // события площадки → схема аналитики (ad_request / ad_result, баннер)
   const AD_FORMAT = { rewarded: 'reward', interstitial: 'interstitial' };
   const AD_OUTCOME = { ok: 'shown', closed: 'declined', no_ads: 'no_ad', timeout: 'timeout' };
@@ -457,6 +475,7 @@
     } else if (ev.type === 'ad_result' && AD_FORMAT[ev.format]) {
       track('ad_result', { place: ev.placement, format: AD_FORMAT[ev.format], outcome: AD_OUTCOME[ev.reason] || 'error', ms: ev.ms || 0, late: 0, level });
     } else if (ev.type === 'banner') bannerStat();
+    else if (ev.type === 'ad_ready' && ev.format === 'rewarded') onAdReady();
   }
 
   /* Баннер: только телефон стоя (решает площадка), внизу, на карте и на
@@ -691,7 +710,7 @@
     $('ws-thanks-sr').textContent = 'Спасибо за покупку! Реклама отключена до ' + dateWord(Store.data.pay.noadsUntil) + '.' +
       (royal ? ' Королевский набор теперь ваш навсегда.' : '');
     $('thanks-overlay').classList.remove('hidden');
-    sfx('reward'); buzz([20, 40, 20]);
+    sfx('reward');
     try { Confetti.burst({ count: 50, durationMs: 1800, colors: CONFETTI }); } catch (e) { /* без конфетти */ }
     syncBanner();
     setTimeout(() => { if (!$('thanks-overlay').classList.contains('hidden')) $('btn-thanks-ok').focus(); }, 60);
@@ -704,8 +723,18 @@
 
   /* ---------- экраны ---------- */
   function showScreen(id) {
-    screen = id === 'screen-menu' ? 'menu' : 'game';
-    ['screen-menu', 'screen-workshop'].forEach(s => $(s).classList.toggle('active', s === id));
+    screen = id === 'screen-workshop' ? 'game' : id === 'screen-start' ? 'start' : 'menu';
+    ['screen-start', 'screen-menu', 'screen-workshop'].forEach(s => $(s).classList.toggle('active', s === id));
+  }
+
+  /* Стартовый экран (п. 4.2.10 правил ВК, решение основателя 12.10.2026): при
+     каждом запуске — название, героиня и «Играть»; «Играть» ведёт на карту. */
+  function onStart() {
+    if (screen !== 'start') return;
+    sfx('click');
+    showScreen('screen-menu');
+    renderMenu();
+    syncBanner();
   }
 
   /* Место тоста (D-2). Тост не закрывает главную кнопку открытого окна (лавка, шкатулка, тарифы, выбор оправы):
@@ -1397,7 +1426,7 @@
     $('lose-overlay').classList.toggle('hidden', !on);
     if (on) {
       sel = -1; WsBoard.select(-1);
-      sfx('lose'); buzz(80);
+      sfx('lose');
       track('level_lose', { level: L.id, moves, limit: limitNow(), delivered: st.delivered, sec: levelSec() });
       renderLose();
       if (rewardOn()) track('ad_offer', { place: 'lose_moves', format: 'reward', level: L.id });
@@ -1429,7 +1458,7 @@
     Store.data.coins -= MORE_PRICE;
     shownCoins = Store.data.coins;
     bonusMoves += MORE_MOVES;
-    sfx('reward'); buzz(20);
+    sfx('reward');
     track('buy_moves', { level: L.id, moves, price: MORE_PRICE });
     track('coin_spend', { what: 'moves', amount: MORE_PRICE, balance: Store.data.coins, level: L.id });
     setLost(false);
@@ -1447,7 +1476,7 @@
     rewardAd('lose_moves', () => {
       if (lost && L && L.id === lvl && epoch === e0 && screen === 'game') {
         bonusMoves += MORE_MOVES;
-        sfx('reward'); buzz(20);
+        sfx('reward');
         setLost(false);
         updateHud();
         bump($('ws-moves'));
@@ -1571,7 +1600,7 @@
 
   /* ---------- касание поля ---------- */
   function lockedTap(idx) {
-    sfx('invalid'); buzz(20);
+    sfx('invalid');
     WsBoard.shake(idx);
     toast('Нужен ключ', 1600);
     track('invalid', { level: L.id, locked: idx });
@@ -1602,7 +1631,7 @@
     if (sel === idx) { sel = -1; WsBoard.select(-1); updateGuide(); return; }
     const count = R.moveCount(st.vials[sel], st.vials[idx]);
     if (count === 0) {
-      sfx('invalid'); buzz(20);
+      sfx('invalid');
       WsBoard.shake(idx);
       toast(st.vials[idx].length >= R.CAP ? 'Пробирка полна' : 'Нужен такой же', 1500);
       track('invalid', { level: L.id, from: sel, to: idx });
@@ -1713,7 +1742,6 @@
       if (e !== epoch) return;
       if (d.state !== 'wait') { landWhenArrived(); return; }
       sfx('ready', { semis: 2 * k });
-      buzz(15);
       WsBoard.flashReady(ev.vial, 300, () => {
         if (e !== epoch) return;
         if (d.state === 'wait') flyToCard(d, e);
@@ -1779,7 +1807,6 @@
     if (pendingUnlock === v) pendingUnlock = -1;
     WsBoard.unlock(v);
     sfx('unlock');
-    buzz([20, 40, 20]);
   }
 
   function boardPoint(fy) {
@@ -1792,13 +1819,11 @@
     Fx.text(p.x, p.y, 'Каскад ×' + (k + 1) + '!', { color: '#ffd36b', size: 30 + 4 * Math.min(k, 3), dur: 1100 });
     WsBoard.quake(0.6 + 0.3 * k);
     sfx('cascade', { semis: 2 * (k - 1) });
-    buzz([30, 30, 30]);
   }
 
   function landDelivery(ev, pay, k, e) {
     sfx('deliver', { semis: 2 * k });
     sfx('stamp', { delay: 0.09 });
-    buzz(25);
     view.delivered++;
     updateCounter(true);
     const card = cardEl(ev.slot);
@@ -1833,7 +1858,6 @@
 
   function jackpotFx(n, e) {
     sfx('jackpot');
-    buzz([40, 30, 60]);
     Fx.rain(36);
     const p = boardPoint(0.42);
     Fx.text(p.x, p.y, 'Джекпот! +' + n, { color: '#ffd84a', size: 34, dur: 1600 });
@@ -1855,7 +1879,6 @@
       if (WsBoard.lockedVial() === v) {
         WsBoard.unlock(v);
         sfx('unlock');
-        buzz([20, 40, 20]);
       }
       if (pay.key) {
         Fx.text(to.x, to.y - 24, '+' + pay.key, { color: '#ffe08a', size: 20 });
@@ -2023,7 +2046,7 @@
     updateRescue();
     updateButtons();
     sfx('win');
-    buzz([30, 50, 30, 50, 80]);
+    vibrateWin();
     const e = epoch;
     setTimeout(() => { if (e === epoch) Piece.shine(); }, REDUCED ? 0 : 420);
     setTimeout(() => { if (e === epoch) showWin(r); }, REDUCED ? 100 : 1000);
@@ -2085,7 +2108,6 @@
         if (e !== epoch) return;
         starEls[i].classList.add('on');
         sfx('star', { semis: [0, 3, 7][i] });
-        buzz(15);
       }, REDUCED ? 0 : 350 + i * 300);
     }
     // монеты попытки считаются вверх
@@ -2174,7 +2196,7 @@
         bump($('ws-win-coins').parentElement);
         $('ws-win-bank-n').textContent = String(Store.data.coins);
         bump($('ws-win-bank'));
-        sfx('reward'); buzz(20);
+        sfx('reward');
       }
       shownCoins = Store.data.coins;
       renderCoins(false);
@@ -2661,7 +2683,6 @@
     Store.save();
     applyDecor();
     sfx('reward');
-    buzz([30, 40, 30]);
     Confetti.burst({ count: 80, durationMs: 2600, colors: CONFETTI });
     track('chest', { collection: ci, coins: c.coins, decor: id });
     coinEarn('chest', c.coins);
@@ -2687,7 +2708,6 @@
     track: (name, data) => track(name, data),
     toast: (msg, ms) => toast(msg, ms),
     sfx: (name) => sfx(name),
-    buzz: (p) => buzz(p),
     confetti: () => Confetti.burst({ count: 60, durationMs: 2000, colors: CONFETTI }),
     coinsChanged: () => { shownCoins = Store.data.coins; renderCoins(true); },
     focusBack: () => $('btn-decor').focus()
@@ -2726,6 +2746,10 @@
   function applyMute() {
     Sound.setMuted(Store.data.muted);
     ['btn-sound', 'btn-sound-game'].forEach(id => { if ($(id)) $(id).setAttribute('aria-pressed', Store.data.muted ? 'true' : 'false'); });
+    const v = $('btn-vibro');
+    v.classList.toggle('hidden', !canVibrate);
+    v.setAttribute('aria-pressed', Store.data.novibe ? 'true' : 'false');
+    v.setAttribute('aria-label', Store.data.novibe ? 'Вибрация выключена' : 'Вибрация включена');
   }
 
   /* ---------- B2: выбор оправы, шкатулка, первые минуты ----------
@@ -2761,7 +2785,7 @@
   function b2Api() {
     const api = {
       Store, LEVELS, COLLECTIONS, PER_COLL, REDUCED, Fx,
-      collLevels, collDone, collCount, isPassed, isOpen, track, ftueStep, sfx, buzz, toast, bump,
+      collLevels, collDone, collCount, isPassed, isOpen, track, ftueStep, sfx, toast, bump,
       gemItem, drawGem: (g, gem, x, y, s, a) => WsBoard.drawGem(g, gem, x, y, s, a), look, playLook,
       sizeCanvas, introduce, decorItem, decorName, chestPic, seqGems, syncBanner, startLevel,
       socket: (i) => Piece.socket(i), redrawPiece: () => Piece.request(), drawWinJewel, renderMenu,
@@ -2880,6 +2904,14 @@
       applyMute();
       sfx('click');
     }));
+    $('btn-vibro').addEventListener('click', () => {
+      Store.data.novibe = !Store.data.novibe;
+      Store.save();
+      applyMute();
+      sfx('click');
+      vibrateWin();          // включили — сразу тот же лёгкий отклик, что на победе
+    });
+    $('btn-start').addEventListener('click', onStart);
     // пауза — от площадки (вкладка скрыта, свернули, реклама, оплата)
     WSPlatform.onPause(onPause);
     WSPlatform.onResume(onResume);
@@ -2954,8 +2986,8 @@
     document.body.classList.toggle('is-owner', isOwner());
     applyDecor();
     applyMute();
-    showScreen('screen-menu');
-    renderMenu();
+    // ?level=N (проверки вне ВК) открывает уровень сразу — без стартового экрана
+    if (startLevel && LEVELS[+startLevel[1] - 1]) { showScreen('screen-menu'); renderMenu(); } else showScreen('screen-start');
     booted = true;
     syncBanner();
     if (startLevel && LEVELS[+startLevel[1] - 1]) loadLevel(+startLevel[1] - 1);

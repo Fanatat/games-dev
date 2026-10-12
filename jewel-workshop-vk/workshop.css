@@ -1058,8 +1058,6 @@ body.is-owner .ws-price.is-video { background-image: url(workshop_assets/ui_crow
   background: radial-gradient(circle at 40% 30%, #ff8a9a, #e0284f 60%, #a3123a); box-shadow: 0 0 0 2px #fff1b5, 0 2px 4px rgba(120, 20, 40, 0.4); }
 .ws-help-support { flex: none; display: flex; flex-direction: column; align-items: center; gap: 2px; width: 100%; padding-top: 4px;
   border-top: 1.5px dashed rgba(185, 138, 163, 0.6); }
-.ws-help-mail { font-size: 1rem; font-weight: 900; color: var(--plum); text-decoration: underline; text-underline-offset: 3px; padding: 4px 6px; }
-.ws-help-addr { font-size: 0.8rem; font-weight: 800; color: var(--ink-soft); -webkit-user-select: text; user-select: text; }
 .ws-help-legal { margin-top: 0; }
 @media (max-height: 640px) {
   .ws-help-list li { font-size: 0.86rem; padding-top: 3px; padding-bottom: 3px; }

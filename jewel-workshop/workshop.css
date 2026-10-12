@@ -53,6 +53,9 @@ button:focus-visible { outline: 3px solid rgba(240, 97, 143, 0.9); outline-offse
 .screen { display: none; position: fixed; inset: 0; z-index: 1; }
 /* баннер площадки внизу: экран кончается над ним (--ws-banner-h ставит WSPlatform на <html>) */
 .screen { bottom: var(--ws-banner-h, 0px); }
+/* экран уровня держит место баннера весь уровень (--ws-field-banner-h ставит workshop.js, G1):
+   баннер, ушедший под окно или пришедший посреди уровня, пробирки не двигает */
+#screen-workshop { bottom: var(--ws-field-banner-h, var(--ws-banner-h, 0px)); }
 .screen.active { display: flex; }
 
 /* ---------- круглые кнопки в золотой оправе ---------- */
@@ -365,7 +368,7 @@ body.is-hard .ws-moves.is-low { animation: wsBump 0.5s ease-out; background: lin
 @keyframes wsBump { 0% { transform: scale(1); } 35% { transform: scale(1.18); } 100% { transform: scale(1); } }
 
 /* ---------- заказчицы: портрет, «4», пузырь с камнем ---------- */
-.ws-orders-panel { flex: none; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.ws-orders-panel { position: relative; flex: none; display: flex; flex-direction: column; align-items: center; gap: 2px; }
 .ws-orders { display: flex; gap: 10px; justify-content: center; width: 100%; --face: 66px; --bubble: 54px; }
 .ws-orders[data-n="3"] { gap: 4px; --face: 56px; --bubble: 48px; }
 .ws-card {
@@ -481,15 +484,20 @@ body.is-hard .ws-moves.is-low { animation: wsBump 0.5s ease-out; background: lin
 .ws-queue-item .ws-key { top: -5px; right: -7px; width: 14px; height: 14px; padding: 2px; box-shadow: 0 0 0 1px #fff; }
 .ws-queue-more { font-size: 0.82rem; font-weight: 900; color: var(--plum); }
 
-/* тупик: короткая плашка с одной кнопкой */
+/* тупик: короткая плашка с одной кнопкой. Встаёт на место полоски «следующие» (она на это время
+   прячется): высотой с полоску и зазор над ней, вниз — на 1 px, чтобы не задеть даже поднятую
+   пробирку верхнего ряда. Высота поля и ряды от плашки не зависят (G1). В поток экрана не входит,
+   поэтому без transform-центровки (у .bump — свой). */
 .ws-rescue {
-  flex: none; margin: 4px auto 0; padding: 5px 5px 5px 16px;
-  display: flex; align-items: center; gap: 10px; justify-content: center;
-  border-radius: 999px; color: var(--plum); font-size: 1.05rem; font-weight: 900;
-  background: rgba(255, 250, 241, 0.95); box-shadow: 0 0 0 2.5px #e8b64a, var(--shadow);
+  position: absolute; left: 0; right: 0; bottom: -1px; z-index: 3;
+  width: max-content; max-width: 100%; height: 30px; margin: 0 auto; padding: 0 1px 0 14px;
+  display: flex; align-items: center; gap: 8px; justify-content: center;
+  border-radius: 999px; color: var(--plum); font-size: 1rem; font-weight: 900; white-space: nowrap;
+  background: rgba(255, 250, 241, 0.97); box-shadow: 0 0 0 2px #e8b64a, var(--shadow);
 }
-.ws-rescue .ws-btn { flex: none; display: inline-flex; align-items: center; gap: 4px; padding: 6px 16px; font-size: 1.05rem; }
-.ws-rescue .ws-btn svg { width: 20px; height: 20px; filter: drop-shadow(0 1.5px 0 rgba(30, 100, 30, 0.75)); }
+.ws-orders-panel.has-rescue .ws-queue { visibility: hidden; }
+.ws-rescue .ws-btn { flex: none; display: inline-flex; align-items: center; gap: 4px; height: 28px; padding: 0 16px; font-size: 1rem; }
+.ws-rescue .ws-btn svg { width: 18px; height: 18px; filter: drop-shadow(0 1.5px 0 rgba(30, 100, 30, 0.75)); }
 .ws-rescue.pulse, .ws-rescue.bump { animation: wsBump 0.5s ease-out; }
 
 .ws-board-wrap { position: relative; flex: 1 1 auto; min-height: 120px; margin: 0 -6px; overflow: hidden; }
@@ -895,7 +903,7 @@ body.is-owner .ws-price.is-video { background-image: url(workshop_assets/ui_crow
   .ws-queue { min-height: 22px; }
   .ws-queue-item { width: 18px; height: 18px; }
   .ws-caption { grid-column: 1; grid-row: 3; }
-  .ws-rescue { grid-column: 1; grid-row: 4; align-self: start; font-size: 0.95rem; }
+  .ws-rescue { bottom: -10px; font-size: 0.95rem; }
   .ws-actions { grid-column: 1; grid-row: 5; padding-bottom: 6px; gap: 22px; }
   .ws-round { width: 48px; height: 48px; }
   .ws-board-wrap { grid-column: 2; grid-row: 1 / 6; }

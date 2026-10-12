@@ -61,6 +61,7 @@ const WsBoard = (() => {
   let hid = [];                   // сколько нижних камней каждой пробирки под бархатом
   let locked = -1;                // запертая пробирка
   let lay = null;                 // { tw, slots: [{cx, rimY, baseY, row}], rows: [{x0, x1, rimY, baseY, from, to}] }
+  let keepRows = 0;               // число рядов уровня (0 — выбрать заново): держится до смены уровня или окна (G1)
   let selected = -1, tutorial = -1, hint = null, waiting = [];
   let selAt = 0;                  // когда выбрана (подъём)
   let drop = null;                // { v, t0 } — пробирка возвращается в стойку
@@ -79,20 +80,26 @@ const WsBoard = (() => {
   function now() { return performance.now(); }
   const ease = (k) => 1 - (1 - k) * (1 - k);
 
-  /* ---------- раскладка ---------- */
-  function computeLayout() {
+  /* ---------- раскладка ----------
+     Число рядов выбирается только при полном пересчёте (full): новый уровень, другое число пробирок, явный resize окна
+     или поворот. Если область поля меняется внутри уровня (баннер, любая плашка), ряды остаются прежними — поле только
+     масштабируется (G1: раньше плашка «Не собрать» перестраивала 2×3 в 1×6). */
+  function computeLayout(full) {
     const n = vials.length;
-    if (!n) { lay = { tw: 0, slots: [], rows: [] }; return; }
+    if (!n) { lay = { tw: 0, slots: [], rows: [] }; keepRows = 0; return; }
+    if (full || !lay || lay.slots.length !== n) keepRows = 0;
     let best = null;
     for (let rows = 1; rows <= 3; rows++) {
       const per = Math.ceil(n / rows);
-      if (rows > 1 && Math.ceil(n / (rows - 1)) === per) continue;
+      if (keepRows && rows !== keepRows) continue;
+      if (!keepRows && rows > 1 && Math.ceil(n / (rows - 1)) === per) continue;
       const wu = per + (per - 1) * GAP + 2 * SIDE;
       const hu = RISE + rows * ROW_H + (rows - 1) * ROW_GAP + 0.1;
       const tw = Math.min(W / wu, H / hu, MAX_TW);
       if (!best || tw > best.tw * 1.04) best = { rows, per, tw };
     }
     const { rows, tw } = best;
+    keepRows = rows;
     // Ряды: первые полнее, последний — остаток (по центру).
     const counts = [];
     let left = n;
@@ -788,12 +795,12 @@ const WsBoard = (() => {
     handImg = pic('ui_hand');
     lockImg = pic('ui_lock');
     resize();
-    // Область поля меняется не только с окном: плашка «тупик», поворот.
-    // Холст подстраивается сам, иначе он вылезает на кнопки.
+    // Область поля может измениться и без resize окна (баннер появился позже старта уровня). Холст подстраивается
+    // сам, иначе он вылезает на кнопки, но ряды держит прежними (полный пересчёт — resize(true) от окна и уровня).
     if (typeof ResizeObserver === 'function') {
       new ResizeObserver(() => {
         const box = canvas.parentElement.getBoundingClientRect();
-        if (Math.floor(box.width) !== W || Math.floor(box.height) !== H) resize();
+        if (Math.floor(box.width) !== W || Math.floor(box.height) !== H) resize(false);
       }).observe(canvas.parentElement);
     }
     // шрифт «?» на тайных камнях может догрузиться позже первого кадра
@@ -801,7 +808,8 @@ const WsBoard = (() => {
     scheduleGlint();
   }
 
-  function resize() {
+  /* full — заново выбрать число рядов (новый уровень, resize окна, поворот); без него ряды прежние. */
+  function resize(full) {
     if (!canvas) return;
     const box = canvas.parentElement.getBoundingClientRect();
     dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -811,7 +819,7 @@ const WsBoard = (() => {
     canvas.height = Math.round(H * dpr);
     canvas.style.width = W + 'px';
     canvas.style.height = H + 'px';
-    computeLayout();
+    computeLayout(!!full);
     request();
   }
 
@@ -827,7 +835,7 @@ const WsBoard = (() => {
     for (const f of flashes.values()) f.cb && setTimeout(f.cb, 0);
     flashes.clear();
     unlockAt = null; sparks = []; glints = []; quakeAt = null; drop = null;
-    if (relayout) computeLayout();
+    if (relayout) computeLayout(true);
     request();
   }
 
@@ -921,6 +929,9 @@ const WsBoard = (() => {
     });
     vials[v] = [];
     hid[v] = 0;
+    // камни забрали раньше конца вспышки (ход в эту пробирку): вспышка кончается сейчас
+    const f = flashes.get(v);
+    if (f) { flashes.delete(v); f.cb && setTimeout(f.cb, 0); }
     for (let j = 0; j < CAP; j++) bounces.delete(v + ':' + j);
     request();
     return out;
@@ -960,6 +971,9 @@ const WsBoard = (() => {
     drawGem: (g, gem, x, y, size, alpha) => drawGem(g, gem, x, y, size, alpha),
     drawHidden: (g, x, y, size) => drawHidden(g, x, y, size),
     isAnimating: () => flights.length > 0 || flashes.size > 0,
+    shown: () => vials.map(v => v.slice()),     // камни так, как их сейчас показывает поле (для сверки в тестах)
+    hidden: () => hid.slice(),                  // тайные камни так, как их сейчас показывает поле
+    lockedVial: () => locked,                   // замок, который сейчас нарисован (ключ может ещё лететь)
     atlasReady: () => atlasReady,
     layout: () => lay && { tw: lay.tw, rows: lay.rows.length }
   };

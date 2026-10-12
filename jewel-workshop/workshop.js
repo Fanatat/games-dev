@@ -327,7 +327,18 @@
   let hist = [];           // снимки для отмены: { st, moves, kind, us, ld }
   let moves = 0;           // переливов в текущей линии партии
   let sel = -1;            // выбранная пробирка
-  let busy = false;        // идёт перелив/выдача — поле не принимает касания
+  let busy = false;        // идут анимации хода (перелив или выдачи); касания держит только pouring
+  /* G1: ход во время выдачи. Поле закрыто для касаний, только пока камни
+     перелива летят в пробирку (pouring). Выдачи хода — работа в очереди jobs:
+     вспышка, полёт к заказчице, печать, смена карточки; работы идут строго по
+     порядку ходов (карточка выдачи — та, что вышла после предыдущей), а игрок
+     тем временем ходит дальше. pend — пробирки, чьи выданные камни ещё стоят
+     на поле: новый ход в такую пробирку сначала отправляет их заказчице (hurry). */
+  let pouring = false;     // камни перелива ещё летят в пробирку
+  let jobs = [];           // очередь выдач по ходам: { e, evs: [{ ev, pay, k, state, onArrive }] }
+  let jobOn = false;       // работа из очереди сейчас доигрывает
+  const pend = new Map();  // пробирка → выдача, чьи камни ещё на поле (state 'wait')
+  let tapQueue = [];       // касания во время перелива (до двух — один ход), повторяются после приземления
   let won = false;
   let lost = false;        // «Сложный заказ»: ходы кончились
   let winCount = 0;        // побед за сессию (для проверок)
@@ -467,6 +478,35 @@
     bannerStat();
     if (want) setTimeout(bannerStat, 2500);
   }
+  /* G1: место баннера под полем держится весь уровень (--ws-field-banner-h).
+     Баннер, ушедший под окно или рекламу, закрытый игроком или пришедший
+     посреди уровня, пробирки не двигает: поле ужимается не больше одного раза
+     и в тех же рядах. Место считается заново на новом уровне, при повороте и
+     заметном resize окна. */
+  let fieldBH = -1, lastBH = 0, winResizeAt = 0;
+  const bannerNow = () => { try { return WSPlatform.state().bannerHeight || 0; } catch (e) { return 0; } };
+  const bannerImpl = () => { try { const s = WSPlatform.state(); return (s.impl && s.impl.banner) || null; } catch (e) { return null; } };
+  const portraitNow = () => window.innerHeight > window.innerWidth;
+  function bannerExpected() {
+    const b = bannerImpl();
+    return !!(lastBH && tapped && !isOwner() && WSPlatform.supports('banner') && portraitNow() &&
+      !(b && (b.closed || b.blocked || b.selfResized)));
+  }
+  function fieldBanner(why) {
+    const h = bannerNow(), b = bannerImpl();
+    if (h) lastBH = h;
+    let v = h;
+    if (why === 'level') v = h || (bannerExpected() ? lastBH : 0);
+    // посреди уровня место только растёт. Отдаётся оно, когда окно само ужалось под баннер ВК (selfResized:
+    // место дала площадка) и когда баннер ушёл вместе с поворотом или resize окна, а не крестиком игрока.
+    else if (why === 'change' && screen === 'game' && portraitNow() && !(b && b.selfResized) &&
+             (performance.now() - winResizeAt > 1500 || (b && b.closed))) v = Math.max(fieldBH, h);
+    if (v === fieldBH) return false;
+    fieldBH = v;
+    document.documentElement.style.setProperty('--ws-field-banner-h', v + 'px');
+    return true;
+  }
+
   // ad_result баннера — раз за сессию на исход: shown, closed, no_ad (площадка отказала)
   const bannerSeen = {};
   function bannerStat() {
@@ -1322,7 +1362,9 @@
 
   function updateRescue() {
     const box = $('ws-rescue');
-    if (rescueK === null || won || lost) { box.classList.add('hidden'); return; }
+    const on = !(rescueK === null || won || lost);
+    box.parentElement.classList.toggle('has-rescue', on);   // плашка поверх полоски «следующие» (G1)
+    if (!on) { box.classList.add('hidden'); return; }
     const dead = R.movesOf(st).length === 0;
     $('ws-rescue-text').textContent = dead ? 'Тупик' : 'Не собрать';
     const b = $('btn-rescue');
@@ -1343,8 +1385,10 @@
   }
 
   /* ---------- «Сложный заказ»: ходы кончились ---------- */
+  // ходы «Сложного заказа» кончились (окно «Ходы кончились» — когда доиграют выдачи)
+  const overLimit = () => !!(L && L.hard && !R.isWon(st) && moves >= limitNow());
   function checkLimit() {
-    setLost(!!(L && L.hard && !won && !R.isWon(st) && moves >= limitNow()));
+    setLost(!won && overLimit());
   }
 
   function setLost(on) {
@@ -1434,6 +1478,7 @@
       urgentSince = initialUrgent(); bonusMoves = 0; lastDeliv = 0; attemptCoins = 0;
     }
     sel = -1; busy = false; won = false; levelWins = 0; pendingUnlock = -1;
+    resetFlow();
     hintMv = null; flash = null; rescueK = null;
     lost = false;
     faces = {};
@@ -1451,7 +1496,8 @@
     showScreen('screen-workshop');
     WsBoard.select(-1); WsBoard.clearHint(); WsBoard.setTutorial(-1);
     WsBoard.setVials(st.vials, st.hid, R.lockedVial(st));
-    WsBoard.resize();
+    fieldBanner('level');
+    WsBoard.resize(true);   // число рядов выбирается здесь и держится весь уровень (G1)
     Piece.resize();
     syncView();
     renderOrders();
@@ -1461,7 +1507,7 @@
     checkLimit();
     updateGuide();
     saveGame();
-    requestAnimationFrame(() => { WsBoard.resize(); Piece.resize(); updateGuide(); });
+    requestAnimationFrame(() => { WsBoard.resize(true); Piece.resize(); updateGuide(); });
     track('level_start', { level: L.id, hard: L.hard ? 1 : 0, resumed: !!resume, moves });
     syncBanner();
     // B2: перед первым запуском уровня (с 4-го) — окно выбора оправы; «Новое!» — после выбора
@@ -1501,6 +1547,7 @@
     urgentSince = snap.us === undefined ? initialUrgent() : snap.us;
     lastDeliv = snap.ld || 0;
     sel = -1; busy = false; hintMv = null; flash = null; pendingUnlock = -1;
+    resetFlow();
     clearTimeout(cardTimer); cardJob = null;
     Fx.clear();
     shownCoins = Store.data.coins;
@@ -1531,14 +1578,21 @@
   }
 
   function tapVial(idx) {
-    if (!L || won || lost || busy || modalOpen || screen !== 'game') return;
+    if (!L || won || lost || modalOpen || screen !== 'game') return;
+    // камни ещё летят в пробирку: касание ждёт приземления (одного хода хватает)
+    if (pouring) { if (tapQueue.length < 2) tapQueue.push(idx); return; }
+    // ход победный или последний на «Сложном заказе»: окно — когда доиграют выдачи
+    if (R.isWon(st) || overLimit()) return;
     if (idx < 0 || idx >= st.vials.length) {
       if (sel !== -1) { sel = -1; WsBoard.select(-1); updateGuide(); }
       return;
     }
+    // ключ уже выдан, но ещё летит к замку: касание открывает замок сразу
+    if (idx === WsBoard.lockedVial() && idx !== R.lockedVial(st)) openLockNow(idx);
     if (idx === R.lockedVial(st)) { lockedTap(idx); return; }
     if (sel === -1) {
-      if (!st.vials[idx].length) return;
+      // выданная четвёрка ещё на поле — касание отправляет её заказчице
+      if (!st.vials[idx].length) { hurry(idx, epoch); return; }
       sel = idx;
       WsBoard.select(idx);
       sfx('pick');
@@ -1579,6 +1633,7 @@
   function doPour(from, to, count) {
     const e = epoch;
     flushCards();
+    hurry(to, e);   // в пробирке ещё стоит выданная четвёрка — она улетает к заказчице, место свободно
     pushHist('move');
     const prevHid = st.hid.slice();
     const before = st.vials[to].length;
@@ -1589,6 +1644,7 @@
     hintMv = null;
     WsBoard.clearHint();
     busy = true;
+    pouring = true;
     hideToast();
     // плата и появление срочного заказа — по порядку выдач этого хода
     const pays = res.deliveries.map((ev, k) => {
@@ -1606,15 +1662,23 @@
     if (res.deliveries.length) ftueStep(2, 'first_delivery');
     const left = urgentLeft();
     if (left !== null && left >= 1 && left <= 2) sfx('tick', { delay: 0.25 });
+    checkWinnable();   // плашка спасения — по правилам сразу после хода, а не после анимаций
     saveGame();
     updateHud();
     updateGuide();
-    // выданные пробирки до вспышки показывают тайные камни как до хода
+    // выданные пробирки до вспышки показывают тайные камни как до хода;
+    // четвёрки прежних ходов, ещё стоящие на поле, — как их сейчас рисует поле
+    const shown = WsBoard.hidden();
     const boardHid = st.hid.slice();
+    pend.forEach((d, v) => { boardHid[v] = shown[v]; });
     res.deliveries.forEach(d => { boardHid[d.vial] = prevHid[d.vial]; });
+    const job = { e, evs: res.deliveries.map((ev, k) => ({ ev, pay: pays[k], k, state: 'wait', onArrive: null })) };
+    job.evs.forEach(d => pend.set(d.ev.vial, d));
     WsBoard.pour(from, to, count, () => {
       if (e !== epoch) return;
-      runDeliveries(res.deliveries, pays, 0, e);
+      pouring = false;
+      if (job.evs.length) { jobs.push(job); nextJob(); } else settle();
+      replayTaps();
     }, {
       onGem: (k) => { if (e === epoch) sfx('gem', { semis: PENTA[Math.min(5, before + k)] }); },
       hid: boardHid,
@@ -1627,38 +1691,95 @@
      карточке, на карточке — печать и монеты, камень встаёт в гнездо
      изделия, на место карточки выходит следующий заказ. Каскад — каждая
      следующая выдача того же хода: «Каскад ×2…», встряска, нота выше. */
-  function runDeliveries(events, pays, k, e) {
+  function runDeliveries(job, k) {
+    const e = job.e;
     if (e !== epoch) return;
-    if (k >= events.length) { afterAction(); return; }
-    const ev = events[k];
+    const d = job.evs[k], ev = d.ev;
+    const land = () => {
+      if (e !== epoch) return;
+      landDelivery(ev, d.pay, k, e);
+      if (k === job.evs.length - 1) { swapCard(ev, true); endJob(job); }
+      else {
+        setTimeout(() => {
+          if (e !== epoch) return;
+          swapCard(ev, false);
+          runDeliveries(job, k + 1);
+        }, REDUCED ? 60 : 320);
+      }
+    };
+    // печать — когда камни долетели (игрок мог отправить их раньше ходом в эту пробирку)
+    const landWhenArrived = () => { if (d.state === 'arrived') land(); else d.onArrive = land; };
     const go = () => {
       if (e !== epoch) return;
+      if (d.state !== 'wait') { landWhenArrived(); return; }
       sfx('ready', { semis: 2 * k });
       buzz(15);
       WsBoard.flashReady(ev.vial, 300, () => {
         if (e !== epoch) return;
-        const card = cardEl(ev.slot);
-        const gemEl = card && card.querySelector('.ws-gem');
-        const r = gemEl ? gemEl.getBoundingClientRect() : null;
-        const target = r ? { x: r.left + r.width / 2, y: r.top + r.height / 2, size: r.width }
-          : { x: window.innerWidth / 2, y: 80, size: 40 };
-        const items = WsBoard.takeVial(ev.vial).map(it => gemItem(it.gem, it.x, it.y, it.size));
-        sfx('whoosh');
-        Fx.fly(items, target, () => {
-          if (e !== epoch) return;
-          landDelivery(ev, pays[k], k, e);
-          if (k === events.length - 1) { swapCard(ev, true); afterAction(); }
-          else {
-            setTimeout(() => {
-              if (e !== epoch) return;
-              swapCard(ev, false);
-              runDeliveries(events, pays, k + 1, e);
-            }, REDUCED ? 60 : 320);
-          }
-        }, { trail: true, dur: 400, step: 45, lift: 60 });
+        if (d.state === 'wait') flyToCard(d, e);
+        landWhenArrived();
       });
     };
     if (k >= 1) { cascadeFx(k); setTimeout(go, REDUCED ? 0 : 220); } else go();
+  }
+
+  /* Камни выданной пробирки летят к карточке заказа: по очереди выдач или
+     раньше — когда игрок ходит в эту пробирку (hurry). */
+  function flyToCard(d, e) {
+    const ev = d.ev;
+    if (pend.get(ev.vial) === d) pend.delete(ev.vial);
+    d.state = 'flying';
+    const card = cardEl(ev.slot);
+    const gemEl = card && card.querySelector('.ws-gem');
+    const r = gemEl ? gemEl.getBoundingClientRect() : null;
+    const target = r ? { x: r.left + r.width / 2, y: r.top + r.height / 2, size: r.width }
+      : { x: window.innerWidth / 2, y: 80, size: 40 };
+    const items = WsBoard.takeVial(ev.vial).map(it => gemItem(it.gem, it.x, it.y, it.size));
+    sfx('whoosh');
+    Fx.fly(items, target, () => {
+      if (e !== epoch) return;
+      d.state = 'arrived';
+      const f = d.onArrive;
+      d.onArrive = null;
+      if (f) f();
+    }, { trail: true, dur: 400, step: 45, lift: 60 });
+  }
+
+  function hurry(v, e) {
+    const d = pend.get(v);
+    if (d) flyToCard(d, e);
+  }
+
+  function nextJob() {
+    if (jobOn || !jobs.length) return;
+    const job = jobs.shift();
+    jobOn = true;
+    flushCards();
+    runDeliveries(job, 0);
+  }
+
+  function endJob(job) {
+    if (job.e !== epoch) return;
+    jobOn = false;
+    if (jobs.length) nextJob(); else settle();
+  }
+
+  function replayTaps() {
+    const q = tapQueue;
+    tapQueue = [];
+    q.forEach(i => tapVial(i));
+  }
+
+  function resetFlow() {
+    pouring = false; jobs = []; jobOn = false; pend.clear(); tapQueue = [];
+  }
+
+  // ключ выдан, но ещё летит: игрок коснулся запертой пробирки — замок открывается сразу
+  function openLockNow(v) {
+    if (pendingUnlock === v) pendingUnlock = -1;
+    WsBoard.unlock(v);
+    sfx('unlock');
+    buzz([20, 40, 20]);
   }
 
   function boardPoint(fy) {
@@ -1722,7 +1843,7 @@
   /* Ключ с карточки летит к запертой пробирке; замок открывается при прилёте. */
   function keyFx(ev, pay, card, e) {
     const v = ev.unlocked;
-    pendingUnlock = v;
+    if (WsBoard.lockedVial() === v) pendingUnlock = v;   // замок ещё нарисован (игрок не открыл его касанием)
     const badge = card && card.querySelector('.ws-key');
     const br = (badge || card) ? (badge || card).getBoundingClientRect() : null;
     const from = br ? { x: br.left + br.width / 2, y: br.top + br.height / 2 } : { x: window.innerWidth / 2, y: 80 };
@@ -1731,9 +1852,11 @@
     Fx.fly([{ x: from.x, y: from.y, size: 26, draw: (g, x, y, s) => Fx.drawKey(g, x, y, s) }], to, () => {
       if (e !== epoch) return;
       if (pendingUnlock === v) pendingUnlock = -1;
-      WsBoard.unlock(v);
-      sfx('unlock');
-      buzz([20, 40, 20]);
+      if (WsBoard.lockedVial() === v) {
+        WsBoard.unlock(v);
+        sfx('unlock');
+        buzz([20, 40, 20]);
+      }
       if (pay.key) {
         Fx.text(to.x, to.y - 24, '+' + pay.key, { color: '#ffe08a', size: 20 });
         coinsTo(to.x, to.y, pay.key, e);
@@ -1761,14 +1884,16 @@
     j();
   }
 
-  function afterAction() {
+  /* Всё доиграло (перелив приземлился, очередь выдач пуста): поле и карточки
+     сверяются с правилами, затем победа или «Ходы кончились». */
+  function settle() {
+    if (pouring || jobOn || jobs.length) return;
     busy = false;
     // поле совпадает с правилами (страховка после анимаций)
     WsBoard.sync(st.vials, st.hid, pendingUnlock >= 0 ? pendingUnlock : R.lockedVial(st));
     const same = view.delivered === st.delivered && view.next === st.next && view.slots.every((o, i) => o === st.slots[i]);
     if (!same && !cardJob) { syncView(); renderOrders(); }
     if (R.isWon(st)) { win(); return; }
-    checkWinnable();
     updateHud();
     checkLimit();
     updateGuide();
@@ -1798,7 +1923,7 @@
 
   /* ---------- подсказка: решатель от текущей позиции, за монеты ---------- */
   function onHint() {
-    if (!L || won || busy || lost || modalOpen) return;
+    if (!L || won || pouring || lost || modalOpen || R.isWon(st) || overLimit()) return;
     if (rescueK !== null) {
       toast('Сначала верните ходы', 1800);
       bump($('ws-rescue'));
@@ -1846,7 +1971,7 @@
     sfx('click');
     const lvl = L.id;
     rewardAd('hint', () => {
-      if (L && L.id === lvl && screen === 'game' && !won && !lost && !busy && !modalOpen && !hintMv && rescueK === null && giveHint(0, true)) return 1;
+      if (L && L.id === lvl && screen === 'game' && !won && !lost && !pouring && !modalOpen && !hintMv && rescueK === null && giveHint(0, true)) return 1;
       giveCoins(HINT_PRICE);
       return HINT_PRICE;
     });
@@ -2134,6 +2259,7 @@
     }
     epoch++;
     busy = false;
+    resetFlow();
     sel = -1;
     lost = false;
     pendingUnlock = -1;
@@ -2765,20 +2891,38 @@
       const mo = new MutationObserver(() => syncBanner());
       OVERLAYS.forEach(id => mo.observe($(id), { attributes: true, attributeFilter: ['class'] }));
     }
-    let resizeRaf = 0;
-    const relayout = () => {
+    /* G1: ряды пробирок выбираются заново только при новом уровне, повороте или
+       заметном resize окна (другая ширина, высота на четверть и больше). Баннер,
+       плашки, тосты и полоска «следующие» рядов не меняют. */
+    let resizeRaf = 0, fullRelayout = false, winW = window.innerWidth, winH = window.innerHeight;
+    const relayout = (full) => {
+      if (full) fullRelayout = true;
       if (resizeRaf) return;
       resizeRaf = requestAnimationFrame(() => {
         resizeRaf = 0;
+        const f = fullRelayout;
+        fullRelayout = false;
         Fx.resize();
-        if (screen === 'game') { WsBoard.resize(); Piece.resize(); updateGuide(); }
+        if (screen === 'game') { WsBoard.resize(f); Piece.resize(); updateGuide(); }
         if (screen === 'menu') renderMap();
         if (!$('win-overlay').classList.contains('hidden')) drawWinJewel(0);
       });
     };
-    window.addEventListener('resize', relayout);
-    // баннер появился или ушёл: экран стал ниже или выше (--ws-banner-h)
-    WSPlatform.banner.onChange(() => { bannerStat(); relayout(); });
+    window.addEventListener('resize', () => {
+      const w = window.innerWidth, h = window.innerHeight;
+      const turned = (w > h) !== (winW > winH);
+      const big = w !== winW || turned || Math.abs(h - winH) > Math.max(160, winH * 0.25);
+      winW = w; winH = h;
+      if (big) { winResizeAt = performance.now(); fieldBanner('window'); }
+      relayout(big);
+    });
+    // баннер появился или ушёл: экран стал ниже или выше (--ws-banner-h); поле держит своё место.
+    // Сразу после поворота или заметного resize баннер — часть того же изменения окна: ряды выбираются заново.
+    WSPlatform.banner.onChange(() => {
+      bannerStat();
+      const moved = fieldBanner('change');
+      relayout(moved && performance.now() - winResizeAt < 1500);
+    });
     // баннер — только после первого касания, когда оно уже сработало
     document.addEventListener('click', () => {
       if (tapped) return;
@@ -2851,6 +2995,7 @@
         delivered: st && st.delivered, total: st && st.orders.length,
         view: view && { slots: view.slots.map(typeOf), delivered: view.delivered, next: view.next },
         won, lost, winCount, levelWins, busy, sel, moves, undoDepth: hist.length,
+        pouring, jobs: jobs.length + (jobOn ? 1 : 0), pend: pend.size,
         rescue: rescueK, hint: hintMv, waiting: st ? waitingVials() : [],
         caption: $('ws-caption').textContent,
         best: L ? Store.data.best[L.id] || null : null,
@@ -2879,6 +3024,8 @@
     },
     solution() { return L ? L.solution.map(m => [m.from, m.to]) : null; },
     layout() { return WsBoard.layout(); },
+    // поле как оно нарисовано сейчас (G1: после всех анимаций должно совпасть с правилами)
+    board() { return { vials: WsBoard.shown().map(v => v.join('')), hid: WsBoard.hidden(), locked: WsBoard.lockedVial(), anim: WsBoard.isAnimating() }; },
     atlasReady() { return WsBoard.atlasReady(); },
     levels() { return LEVELS.map(l => ({ id: l.id, piece: l.piece, hard: l.hard, limit: l.limit, par: l.par, s3: l.s3, s2: l.s2, novelty: l.novelty })); },
     productId: PRODUCT_ID, saveKey: SAVE_KEY

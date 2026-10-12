@@ -75,9 +75,37 @@ const WsBoard = (() => {
   let sparks = [];                // искорки приземления
   let glints = [];                // блики на камнях { v, j, t0 }
   let quakeAt = null;             // { t0, power } — встряска поля
-  let raf = 0, glintTimer = 0;
+  let raf = 0, glintTimer = 0, active = false, lastFrame = 0;
 
-  function now() { return performance.now(); }
+  /* Часы игры (модерация ВК, VK-R2): на паузе площадки (свернули, вкладка скрыта,
+     реклама, оплата) время анимаций стоит, а отложенные переходы (later) ждут и после
+     возврата доигрывают остаток в прежнем порядке. Ими же пользуются эффекты и
+     переходы workshop.js (WsBoard.clock). */
+  const clock = (() => {
+    let pausedAt = 0, shift = 0, seq = 0;
+    const timers = new Set();
+    const now = () => (pausedAt || performance.now()) - shift;
+    function arm(t) { t.id = setTimeout(() => { timers.delete(t); t.fn(); }, Math.max(0, t.due - now())); }
+    function later(fn, ms) {
+      const t = { fn, due: now() + Math.max(0, ms || 0), n: seq++, id: 0 };
+      timers.add(t);
+      if (!pausedAt) arm(t);
+      return t;
+    }
+    function cancel(t) { if (t && timers.delete(t)) clearTimeout(t.id); }
+    function pause(on) {
+      if (on && !pausedAt) {
+        pausedAt = performance.now();
+        timers.forEach(t => clearTimeout(t.id));
+      } else if (!on && pausedAt) {
+        shift += performance.now() - pausedAt;
+        pausedAt = 0;
+        [...timers].sort((a, b) => a.due - b.due || a.n - b.n).forEach(arm);
+      }
+    }
+    return { now, later, cancel, pause, paused: () => !!pausedAt, pending: () => timers.size };
+  })();
+  function now() { return clock.now(); }
   const ease = (k) => 1 - (1 - k) * (1 - k);
 
   /* ---------- раскладка ----------
@@ -703,8 +731,13 @@ const WsBoard = (() => {
 
   function frame() {
     raf = 0;
-    if (!ctx || !lay) return;
+    if (!ctx || !lay || !active || document.hidden || clock.paused()) return;
     const t = now();
+    const moving = flights.length || shakes.size || drop || bounces.size || flips.size || flashes.size ||
+      unlockAt || sparks.length || quakeAt || (selected >= 0 && t - selAt < SEL_MS);
+    // Real moves stay at 60 fps; decorative idle cues need only 30 fps.
+    if (t - lastFrame < 1000 / (moving ? 60 : 30) - 1) { request(); return; }
+    lastFrame = t;
     // приземлившиеся камни переходят в пробирку
     let landed = false;
     flights = flights.filter(f => {
@@ -720,7 +753,7 @@ const WsBoard = (() => {
       }
       return true;
     });
-    for (const [v, f] of flashes) if (t >= f.t0 + f.dur) { flashes.delete(v); f.cb && setTimeout(f.cb, 0); }
+    for (const [v, f] of flashes) if (t >= f.t0 + f.dur) { flashes.delete(v); f.cb && clock.later(f.cb, 0); }
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, W, H);
     if (quakeAt) {
@@ -755,20 +788,33 @@ const WsBoard = (() => {
     drawSparks(t);
     drawHintArrow(t);
     drawHand(t);
-    const busy = flights.length || shakes.size || selected >= 0 || drop || tutorial >= 0 || hint || bounces.size ||
+    const busy = flights.length || shakes.size || (selected >= 0 && (!reduceMotion || t - selAt < SEL_MS)) || drop ||
+      (!reduceMotion && (tutorial >= 0 || hint)) || bounces.size ||
       flips.size || flashes.size || unlockAt || sparks.length || glints.length || quakeAt;
     if (busy || landed) request();
   }
 
-  function request() { if (!raf) raf = requestAnimationFrame(frame); }
+  function request() { if (!raf && active && !document.hidden && !clock.paused()) raf = requestAnimationFrame(frame); }
+  function setActive(value) {
+    active = value;
+    clearTimeout(glintTimer);
+    if (raf) cancelAnimationFrame(raf);
+    raf = 0; lastFrame = 0;
+    if (active && !document.hidden && !clock.paused()) { request(); scheduleGlint(); }
+  }
+  /* Пауза площадки: кадры и часы стоят; после — анимации идут с того же места. */
+  function setPaused(on) {
+    clock.pause(!!on);
+    setActive(active);
+  }
 
   /* Блики: раз в 1–2,5 с случайный открытый камень вспыхивает звёздочкой
      (золотые — чаще). Пока поле не видно, блики не запускаются. */
   function scheduleGlint() {
     clearTimeout(glintTimer);
-    if (reduceMotion) return;
+    if (reduceMotion || !active || document.hidden || clock.paused()) return;
     glintTimer = setTimeout(() => {
-      if (!document.hidden && canvas && canvas.offsetParent !== null && lay && !flights.length) {
+      if (!document.hidden && !clock.paused() && canvas && canvas.offsetParent !== null && lay && !flights.length) {
         const all = [], gold = [];
         vials.forEach((a, v) => a.forEach((gem, j) => {
           if (j < (hid[v] || 0) || v === locked) return;
@@ -805,7 +851,7 @@ const WsBoard = (() => {
     }
     // шрифт «?» на тайных камнях может догрузиться позже первого кадра
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(request);
-    scheduleGlint();
+    document.addEventListener('visibilitychange', () => setActive(active));
   }
 
   /* full — заново выбрать число рядов (новый уровень, resize окна, поворот); без него ряды прежние. */
@@ -832,7 +878,7 @@ const WsBoard = (() => {
     locked = lockV === undefined ? -1 : lockV;
     flights = [];
     shakes.clear(); bounces.clear(); flips.clear();
-    for (const f of flashes.values()) f.cb && setTimeout(f.cb, 0);
+    for (const f of flashes.values()) f.cb && clock.later(f.cb, 0);
     flashes.clear();
     unlockAt = null; sparks = []; glints = []; quakeAt = null; drop = null;
     if (relayout) computeLayout(true);
@@ -865,7 +911,7 @@ const WsBoard = (() => {
         x0: p0.x, y0: p0.y, x1: p1.x, y1: p1.y,
         onLand: () => {
           opts.onGem && opts.onGem(k);
-          if (--left === 0 && cb) setTimeout(cb, reduceMotion ? 0 : 90);
+          if (--left === 0 && cb) clock.later(cb, reduceMotion ? 0 : 90);
         }
       });
     });
@@ -931,7 +977,7 @@ const WsBoard = (() => {
     hid[v] = 0;
     // камни забрали раньше конца вспышки (ход в эту пробирку): вспышка кончается сейчас
     const f = flashes.get(v);
-    if (f) { flashes.delete(v); f.cb && setTimeout(f.cb, 0); }
+    if (f) { flashes.delete(v); f.cb && clock.later(f.cb, 0); }
     for (let j = 0; j < CAP; j++) bounces.delete(v + ':' + j);
     request();
     return out;
@@ -966,7 +1012,7 @@ const WsBoard = (() => {
   }
 
   return {
-    init, resize, setVials, sync, pour, flashReady, select, shake, quake, showHint, clearHint, setTutorial, setWaiting,
+    init, resize, setActive, setPaused, clock, setVials, sync, pour, flashReady, select, shake, quake, showHint, clearHint, setTutorial, setWaiting,
     setLock, unlock, setTube, takeVial, hitTest, vialClientRect,
     drawGem: (g, gem, x, y, size, alpha) => drawGem(g, gem, x, y, size, alpha),
     drawHidden: (g, x, y, size) => drawHidden(g, x, y, size),

@@ -268,7 +268,7 @@
     if (!s || !Number.isInteger(c.m) || c.m < 0) return null;
     let h = [];
     if (Array.isArray(c.h)) {
-      for (const e of c.h) {
+      for (const e of c.h.slice(-HIST_SAVE)) {
         const hs = e && unpackState(e.st, lv);
         if (!hs || !Number.isInteger(e.m) || e.m < 0) { h = []; break; }
         h.push({ st: hs, moves: e.m, kind: e.k === 'restart' ? 'restart' : 'move', us: usOf(e.us, e.m), ld: intIn(e.ld, 0, e.m) ? e.ld : 0 });
@@ -351,8 +351,34 @@
   let epoch = 0;           // меняется при отмене/рестарте/выходе: опоздавшие колбэки отбрасываются
   let rescueK = null;      // null — победа достижима; число — сколько ходов вернуть; 0 — только «Заново»
   let hintMv = null;
+  /* Перф 1.0: поиск (плашка спасения, подсказка) идёт кусочками и отменяется
+     ходом, отменой, заново, сменой уровня/экрана и паузой (searchGuard). */
+  let searchVersion = 0, checking = false, hintPending = 0, checkDone = null, recheck = false;
+  const winCache = new Map();
+  let tutorialKey = '', tutorialStep = null;
+  function cancelSearch() { searchVersion++; checking = false; hintPending = 0; }
+  function searchGuard() {
+    const version = searchVersion, e = epoch, m = moves;
+    return () => version !== searchVersion || e !== epoch || m !== moves || screen !== 'game' || !!pauseAt || document.hidden;
+  }
+  function rememberWin(s, value) {
+    const key = R.stateKey(s);
+    if (winCache.size >= 256 && !winCache.has(key)) winCache.delete(winCache.keys().next().value);
+    winCache.set(key, value);
+  }
+  async function canWin(s, cancelled) {
+    const key = R.stateKey(s);
+    if (winCache.has(key)) return winCache.get(key);
+    const result = await R.solveFastAsync(s, { cancelled, maxMs: 1500 });
+    if (!result.capped && !result.cancelled) rememberWin(s, !!result.moves);
+    return !!result.moves || !!result.capped;
+  }
   let flash = null;        // временная подпись { text, until }
   let flashTimer = null;
+  /* Отложенные переходы (выдачи, смена карточки, победа, «Новое!»…) — на часах игры
+     WsBoard.clock: на паузе площадки стоят, после возврата доигрывают остаток. */
+  const later = (fn, ms) => WsBoard.clock.later(fn, ms);
+  const cancelLater = (t) => WsBoard.clock.cancel(t);
   let toastTimer = null;
   let stats = null;        // { hints, undos, restarts } за прохождение
   let screen = 'menu';
@@ -483,7 +509,8 @@
      окнами (победа, «Ходы кончились», карточки, убранство, покупка); закрытый
      игроком не возвращается до перезапуска (площадка). */
   const OVERLAYS = ['win-overlay', 'lose-overlay', 'modal-overlay', 'decor-overlay', 'noads-overlay', 'thanks-overlay']
-    .concat(window.WsCase ? WsCase.OVERLAYS : []);   // B2: выбор оправы, шкатулка, «В избранное»
+    .concat(window.WsCase ? WsCase.OVERLAYS : [])    // B2: выбор оправы, шкатулка, «В избранное»
+    .concat(window.WsHelp ? WsHelp.OVERLAYS : []);   // VK-03: «Как играть»
   let bannerWanted = null;
   let tapped = false;      // первое касание закончилось: баннер не сдвигает экран под пальцем
   function syncBanner() {
@@ -543,10 +570,19 @@
   }
 
   /* Пауза площадки (свернули, вкладка скрыта, реклама, окно оплаты): звук,
-     блеск в окне победы, CSS-анимации и время уровня стоят. */
+     блеск в окне победы, CSS-анимации и время уровня стоят. VK-R2 (модерация):
+     ввод закрыт (касания поля, кнопки уровня, клавиши), часы игры стоят —
+     полёты камней, выдачи, смена карточек, победа и её церемония не идут, а
+     после возврата доигрывают с того же места; награды не повторяются (они
+     начисляются один раз в своём переходе). Поиск отменяется и после
+     возврата начинается заново. */
   function onPause() {
     if (pauseAt) return;
     pauseAt = Date.now();
+    if (checking) recheck = true;
+    cancelSearch();
+    WsBoard.setPaused(true);
+    try { Confetti.stop(); } catch (e) { /* без конфетти */ }
     try { Sound.suspend('pause'); } catch (e) { /* без звука */ }
     document.body.classList.add('ws-paused');
     clearInterval(winShineTimer);
@@ -555,9 +591,12 @@
     if (!pauseAt) return;
     levelT0 += Date.now() - pauseAt;
     pauseAt = 0;
+    WsBoard.setPaused(false);
+    Fx.request(); Piece.request();
     try { Sound.resume('pause'); } catch (e) { /* без звука */ }
     document.body.classList.remove('ws-paused');
     if (winShineRun && !$('win-overlay').classList.contains('hidden')) winShineRun();
+    if (recheck) { recheck = false; if (L && st && screen === 'game' && !won) checkWinnable(); }
   }
 
   /* ---------- «Без рекламы» и Королевский набор ----------
@@ -725,6 +764,8 @@
   function showScreen(id) {
     screen = id === 'screen-workshop' ? 'game' : id === 'screen-start' ? 'start' : 'menu';
     ['screen-start', 'screen-menu', 'screen-workshop'].forEach(s => $(s).classList.toggle('active', s === id));
+    WsBoard.setActive(screen === 'game');   // поле рисует кадры только на экране уровня
+    if (screen !== 'game') Confetti.stop();
   }
 
   /* Стартовый экран (п. 4.2.10 правил ВК, решение основателя 12.10.2026): при
@@ -826,7 +867,7 @@
   const Fx = (() => {
     let cv = null, g = null, dpr = 1, W = 0, H = 0, raf = 0;
     let jobs = [], sparks = [], texts = [], rings = [], drops = [];
-    const now = () => performance.now();
+    const now = () => WsBoard.clock.now();   // часы игры: на паузе полёты стоят
     const ease = (k) => (k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2);
 
     function init(c) { cv = c; g = cv.getContext('2d'); resize(); }
@@ -837,7 +878,7 @@
       cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
       request();
     }
-    function request() { if (!raf && g) raf = requestAnimationFrame(frame); }
+    function request() { if (!raf && g && !document.hidden && !WsBoard.clock.paused()) raf = requestAnimationFrame(frame); }
 
     /* items: [{ x, y, size, draw(g, x, y, size, t) }] в координатах окна;
        o: step, dur, lift, trail, sparkle, onEach(k). cb — долетел последний. */
@@ -948,6 +989,7 @@
 
     function frame() {
       raf = 0;
+      if (document.hidden || WsBoard.clock.paused()) return;
       const t = now();
       g.setTransform(dpr, 0, 0, dpr, 0, 0);
       g.clearRect(0, 0, W, H);
@@ -1042,10 +1084,12 @@
       });
     }
     function clear() {
+      if (raf) cancelAnimationFrame(raf);
+      raf = 0;
       jobs = []; sparks = []; texts = []; rings = []; drops = [];
       if (g) { g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, cv.width, cv.height); }
     }
-    return { init, resize, fly, coins, text, ring, rain, sparkle, clear, drawCoin, drawKey, drawPadlock };
+    return { init, resize, request, fly, coins, text, ring, rain, sparkle, clear, drawCoin, drawKey, drawPadlock };
   })();
 
   const gemItem = (gem, x, y, size) => ({ x, y, size, draw: (g, px, py, s) => WsBoard.drawGem(g, gem, px, py, s) });
@@ -1064,11 +1108,11 @@
       cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
       request();
     }
-    function request() { if (!raf && g) raf = requestAnimationFrame(frame); }
+    function request() { if (!raf && g && !document.hidden) raf = requestAnimationFrame(frame); }
     function frame() {
       raf = 0;
-      if (!L) return;
-      const t = performance.now();
+      if (!L || screen !== 'game' || document.hidden) return;
+      const t = WsBoard.clock.now();
       g.setTransform(dpr, 0, 0, dpr, 0, 0);
       g.clearRect(0, 0, W, H);
       let p = null;
@@ -1091,8 +1135,8 @@
       const s = L && WsJewel.sockets(playLook().shape, L.orders.length, box())[i];
       return s ? { x: r.left + s.x, y: r.top + s.y, size: s.r * 2.35 } : { x: r.left + W / 2, y: r.top + H / 2, size: 20 };
     }
-    function set(i, gem) { pieceGems[i] = gem; pop = REDUCED ? null : { i, t0: performance.now() }; request(); }
-    function shine() { if (!REDUCED) { shineAt = performance.now(); request(); } }
+    function set(i, gem) { pieceGems[i] = gem; pop = REDUCED ? null : { i, t0: WsBoard.clock.now() }; request(); }
+    function shine() { if (!REDUCED) { shineAt = WsBoard.clock.now(); request(); } }
     function reset() { pop = null; shineAt = 0; request(); }
     return { init, resize, request, socket, set, shine, reset };
   })();
@@ -1136,6 +1180,22 @@
   const HERO = { ring: 'bride', necklace: 'bride', tiara: 'bride', crown: 'bride', earrings: 'curly',
     bracelet: 'curly', hairpin: 'curly', pendant: 'grandma', brooch: 'grandma', cufflinks: 'grandma' };
   let faces = {};
+  /* Картинки по требованию (перф 1.0): радостные лица и героиня победы не грузятся
+     все при запуске — только то, что скоро понадобится (карточки на столе, уровень). */
+  let assetBase = '';
+  const prefetched = new Set();
+  function prefetchImg(name) {
+    if (!assetBase || prefetched.has(name) || typeof Image === 'undefined') return;
+    prefetched.add(name);
+    const im = new Image();
+    im.decoding = 'async';
+    im.src = assetBase + name + '.webp';
+  }
+  function prefetchLevel() {
+    if (!L) return;
+    WsJewel.prefetch([L.piece, playLook().shape]);          // изделие (и вторая форма, если выбрана)
+    prefetchImg('hero_' + (HERO[L.piece] || 'curly'));      // героиня окна победы
+  }
   function assignFaces(slots) {
     const used = [];
     const vis = slots.filter(o => o >= 0);
@@ -1161,6 +1221,7 @@
     box.innerHTML = '';
     box.dataset.n = String(view.slots.length);
     assignFaces(view.slots);
+    view.slots.forEach(o => { if (o >= 0) prefetchImg('face_' + FACES[faces[o]] + '_joy'); });   // лицо после выдачи
     view.slots.forEach((o, i) => {
       const card = document.createElement('div');
       const face = document.createElement('span');
@@ -1320,14 +1381,17 @@
 
   /* ---------- подпись над полем ---------- */
   function setFlash(text, ms) {
-    flash = { text, until: performance.now() + ms };
-    clearTimeout(flashTimer);
-    flashTimer = setTimeout(() => { flash = null; updateGuide(); }, ms);
+    flash = { text, until: WsBoard.clock.now() + ms };
+    cancelLater(flashTimer);
+    flashTimer = later(() => { flash = null; updateGuide(); }, ms);
   }
 
   function tutorialText() {
     // Уровень 1: кольцо ведёт по кратчайшему решению от текущей позиции.
-    const step = R.hint(st);
+    // ход ищется один раз на позицию (перф 1.0); ключ с порядком пробирок — ход называет их номера
+    const key = st.vials.map(v => v.join('')).join('|') + '#' + st.next + '#' + st.hid.join(',');
+    if (key !== tutorialKey) { tutorialKey = key; tutorialStep = R.hint(st); }
+    const step = tutorialStep;
     if (!step) { WsBoard.setTutorial(-1); return ''; }
     if (sel === step.from) {
       WsBoard.setTutorial(step.to);
@@ -1345,7 +1409,7 @@
     const tutorial = L.id === 1 && !won && !lost && rescueK === null && !busy;
     if (!tutorial) WsBoard.setTutorial(-1);
     if (won || lost || rescueK !== null) text = '';
-    else if (flash && performance.now() < flash.until) { text = flash.text; if (tutorial) tutorialText(); }
+    else if (flash && WsBoard.clock.now() < flash.until) { text = flash.text; if (tutorial) tutorialText(); }
     else if (tutorial) text = tutorialText();
     else if (hintMv) text = 'Подсказка: по стрелке';
     else {
@@ -1378,15 +1442,40 @@
 
   /* ---------- спасение: победа стала недостижимой ---------- */
   const UNDO_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 7L4 12l5 5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 12h9a5 5 0 0 1 0 10h-2" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>';
-  function checkWinnable() {
+  /* Плашка спасения. known — вывод без поиска (null — победа достижима,
+     k — вернуть k ходов, 0 — только «Заново»): ход вперёд из непроходимой
+     позиции, отмена хода, «Заново» и спасение знают ответ по прежнему rescueK.
+     Без known — поиск кусочками (перф 1.0); пока он идёт, checking = true, а
+     onHint ждёт checkDone. Неопределённость (лимит поиска) — «достижима», не тупик. */
+  function checkWinnable(known) {
+    cancelSearch();
+    recheck = false; checkDone = null;
     if (won || R.isWon(st)) { rescueK = null; return; }
-    if (R.isWinnable(st)) { rescueK = null; return; }
-    let k = 0;
-    for (let i = hist.length - 1; i >= 0; i--) {
-      if (R.isWinnable(hist[i].st)) { k = hist.length - i; break; }
-    }
-    if (rescueK === null) track('unwinnable', { level: L.id, moves, back: k, dead: R.movesOf(st).length === 0 });
+    if (known !== undefined) { setRescue(known); return; }
+    checkDone = searchRescue();
+    return checkDone;
+  }
+  function setRescue(k) {
+    if (k !== null && rescueK === null) track('unwinnable', { level: L.id, moves, back: k, dead: R.movesOf(st).length === 0 });
     rescueK = k;
+  }
+  async function searchRescue() {
+    const cancelled = searchGuard();
+    checking = true;
+    try {
+      let k = null;
+      if (!await canWin(R.cloneState(st), cancelled)) {
+        k = 0;
+        for (let i = hist.length - 1; i >= 0 && !cancelled(); i--) {
+          if (await canWin(hist[i].st, cancelled)) { k = hist.length - i; break; }
+        }
+      }
+      if (cancelled()) { if (pauseAt && screen === 'game') recheck = true; return; }
+      setRescue(k);
+    } catch (e) { /* сбой поиска не закрывает игру и не объявляет тупик */ }
+    finally {
+      if (!cancelled()) { checking = false; updateGuide(); }
+    }
   }
 
   function updateRescue() {
@@ -1403,14 +1492,14 @@
   }
 
   function onRescue() {
-    if (rescueK === null || won) return;
+    if (rescueK === null || won || pauseAt) return;
     sfx('click');
     if (rescueK === 0) { restart(); return; }
     const k = rescueK;
     const snap = hist[hist.length - k];
     hist.length = hist.length - k;
     track('rescue', { level: L.id, back: k });
-    restoreSnap(snap);
+    restoreSnap(snap, null);   // возврат ровно к последней проходимой позиции
   }
 
   /* ---------- «Сложный заказ»: ходы кончились ---------- */
@@ -1493,6 +1582,7 @@
 
   function loadLevel(i, resume) {
     epoch++;
+    cancelSearch(); winCache.clear(); tutorialKey = '';
     levelIdx = i;
     levelT0 = Date.now();
     if (pauseAt) pauseAt = levelT0;
@@ -1511,7 +1601,7 @@
     hintMv = null; flash = null; rescueK = null;
     lost = false;
     faces = {};
-    clearTimeout(cardTimer); cardJob = null;
+    cancelLater(cardTimer); cardJob = null;
     clearInterval(winShineTimer);
     stats = { hints: 0, undos: 0, restarts: 0 };
     Fx.clear();
@@ -1531,6 +1621,7 @@
     syncView();
     renderOrders();
     resetPiece();
+    prefetchLevel();
     if (resume) checkWinnable();
     updateHud();
     checkLimit();
@@ -1560,24 +1651,26 @@
       Store.data.seen[L.novelty] = true;
       Store.save();
       track('novelty', { level: L.id, novelty: L.novelty });
-      setTimeout(() => {
+      later(() => {
         if (e !== epoch) return;
         sfx('novelty');
         showModal({ kicker: 'Новое!', title: n.title, text: n.text, art: NOVELTY_ART[L.novelty], ok: 'Понятно', onOk: hard });
       }, REDUCED ? 0 : 350);
-    } else if (L.hard && !isPassed(levelIdx)) setTimeout(hard, REDUCED ? 0 : 300);
+    } else if (L.hard && !isPassed(levelIdx)) later(hard, REDUCED ? 0 : 300);
   }
 
-  /* Вернуть снимок (отмена/спасение/заново): анимации обрываются, всё рисуется заново. */
-  function restoreSnap(snap) {
+  /* Вернуть снимок (отмена/спасение/заново): анимации обрываются, всё рисуется заново.
+     known — ответ плашки спасения без поиска (см. checkWinnable), undefined — искать. */
+  function restoreSnap(snap, known) {
     epoch++;
+    cancelSearch();
     st = snap.st;
     moves = snap.moves;
     urgentSince = snap.us === undefined ? initialUrgent() : snap.us;
     lastDeliv = snap.ld || 0;
     sel = -1; busy = false; hintMv = null; flash = null; pendingUnlock = -1;
     resetFlow();
-    clearTimeout(cardTimer); cardJob = null;
+    cancelLater(cardTimer); cardJob = null;
     Fx.clear();
     shownCoins = Store.data.coins;
     hideToast();
@@ -1586,7 +1679,7 @@
     syncView();
     renderOrders();
     resetPiece();
-    checkWinnable();
+    checkWinnable(known);
     updateHud();
     checkLimit();
     updateGuide();
@@ -1607,7 +1700,7 @@
   }
 
   function tapVial(idx) {
-    if (!L || won || lost || modalOpen || screen !== 'game') return;
+    if (!L || won || lost || modalOpen || screen !== 'game' || pauseAt) return;
     // камни ещё летят в пробирку: касание ждёт приземления (одного хода хватает)
     if (pouring) { if (tapQueue.length < 2) tapQueue.push(idx); return; }
     // ход победный или последний на «Сложном заказе»: окно — когда доиграют выдачи
@@ -1663,11 +1756,16 @@
     const e = epoch;
     flushCards();
     hurry(to, e);   // в пробирке ещё стоит выданная четвёрка — она улетает к заказчице, место свободно
+    // ход из непроходимой позиции: победа по-прежнему недостижима, вернуться нужно к той же
+    // последней проходимой позиции (ws) — плашка без поиска
+    const known = checking ? undefined : rescueK;
+    const ws = known > 0 ? hist[hist.length - known] : null;
     pushHist('move');
     const prevHid = st.hid.slice();
     const before = st.vials[to].length;
     const res = R.moveInPlace(st, { from, to });
     if (!res) { hist.pop(); return; }
+    cancelSearch();
     moves++;
     sel = -1;
     hintMv = null;
@@ -1691,7 +1789,9 @@
     if (res.deliveries.length) ftueStep(2, 'first_delivery');
     const left = urgentLeft();
     if (left !== null && left >= 1 && left <= 2) sfx('tick', { delay: 0.25 });
-    checkWinnable();   // плашка спасения — по правилам сразу после хода, а не после анимаций
+    // плашка спасения — по правилам сразу после хода, а не после анимаций (поиск — кусочками)
+    if (known === null || known === undefined) checkWinnable();
+    else { const i = ws ? hist.indexOf(ws) : -1; checkWinnable(i >= 0 ? hist.length - i : 0); }
     saveGame();
     updateHud();
     updateGuide();
@@ -1713,7 +1813,7 @@
       hid: boardHid,
       reveal: res.revealed
     });
-    if (res.revealed) setTimeout(() => { if (e === epoch) sfx('reveal'); }, REDUCED ? 0 : 160);
+    if (res.revealed) later(() => { if (e === epoch) sfx('reveal'); }, REDUCED ? 0 : 160);
   }
 
   /* Выдачи по очереди: четвёрка вспыхивает, камни со шлейфом летят к
@@ -1729,7 +1829,7 @@
       landDelivery(ev, d.pay, k, e);
       if (k === job.evs.length - 1) { swapCard(ev, true); endJob(job); }
       else {
-        setTimeout(() => {
+        later(() => {
           if (e !== epoch) return;
           swapCard(ev, false);
           runDeliveries(job, k + 1);
@@ -1748,7 +1848,7 @@
         landWhenArrived();
       });
     };
-    if (k >= 1) { cascadeFx(k); setTimeout(go, REDUCED ? 0 : 220); } else go();
+    if (k >= 1) { cascadeFx(k); later(go, REDUCED ? 0 : 220); } else go();
   }
 
   /* Камни выданной пробирки летят к карточке заказа: по очереди выдач или
@@ -1850,7 +1950,7 @@
     }
     if (pay.urgent === true) Fx.text(cx, cy - 34, 'Успели! ×3', { color: '#ffb27a', size: 18, delay: 140 });
     else if (pay.urgent === false) Fx.text(cx, cy - 34, 'Не успели', { color: '#e6d6bf', size: 16, delay: 140 });
-    if (pay.jackpot) setTimeout(() => { if (e === epoch) jackpotFx(pay.jackpot, e); }, REDUCED ? 0 : 250);
+    if (pay.jackpot) later(() => { if (e === epoch) jackpotFx(pay.jackpot, e); }, REDUCED ? 0 : 250);
     if (ev.unlocked >= 0) keyFx(ev, pay, card, e);
     if (L.id <= 3 && k === 0) setFlash('Заказ готов', 2400);
     track('stamp', { level: L.id, order: ev.order, coins: pay.coins + pay.jackpot + pay.key });
@@ -1895,13 +1995,13 @@
     view.slots[ev.slot] = ev.incoming;
     if (ev.incoming >= 0) view.next = ev.incoming + 1;
     const render = () => { cardJob = null; renderOrders(ev.incoming >= 0 ? ev.slot : -1); };
-    if (defer && !REDUCED) { clearTimeout(cardTimer); cardJob = render; cardTimer = setTimeout(render, 320); }
+    if (defer && !REDUCED) { cancelLater(cardTimer); cardJob = render; cardTimer = later(render, 320); }
     else render();
   }
 
   function flushCards() {
     if (!cardJob) return;
-    clearTimeout(cardTimer);
+    cancelLater(cardTimer);
     const j = cardJob;
     cardJob = null;
     j();
@@ -1925,50 +2025,79 @@
 
   /* ---------- отмена / заново ---------- */
   function undo() {
-    if (!L || won || !hist.length || modalOpen) return;
+    if (!L || won || !hist.length || modalOpen || pauseAt) return;
     sfx('click');
+    // плашка спасения без поиска: позиция до хода из проходимой — проходима; из
+    // непроходимой — на шаг ближе к последней проходимой (k-1), «только заново» остаётся
+    const k = checking ? undefined : rescueK;
     const snap = hist.pop();
     stats.undos++;
     track('undo', { level: L.id, kind: snap.kind, depth: hist.length });
-    restoreSnap(snap);
+    restoreSnap(snap, snap.kind !== 'move' || k === undefined ? undefined : k === null || k === 1 ? null : k > 1 ? k - 1 : 0);
     if (snap.kind === 'restart') toast('Партия вернулась', 1600);
   }
 
   function restart() {
-    if (!L || won || modalOpen || (moves === 0 && st.delivered === 0)) return;
+    if (!L || won || modalOpen || pauseAt || (moves === 0 && st.delivered === 0)) return;
     sfx('click');
     pushHist('restart');
     stats.restarts++;
     track('restart', { level: L.id, moves, delivered: st.delivered });
-    restoreSnap({ st: R.makeState(L), moves: 0, us: initialUrgent(), ld: 0 });
+    restoreSnap({ st: R.makeState(L), moves: 0, us: initialUrgent(), ld: 0 }, null);   // начало уровня проходимо
     toast('Отменить — вернёт партию', 2000);
   }
 
-  /* ---------- подсказка: решатель от текущей позиции, за монеты ---------- */
-  function onHint() {
-    if (!L || won || pouring || lost || modalOpen || R.isWon(st) || overLimit()) return;
-    if (rescueK !== null) {
-      toast('Сначала верните ходы', 1800);
-      bump($('ws-rescue'));
-      return;
+  /* ---------- подсказка: решатель от текущей позиции, за монеты ----------
+     Перф 1.0: ход ищется по кусочкам (R.hintAsync), касания и кадры не стоят.
+     Повторное касание, пока ход ищется, ничего не делает (вторая оплата
+     невозможна); ход, отмена, заново, смена уровня/экрана и пауза отменяют
+     поиск — тогда ничего не списано. Монеты списываются только за найденный
+     для текущей позиции ход; подсказка за видео — ход найден ДО ролика. */
+  let hintSeq = 0;
+  async function onHint() {
+    if (!L || won || pouring || lost || modalOpen || hintPending || pauseAt || screen !== 'game' || R.isWon(st) || overLimit()) return;
+    const tok = hintPending = ++hintSeq;
+    let step = null, cancelled = null;
+    try {
+      // плашка спасения ещё считается — подсказка ждёт её (без неё нельзя решить, к месту ли подсказка)
+      while (checking && checkDone) { await checkDone; if (hintPending !== tok) return; }
+      if (rescueK !== null) {
+        toast('Сначала верните ходы', 1800);
+        bump($('ws-rescue'));
+        return;
+      }
+      if (hintMv) { WsBoard.showHint(hintMv.from, hintMv.to); return; }   // уже оплачена
+      const price = hintPrice();
+      const video = price > Store.data.coins;
+      if (video && !rewardOn()) {
+        sfx('invalid');
+        toast('Мало монет', 1600);
+        return;
+      }
+      cancelled = searchGuard();
+      const key = epoch + ':' + moves;   // позиция меняется только ходом (moves) или снимком (epoch)
+      try { step = await R.hintAsync(R.cloneState(st), { cancelled }); }
+      catch (e) { step = null; /* нет подсказки — ничего не списано */ }
+      if (cancelled() || hintPending !== tok) return;
+      hintPending = 0;
+      if (!step) {
+        stats.hints++;
+        track('hint', { level: L.id, from: null, to: null, moves, price: 0, video: video ? 1 : 0 });
+        toast('Попробуйте другой ход', 1600);
+        return;
+      }
+      if (video) { hintByVideo(step, key); return; }
+      giveHint(price, false, step);
+    } finally {
+      if (hintPending === tok) hintPending = 0;
+      updateButtons();
     }
-    if (hintMv) { WsBoard.showHint(hintMv.from, hintMv.to); return; }   // уже оплачена
-    const price = hintPrice();
-    if (price > Store.data.coins) {
-      if (rewardOn()) { hintByVideo(); return; }
-      sfx('invalid');
-      toast('Мало монет', 1600);
-      return;
-    }
-    giveHint(price, false);
   }
 
-  // Показать подсказку от текущей позиции; price — списать монеты. false — подсказки нет.
-  function giveHint(price, video) {
-    const step = R.hint(st);
+  // Показать найденную подсказку step; price — списать монеты.
+  function giveHint(price, video, step) {
     stats.hints++;
-    track('hint', { level: L.id, from: step && step.from, to: step && step.to, moves, price: step ? price : 0, video: video ? 1 : 0 });
-    if (!step) return false;
+    track('hint', { level: L.id, from: step.from, to: step.to, moves, price, video: video ? 1 : 0 });
     if (price) {
       Store.data.coins -= price;
       shownCoins -= price;
@@ -1988,13 +2117,17 @@
     return true;
   }
 
-  /* Подсказка за видео (монет меньше цены). Позднее подтверждение, когда
-     подсказка уже не к месту (другой уровень, победа), — цена подсказки монетами. */
-  function hintByVideo() {
+  /* Подсказка за видео (монет меньше цены). Ход step найден до ролика для
+     позиции key: награда выдаёт его без нового поиска, один раз (rewardAd
+     вызывает grant один раз). Если подсказка уже не к месту (позиция
+     сменилась, другой уровень, победа, позднее подтверждение) — цена
+     подсказки монетами. */
+  function hintByVideo(step, key) {
     sfx('click');
     const lvl = L.id;
     rewardAd('hint', () => {
-      if (L && L.id === lvl && screen === 'game' && !won && !lost && !pouring && !modalOpen && !hintMv && rescueK === null && giveHint(0, true)) return 1;
+      if (L && L.id === lvl && screen === 'game' && st && epoch + ':' + moves === key && !won && !lost && !pouring && !modalOpen &&
+        !hintMv && rescueK === null && giveHint(0, true, step)) return 1;
       giveCoins(HINT_PRICE);
       return HINT_PRICE;
     });
@@ -2048,8 +2181,9 @@
     sfx('win');
     vibrateWin();
     const e = epoch;
-    setTimeout(() => { if (e === epoch) Piece.shine(); }, REDUCED ? 0 : 420);
-    setTimeout(() => { if (e === epoch) showWin(r); }, REDUCED ? 100 : 1000);
+    // переходы победы — на часах игры: на паузе площадки ждут, после — доигрывают (VK-R2)
+    later(() => { if (e === epoch) Piece.shine(); }, REDUCED ? 0 : 420);
+    later(() => { if (e === epoch) showWin(r); }, REDUCED ? 100 : 1000);
   }
 
   /* Церемония: изделие крупно с бликом, звёзды по одной, монеты считаются,
@@ -2104,7 +2238,7 @@
     b2('win', r);   // B2: кнопка шкатулки, полёт изделия в неё (первые три победы), «В избранное»
     // звёзды по одной
     for (let i = 0; i < r.stars; i++) {
-      setTimeout(() => {
+      later(() => {
         if (e !== epoch) return;
         starEls[i].classList.add('on');
         sfx('star', { semis: [0, 3, 7][i] });
@@ -2113,11 +2247,11 @@
     // монеты попытки считаются вверх
     const total = attemptCoins;
     const t0 = (REDUCED ? 0 : 350 + r.stars * 300 + 150);
-    setTimeout(() => {
+    later(() => {
       if (e !== epoch) return;
       const steps = Math.min(14, Math.max(1, Math.ceil(total / 10)));
       for (let s = 1; s <= steps; s++) {
-        setTimeout(() => {
+        later(() => {
           if (e !== epoch) return;
           coinsEl.textContent = '+' + Math.round(total * s / steps);
           if (s % 2 === 0 || s === steps) sfx('count', { semis: Math.min(12, s) });
@@ -2224,13 +2358,13 @@
   }
 
   async function nextFromWin() {
-    if (nextBusy) return;
+    if (nextBusy || pauseAt) return;
     sfx('click');
     const mode = $('btn-next').dataset.mode;
     if (mode === 'chest') {
       const ci = collOfIdx(levelIdx);
       leaveToMenu();
-      setTimeout(() => openChest(ci), REDUCED ? 0 : 350);
+      later(() => openChest(ci), REDUCED ? 0 : 350);
     } else if (mode === 'next' && levelIdx < LEVELS.length - 1) {
       track('next_click', { level: L.id, stars: Store.data.stars[String(L.id)] || 0, moves });
       ftueStep(4, 'first_next');
@@ -2280,12 +2414,13 @@
       }
     }
     epoch++;
+    cancelSearch();
     busy = false;
     resetFlow();
     sel = -1;
     lost = false;
     pendingUnlock = -1;
-    clearTimeout(cardTimer); cardJob = null;
+    cancelLater(cardTimer); cardJob = null;
     clearInterval(winShineTimer);
     Fx.clear();
     b2('leave');
@@ -2818,6 +2953,7 @@
     };
     const atlasUrl = (document.querySelector('link[rel="preload"][as="image"]') || {}).href || 'workshop_assets/gems.webp';
     const assets = atlasUrl.replace(/[^/]*$/, '');
+    assetBase = assets;
     WsBoard.init($('board-canvas'), {
       spriteOf: (t) => (GEMS[t] ? GEMS[t].sprite : 0),
       colorOf: (t) => (GEMS[t] ? GEMS[t].color : '#c33'),
@@ -2825,11 +2961,6 @@
       onAtlas: redrawArt
     });
     WsJewel.load(assets, redrawArt);
-    // радостные лица и героини победы — заранее, чтобы не появлялись с задержкой
-    if (typeof Image !== 'undefined') {
-      FACES.map(f => 'face_' + f + '_joy').concat(['hero_bride', 'hero_curly', 'hero_grandma'])
-        .forEach(n => { new Image().src = assets + n + '.webp'; });
-    }
     Fx.init($('fx-canvas'));
     Piece.init($('ws-piece'));
     Confetti.init($('confetti-canvas'));
@@ -2843,6 +2974,8 @@
       tapVial(WsBoard.hitTest(ev.clientX, ev.clientY));
     });
     document.addEventListener('keydown', (ev) => {
+      if (pauseAt) return;            // пауза площадки: ввод закрыт (VK-R2)
+      if (window.WsHelp && WsHelp.key(ev)) return;   // VK-03: «Как играть» открыто — поле не слушает
       if (b2('key', ev)) return;   // B2: окна выбора, шкатулки, «В избранное»
       if (!$('thanks-overlay').classList.contains('hidden')) {
         if (ev.key === 'Escape' || ev.key === 'Enter') { ev.preventDefault(); closeThanks(); }
@@ -2912,9 +3045,15 @@
       vibrateWin();          // включили — сразу тот же лёгкий отклик, что на победе
     });
     $('btn-start').addEventListener('click', onStart);
+    // VK-03: «Как играть» — «?» на карте и на уровне; цены — из правил игры, а не из текста
+    if (window.WsHelp) WsHelp.attach({ sfx, track, screen: () => screen, level: () => (L ? L.id : 0),
+      deselect: () => { sel = -1; if (st) WsBoard.select(-1); },
+      hintPrice: HINT_PRICE, freeHint: FREE_HINT_LEVELS, moreMoves: MORE_MOVES, morePrice: MORE_PRICE });
     // пауза — от площадки (вкладка скрыта, свернули, реклама, оплата)
     WSPlatform.onPause(onPause);
     WSPlatform.onResume(onResume);
+    // скрытая вкладка: декоративные CSS-анимации всех экранов стоят (перф 1.0)
+    document.addEventListener('visibilitychange', () => document.body.classList.toggle('ws-background', document.hidden));
     WSPlatform.onResume((src) => { if (src === 'view' || src === 'doc') payRetry(); });
     WSPlatform.onLateReward(onLateReward);
     WSPlatform.onEvent(onPlatformEvent);
@@ -2971,6 +3110,7 @@
       document.body.appendChild(b);
     }
 
+    if (window.WsBoot) WsBoot.wait(25000);   // VK-01: ожидание площадки (до 8 + 8 с) — не отказ загрузки
     try { await WSPlatform.init({ saveKey: SAVE_KEY }); } catch (e) { /* площадка не роняет запуск */ }
     let raw = null;
     try { raw = await WSPlatform.loadSave(); } catch (e) { raw = null; }
@@ -2989,6 +3129,7 @@
     // ?level=N (проверки вне ВК) открывает уровень сразу — без стартового экрана
     if (startLevel && LEVELS[+startLevel[1] - 1]) { showScreen('screen-menu'); renderMenu(); } else showScreen('screen-start');
     booted = true;
+    if (window.WsBoot) WsBoot.ready();       // VK-02: стартовый экран готов — заставка уходит сразу
     syncBanner();
     if (startLevel && LEVELS[+startLevel[1] - 1]) loadLevel(+startLevel[1] - 1);
     try { catalog = (await WSPlatform.catalog()) || []; } catch (e) { catalog = []; }
@@ -3026,8 +3167,8 @@
         queue: st && st.orders.slice(st.next),
         delivered: st && st.delivered, total: st && st.orders.length,
         view: view && { slots: view.slots.map(typeOf), delivered: view.delivered, next: view.next },
-        won, lost, winCount, levelWins, busy, sel, moves, undoDepth: hist.length,
-        pouring, jobs: jobs.length + (jobOn ? 1 : 0), pend: pend.size,
+        won, lost, winCount, levelWins, busy: busy || checking || !!hintPending, sel, moves, undoDepth: hist.length,
+        pouring, jobs: jobs.length + (jobOn ? 1 : 0), pend: pend.size, searching: checking || !!hintPending,
         rescue: rescueK, hint: hintMv, waiting: st ? waitingVials() : [],
         caption: $('ws-caption').textContent,
         best: L ? Store.data.best[L.id] || null : null,
@@ -3063,5 +3204,6 @@
     productId: PRODUCT_ID, saveKey: SAVE_KEY
   };
 
-  init();
+  // VK-01: запуск упал — не белый экран, а «Не удалось загрузить» и «Повторить» (workshop.html)
+  init().catch((e) => { try { console.error(e); } catch (x) { /* без консоли */ } if (window.WsBoot) WsBoot.fail('init'); });
 })();

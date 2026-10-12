@@ -207,7 +207,7 @@
 
   /* Кратчайшее решение (BFS по числу переливов). { moves, visited } или
      { moves: null }. opts.cap — предохранитель по числу состояний. */
-  function solve(state, opts) {
+  function* searchBreadth(state, opts) {
     opts = opts || {};
     const cap = opts.cap || 300000;
     const start = cloneState(state);
@@ -219,6 +219,7 @@
     while (frontier.length) {
       const next = [];
       for (const node of frontier) {
+        yield visited;
         for (const mv of movesOf(node.s, true)) {
           const ns = applyMove(node.s, mv, opts);
           if (!ns) continue;
@@ -239,7 +240,7 @@
 
   /* Быстрый поиск ЛЮБОГО решения: лучший-первым по g + w·disorder.
      Решение не обязательно кратчайшее. { moves, visited } / { moves: null[, capped] }. */
-  function solveFast(state, opts) {
+  function* searchFast(state, opts) {
     opts = opts || {};
     const cap = opts.cap || 60000, w = opts.weight || 2;
     const start = cloneState(state);
@@ -273,6 +274,7 @@
     let visited = 1, seq = 0;
     while (heap.length) {
       const node = pop();
+      yield visited;
       for (const mv of movesOf(node.s, true)) {
         const ns = applyMove(node.s, mv);
         if (!ns) continue;
@@ -292,6 +294,46 @@
       }
     }
     return { moves: null, visited };
+  }
+
+  function drain(search) {
+    let step;
+    do { step = search.next(); } while (!step.done);
+    return step.value;
+  }
+  function solve(state, opts) { return drain(searchBreadth(state, opts)); }
+  function solveFast(state, opts) { return drain(searchFast(state, opts)); }
+
+  // Yield to input/painting between short slices. No worker or network is needed,
+  // including file://. A cancelled/budget-limited search never proves a dead end.
+  async function sliced(search, opts) {
+    opts = opts || {};
+    const clock = () => performance.now();
+    const started = clock();
+    let visited = 1;
+    try {
+      for (;;) {
+        const slice = clock();
+        do {
+          if (opts.cancelled && opts.cancelled()) return { moves: null, visited, cancelled: true, capped: true };
+          if (clock() - started > (opts.maxMs || 2500)) return { moves: null, visited, capped: true };
+          const step = search.next();
+          if (step.done) return step.value;
+          visited = step.value;
+        } while (clock() - slice < 4);
+        await new Promise(resolve => setTimeout(resolve, 0));
+      }
+    } finally { search.return(); }
+  }
+  function solveFastAsync(state, opts) { return sliced(searchFast(state, opts), opts); }
+  async function hintAsync(state, opts) {
+    opts = opts || {};
+    const r = await sliced(searchBreadth(state, { cap: opts.cap || 25000 }), opts);
+    if (r.cancelled) return null;
+    if (r.moves) return r.moves.length ? r.moves[0] : null;
+    if (!r.capped) return null;
+    const f = await solveFastAsync(state, Object.assign({}, opts, { cap: opts.fastCap || 80000 }));
+    return f.moves && f.moves.length ? f.moves[0] : null;
   }
 
   /* Полный граф достижимых состояний: сколько всего, сколько безнадёжных
@@ -368,7 +410,7 @@
   const api = {
     CAP, SEALED, isComplete, isHomogeneous, moveCount, legalMoves, movesOf, makeState, cloneState, activeTypes,
     isDelivered, lockedVial, findDelivery, settle, moveInPlace, applyMove, isWon, isDeadEnd, stateKey, disorder,
-    solve, solveFast, analyze, hint, isWinnable
+    solve, solveFast, solveFastAsync, hintAsync, analyze, hint, isWinnable
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.WorkshopRules = api;

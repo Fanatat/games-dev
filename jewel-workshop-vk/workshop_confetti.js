@@ -1,5 +1,6 @@
 /* ============================================================
-   confetti.js — простая физика конфетти на отдельном canvas поверх
+   workshop_confetti.js — конфетти форка (DPR ≤2, остановка при выходе/скрытии).
+   Простая физика конфетти на отдельном canvas поверх
    оверлея победы. Без библиотек, без картинок: кружки и квадраты
    цветами игры, гравитация + вращение. ~2.5с и самоочищается.
 
@@ -25,11 +26,11 @@ const Confetti = (() => {
      (main.js) для заведомо более лёгкого всплеска — финал остаётся
      единственным с полноразмерным конфетти. */
   function burst(opts) {
-    if (!canvas || reduceMotion) return;
+    if (!canvas || !ctx || reduceMotion || document.hidden) return;
     const count = (opts && opts.count) || 44;
-    const colors = (opts && opts.colors) || COLORS;   // свои цвета — у «Ювелир Ленд»
+    const colors = (opts && opts.colors) || COLORS;   // свои цвета — у «Мастерской»
     const durationMs = (opts && opts.durationMs) || 2600;
-    const dpr = window.devicePixelRatio || 1;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
     const cssW = canvas.clientWidth, cssH = canvas.clientHeight;
     canvas.width = cssW * dpr;
     canvas.height = cssH * dpr;
@@ -55,6 +56,7 @@ const Confetti = (() => {
     let lastT = t0;
 
     function frame(now) {
+      if (document.hidden) { stop(); return; }
       const dt = Math.min(32, now - lastT);
       lastT = now;
       const step = dt / 16;
@@ -90,5 +92,10 @@ const Confetti = (() => {
     rafId = requestAnimationFrame(frame);
   }
 
-  return { init, burst };
+  function stop() {
+    if (rafId) cancelAnimationFrame(rafId);
+    rafId = null;
+    if (ctx) { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, canvas.width, canvas.height); }
+  }
+  return { init, burst, stop };
 })();

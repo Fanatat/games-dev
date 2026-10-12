@@ -68,7 +68,27 @@ function defaultProgress() {
     // { id → [заработано, потрачено] }; 'base' — наследие старого формата.
     // shopCurrencyEarned/Spent теперь — суммы по всем записям (производные).
     shopLedger: {},
+    // «Последний конвой» (сборка 9): слава копится между походами (число,
+    // слияние max), рекорды уровней { [уровень]: {stop, wins, runs} } —
+    // поэлементный max; wins>0 у уровня открывает следующий (с учётом
+    // календаря, см. convoy.js). Живут в облаке ВК вместе с остальным.
+    cvGlory: 0,
+    cvBest: {},
   };
+}
+
+// Рекорды уровней конвоя: каждое поле каждого уровня — максимум из двух копий.
+function mergeBestMap(a, b) {
+  const out = {};
+  for (const src of [a, b]) {
+    if (!src || typeof src !== 'object') continue;
+    for (const id of Object.keys(src)) {
+      const v = src[id], cur = out[id] || { stop: 0, wins: 0, runs: 0 };
+      if (!v || typeof v !== 'object') continue;
+      out[id] = { stop: Math.max(cur.stop, v.stop || 0), wins: Math.max(cur.wins, v.wins || 0), runs: Math.max(cur.runs, v.runs || 0) };
+    }
+  }
+  return out;
 }
 
 // Поэлементный max двух словарей «id → число» (звёзды миссий): прогресс
@@ -116,6 +136,7 @@ const SAVE_NUM_RANGES = {
   unlocked: [1, () => (typeof MISSIONS !== 'undefined' ? MISSIONS.length : 15), true],
   gearSword: [0, 3, true], gearShield: [0, 3, true], gearArmor: [0, 3, true], gearLongBlade: [0, 3, true],
   missionsStarted: [0, 1e6, true],
+  cvGlory: [0, 1e7, true],
 };
 const SAVE_STRING_ENUMS = {
   cosmeticTime: ['cycle', 'day', 'night'],
@@ -172,6 +193,16 @@ function sanitizeSaveData(raw) {
         for (const id of Object.keys(v)) {
           const n = Number(id), st = v[id];
           if (Number.isInteger(n) && n >= 1 && n <= max && typeof st === 'number' && Number.isFinite(st) && st >= 1) m[n] = Math.min(3, Math.floor(st));
+        }
+      }
+      out[k] = m;
+    } else if (k === 'cvBest') {
+      const m = {};
+      if (v && typeof v === 'object' && !Array.isArray(v)) {
+        const int = (x, hi) => (typeof x === 'number' && Number.isFinite(x) ? Math.max(0, Math.min(hi, Math.floor(x))) : 0);
+        for (const id of Object.keys(v)) {
+          const n = Number(id), b = v[id];
+          if (Number.isInteger(n) && n >= 1 && n <= 20 && b && typeof b === 'object') m[n] = { stop: int(b.stop, 10), wins: int(b.wins, 1e6), runs: int(b.runs, 1e6) };
         }
       }
       out[k] = m;
@@ -458,6 +489,7 @@ function mergeProgress(localData, cloudData) {
   for (const k of keys) {
     if (k === 'stamps' || k === 'shopLedger') continue;
     if (k === 'missionStars') { merged[k] = mergeMaxMap(L[k], C[k]); continue; } // раунд 15 (И4)
+    if (k === 'cvBest') { merged[k] = mergeBestMap(L[k], C[k]); continue; } // конвой: рекорды уровней
     if (k === 'chapterBonusClaimed') { merged[k] = Object.assign({}, C[k], L[k]); continue; } // А09: полученный бонус не «разполучается»
     const hasLocal = Object.prototype.hasOwnProperty.call(L, k);
     const hasCloud = Object.prototype.hasOwnProperty.call(C, k);

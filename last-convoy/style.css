@@ -1699,7 +1699,7 @@ body.convoy #heroDownFlash, body.convoy #fortEdge { display: none !important; }
 /* Сборка 4 (макет UI_МАКЕТЫ/КОНВОЙ_UI.md). Три семейства элементов и больше ничего:
    сводка — тёмная плашка (не нажимается), действие — деревянная плитка, главная кнопка — золотая (.menu-btn).
    Слов в бою нет: значки и числа; обучение — указатель над плиткой (.cv-point). */
-#cvHud, #cvMenu, #cvResult, #screenPause {
+#cvHud, #cvMenu, #cvResult, #cvRevive, #screenPause {
   --cv-sum-bg: rgba(28,19,11,.8);
   --cv-sum-edge: rgba(8,5,2,.85);
   --cv-r: .75em;
@@ -2039,6 +2039,21 @@ body.convoy #heroDownFlash, body.convoy #fortEdge { display: none !important; }
 .cv-result-btns { display: flex; align-items: center; justify-content: center; gap: .7em; margin-top: .2em; font-size: max(15px, 1em); }
 .cv-result-btns .menu-btn.result-main { font-size: 1.1em; min-height: 0; height: 2.6em; padding: 0 2.1em; white-space: nowrap; }
 .cv-result-btns .cv-home { width: 2.86em; height: 2.86em; border-radius: .8em; }
+/* реклама (сборка 9): «Второй шанс» поверх замершего боя, «Слава ×2» рядом с «+N ★» */
+#cvRevive { background: rgba(40,6,2,.45); }
+.cv-revive-card { align-items: center; width: min(24em, 92vw); gap: .6em; padding: 1.1em 1.4em 1.2em; text-align: center; animation: cvUnlockIn .35s cubic-bezier(.34,1.56,.64,1); }
+.cv-revive-card h2 { margin: 0; font-size: 1.6em; line-height: 1.1; color: #ff9a7c; }
+.cv-revive-card p { margin: 0; font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: max(13px, .8em); letter-spacing: 0; line-height: 1.3; color: var(--paper); }
+.cv-revive-ad, .cv-ad-btn { display: inline-flex; align-items: center; gap: .4em; }
+.cv-revive-ad svg.ico, .cv-ad-btn svg.ico { width: .9em; height: .9em; vertical-align: 0; color: #fff6d8; }
+.cv-revive-ad:disabled, .cv-ad-btn:disabled { filter: grayscale(.6) brightness(.85); cursor: default; }
+.cv-glory-top { display: flex; align-items: center; justify-content: center; gap: .6em; }
+.cv-ad-btn {
+  padding: .25em .9em .25em .7em; border-radius: 999px; border: 2.5px solid var(--ink); cursor: pointer;
+  background: linear-gradient(#7bd98a, #3c9c4c); color: #fff; font-family: 'Lilita One', sans-serif; font-size: max(14px, .95em);
+  text-shadow: var(--cv-outline); box-shadow: 0 3px 0 var(--ink); animation: glowPulse 1.6s ease-in-out infinite;
+}
+.cv-ad-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--ink); }
 
 /* ---------- меню ---------- */
 .cv-menu-glory { display: flex; flex-direction: column; align-items: center; max-width: 100%; }
@@ -2055,7 +2070,12 @@ body.convoy #heroDownFlash, body.convoy #fortEdge { display: none !important; }
 .cv-pips i.next { border-color: #ffd35c; animation: glowPulse 1.6s ease-in-out infinite; }
 #cvMenu .cv-menu-best { font-size: max(13px, .85em); }
 /* уровни похода: плитка — край и его враг, номер, рекорд; закрытый — серый с замком */
-.cv-levels { display: flex; gap: .6em; justify-content: center; font-size: max(13px, 2.3vh); }
+.cv-levels {
+  display: flex; gap: .6em; justify-content: safe center; font-size: max(13px, 2.3vh);
+  max-width: 94vw; overflow-x: auto; padding: 4px 4px 6px; scrollbar-width: none;
+}
+.cv-levels::-webkit-scrollbar { display: none; }
+.cv-levels > .cv-level { flex: none; }
 .cv-levels:empty { display: none; }
 .cv-level {
   position: relative; width: 6.4em; aspect-ratio: 7 / 4; max-width: 40vw; padding: 0; border-radius: .7em; overflow: hidden; cursor: pointer;
@@ -2079,6 +2099,13 @@ body.convoy #heroDownFlash, body.convoy #fortEdge { display: none !important; }
 .cv-level.locked .cv-level-rec { top: 0; background: none; }
 .cv-level.locked .cv-level-rec svg.ico { width: 1.7em; height: 1.7em; color: #f2e6cf; }
 .cv-unlock.cv-unlock-level canvas { border-radius: .45em; width: 3.4em; height: 2.2em; }
+/* следующий край, который ещё не открыл календарь: тёмный силуэт и срок */
+.cv-level.soon canvas { filter: grayscale(1) brightness(.22); }
+.cv-level.soon .cv-level-rec { flex-direction: column; gap: 0; line-height: 1; }
+.cv-level.soon .cv-level-rec svg.ico { width: 1.25em; height: 1.25em; }
+.cv-level-rec small { font-size: .78em; color: #ffd35c; white-space: nowrap; }
+.cv-unlock-level.soon canvas { filter: grayscale(1) brightness(.3); }
+.cv-level.fresh .cv-level-rec { color: #ffd35c; animation: glowPulse 1.6s ease-in-out infinite; }
 
 /* ---------- узкие и низкие экраны ---------- */
 @media (max-height: 520px) {

@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-<!-- Последний конвой, тестовая сборка 8 снаряжение и Сумрачный лес convoy-roguelite@9e783ec (2026-10-11) -->
+<!-- Последний конвой, тестовая сборка 9 к выпуску в ВК convoy-roguelite@c0ab3b1 (2026-10-12) -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>Последний конвой</title>
@@ -407,11 +407,23 @@
         </div>
       </div>
     </div>
+
+    <div id="cvRevive" class="screen overlay hidden">
+      <div class="popup-card cv-revive-card">
+        <h2>Повозки разбиты!</h2>
+        <p>Посмотри рекламу — конвой встанет с половиной прочности, а враги у повозок отлетят.</p>
+        <div class="cv-result-btns">
+          <button class="menu-btn result-main cv-revive-ad" id="cvReviveAd"><svg class="ico"><use href="#i-play"/></svg><span>Второй шанс</span></button>
+          <button class="menu-btn secondary small" id="cvReviveNo">Итог</button>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 
-<!-- Прототип «Последний конвой» (форк game4): платформенные SDK, реклама, облако и платежи выключены. -->
-<script>window.GAME_PLATFORM='none';window.CONVOY_PROTOTYPE=true;</script>
+<!-- «Последний конвой» (форк game4): внутри ВК (vk_app_id в адресе) — мост ВК: облако и реклама; иначе площадки нет. -->
+<!-- game4 build convoy-b9-c0ab3b1 (vk) -->
+<script>if(!window.GAME_PLATFORM)window.GAME_PLATFORM='none';window.CONVOY_PROTOTYPE=true;</script>
 <script src="js/diag.js"></script>
 <script src="js/crashlog.js"></script>
 <script src="js/i18n.js"></script>

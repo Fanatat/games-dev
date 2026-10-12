@@ -46,6 +46,9 @@ const CONVOY = {
   holdLine: { melee: 230, spear: 240, ranged: 170, heavy: 250, default: 230, chase: 260 },
   siege: 220,              // вражеские стрелки бьют конвой с дальности выстрела + siege (entities.js findTarget)
   // Камнепад: тап по полю (или Пробел — по самой густой толпе). Число камней, ширина, урон — до карт.
+  // Реклама (сборка 9, ВК): второй шанс раз за поход — половина прочности, враги у повозок
+  // отлетают и стоят оглушённые; межэкранная — между походами, не чаще раза в gapSec.
+  ads: { reviveHp: 0.5, reviveRadius: 320, revivePush: 150, reviveStun: 2.5, gapSec: 150 },
   rock: { cd: 12, shells: 12, width: 140, radius: 26, dmg: 14, fall: 0.45, spread: 0.55, doubleDelay: 0.55 },
   repair: { base: 40, step: 8, heal: 0.25 },   // «Починить» в окне выбора: 40 + 8 × стоянка, +25 % прочности
   reroll: { cost: 25 },                        // «Другие карты»: 25, 50, 100… внутри одного выбора
@@ -84,12 +87,27 @@ const CONVOY = {
     { id: 'freeReroll', at: 290, icon: 'reroll', name: 'Гадальщик', desc: 'Первая смена карт даром' },
     { id: 'banner', at: 350, v: 1.08, icon: 'banner', name: 'Знамя похода', desc: '{dmg}+8% отряду' },
   ],
+  // «Доблесть» — награды после последней: каждая ступень +per к урону и здоровью отряда (newRun);
+  // первая стоит cost славы сверх from, каждая следующая на step дороже — хвост без конца, но всё медленнее.
+  valor: { from: 350, cost: 100, step: 25, per: 0.03 },
   // Уровни похода: доставка конвоя на уровне открывает следующий. Те же 10 стоянок и роли врагов,
   // другой край (фон bg_rN, враги — js/sprites.js REGION_ENEMY), враги крепче (stat × к волне), слава × glory.
+  // tint — цвет плитки, пока фона края нет или он грузится.
   levels: [
-    { id: 1, name: 'Тракт', go: 'На тракт', boss: 'Вождь', stat: 1, glory: 1 },
-    { id: 2, name: 'Сумрачный лес', go: 'В Сумрачный лес', boss: 'Вожак стаи', stat: 1.1, glory: 1.5 },
+    { id: 1, name: 'Тракт', go: 'На тракт', boss: 'Вождь', stat: 1, glory: 1, tint: '#6f8f4e' },
+    { id: 2, name: 'Сумрачный лес', go: 'В Сумрачный лес', boss: 'Вожак стаи', stat: 1.05, glory: 1.5, tint: '#2c3b2a' },
+    { id: 3, name: 'Гнилые топи', go: 'В Гнилые топи', boss: 'Король-жаба', stat: 1.1, glory: 2, tint: '#3d4a2c' },
+    { id: 4, name: 'Горный перевал', go: 'На Горный перевал', boss: 'Горный великан', stat: 1.1, glory: 2.5, tint: '#6b6458' },
+    { id: 5, name: 'Красные пески', go: 'В Красные пески', boss: 'Чёрный скорпион', stat: 1.15, glory: 3, tint: '#a5683a' },
+    { id: 6, name: 'Ледяной перевал', go: 'На Ледяной перевал', boss: 'Ледяной великан', stat: 1.2, glory: 3.5, tint: '#7f98aa' },
+    { id: 7, name: 'Огненные земли', go: 'В Огненные земли', boss: 'Огненный демон', stat: 1.25, glory: 4, tint: '#6b2a1c' },
+    { id: 8, name: 'Проклятые руины', go: 'В Проклятые руины', boss: 'Король-лич', stat: 1.3, glory: 4.5, tint: '#3a3446' },
   ],
+  // Календарь: на выходе открыты уровни 1..open, следующий — в первую пятницу (weekday 5) не раньше чем
+  // через gap дней после выхода, дальше по одному каждые gap дней; полночь по Москве (tz +3).
+  // Играть уровень можно, когда он открыт календарём и конвой доставлен на предыдущем.
+  // release — день выхода в ВК: поставить при выпуске (до него на стенде считается от этой даты).
+  calendar: { release: '2026-10-12', open: 2, gap: 7, weekday: 5, tz: 3 },
   // Волны стоянок. stat — HP и урон врагов (entities.js spawnUnit, world.enemyStatMult);
   // groups — группы внутри волны: at — секунда от начала волны, elite — элитные враги, boss — Вождь.
   waves: [
@@ -388,18 +406,75 @@ const Convoy = (() => {
   function playerNo() {
     try { return Number(localStorage.getItem(PLAYER_KEY)) || 1; } catch (e) { return 1; }
   }
-  // Рекорд уровня: первый — прежний ключ (рекорды плейтеста сохраняются), дальше — BEST_KEY_lN.
+  // Рекорд уровня и слава (сборка 9) — в общем сейве progress (save.js): он
+  // уходит в облако ВК и сливается с другими устройствами (max по полям).
+  // Прежние ключи плейтеста (lastconvoy_best_v1[_lN], lastconvoy_glory_v1)
+  // один раз переносятся в progress при старте — migrateLegacy().
   const bestKey = (lvl) => (lvl > 1 ? `${BEST_KEY}_l${lvl}` : BEST_KEY);
+  const prog = () => (typeof progress !== 'undefined' && progress ? progress : null);
   function readBest(lvl = 1) {
-    try {
-      const v = JSON.parse(localStorage.getItem(bestKey(lvl)) || 'null');
-      return v && typeof v === 'object' ? v : { stop: 0, wins: 0, runs: 0 };
-    } catch (e) { return { stop: 0, wins: 0, runs: 0 }; }
+    const p = prog(), v = p && p.cvBest && p.cvBest[lvl];
+    return v ? { stop: v.stop || 0, wins: v.wins || 0, runs: v.runs || 0 } : { stop: 0, wins: 0, runs: 0 };
   }
-  // Открыто уровней: первый всегда, каждый следующий — после доставки на предыдущем.
+  function migrateLegacy() {
+    const p = prog();
+    if (!p) return;
+    let moved = false;
+    try {
+      const g = JSON.parse(localStorage.getItem(GLORY_KEY) || 'null');
+      if (g && Number.isFinite(g.total)) { p.cvGlory = Math.max(p.cvGlory || 0, Math.floor(g.total)); moved = true; }
+      localStorage.removeItem(GLORY_KEY);
+      for (let lvl = 1; lvl <= 20; lvl++) {
+        const b = JSON.parse(localStorage.getItem(bestKey(lvl)) || 'null');
+        if (b && typeof b === 'object') {
+          const c = readBest(lvl);
+          if (!p.cvBest) p.cvBest = {};
+          p.cvBest[lvl] = { stop: Math.max(c.stop, b.stop || 0), wins: Math.max(c.wins, b.wins || 0), runs: Math.max(c.runs, b.runs || 0) };
+          moved = true;
+        }
+        localStorage.removeItem(bestKey(lvl));
+      }
+    } catch (e) { /* без хранилища переносить нечего */ }
+    if (moved) saveProgress(p);
+  }
+  // ------------------------------------------------------------ календарь уровней
+  // Время: в ВК — vk_ts из параметров запуска (часы устройства не открывают уровни раньше), иначе часы
+  // устройства. На стенде ?day=9 сдвигает «сегодня» на 9 дней вперёд — проверить, как откроется уровень.
+  const DAY = 864e5, HOUR = 36e5;
+  const clock = (() => {
+    let at = Date.now();
+    try {
+      const q = new URLSearchParams(location.search), ts = Number(q.get('vk_ts'));
+      if (ts > 1e9) at = ts * 1000;
+      else if (Number(q.get('day'))) at += Number(q.get('day')) * DAY;
+    } catch (e) { /* без адреса — часы устройства */ }
+    return { at, perf: performance.now() };
+  })();
+  const nowMs = () => clock.at + performance.now() - clock.perf;
+  // Когда календарь открывает уровень id (мс UTC); 0 — открыт с выхода.
+  function levelOpenAt(id) {
+    const K = CONVOY.calendar;
+    if (id <= K.open) return 0;
+    const [y, m, d] = K.release.split('-').map(Number);
+    const first = Date.UTC(y, m - 1, d) - K.tz * HOUR + K.gap * DAY;         // полночь по Москве + gap дней
+    const dow = new Date(first + K.tz * HOUR).getUTCDay();
+    return first + ((K.weekday - dow + 7) % 7) * DAY + (id - K.open - 1) * K.gap * DAY;
+  }
+  const calendarOpen = (id) => nowMs() >= levelOpenAt(id);
+  // «через 9 дней» / «через 5 ч» до открытия уровня календарём
+  function untilText(id) {
+    const ms = levelOpenAt(id) - nowMs();
+    if (ms < HOUR) return 'совсем скоро';
+    if (ms < DAY) return `через ${Math.ceil(ms / HOUR)} ч`;
+    const n = Math.ceil(ms / DAY);
+    return `через ${n} ${n % 10 === 1 && n % 100 !== 11 ? 'день' : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? 'дня' : 'дней'}`;
+  }
+  const openDate = (id) => new Date(levelOpenAt(id) + CONVOY.calendar.tz * HOUR)
+    .toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', timeZone: 'UTC' });
+  // Открыто уровней: первый всегда, каждый следующий — после доставки на предыдущем, если его открыл календарь.
   function levelsOpen() {
     let n = 1;
-    while (n < LEVELS.length && readBest(n).wins > 0) n++;
+    while (n < LEVELS.length && readBest(n).wins > 0 && calendarOpen(n + 1)) n++;
     return n;
   }
   function pickedLevel() {
@@ -419,13 +494,20 @@ const Convoy = (() => {
     const best = { stop: Math.max(prev.stop || 0, reached), wins: (prev.wins || 0) + (run.win ? 1 : 0), runs: (prev.runs || 0) + 1 };
     run.record = { prev: prev.stop || 0, isNew: reached > (prev.stop || 0) || (run.win && !prev.wins) };
     // первая доставка открывает следующий уровень — он же становится выбранным
-    run.unlock = run.win && !prev.wins && LEVELS[run.level] ? LEVELS[run.level] : null;
+    const nextL = run.win && !prev.wins ? LEVELS[run.level] : null;
+    run.unlock = nextL && calendarOpen(nextL.id) ? nextL : null;
+    run.soon = nextL && !run.unlock ? nextL : null;            // доставили, а край ещё закрыт календарём
     const g = gloryOf(), was = readGlory().total;
-    run.glory = { ...g, prev: was, total: was + g.gain, fresh: CONVOY.meta.filter(u => u.at > was && u.at <= was + g.gain) };
+    run.glory = { ...g, start: was, prev: was, total: was + g.gain, fresh: freshOf(was, was + g.gain) };
+    const p = prog();
+    if (p) {
+      if (!p.cvBest) p.cvBest = {};
+      p.cvBest[run.level] = best;
+      p.cvGlory = run.glory.total;
+      saveProgress(p);
+    }
     try {
-      localStorage.setItem(bestKey(run.level), JSON.stringify(best));
       if (run.unlock) localStorage.setItem(LEVEL_KEY, String(run.unlock.id));
-      localStorage.setItem(GLORY_KEY, JSON.stringify({ total: run.glory.total }));
       const log = readLog();
       log.push({
         ts: Date.now(), player: playerNo(), stop: reached, win: run.win, cards: run.cards.slice(),
@@ -438,12 +520,17 @@ const Convoy = (() => {
 
   // ------------------------------------------------------------ слава и открытия (этап 3)
   function readGlory() {
-    try {
-      const v = JSON.parse(localStorage.getItem(GLORY_KEY) || 'null');
-      return v && Number.isFinite(v.total) ? v : { total: 0 };
-    } catch (e) { return { total: 0 }; }
+    const p = prog();
+    return { total: p && Number.isFinite(p.cvGlory) ? p.cvGlory : 0 };
   }
   function metaOf(total) { return CONVOY.meta.filter(u => total >= u.at).map(u => u.id); }
+  // Ступень «Доблести» по всей славе: n — сколько ступеней, floor/next — слава начала текущей и следующей.
+  function valorOf(total) {
+    const V = CONVOY.valor;
+    let n = 0, floor = V.from, cost = V.cost;
+    while (total >= floor + cost) { floor += cost; n++; cost += V.step; }
+    return { n, floor, next: floor + cost };
+  }
   // Слава за поход: за сам поход, пройденные стоянки, вожаков, Вождя, доставку и каждых killsPer врагов.
   function gloryOf() {
     const G = CONVOY.glory, s = run.stats;
@@ -474,9 +561,15 @@ const Convoy = (() => {
       rng: opts.seed ? seededRandom(opts.seed) : null,
       // открытые за славу награды; симулятор передаёт glory (или meta), иначе — свежий игрок
       meta: opts.meta || metaOf(opts.glory != null ? opts.glory : opts.headless ? 0 : readGlory().total),
+      valor: valorOf(opts.glory != null ? opts.glory : opts.headless ? 0 : readGlory().total).n,
     };
     if (hasMeta('rockCd')) run.mods.rockCd *= META.rockCd.v;
     if (hasMeta('banner')) run.mods.allDmg *= META.banner.v;
+    if (run.valor) {
+      const k = 1 + run.valor * CONVOY.valor.per;
+      run.mods.allDmg *= k;
+      for (const cm of Object.values(run.mods.cls)) cm.hp *= k;
+    }
     match = null;
     return run;
   }
@@ -534,7 +627,7 @@ const Convoy = (() => {
       shakeScreen(match, 2.5);
       VFX.burst(match, 'chip', core.x + 10, -26, 6, { speed: 130, spread: Math.PI * 1.2, dir: -Math.PI / 2, life: 0.6, size: 3, color: ART.woodChip, gravity: 320, jitter: 22 });
     };
-    world.onCoreDestroyed = () => { if (match && match.world === world) finish(false); };
+    world.onCoreDestroyed = () => { if (match && match.world === world) coreDown(); };
     world.onUnitDeath = (u) => { if (match && match.world === world) onDeath(u); };
     world.onImpact = (x) => { if (!headless) VFX.impact(match, x); };
     world.onHit = (ref, role) => {
@@ -595,6 +688,7 @@ const Convoy = (() => {
   // ------------------------------------------------------------ шаг боя
   function update(dt) {
     const m = match, C = m.convoy, w = m.world;
+    if (C.revive) return;   // ждём ответа на «Второй шанс» — бой стоит
     m.elapsed += dt;
     w.clock += dt;
     C.phaseT += dt;
@@ -941,6 +1035,99 @@ const Convoy = (() => {
     return u;
   }
 
+  // ------------------------------------------------------------ реклама (сборка 9)
+  // Повозка пала: раз за поход — предложение «Второй шанс» за ролик; бой замирает до ответа.
+  // Без рекламы площадки (стенд вне ВК, отказ ВК) — сразу итог, как раньше.
+  let lastAdAt = performance.now();   // первая межэкранная — не раньше gapSec от запуска
+  let runsEnded = 0;                   // походов, дошедших до итога в этой сессии
+  function coreDown() {
+    const C = match.convoy;
+    if (C.revive || match.resolved) return;
+    if (C.headless || run.revived || !PLATFORM.rewardedPossible()) { finish(false); return; }
+    run.revived = true;
+    C.revive = { state: 'check' };
+    renderRevive();
+    syncOverlays();
+    SFX.alarm();
+    PLATFORM.checkRewardedAvailable().then((ok) => {
+      if (!match || match.convoy !== C || !C.revive) return;
+      if (ok === false) { declineRevive(); return; }
+      C.revive.state = 'offer';
+      renderRevive();
+    });
+  }
+  function renderRevive() {
+    const C = match && match.convoy, r = C && C.revive, btn = $('cvReviveAd');
+    if (!r || !btn) return;
+    btn.disabled = r.state !== 'offer';
+    btn.querySelector('span').textContent = r.state === 'check' ? 'Готовим…' : r.state === 'ad' ? 'Реклама…' : 'Второй шанс';
+  }
+  function declineRevive() {
+    const C = match && match.convoy;
+    if (!C || !C.revive) return;
+    C.revive = null;
+    syncOverlays();
+    finish(false);
+  }
+  function acceptRevive() {
+    const C = match && match.convoy;
+    if (!C || !C.revive || C.revive.state !== 'offer') return;
+    C.revive.state = 'ad';
+    renderRevive();
+    PLATFORM.showBonusAd().then((r) => {
+      if (!match || match.convoy !== C || !C.revive) return;
+      if (!r.shown) { declineRevive(); return; }
+      lastAdAt = performance.now();
+      revive();
+    });
+  }
+  function revive() {
+    const m = match, C = m.convoy, core = m.world.playerCore, A = CONVOY.ads;
+    C.revive = null;
+    core.hp = Math.max(1, Math.round(core.maxHp * A.reviveHp));
+    for (const u of m.world.units) {
+      if (u.team !== 'enemy' || u.state === 'dead' || u.x - core.x > A.reviveRadius) continue;
+      const boss = u === C.boss ? 0.35 : 1;
+      u.stunT = Math.max(u.stunT || 0, A.reviveStun * boss);
+      u.x = Math.min(ARENA.laneMax, u.x + A.revivePush * boss);
+    }
+    healConvoy(0);
+    VFX.burst(m, 'spark', core.x + 40, -40, 26, { speed: 160, life: 1, size: 3.2, colors: ['#fff6c0', '#ffd35c', '#b8f5a0'], lift: 60, gravity: -10, jitter: 60 });
+    shakeScreen(m, 5);
+    banner('Второй шанс!', '', 'gold', 1.8);
+    SFX.unlock();
+    syncOverlays();
+    updateHud();
+  }
+  // Межэкранная — только при переходе с итога (в новый поход или в меню), не после первого похода
+  // сессии и не чаще раза в CONVOY.ads.gapSec (считая и ролики за награду).
+  function betweenRunsAd() {
+    const due = runsEnded >= 2 && performance.now() - lastAdAt >= CONVOY.ads.gapSec * 1000;
+    if (!due || !PLATFORM.supportsInterstitial()) return Promise.resolve(false);
+    return PLATFORM.showInterstitial().then((shown) => { if (shown) lastAdAt = performance.now(); return shown; });
+  }
+  // «Слава ×2» на итоге: ролик — и слава похода начисляется ещё раз (раз за поход).
+  function doubleGlory() {
+    const g = run && run.glory, btn = $('cvGloryX2');
+    if (!g || run.doubled || !btn || btn.disabled) return;
+    btn.disabled = true;
+    btn.querySelector('span').textContent = 'Реклама…';
+    PLATFORM.showBonusAd().then((r) => {
+      if (!run || run.glory !== g) return;
+      if (!r.shown) { btn.disabled = false; btn.querySelector('span').textContent = 'Слава ×2'; return; }
+      lastAdAt = performance.now();
+      run.doubled = true;
+      const was = g.total;
+      g.prev = was;
+      g.total = was + g.gain;
+      g.gain *= 2;
+      g.fresh = freshOf(g.start, g.total);                   // открытия обеих половин
+      const p = prog();
+      if (p) { p.cvGlory = Math.max(p.cvGlory || 0, g.total); saveProgress(p); }
+      renderResultGlory(true);
+    });
+  }
+
   // ------------------------------------------------------------ итог похода
   function finish(win) {
     const m = match;
@@ -950,6 +1137,7 @@ const Convoy = (() => {
     C.phase = 'end'; C.phaseT = 0; C.win = win;
     run.finished = true; run.win = win;
     if (C.headless) return;
+    runsEnded++;
     saveRun();
     syncOverlays();
     banner(win ? 'Конвой доставлен!' : 'Конвой пал', '', win ? 'gold' : 'red', CONVOY.endSec + 1);
@@ -993,8 +1181,18 @@ const Convoy = (() => {
       row.innerHTML = `<canvas width="170" height="110"></canvas><div><b>Открыт уровень ${run.unlock.id}</b><span>${run.unlock.name}</span></div>`;
       $('cvResultGlory').prepend(row);
       drawLevelThumb(row.querySelector('canvas'), run.unlock.id);
+      Sprites.preload(run.unlock.id);
+    } else if (run.soon) {
+      const row = document.createElement('div');
+      row.className = 'cv-unlock cv-unlock-level soon';
+      row.style.animationDelay = '0.4s';
+      row.innerHTML = `<canvas width="170" height="110"></canvas><div><b>Уровень ${run.soon.id} — ${untilText(run.soon.id)}</b>` +
+        `<span>${run.soon.name} откроется ${openDate(run.soon.id)}</span></div>`;
+      $('cvResultGlory').prepend(row);
+      drawLevelThumb(row.querySelector('canvas'), run.soon.id);
     }
     countUp($('cvResultStats'));
+    if (PLATFORM.supportsInterstitial()) PLATFORM.preloadInterstitial();
     syncOverlays();
   }
   // Числа итога набегают от нуля за 0,6 с (как слава) — итог «засчитывается» на глазах.
@@ -1008,27 +1206,33 @@ const Convoy = (() => {
     requestAnimationFrame(tick);
   }
   // Слава за поход: «+N ★» набегает, шкала до следующей награды (её значок в конце), открытые награды выезжают со звуком.
-  function renderResultGlory() {
+  function renderResultGlory(doubled) {
     const box = $('cvResultGlory'), g = run.glory;
     if (!box) return;
     if (!g) { box.innerHTML = ''; return; }
     const next = CONVOY.meta.find(u => u.at > g.total);
-    const floor = CONVOY.meta.filter(u => u.at <= g.total).reduce((a, u) => Math.max(a, u.at), 0);
-    const frac = (v) => next ? clamp01((v - floor) / (next.at - floor)) : 1;
+    // все награды открыты — шкала до следующей ступени «Доблести»
+    const v = valorOf(g.total), top = next ? next.at : v.next;
+    const floor = next ? CONVOY.meta.filter(u => u.at <= g.total).reduce((a, u) => Math.max(a, u.at), 0) : v.floor;
+    const frac = (x) => clamp01((x - floor) / (top - floor));
+    const x2 = g.gain > 0 && !run.doubled && PLATFORM.rewardedPossible();
     box.innerHTML =
-      '<b class="cv-glory-gain" title="Слава за поход"><span>+0</span><svg class="ico"><use href="#i-star"/></svg></b>' +
+      '<div class="cv-glory-top"><b class="cv-glory-gain" title="Слава за поход"><span>+0</span><svg class="ico"><use href="#i-star"/></svg></b>' +
+      (x2 ? '<button class="cv-ad-btn" id="cvGloryX2" title="Посмотреть рекламу — слава за поход ещё раз"><svg class="ico"><use href="#i-play"/></svg><span>Слава ×2</span></button>' : '') + '</div>' +
       `<div class="cv-glory-row"><div class="cv-glory-bar"><i style="width:${frac(g.prev) * 100}%"></i>` +
-      `<span>${next ? `${g.total} / ${next.at}` : g.total}</span></div>` +
+      `<span>${g.total} / ${top}</span></div>` +
       (next ? `<canvas class="cv-glory-next" width="64" height="64" title="${next.name}: ${plainDesc(next.desc)}"></canvas>` : '') + '</div>' +
       g.fresh.map((u, i) => `<div class="cv-unlock" style="animation-delay:${0.7 + i * 0.25}s"><canvas width="64" height="64"></canvas>` +
         `<div><b>Открыто: ${u.name}</b><span>${fmtDesc(u.desc)}</span></div></div>`).join('');
     if (next) drawCardIcon(box.querySelector('.cv-glory-next'), next);
     box.querySelectorAll('.cv-unlock canvas').forEach((cv, i) => drawCardIcon(cv, g.fresh[i]));
+    if (x2) box.querySelector('#cvGloryX2').addEventListener('click', (e) => { SFX.click(); doubleGlory(); e.currentTarget.blur(); });
     const gain = box.querySelector('.cv-glory-gain span'), bar = box.querySelector('.cv-glory-bar i'), t0 = performance.now();
+    const from = doubled ? g.gain / 2 : 0;
     const tick = () => {
       if (!box.contains(gain)) return;
       const k = Math.min(1, (performance.now() - t0) / 700);
-      gain.textContent = `+${Math.round(g.gain * k)}`;
+      gain.textContent = `+${Math.round(from + (g.gain - from) * k)}`;
       if (k < 1) requestAnimationFrame(tick);
       else if (g.gain > 0) gain.parentNode.classList.add('pop');
     };
@@ -1613,8 +1817,9 @@ const Convoy = (() => {
     $('cvPick').classList.toggle('hidden', !(live && C.phase === 'pick'));
     $('cvHud').classList.toggle('picking', live && C.phase === 'pick');   // низкий экран: место под карты (style.css)
     $('cvResult').classList.toggle('hidden', !(live && C.phase === 'end' && C.shown));
+    $('cvRevive').classList.toggle('hidden', !(live && C.revive));
   }
-  function canPause() { return !(match && match.convoy && match.convoy.phase === 'end'); }
+  function canPause() { return !(match && match.convoy && (match.convoy.phase === 'end' || match.convoy.revive)); }
   // Меню: рекорд одной плашкой и следующая награда за славу — иконка, имя, шкала, точки всех наград.
   function renderMenu() {
     Sprites.setRegion(pickedLevel());
@@ -1636,25 +1841,47 @@ const Convoy = (() => {
         ? `<b class="cv-next-name">${next.name}</b><span class="cv-next-desc">${fmtDesc(next.desc)}</span>` +
           `<div class="cv-glory-bar"><i style="width:${clamp01((total - floor) / (next.at - floor)) * 100}%"></i>` +
           `<span>${total} / ${next.at} <svg class="ico"><use href="#i-star"/></svg></span></div>`
-        : '<b class="cv-next-name">Все награды открыты</b>') +
+        : valorRow(total)) +
       `<div class="cv-pips" aria-label="Открыто наград: ${have.length} из ${CONVOY.meta.length}">${pips}</div></div></div>`;
     drawCardIcon(box.querySelector('canvas'), shown);
   }
 
+  function freshOf(from, to) {
+    const out = CONVOY.meta.filter(u => u.at > from && u.at <= to);
+    const a = valorOf(from).n, b = valorOf(to).n, per = CONVOY.valor.per;
+    if (b > a) out.push({ id: 'valor', icon: 'banner', name: `Доблесть ${b}`, desc: `{dmg}+${Math.round(b * per * 100)}% урона и здоровья отряду` });
+    return out;
+  }
+  // После всех наград — «Доблесть»: ступень, прибавка отряду и шкала до следующей ступени.
+  function valorRow(total) {
+    const v = valorOf(total), V = CONVOY.valor;
+    const name = v.n ? `Доблесть ${v.n}` : 'Доблесть', pct = Math.round(v.n * V.per * 100);
+    return `<b class="cv-next-name">${name}</b><span class="cv-next-desc">` +
+      (v.n ? `${fmtDesc('{dmg}')}+${pct}% урона и здоровья отряду` : `Каждая ступень: +${Math.round(V.per * 100)}% урона и здоровья отряду`) + '</span>' +
+      `<div class="cv-glory-bar"><i style="width:${clamp01((total - v.floor) / (v.next - v.floor)) * 100}%"></i>` +
+      `<span>${total} / ${v.next} <svg class="ico"><use href="#i-star"/></svg></span></div>`;
+  }
+
   // Плитки уровней в меню: край (фон и его враг), номер, рекорд; закрытый — замок. Нажатие выбирает уровень.
+  // Видны открытые уровни и один следующий: «доставь конвой» или тёмный «откроется через N дней».
   function renderLevels() {
     const box = $('cvMenuLevels');
     if (!box) return;
     const open = levelsOpen(), cur = pickedLevel();
-    box.innerHTML = LEVELS.map(L => {
-      const b = readBest(L.id), locked = L.id > open;
-      const rec = locked ? '<svg class="ico"><use href="#i-lock"/></svg>'
-        : b.wins ? `<svg class="ico"><use href="#i-wagon"/></svg>×${b.wins}` : b.runs ? `${b.stop}/${STOPS}` : '';
-      const title = locked ? `${L.name} — доставь конвой: уровень ${L.id - 1}` : L.name;
-      return `<button class="cv-level${L.id === cur ? ' on' : ''}${locked ? ' locked' : ''}" data-l="${L.id}" title="${title}" aria-label="${title}"` +
+    box.innerHTML = LEVELS.slice(0, open + 1).map(L => {
+      const b = readBest(L.id), locked = L.id > open, soon = locked && !calendarOpen(L.id);
+      const fresh = !locked && L.id > 1 && !b.runs;
+      const rec = soon ? `<svg class="ico"><use href="#i-lock"/></svg><small>${untilText(L.id)}</small>`
+        : locked ? '<svg class="ico"><use href="#i-lock"/></svg>'
+          : b.wins ? `<svg class="ico"><use href="#i-wagon"/></svg>×${b.wins}` : b.runs ? `${b.stop}/${STOPS}` : fresh ? 'Новый!' : '';
+      const title = soon ? `${L.name} — откроется ${untilText(L.id)}, ${openDate(L.id)}`
+        : locked ? `${L.name} — доставь конвой: уровень ${L.id - 1}` : L.name;
+      return `<button class="cv-level${L.id === cur ? ' on' : ''}${locked ? ' locked' : ''}${soon ? ' soon' : ''}${fresh ? ' fresh' : ''}" data-l="${L.id}" title="${title}" aria-label="${title}"` +
         `${locked ? ' aria-disabled="true"' : ''}><canvas width="168" height="96"></canvas><b class="cv-level-n">${L.id}</b>` +
         `${rec ? `<span class="cv-level-rec">${rec}</span>` : ''}</button>`;
     }).join('');
+    const on = box.querySelector('.cv-level.on');
+    if (on && box.scrollWidth > box.clientWidth) box.scrollLeft = on.offsetLeft - (box.clientWidth - on.offsetWidth) / 2;
     box.querySelectorAll('.cv-level').forEach(btn => {
       const n = Number(btn.dataset.l), cv = btn.querySelector('canvas');
       drawLevelThumb(cv, n);
@@ -1675,7 +1902,7 @@ const Convoy = (() => {
     const c = cv.getContext('2d'), W = cv.width, H = cv.height;
     c.clearRect(0, 0, W, H);
     const bgOk = Sprites.drawBgThumb(c, n, 0, 0, W, H);
-    if (!bgOk) { c.fillStyle = n > 1 ? '#2c3b2a' : '#6f8f4e'; c.fillRect(0, 0, W, H); Sprites.onBg(n, () => drawLevelThumb(cv, n)); }
+    if (!bgOk) { c.fillStyle = (LEVELS[n - 1] || LEVELS[0]).tint; c.fillRect(0, 0, W, H); Sprites.onBg(n, () => drawLevelThumb(cv, n)); }
     if (!Sprites.drawIcon(c, 'heavy', true, W * 0.74, H - 4, W * 0.42, H * 0.82, 0, n)) Sprites.onReady('heavy', true, () => drawLevelThumb(cv, n), n);
   }
 
@@ -1706,10 +1933,11 @@ const Convoy = (() => {
       // новый игрок плейтеста начинает с нуля: без славы, наград и рекорда прошлого (журнал остаётся)
       try {
         localStorage.setItem(PLAYER_KEY, String(p + 1));
-        localStorage.removeItem(GLORY_KEY);
-        LEVELS.forEach(L => localStorage.removeItem(bestKey(L.id)));   // рекорды и открытые уровни
         localStorage.removeItem(LEVEL_KEY);
       } catch (e) { /* без хранилища — один игрок */ }
+      // слава, рекорды и открытые уровни (на стенде без облака; в ВК облако вернёт их при слиянии)
+      const pr = prog();
+      if (pr) { pr.cvGlory = 0; pr.cvBest = {}; saveProgress(pr); }
       showJournal();
     });
     $('cvJournalSave').addEventListener('click', () => {
@@ -2452,13 +2680,21 @@ const Convoy = (() => {
     }
     syncSound();
     $('cvMenuPlay').addEventListener('click', () => { SFX.unlock(); SFX.click(); startRun(); });
+    // переход с итога: сначала (иногда) межэкранная реклама, потом новый поход или меню
+    let leaving = false;
+    const leaveResult = (go) => {
+      if (leaving) return;
+      leaving = true;
+      betweenRunsAd().then(() => { leaving = false; go(); });
+    };
     $('cvResultAgain').addEventListener('click', () => {
       SFX.click();
       const lvl = run && run.next;
-      if (lvl) pickLevel(lvl);
-      startRun(lvl);
+      leaveResult(() => { if (lvl) pickLevel(lvl); startRun(lvl); });
     });
-    $('cvResultMenu').addEventListener('click', () => { SFX.click(); toMenu(); });
+    $('cvResultMenu').addEventListener('click', () => { SFX.click(); leaveResult(toMenu); });
+    $('cvReviveAd').addEventListener('click', (e) => { SFX.click(); acceptRevive(); e.currentTarget.blur(); });
+    $('cvReviveNo').addEventListener('click', (e) => { SFX.click(); declineRevive(); e.currentTarget.blur(); });
     $('cvRepair').addEventListener('click', (e) => { repair(); e.currentTarget.blur(); });
     $('cvReroll').addEventListener('click', (e) => { reroll(); e.currentTarget.blur(); });
     $('cvRock').addEventListener('click', (e) => { rockAuto() || (match && match.convoy && match.convoy.phase === 'wave' && rockAt(aim.x)); e.currentTarget.blur(); });
@@ -2475,14 +2711,18 @@ const Convoy = (() => {
     // Потеря фокуса и уход со вкладки ставят бой на паузу; продолжить — только игроку.
     window.addEventListener('blur', () => { if (screen === 'match' && canPause()) showScreen('paused'); });
     document.addEventListener('visibilitychange', () => { if (document.hidden && screen === 'match' && canPause()) showScreen('paused'); });
+    migrateLegacy();
     showScreen('cmenu');
     if (new URLSearchParams(location.search).has('journal')) showJournal();
   }
+  // Облако прочиталось позже (resync в save.js) — меню перерисовывается со свежей славой и уровнями.
+  function refreshMenu() { if (screen === 'cmenu') renderMenu(); }
 
   return {
     boot, startRun, newRun, setupMatch, update, updateHud, buy, buyIndex, key, choose, repair, reroll,
     rockAt, rockAuto, rockReady, toMenu, onScreen, canPause, drawStructures, drawMenuWagons, drawOverlay, dayT,
     showJournal, readLog, readBest, simulate, api, waveText, drawCardIcon, bossPose,
+    refreshMenu,
     get run() { return run; },
   };
 })();

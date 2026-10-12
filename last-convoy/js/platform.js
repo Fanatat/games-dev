@@ -286,11 +286,9 @@ const PLATFORM = (() => {
     const override = params.get('platform');
     const forced = window.GAME_PLATFORM !== 'auto' ? window.GAME_PLATFORM : null;
     try {
-      if (window.CONVOY_PROTOTYPE) {
-        // Прототип «Последний конвой»: никаких SDK площадок — ни рекламы, ни облака,
-        // ни платежей, ни аналитики; даже внутри ВК (vk_app_id в адресе) не подключаемся.
-        kind = 'none';
-      } else if (params.has('vk_app_id')) {
+      if (params.has('vk_app_id')) {
+        // «Последний конвой» (сборка 9) выходит в ВК: внутри ВК подключаемся
+        // к мосту (облако, реклама); вне ВК — kind='none' (GAME_PLATFORM).
         // Реальный запуск внутри VK отвечает быстро; таймаут — страховка на
         // случай, если VKWebAppInit вообще не получит ответ (сбой хоста),
         // чтобы определение площадки не зависало навсегда.
@@ -365,9 +363,26 @@ const PLATFORM = (() => {
   // Dev-режим заглушки рекламы: только страница, открытая локально
   // (localhost / 127.0.0.1 / file:). Ни в какой хостинг-сборке (стенд, ВК,
   // Яндекс, CG) заглушки нет — правило 2 ТЗ 01.10.2026 «бесплатного режима нет».
+  // «Последний конвой» (сборка 9): плюс тестовый стенд games-dev (не прод) —
+  // основатель проверяет там, где появляются ролики, без ВК.
   const DEV_ADS = (() => {
-    try { return ['localhost', '127.0.0.1', '[::1]', ''].includes(location.hostname); } catch (e) { return false; }
+    try {
+      return ['localhost', '127.0.0.1', '[::1]', ''].includes(location.hostname) ||
+        (location.hostname === 'fanatat.github.io' && location.pathname.startsWith('/games-dev/'));
+    } catch (e) { return false; }
   })();
+  // Заглушка межэкранной рекламы для стенда: видно, в какой момент её покажет ВК.
+  function showTestInterstitial() {
+    return new Promise((resolve) => {
+      pauseHook();
+      const overlay = document.createElement('div');
+      overlay.className = 'ad-test-overlay';
+      overlay.innerHTML = '<div class="ad-test-box"><div class="ad-test-badge">Межэкранная реклама (тест)</div>' +
+        '<p>Здесь ВК покажет ролик между походами.</p><div class="ad-test-bar"><div class="ad-test-bar-fill"></div></div></div>';
+      document.body.appendChild(overlay);
+      setTimeout(() => { overlay.remove(); resumeHook(); resolve(true); }, 1500);
+    });
+  }
   function showTestAd() {
     return new Promise((resolve) => {
       pauseHook();
@@ -763,9 +778,13 @@ const PLATFORM = (() => {
     showInterstitial() {
       if (kind === 'vk') return showVkInterstitial();
       if (kind === 'yandex') return showYandexInterstitial();
+      if (DEV_ADS && window.CONVOY_PROTOTYPE) return showTestInterstitial();
       return Promise.resolve(false);
     },
-    supportsInterstitial() { return kind === 'vk' || kind === 'yandex'; },
+    // Есть ли вообще чем показать ролик за награду: SDK площадки или заглушка стенда/локалки.
+    // Без этого кнопку рекламы не показываем (бесплатной награды нет).
+    rewardedPossible() { return kind === 'vk' || kind === 'yandex' || kind === 'crazygames' || DEV_ADS; },
+    supportsInterstitial() { return kind === 'vk' || kind === 'yandex' || (DEV_ADS && !!window.CONVOY_PROTOTYPE); },
     preloadInterstitial() { if (kind === 'vk') preloadVkInterstitial(); },
     // Лидерборд (только CrazyGames — см. методичку §9, ГДД «Допущения»).
     // Что именно передаётся как `score` — решает вызывающий код (game.js),

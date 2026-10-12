@@ -177,7 +177,7 @@ document.addEventListener('contextmenu', (e) => { e.preventDefault(); });
 // слияние после позднего чтения облака — перерисовка того, что зависит от сейва.
 setSaveHooks({
   problem: (kind) => showLoudNotice(I18N.t(kind === 'local' ? 'err.saveFailedLocal' : 'err.saveFailedCloud')),
-  replaced: () => { applyTheme(); SFX.setMuted(!!progress.muted); MUSIC.setMusicMuted(!!progress.musicMuted); refreshMuteButtons(); if (screen === 'shop') renderShop(); },
+  replaced: () => { applyTheme(); SFX.setMuted(!!progress.muted); MUSIC.setMusicMuted(!!progress.musicMuted); refreshMuteButtons(); if (screen === 'shop') renderShop(); if (window.CONVOY_PROTOTYPE) Convoy.refreshMenu(); },
 });
 window.addEventListener('pagehide', () => { flushCloudPush(progress); });
 document.addEventListener('visibilitychange', () => {

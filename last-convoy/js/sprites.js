@@ -18,6 +18,12 @@ const Sprites = (() => {
   // враг первого уровня (гоблин), чтобы бой не остался без картинки.
   const REGION_ENEMY = {
     2: { infantry: 'wolf', spear: 'wolf_spear', archer: 'witch', heavy: 'bear', chief: 'alpha' },
+    3: { infantry: 'lizard', spear: 'lizard_spear', archer: 'toad', heavy: 'troll', chief: 'toad_king' },
+    4: { infantry: 'kobold', spear: 'kobold_pole', archer: 'kobold_sling', heavy: 'golem', chief: 'giant' },
+    5: { infantry: 'gnoll', spear: 'gnoll_glaive', archer: 'gnoll_archer', heavy: 'gnoll_brute', chief: 'scorpion' },
+    6: { infantry: 'snow_goblin', spear: 'frost_spear', archer: 'yeti_cub', heavy: 'yeti', chief: 'frost_giant' },
+    7: { infantry: 'imp', spear: 'imp_fork', archer: 'imp_fire', heavy: 'lava_golem', chief: 'demon' },
+    8: { infantry: 'skeleton', spear: 'skel_halberd', archer: 'skel_archer', heavy: 'bone_knight', chief: 'lich' },
   };
   let region = 1;
   // Рост «покоя» обычного бойца в атласе — 210 px, на поле ≈ 76 ед. арены (рост рига ≈ 74).
@@ -41,10 +47,10 @@ const Sprites = (() => {
     if (D.bg.bg_r1) image(D.bg.bg_r1.src);
     image(D.props.src); image(D.wagon.src); image(D.wagon_painted.src);
     if (D.portraits) image(D.portraits.src);
-    // снаряжение 2–3 нужно не раньше первой «Новой эпохи», уровень 2 — не раньше первой доставки: грузим после старта
+    // снаряжение 2–3 нужно не раньше первой «Новой эпохи»: грузим после старта. Враги и фоны других уровней —
+    // по выбору уровня (setRegion), плиткам меню и итогу с новым уровнем (preload).
     setTimeout(() => {
-      for (const [id, u] of Object.entries(D.units)) if (later(id)) image(u.src);
-      for (const b of Object.values(D.bg)) image(b.src);
+      for (const [id, u] of Object.entries(D.units)) if (/_t\d$/.test(id)) image(u.src);
     }, 4000);
   }
 
@@ -70,10 +76,13 @@ const Sprites = (() => {
   // Уровень для фона и врагов: бой, меню и значки рисуют выбранный уровень; его рисунки грузятся сразу.
   function setRegion(n) {
     region = Number(n) || 1;
+    preload(region);
+  }
+  function preload(r) {
     if (!D) return;
-    const map = REGION_ENEMY[region] || {};
+    const map = REGION_ENEMY[r] || {};
     for (const id of Object.values(map)) if (D.units[id]) image(D.units[id].src);
-    const b = D.bg['bg_r' + region];
+    const b = D.bg['bg_r' + r];
     if (b) image(b.src);
   }
   // Фон уровня; пока картинка грузится (или её нет) — фон первого уровня.
@@ -328,5 +337,5 @@ const Sprites = (() => {
   function onPortrait(cb) { if (D && D.portraits) image(D.portraits.src).addEventListener('load', cb, { once: true }); }
 
   if (typeof window !== 'undefined' && window.CONVOY_PROTOTYPE) load();
-  return { load, setRegion, bgId, drawBgThumb, onBg, get region() { return region; }, hasUnit, drawUnit, drawProp, prop, drawBg, bg, wagonSet, drawWagonBody, drawWheel, drawFlag, drawIcon, onReady, drawPortrait, onPortrait, image, artId };
+  return { load, setRegion, preload, bgId, drawBgThumb, onBg, get region() { return region; }, hasUnit, drawUnit, drawProp, prop, drawBg, bg, wagonSet, drawWagonBody, drawWheel, drawFlag, drawIcon, onReady, drawPortrait, onPortrait, image, artId };
 })();

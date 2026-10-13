@@ -77,6 +77,8 @@ function defaultProgress() {
     // Сборка 11: награда за вход — последний день, когда забрана (номер дня по Москве), и дней подряд.
     cvDayLast: 0,
     cvDayStreak: 0,
+    // Сборка 15: «Казна» — золото, довезённое доставками за всё время (личный счёт рейтинга, слияние max).
+    cvTreasury: 0,
   };
 }
 
@@ -142,6 +144,7 @@ const SAVE_NUM_RANGES = {
   cvGlory: [0, 1e7, true],
   cvDayLast: [0, 1e6, true],
   cvDayStreak: [0, 1e6, true],
+  cvTreasury: [0, 1e9, true],
 };
 const SAVE_STRING_ENUMS = {
   cosmeticTime: ['cycle', 'day', 'night'],

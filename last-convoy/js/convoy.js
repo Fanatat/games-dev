@@ -1477,6 +1477,12 @@ const Convoy = (() => {
     if (C.headless) return;
     runsSinceAd++;
     saveRun();
+    // рейтинг (сборка 15): золото повозок на финише — в казну; место приходит с сервера позже, итог его дорисует
+    if (win) {
+      const r = run, gold = Math.floor(m.gold);
+      r.treasury = { gold, rank: null };
+      RANKS.delivered(r.level, gold).then((res) => { if (res && res.place) { r.treasury.rank = res; if (run === r) renderResultRank(); } });
+    }
     syncOverlays();
     banner(win ? 'Конвой доставлен!' : 'Конвой пал', '', win ? 'gold' : 'red', CONVOY.endSec + 1);
     MUSIC.play(win ? 'cv_victory' : 'cv_defeat');
@@ -1513,7 +1519,9 @@ const Convoy = (() => {
     $('cvResultStats').innerHTML =
       `<span class="cv-res-stat kills" title="Врагов повержено"><svg class="ico"><use href="#i-foe"/></svg><b data-n="${s.kills}">0</b></span>` +
       `<span class="cv-res-stat gold" title="Золота добыто"><i class="gold-dot"></i><b data-n="${Math.floor(s.gold)}">0</b></span>` +
-      (s.bestStreak > 1 ? `<span class="cv-res-stat streak" title="Лучшая серия"><svg class="ico"><use href="#i-burst"/></svg><b>×${s.bestStreak}</b></span>` : '');
+      (s.bestStreak > 1 ? `<span class="cv-res-stat streak" title="Лучшая серия"><svg class="ico"><use href="#i-burst"/></svg><b>×${s.bestStreak}</b></span>` : '') +
+      (win && run.treasury && RANKS.mode() ? `<span class="cv-res-stat treasury" id="cvResultRank" title="Довезено в казну — рейтинг «Казна»"><svg class="ico"><use href="#i-cup"/></svg>` +
+        `<em>+</em><b data-n="${run.treasury.gold}">0</b><small class="hidden"></small></span>` : '');
     const counts = {};
     for (const id of run.cards) counts[id] = (counts[id] || 0) + 1;
     const ids = Object.keys(counts), cardsBox = $('cvResultCards');
@@ -1557,8 +1565,18 @@ const Convoy = (() => {
       drawCardIcon(row.querySelector('canvas'), tip);
     }
     countUp($('cvResultStats'));
+    renderResultRank();
     if (PLATFORM.supportsInterstitial()) PLATFORM.preloadInterstitial();
     syncOverlays();
+  }
+  // Место в «Казне» на плашке итога — как только сервер ответил (в демо — сразу).
+  function renderResultRank() {
+    const el = $('cvResultRank'), rk = run && run.treasury && run.treasury.rank;
+    if (!el || !rk || !rk.place || !rk.place.gold) return;
+    const sm = el.querySelector('small');
+    sm.textContent = `${rk.place.gold}-е место`;
+    sm.classList.remove('hidden');
+    el.title = `Казна: ${Math.floor(rk.gold || 0).toLocaleString('ru-RU')} — ${rk.place.gold}-е место в рейтинге`;
   }
   // Числа итога набегают от нуля за 0,6 с (как слава) — итог «засчитывается» на глазах.
   function countUp(box) {
@@ -2191,6 +2209,7 @@ const Convoy = (() => {
   // ------------------------------------------------------------ экраны
   function onScreen(name) {
     $('cvMenu').classList.toggle('hidden', name !== 'cmenu');
+    if (name !== 'cmenu') RANKS.close();
     $('cvHud').classList.toggle('hidden', !(name === 'match' || name === 'paused'));
     syncOverlays();
     renderDaily();
@@ -3143,6 +3162,7 @@ const Convoy = (() => {
     const share = $('cvShare');
     share.classList.toggle('hidden', !PLATFORM.canShare());
     share.addEventListener('click', (e) => { SFX.click(); e.currentTarget.blur(); PLATFORM.share(); });
+    RANKS.boot();
     for (const b of document.querySelectorAll('.cv-snd')) {
       b.addEventListener('click', (e) => {
         SFX.unlock();

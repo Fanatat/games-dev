@@ -811,6 +811,12 @@ const PLATFORM = (() => {
     rewardedPossible() { return kind === 'vk' || kind === 'yandex' || kind === 'crazygames' || DEV_ADS; },
     supportsInterstitial() { return kind === 'vk' || kind === 'yandex' || (DEV_ADS && !!window.CONVOY_PROTOTYPE); },
     devQuery() { return DEV_QUERY; },
+    // Рейтинг «Последнего конвоя» (сборка 15, js/ranks.js): 'live' — в ВК (сервер студии узнаёт игрока
+    // по подписанной строке запуска), 'demo' — локально и на стенде вне ВК (выдуманный топ), null — кнопки нет.
+    // Рейтинг «Последнего конвоя» (сборка 15): настоящий — только в ВК с подписанными параметрами запуска
+    // (без sign сервер всё равно ответит 401), демо — локально и на стенде, иначе кнопки нет.
+    ranksMode() { return kind === 'vk' && /(^|[?&])sign=/.test(location.search) ? 'live' : DEV_ADS ? 'demo' : null; },
+    launchParams() { try { return kind === 'vk' ? location.search.replace(/^\?/, '') : ''; } catch (e) { return ''; } },
     preloadInterstitial() { if (kind === 'vk') preloadVkInterstitial(); },
     // Лидерборд (только CrazyGames — см. методичку §9, ГДД «Допущения»).
     // Что именно передаётся как `score` — решает вызывающий код (game.js),

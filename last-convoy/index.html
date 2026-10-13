@@ -57,6 +57,8 @@
     <symbol id="i-rock" viewBox="0 0 24 24"><path d="M3.6 17.6 2.8 12.4 6.2 7 11.6 4.4 17.6 5.8 21.2 11.2 20.6 17 15.8 20.2 8.4 20.2Z" fill="#a99b86" stroke="#1a120a" stroke-width="1.6" stroke-linejoin="round"/><path d="M6.8 9.6 11.6 7 16.4 8.2" fill="none" stroke="#e8dfcf" stroke-width="1.8" stroke-linecap="round"/><path d="M12.2 13.4 15.4 16.4M8.4 14.8 10 17.6" stroke="#6b5f50" stroke-width="1.5" stroke-linecap="round"/></symbol>
     <symbol id="i-share" viewBox="0 0 24 24"><g stroke="#1a120a" stroke-width="1.3"><path d="M7.6 11.2 16 6.6M7.6 12.8 16 17.4" stroke-width="5" stroke-linecap="round"/><path d="M7.6 11.2 16 6.6M7.6 12.8 16 17.4" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><circle cx="5.6" cy="12" r="3.4" fill="currentColor"/><circle cx="18" cy="5.4" r="3.4" fill="currentColor"/><circle cx="18" cy="18.6" r="3.4" fill="currentColor"/></g></symbol>
     <symbol id="i-phone" viewBox="0 0 24 24"><rect x="6.6" y="1.6" width="10.8" height="20.8" rx="2.2" fill="#2a2018" stroke="currentColor" stroke-width="1.6"/><rect x="8.2" y="4.2" width="7.6" height="14.4" rx=".8" fill="currentColor" opacity=".3"/><circle cx="12" cy="20.4" r=".9" fill="currentColor"/></symbol>
+    <!-- сборка 15: кубок — рейтинг (кнопка в меню, строка итога) -->
+    <symbol id="i-cup" viewBox="0 0 24 24"><g stroke="#1a120a" stroke-width="1.3" stroke-linejoin="round"><path d="M6.2 5.2H2.8v1.6c0 3 1.8 5 4.6 5.4M17.8 5.2h3.4v1.6c0 3-1.8 5-4.6 5.4" fill="none" stroke-width="3.6"/><path d="M6.2 5.2H2.8v1.6c0 3 1.8 5 4.6 5.4M17.8 5.2h3.4v1.6c0 3-1.8 5-4.6 5.4" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M5.6 2.6h12.8v4.6c0 4.2-2.8 7.2-6.4 7.2s-6.4-3-6.4-7.2Z" fill="currentColor"/><path d="M10.4 14.2h3.2v3.4h-3.2Z" fill="currentColor"/><rect x="6.8" y="17.4" width="10.4" height="4" rx=".8" fill="#a8693a"/></g></symbol>
   </defs>
 </svg>
 <div id="rotatePrompt">
@@ -384,7 +386,7 @@
     <!-- «Последний конвой»: экраны похода -->
     <div id="cvMenu" class="screen hidden">
       <div class="cv-menu-snd"><button class="icon-btn hud-round cv-snd" data-snd="sfx" title="Звук" aria-label="Звук"><svg class="ico"><use href="#i-sound"/></svg></button><button class="icon-btn hud-round cv-snd" data-snd="music" title="Музыка" aria-label="Музыка"><svg class="ico"><use href="#i-music"/></svg></button></div>
-      <div class="cv-menu-share"><button class="icon-btn hud-round cv-share hidden" id="cvShare" title="Рассказать друзьям" aria-label="Рассказать друзьям"><svg class="ico"><use href="#i-share"/></svg></button></div>
+      <div class="cv-menu-share"><button class="icon-btn hud-round cv-share hidden" id="cvShare" title="Рассказать друзьям" aria-label="Рассказать друзьям"><svg class="ico"><use href="#i-share"/></svg></button><button class="icon-btn hud-round cv-share hidden" id="cvRanksBtn" title="Рейтинг" aria-label="Рейтинг"><svg class="ico"><use href="#i-cup"/></svg></button></div>
       <div class="menu-main">
         <h1 class="logo"><span class="logo-back">ПОСЛЕДНИЙ КОНВОЙ</span><span class="logo-front" aria-hidden="true">ПОСЛЕДНИЙ КОНВОЙ</span></h1>
         <button class="menu-btn primary-big" id="cvMenuPlay">В поход</button>
@@ -421,6 +423,20 @@
       </div>
     </div>
 
+    <div id="cvRanks" class="screen overlay hidden" role="dialog" aria-labelledby="cvRanksTitle">
+      <div class="popup-card cv-ranks-card">
+        <button class="icon-btn cv-ranks-close" id="cvRanksClose" title="Закрыть" aria-label="Закрыть"><svg class="ico"><use href="#i-close"/></svg></button>
+        <h2 id="cvRanksTitle">Рейтинг</h2>
+        <div class="cv-ranks-tabs" role="tablist">
+          <button role="tab" data-b="gold" aria-selected="true" class="on"><i class="gold-dot"></i><span>Казна</span></button>
+          <button role="tab" data-b="runs" aria-selected="false"><svg class="ico"><use href="#i-wagon"/></svg><span>Походы</span></button>
+        </div>
+        <p class="cv-ranks-hint" id="cvRanksHint"></p>
+        <div class="cv-ranks-body" id="cvRanksBody"></div>
+        <div class="cv-ranks-me" id="cvRanksMe"></div>
+      </div>
+    </div>
+
     <div id="cvDaily" class="screen overlay hidden">
       <div class="popup-card cv-daily-card">
         <h2>Награда за вход</h2>
@@ -433,7 +449,7 @@
 </div>
 
 <!-- «Последний конвой» (форк game4): внутри ВК (vk_app_id в адресе) — мост ВК: облако и реклама; иначе площадки нет. -->
-<!-- game4 build convoy-b14-964475c (vk) -->
+<!-- game4 build convoy-b15-5262190 (vk) -->
 <script>window.GAME_PLATFORM='vk';</script>
 <script>if(!window.GAME_PLATFORM)window.GAME_PLATFORM='none';window.CONVOY_PROTOTYPE=true;</script>
 <script src="js/diag.js"></script>
@@ -451,6 +467,7 @@
 <script src="js/tutorial.js"></script>
 <script src="js/entities.js"></script>
 <script src="js/ai.js"></script>
+<script src="js/ranks.js"></script>
 <script src="js/convoy.js"></script>
 <script src="js/game.js"></script>
 </body>

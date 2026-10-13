@@ -7,7 +7,10 @@
 <!-- Страница прослушивания SFX «Последнего конвоя» для основателя. Только для
      тестового стенда: кладётся в корень сборки как sfx.html, в выпуск не идёт.
      Кнопки событий зовут тот же SFX из js/audio.js, что и игра, — с той же
-     громкостью и наложением слоёв; ниже — каждый файл отдельно. -->
+     громкостью и наложением слоёв; ниже — каждый файл отдельно.
+     Музыка: оба варианта Suno на каждый трек (в игре — assets/audio/convoy,
+     второй — music_alt/, его стенд кладёт рядом), «Стык» — последние секунды
+     петли и переход на её начало, как крутит игра. -->
 <style>
   :root { --bg: #f4efe4; --fg: #2b241b; --card: #fffaf0; --line: #d9ccb4; --accent: #8a5a1f; }
   @media (prefers-color-scheme: dark) { :root { --bg: #1d1a16; --fg: #eee4d2; --card: #2a251f; --line: #4a4033; --accent: #e0a85a; } }
@@ -20,11 +23,22 @@
     font: inherit; cursor: pointer; text-align: left; }
   button:active { border-color: var(--accent); }
   button small { display: block; opacity: .6; font-size: 12px; }
+  .row { display: grid; grid-template-columns: 1fr repeat(3, minmax(0, 92px)); gap: 6px; align-items: center;
+    padding: 6px 0; border-bottom: 1px solid var(--line); }
+  .row b { font-weight: 600; }
+  .row button { padding: 8px 6px; text-align: center; font-size: 14px; }
+  .row button.on { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+  .row button.play { background: var(--accent); color: var(--card); }
+  #stop { margin-top: 10px; }
 </style>
 </head>
 <body>
 <h1>Звуки «Последнего конвоя»</h1>
 <p>Нажмите кнопку — звук сыграет так же, как в игре. Первое нажатие включает звук (так требует браузер).</p>
+<h2>Музыка</h2>
+<p>Два варианта из Suno на каждый трек, рамкой отмечен тот, что сейчас в игре. «Стык» — конец петли и её начало: так трек идёт по кругу.</p>
+<div id="music"></div>
+<button id="stop">■ Остановить музыку</button>
 <h2>События игры</h2>
 <div class="grid" id="events"></div>
 <h2>Каждый файл отдельно</h2>
@@ -61,6 +75,67 @@
     b.onclick = () => { SFX.unlock(); setTimeout(fn, 30); };
     ev.appendChild(b);
   }
+  // музыка: [имя файла, название, вариант в игре (1/2), есть ли второй вариант, петля]
+  const MUSIC_LIST = [['menu', 'Меню', 2, true, true], ['land_1', 'Тракт', 2, true, true],
+    ['land_2', 'Сумрачный лес', 2, true, true], ['land_3', 'Гнилые топи', 2, true, true],
+    ['land_4', 'Горный перевал', 2, true, true], ['land_5', 'Красные пески', 2, true, true],
+    ['land_6', 'Ледяной перевал', 2, true, true], ['land_7', 'Огненные земли', 2, true, true],
+    ['land_8', 'Проклятые руины', 2, true, true], ['boss', 'Вожак', 2, true, true],
+    ['victory', 'Победа', 2, true, false], ['defeat', 'Поражение', 2, false, false]];
+  let mctx = null, msrc = null, mbtn = null;
+  const mcache = {};
+  function mstop() {
+    if (msrc) { try { msrc.stop(); } catch (e) {} msrc = null; }
+    if (mbtn) { mbtn.classList.remove('play'); mbtn = null; }
+  }
+  async function mplay(url, btn, seam) {
+    const again = mbtn === btn;
+    mstop();
+    if (again) return;
+    mctx = mctx || new (window.AudioContext || window.webkitAudioContext)();
+    mctx.resume();
+    btn.classList.add('play'); mbtn = btn;
+    const buf = mcache[url] || (mcache[url] = await fetch(url).then(r => r.arrayBuffer()).then(a => mctx.decodeAudioData(a)));
+    if (mbtn !== btn) return;
+    const s = mctx.createBufferSource();
+    s.buffer = buf;
+    if (seam) {
+      // как в игре (js/audio.js): тишина-заглушка mp3 по краям не входит в петлю
+      const d = buf.getChannelData(0), n = Math.min(8192, d.length >> 2);
+      let a = 0, b = d.length;
+      while (a < n && Math.abs(d[a]) < 1e-4) a++;
+      while (b > d.length - n && Math.abs(d[b - 1]) < 1e-4) b--;
+      s.loop = true; s.loopStart = a / buf.sampleRate; s.loopEnd = b / buf.sampleRate;
+    }
+    s.connect(mctx.destination);
+    s.onended = () => { if (msrc === s) mstop(); };
+    s.start(0, seam ? Math.max(0, s.loopEnd - 6) : 0);
+    msrc = s;
+  }
+  document.getElementById('stop').onclick = mstop;
+  const mu = document.getElementById('music');
+  for (const [id, title, inGame, two, loop] of MUSIC_LIST) {
+    const row = document.createElement('div');
+    row.className = 'row';
+    row.innerHTML = `<b>${title}</b>`;
+    const url = v => (v === inGame ? 'assets/audio/convoy/' : 'music_alt/') + id + '.mp3';
+    for (const v of [1, 2]) {
+      const b = document.createElement('button');
+      if (v === 2 && !two) { row.appendChild(document.createElement('span')); continue; }
+      b.textContent = two ? 'Вариант ' + v : 'Слушать';
+      if (two && v === inGame) b.classList.add('on');
+      b.onclick = () => mplay(url(two ? v : inGame), b, false);
+      row.appendChild(b);
+    }
+    if (loop) {
+      const b = document.createElement('button');
+      b.textContent = 'Стык';
+      b.onclick = () => mplay(url(inGame), b, true);
+      row.appendChild(b);
+    } else row.appendChild(document.createElement('span'));
+    mu.appendChild(row);
+  }
+
   // список файлов — из того же банка, что грузит игра (имя_1 … имя_N)
   const FILES = { hit_melee: 4, hit_spear: 4, hit_heavy: 4, hit_ranged: 4, shoot: 3, death_enemy: 4, death_ally: 3,
     spawn: 3, core_hit: 6, bomb: 2, horn: 1, horn_big: 1, roar: 2, boss_death: 1, slam: 1, rock_launch: 1, rock_hit: 3,

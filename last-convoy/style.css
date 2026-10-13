@@ -1762,6 +1762,15 @@ body.convoy #heroDownFlash, body.convoy #fortEdge { display: none !important; }
   position: relative; z-index: 1; padding-left: .8em; font-weight: 400; font-family: 'Lilita One', sans-serif;
   font-size: max(12px, .85em); line-height: 1; color: #fff; text-shadow: var(--cv-outline); font-variant-numeric: tabular-nums;
 }
+/* «Попутный ветер» (сборка 14): значок у правого края полосы прочности, пока новичок не доставил конвой */
+.cv-wind {
+  position: absolute; z-index: 1; right: .55em; top: 50%; transform: translateY(-50%); display: inline-flex; align-items: center; gap: .1em;
+  font-family: 'Lilita One', sans-serif; font-size: max(11px, .7em); line-height: 1; color: #bfeaff; text-shadow: var(--cv-outline);
+}
+.cv-wind svg.ico { width: 1.35em; height: 1.35em; vertical-align: 0; color: #bfeaff; }
+/* совет на итоге поражения (сборка 14) */
+.cv-unlock.cv-tip { border-color: #7fc6e8; box-shadow: 0 0 12px rgba(127,198,232,.45); background: linear-gradient(#2c4252, #1a2a36); }
+.cv-unlock.cv-tip b { color: #bfeaff; }
 /* собранные сочетания — значки под полосой, имя во всплывающей подсказке */
 .cv-syn { display: flex; flex-wrap: wrap; gap: .25em; padding-left: 1.05em; }
 .cv-syn:empty { display: none; }

@@ -371,6 +371,13 @@ const PLATFORM = (() => {
         (location.hostname === 'fanatat.github.io' && location.pathname.startsWith('/games-dev/'));
     } catch (e) { return false; }
   })();
+  // Тестовые точки входа «Последнего конвоя» (сборка 14): параметры адреса действуют только там же, где
+  // заглушки (локально и на стенде), и не в запуске из ВК (vk_app_id). ?ads=off — ролика нет («Реклама
+  // недоступна»), ?ads=fail — ролик открылся и сорвался; остальное (?glory, ?levels, ?lose, ?seed) — convoy.js.
+  const DEV_QUERY = (() => {
+    try { const q = new URLSearchParams(location.search); return DEV_ADS && !q.has('vk_app_id') ? q : null; } catch (e) { return null; }
+  })();
+  const DEV_ADS_MODE = DEV_QUERY ? DEV_QUERY.get('ads') : null;
   // Заглушка межэкранной рекламы для стенда: видно, в какой момент её покажет ВК.
   function showTestInterstitial() {
     return new Promise((resolve) => {
@@ -754,7 +761,9 @@ const PLATFORM = (() => {
     // только для локальной разработки (DEV_ADS: localhost/127.0.0.1/file:).
     showBonusAd() {
       let p;
-      if (kind === 'yandex') p = bonusAdFormat() === 'interstitial' ? showYandexFullscreen() : showYandexRewardedResult();
+      if (DEV_ADS_MODE === 'off') p = Promise.resolve({ shown: false, reason: 'blocked' });
+      else if (DEV_ADS_MODE === 'fail') p = showTestAd().then(() => ({ shown: false, reason: 'blocked' }));
+      else if (kind === 'yandex') p = bonusAdFormat() === 'interstitial' ? showYandexFullscreen() : showYandexRewardedResult();
       else if (kind === 'vk') p = showVkRewarded().then((ok) => ({ shown: ok, reason: ok ? 'ok' : 'blocked' }));
       else if (kind === 'crazygames') p = showCrazyGamesRewarded().then((ok) => ({ shown: ok, reason: ok ? 'ok' : 'blocked' }));
       else if (DEV_ADS) p = showTestAd().then((ok) => ({ shown: ok, reason: ok ? 'ok' : 'blocked' }));
@@ -769,6 +778,7 @@ const PLATFORM = (() => {
     // null — площадка (Yandex/CrazyGames) такой проверки не даёт, вызывающий
     // код должен вести себя как раньше (не гейтить кнопку проверкой).
     checkRewardedAvailable() {
+      if (DEV_ADS_MODE === 'off') return Promise.resolve(false);
       if (kind === 'vk') return checkVkRewardedAvailable();
       if (kind === 'yandex' || kind === 'crazygames') return Promise.resolve(null);
       return Promise.resolve(true); // локальный тест — заглушка всегда «готова»
@@ -776,6 +786,7 @@ const PLATFORM = (() => {
     // Всегда резолвится (true — ролик показан), не бросает: вызывающий код
     // продолжает переход между миссиями в любом исходе.
     showInterstitial() {
+      if (DEV_ADS_MODE === 'off') return Promise.resolve(false);
       if (kind === 'vk') return showVkInterstitial();
       if (kind === 'yandex') return showYandexInterstitial();
       if (DEV_ADS && window.CONVOY_PROTOTYPE) return showTestInterstitial();
@@ -799,6 +810,7 @@ const PLATFORM = (() => {
     // Без этого кнопку рекламы не показываем (бесплатной награды нет).
     rewardedPossible() { return kind === 'vk' || kind === 'yandex' || kind === 'crazygames' || DEV_ADS; },
     supportsInterstitial() { return kind === 'vk' || kind === 'yandex' || (DEV_ADS && !!window.CONVOY_PROTOTYPE); },
+    devQuery() { return DEV_QUERY; },
     preloadInterstitial() { if (kind === 'vk') preloadVkInterstitial(); },
     // Лидерборд (только CrazyGames — см. методичку §9, ГДД «Допущения»).
     // Что именно передаётся как `score` — решает вызывающий код (game.js),

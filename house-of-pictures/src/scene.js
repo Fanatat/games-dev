@@ -81,7 +81,9 @@ window.Scene = (function () {
            interactive: false — без кнопок (для «до/после»),
            hide: oid — нарисовать этот предмет на стадию раньше (пока летит миниатюра),
            fresh: oid | 'room' — проиграть появление предмета / прихода кота,
-           preview: { oid, vid } — примерка оформления (ещё не куплено). */
+           preview: { oid, vid } — примерка оформления (ещё не куплено),
+           noGlow: oid — пока не показывать «Сияние» (сундучок ещё не открыт),
+           afford: oid — значок «Хватает!» (монет хватает на оформление). */
   function render(host, C, S, rid, opts) {
     opts = opts || {};
     var room = C.rooms[rid], L = room.layout;
@@ -96,15 +98,24 @@ window.Scene = (function () {
       total += n; solved += st;
     });
     var complete = room.objects.every(function (oid) { return restored[oid]; });
+    // Тепло ступенями: на 1/3 и 2/3 картинок комната теплеет, готовая — полностью.
+    var warm = opts.before ? 0 : complete ? 3 : Math.floor(3 * solved / total);
+    var was = host.getAttribute('data-warm');
+    if (!opts.before && host.getAttribute('data-room') === rid && was !== null && +was < warm) host._warmAt = Date.now();
+    if (host.getAttribute('data-room') !== rid) host._warmAt = 0;
 
     host.innerHTML = '';
     host.setAttribute('data-room', rid);
+    host.setAttribute('data-warm', String(warm));
     host.style.setProperty('--life', (solved / total).toFixed(3));
+    host.style.setProperty('--warm', (warm / 3).toFixed(3));
+    host.classList.toggle('is-warming', !!host._warmAt && Date.now() - host._warmAt < 2200);
     host.classList.toggle('is-complete', complete);
     host.classList.toggle('is-lit', !!restored.r01_lamp);
     host.classList.toggle('fresh-lamp', opts.fresh === 'r01_lamp');
 
     host.appendChild(el('img', 'scene-bg', { src: room.background, alt: '', draggable: 'false' }));
+    host.appendChild(el('div', 'scene-warm'));
 
     var hall = rid === 'r01';
     if (hall) {
@@ -154,11 +165,21 @@ window.Scene = (function () {
       if (stage[oid] === 0) img.classList.add(st === 'locked' ? 'is-locked' : 'is-ghost');
       else if (!restored[oid]) img.classList.add('is-stage');
       wrap.appendChild(img);
+      if (restored[oid] && !opts.before && o.life) wrap.appendChild(lifeFx(o.life, opts.fresh === oid));
       if (inter && (st === 'available' || st === 'in_progress')) wrap.appendChild(el('span', 'hs-ring'));
+      if (restored[oid] && !opts.before && (S.glows || []).indexOf(oid) !== -1 && opts.noGlow !== oid) {
+        wrap.classList.add('is-glow');
+        for (var g = 0; g < 3; g++) wrap.appendChild(el('i', 'glow-spark'));
+      }
       if (inter && st === 'choose_variant') {
         var dot = el('span', 'hs-badge');
         dot.innerHTML = '<svg class="ico"><use href="#i-palette"/></svg>';
         wrap.appendChild(dot);
+      } else if (inter && opts.afford === oid && st === 'restored') {
+        var coin = el('span', 'hs-badge hs-afford');
+        coin.appendChild(el('img', '', { src: ART + 'coin.webp', alt: '', draggable: 'false' }));
+        wrap.appendChild(coin);
+        wrap.setAttribute('aria-label', o.title + ' — хватает на оформление');
       }
       if (pv) {
         wrap.classList.add('is-preview');
@@ -187,6 +208,35 @@ window.Scene = (function () {
       place(bird, L.bird);
       host.appendChild(bird);
     }
+  }
+
+  // Функция готового предмета: пар над чайником, отблеск маятника, ноты шкатулки, цветы оранжереи.
+  var BLOOM = ['#f2b6c6', '#f7d36b', '#c9b6f2'];
+  function lifeFx(life, fresh) {
+    var box = el('span', 'life life-' + life.kind + (fresh ? ' is-fresh' : ''));
+    if (life.x !== undefined) { box.style.left = (life.x * 100) + '%'; box.style.top = (life.y * 100) + '%'; }
+    if (life.kind === 'steam') for (var i = 0; i < 3; i++) box.appendChild(el('i'));
+    else if (life.kind === 'waltz') ['♪', '♫', '♪'].forEach(function (n) { box.appendChild(el('i')).textContent = n; });
+    else if (life.kind === 'glint') box.appendChild(el('i'));
+    else if (life.kind === 'bloom') {
+      BLOOM.forEach(function (color, k) {
+        var f = document.createElementNS(SVGNS, 'svg');
+        f.setAttribute('viewBox', '0 0 20 20');
+        f.setAttribute('class', 'bloom bloom-' + k);
+        for (var p = 0; p < 5; p++) {
+          var e = document.createElementNS(SVGNS, 'ellipse');
+          e.setAttribute('cx', '10'); e.setAttribute('cy', '5.2'); e.setAttribute('rx', '3.6'); e.setAttribute('ry', '4.8');
+          e.setAttribute('fill', color);
+          e.setAttribute('transform', 'rotate(' + (p * 72) + ' 10 10)');
+          f.appendChild(e);
+        }
+        var c = document.createElementNS(SVGNS, 'circle');
+        c.setAttribute('cx', '10'); c.setAttribute('cy', '10'); c.setAttribute('r', '2.8'); c.setAttribute('fill', '#e9a23b');
+        f.appendChild(c);
+        box.appendChild(f);
+      });
+    }
+    return box;
   }
 
   // Комната, где сейчас кот (null — ещё не пришёл). hide — предмет, который

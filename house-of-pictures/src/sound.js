@@ -19,8 +19,13 @@ window.Sound = (function () {
     tap: { files: ['ui_tap_1'], vol: 0.45, gap: 40 },
     toggle: { files: ['ui_toggle'], vol: 0.45 },
     back: { files: ['ui_back'], vol: 0.45 },
-    hint: { files: ['hint_sparkle'], vol: 0.55 }
+    hint: { files: ['hint_sparkle'], vol: 0.55 },
+    coin: { files: ['reward_bell'], vol: 0.4, gap: 120 },
+    note: { files: ['line_marimba_D5', 'line_marimba_E5', 'line_marimba_G5', 'line_marimba_A5', 'line_marimba_B5', 'line_marimba_D6'], vol: 0.5 }
   };
+  // Вальс шкатулки на три четверти: [доля, нота D5 E5 G5 A5 B5 D6 = 0..5].
+  var WALTZ = [[0, 2], [1, 4], [2, 5], [3, 4], [6, 3], [7, 2], [8, 1], [9, 0], [12, 1], [13, 2], [14, 4], [15, 3], [16, 2], [17, 1], [18, 2]];
+  var BEAT = 0.34;
   var COMBO_MS = 2500;
 
   var ctx = null, master = null;
@@ -104,6 +109,13 @@ window.Sound = (function () {
     play('line', { index: combo });
   }
 
+  // Возвращает длительность в мс (0 — звук выключен).
+  function waltz() {
+    if (!enabled || !ctx || ctx.state !== 'running') return 0;
+    WALTZ.forEach(function (n, i) { play('note', { index: n[1], delay: n[0] * BEAT, vol: i % 3 ? 0.75 : 1 }); });
+    return Math.round((WALTZ[WALTZ.length - 1][0] + 2) * BEAT * 1000);
+  }
+
   function buzz(ms) {
     if (!vibration || !navigator.vibrate) return;
     try { navigator.vibrate(ms); } catch (e) { /* без вибрации */ }
@@ -111,6 +123,7 @@ window.Sound = (function () {
 
   return {
     play: play,
+    waltz: waltz,
     line: line,
     buzz: buzz,
     setEnabled: function (v) { enabled = !!v; },

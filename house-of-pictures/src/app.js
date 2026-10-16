@@ -306,14 +306,20 @@
 
   /* ---------------- плашки валют и разделы ---------------- */
 
-  var hudShown = null; // { coins, pencils } — пока летят награды, плашки показывают старые числа
+  // Ещё летит к плашкам (значки наград, закрытый сундучок): плашки показывают
+  // число без этого, пока значок не долетит.
+  var hudHold = { coins: 0, pencils: 0 };
+  function holdHud(coins, pencils) {
+    hudHold.coins = Math.max(0, hudHold.coins + coins);
+    hudHold.pencils = Math.max(0, hudHold.pencils + pencils);
+  }
 
   function renderHud() {
     var cur = showCurrencies();
     $('hud-coins').hidden = !cur;
     $('hud-pencils').hidden = !cur;
-    $('hud-coins-n').textContent = String(hudShown ? hudShown.coins : S.coins);
-    $('hud-pencils-n').textContent = String(hudShown ? hudShown.pencils : S.pencils);
+    $('hud-coins-n').textContent = String(Math.max(0, S.coins - hudHold.coins));
+    $('hud-pencils-n').textContent = String(Math.max(0, S.pencils - hudHold.pencils));
     var tabsOn = hallDone();
     if ($('tabbar').hidden === tabsOn) {
       $('tabbar').hidden = !tabsOn;
@@ -359,17 +365,12 @@
     rewards.forEach(function (r) { if (r.type === 'stamp') list.push(r); });
     if (!list.length) { renderHud(); return; }
     var rm = reducedMotion();
-    hudShown = rm ? null : { coins: S.coins - coins, pencils: S.pencils - pencils };
-    renderHud();
-    var left = list.length;
     list.forEach(function (r, i) {
       var target = r.type === 'coins' ? $('hud-coins') : r.type === 'pencils' ? $('hud-pencils') : $('tabbar').querySelector('[data-tab="letters"]');
+      var held = !rm && target && target.offsetParent !== null && !!document.body.animate && r.type !== 'stamp';
+      if (held) holdHud(r.type === 'coins' ? r.n : 0, r.type === 'pencils' ? r.n : 0);
       var land = function () {
-        if (hudShown) {
-          if (r.type === 'coins') hudShown.coins += r.n;
-          if (r.type === 'pencils') hudShown.pencils += r.n;
-        }
-        if (--left === 0) hudShown = null;
+        if (held) holdHud(r.type === 'coins' ? -r.n : 0, r.type === 'pencils' ? -r.n : 0);
         renderHud();
         bump(target);
         if (r.type !== 'stamp') Sound.play('tap');
@@ -377,7 +378,7 @@
       if (rm || !target || target.offsetParent === null || !document.body.animate) { land(); return; }
       setTimeout(function () { flyBadge(r, from, target, land); }, i * 260);
     });
-    if (rm) hudShown = null;
+    renderHud();
   }
 
   function flyBadge(r, from, target, done) {
@@ -592,15 +593,29 @@
     return row;
   }
 
+  // Плашка комнаты считает картинки, а не вещи: каждое поле двигает полосу.
+  function roomPictures(rid) {
+    var n = 0, done = 0;
+    C.rooms[rid].objects.forEach(function (oid) { n += C.objects[oid].puzzles.length; done += St.objectStage(C, S, oid); });
+    return { done: done, n: n };
+  }
+
   function renderPill() {
-    var rid = curRoom(), R = C.rooms[rid];
+    var rid = curRoom(), R = C.rooms[rid], pc = roomPictures(rid);
     $('room-title').textContent = R.title;
-    $('room-count').textContent = St.restoredCount(C, S, rid) + '/' + R.objects.length;
+    $('room-count').textContent = pc.done + '/' + pc.n;
+    $('room-bar').style.width = Math.round(100 * pc.done / pc.n) + '%';
+    $('room-pill').setAttribute('aria-label', 'Комнаты. ' + R.title + ': ' + pc.done + ' из ' + pc.n + ' картинок');
     $('room-pill').classList.toggle('has-more', St.openRooms(C, S).length > 1);
   }
 
   function renderHome(sceneOpts) {
-    Scene.render($('scene'), C, S, curRoom(), sceneOpts);
+    var so = sceneOpts || {};
+    if (so.afford === undefined) {
+      var af = St.affordableVariant(C, S, curRoom());
+      so.afford = af ? af.object_id : null;
+    }
+    Scene.render($('scene'), C, S, curRoom(), so);
     renderPill();
     renderPanel();
     renderHud();
@@ -622,6 +637,7 @@
       var img = t.querySelector('img');
       if (img) { img.classList.remove('is-wiggle'); void img.offsetWidth; img.classList.add('is-wiggle'); }
       log('object_tap', { object_id: oid });
+      if (C.objects[oid].life && C.objects[oid].life.kind === 'waltz') playWaltz(oid);
       openVariantSheet(oid, { secret: true });
     } else {
       Sound.play('back');
@@ -753,6 +769,8 @@
     updateUndo();
     $('btn-pencil').hidden = cur.tutorial || !S.story_flags.tutorial_done;
     renderHud();
+    renderHintCount();
+    renderFieldCoins();
     log('puzzle_start', { puzzle_id: pid, object_id: cur.oid, resumed: !!d });
     coachStart();
     if (!cur.tutorial && !$('btn-pencil').hidden && !S.story_flags.pencil_tip) {
@@ -810,11 +828,42 @@
       log('first_move', { puzzle_id: cur.pid });
     }
     if (!N.isWon()) {
-      St.saveDraft(S, cur.pid, N.getBoardState());
+      var board = N.getBoardState();
+      if (kind === 'fill' || kind === 'pencil') foundCoins(board);
+      St.saveDraft(S, cur.pid, board);
       scheduleSave();
     }
     updateUndo();
     coachCheck();
+  }
+
+  // Монетка в клетке: верно закрашенная клетка с монеткой отдаёт её сразу.
+  function foundCoins(board) {
+    var got = St.collectFieldCoins(C, S, cur.pid, board);
+    got.forEach(function (f) {
+      var cell = $('puzzle-container').querySelector('.grid-cell[data-r="' + f.r + '"][data-c="' + f.c + '"]');
+      if (cell) {
+        var spark = h('i', 'cell-coin');
+        spark.appendChild(pic('coin'));
+        cell.appendChild(spark);
+        setTimeout(function () { spark.remove(); }, 1200);
+      }
+      Sound.play('coin');
+      playRewards([{ type: 'coins', n: f.n }], cell ? cell.getBoundingClientRect() : null);
+      log('field_coin', { puzzle_id: cur.pid });
+    });
+    if (got.length) renderFieldCoins();
+  }
+
+  function renderFieldCoins() {
+    var box = $('puzzle-coins');
+    var all = cur ? St.fieldCoins(C, cur.pid) : [];
+    box.hidden = !all.length;
+    if (!all.length) return;
+    var found = all.filter(function (x, i) { return S.granted.indexOf('f:' + cur.pid + ':' + i) !== -1; }).length;
+    $('puzzle-coins-n').textContent = found + '/' + all.length;
+    box.setAttribute('aria-label', 'Монетки на поле: найдено ' + found + ' из ' + all.length);
+    box.classList.toggle('is-all', found === all.length);
   }
 
   function onLine() { Sound.line(); }
@@ -1020,20 +1069,51 @@
       log('hint', { puzzle_id: cur.pid, kind: 'wrong_cross' });
       return;
     }
+    // Ошибки лампа исправляет всегда; новые клетки — три раза на поле, дальше карандаш.
+    if (St.freeHintsLeft(C, S, cur.pid) <= 0) {
+      Sound.play('back');
+      shake($('btn-hint'));
+      if (!$('btn-pencil').hidden) { bump($('btn-pencil')); flash($('btn-pencil'), 'is-call'); }
+      log('hint_out', { puzzle_id: cur.pid });
+      return;
+    }
     var d = lineDeduction();
     if (d) {
       flashLine(d.kind, d.idx);
       N.applyHint({ r: d.r, c: d.c, action: 'fill' });
       toast((d.kind === 'row' ? 'Строка ' : 'Столбец ') + (d.idx + 1) + ': эта клетка закрашена при любом раскладе');
+      St.useFreeHint(C, S, cur.pid);
       log('hint', { puzzle_id: cur.pid, kind: 'line', line: d.kind + d.idx });
+      renderHintCount();
       return;
     }
     var any = N.findHint();
     if (any) {
       N.applyHint(any);
       toast('Вот одна верная клетка');
+      St.useFreeHint(C, S, cur.pid);
       log('hint', { puzzle_id: cur.pid, kind: 'cell' });
+      renderHintCount();
     }
+  }
+
+  function renderHintCount() {
+    var n = cur ? St.freeHintsLeft(C, S, cur.pid) : Infinity;
+    var b = $('hint-n');
+    b.hidden = n === Infinity;
+    b.textContent = n === Infinity ? '' : String(n);
+    $('btn-hint').classList.toggle('is-out', n === 0);
+    $('btn-hint').setAttribute('aria-label', n === Infinity ? 'Подсказка' : 'Подсказка, осталось ' + n);
+  }
+
+  function shake(node) {
+    if (!node) return;
+    node.classList.remove('is-shake'); void node.offsetWidth; node.classList.add('is-shake');
+  }
+  function flash(node, cls) {
+    if (!node) return;
+    node.classList.remove(cls); void node.offsetWidth; node.classList.add(cls);
+    setTimeout(function () { node.classList.remove(cls); }, 1600);
   }
 
   // Ищет линию, где по числам и уже поставленным отметкам клетка точно закрашена.
@@ -1175,11 +1255,13 @@
   }
 
   function arrive(rs) {
-    var o = C.objects[rs.oid], res = rs.res;
+    var o = C.objects[rs.oid], res = rs.res, chest = res.chest;
     var fresh = res.object_done ? rs.oid : null;
-    renderHome({ fresh: fresh || rs.oid });
+    renderHome({ fresh: fresh || rs.oid, noGlow: chest && chest.kind === 'rare' ? rs.oid : null });
     Sound.play('reward');
     Sound.buzz(20);
+    // Содержимое сундучка придержано на плашках, пока он не откроется.
+    if (chest && !reducedMotion()) holdHud(chest.coins, chest.pencils);
     playRewards(res.rewards, Scene.objectRect($('scene'), rs.oid));
     var gift = res.rewards.filter(function (r) { return r.type === 'gift'; })[0];
     if (!res.object_done) {
@@ -1192,7 +1274,7 @@
     toast(o.done_text, 4200);
     var newly = St.playableObjects(C, S, o.room).filter(function (oid) { return St.objectStatus(C, S, oid) === 'available'; });
     if (newly.length && !res.room_done) setTimeout(function () { Sound.play('unlock'); }, 600);
-    setTimeout(function () {
+    var sheet = function () {
       $('scene').classList.remove('is-busy');
       openVariantSheet(rs.oid, {
         afterReveal: true,
@@ -1202,7 +1284,66 @@
           else if (gift) showGift(gift);
         }
       });
-    }, reducedMotion() ? 400 : 1400);
+    };
+    var waltz = o.life && o.life.kind === 'waltz';
+    setTimeout(function () { playChest(rs.oid, chest, waltz ? function () { playWaltz(rs.oid); setTimeout(sheet, reducedMotion() ? 300 : 2200); } : sheet); }, reducedMotion() ? 200 : 900);
+  }
+
+  // Шкатулка играет вальс: ноты чаще, шкатулка покачивается в такт.
+  function playWaltz(oid) {
+    var ms = Sound.waltz() || 3000;
+    var w = $('scene').querySelector('.obj[data-obj="' + oid + '"]');
+    if (w) w.classList.add('is-playing');
+    setTimeout(function () {
+      var x = $('scene').querySelector('.obj[data-obj="' + oid + '"]');
+      if (x) x.classList.remove('is-playing');
+    }, ms);
+    log('waltz', { object_id: oid });
+  }
+
+  // Сундучок над готовым предметом: появляется, вздрагивает, раскрывается,
+  // и содержимое летит на плашки. Редкое — золотой сундучок и «Сияние».
+  function playChest(oid, chest, done) {
+    if (!chest) { done(); return; }
+    var rare = chest.kind === 'rare', rm = reducedMotion();
+    var rect = Scene.objectRect($('scene'), oid) || $('scene').getBoundingClientRect();
+    var finished = false;
+    var open = function () {
+      if (finished) return;
+      finished = true;
+      var list = [];
+      if (chest.coins) list.push({ type: 'coins', n: chest.coins });
+      if (chest.pencils) list.push({ type: 'pencils', n: chest.pencils });
+      if (!rm) holdHud(-chest.coins, -chest.pencils);
+      Sound.play(rare ? 'chord' : 'reward');
+      if (rare) {
+        renderHome({ fresh: oid });
+        hideToast();
+        toast('Сияние! ' + C.objects[oid].title, 2600);
+      }
+      playRewards(list, rect);
+      setTimeout(done, rm ? 300 : rare ? 1500 : 1000);
+    };
+    log('chest_show', { object_id: oid, kind: chest.kind });
+    if (rm || !document.body.animate) { open(); return; }
+    var box = h('div', 'fx-chest' + (rare ? ' is-rare' : ''));
+    box.appendChild(pic(rare ? 'chest_b' : 'chest_a'));
+    box.style.left = (rect.left + rect.width / 2) + 'px';
+    box.style.top = (rect.top + rect.height / 2) + 'px';
+    $('fx').appendChild(box);
+    Sound.play('unlock');
+    var a = box.animate([
+      { transform: 'translate(-50%,-30%) scale(.3)', opacity: 0, offset: 0 },
+      { transform: 'translate(-50%,-90%) scale(1.1)', opacity: 1, offset: 0.25 },
+      { transform: 'translate(-50%,-90%) scale(1) rotate(-8deg)', opacity: 1, offset: 0.42 },
+      { transform: 'translate(-50%,-90%) scale(1) rotate(8deg)', opacity: 1, offset: 0.56 },
+      { transform: 'translate(-50%,-90%) scale(1) rotate(-6deg)', opacity: 1, offset: 0.68 },
+      { transform: 'translate(-50%,-90%) scale(1.05) rotate(0)', opacity: 1, offset: 0.8 },
+      { transform: 'translate(-50%,-90%) scale(1.6)', opacity: 0, offset: 1 }
+    ], { duration: 1300, easing: 'ease-out', fill: 'forwards' });
+    var fin = function () { box.remove(); open(); };
+    a.onfinish = fin; a.oncancel = fin;
+    setTimeout(fin, 2500); // вкладка в фоне: не держать награду
   }
 
   function roomFinale(rid, gift) {
@@ -1210,11 +1351,71 @@
     saveNow();
     renderHome({ fresh: rid === 'r01' ? 'room' : Scene.catSeat(rid) });
     Sound.play('chord');
-    if (rid !== 'r01') {
-      toast(C.rooms[rid].final_text, 4200);
-      setTimeout(function () { if (gift) showGift(gift); else showInvitation(rid); }, reducedMotion() ? 300 : 1600);
-    }
-    else if (gift) setTimeout(function () { showGift(gift); }, 900);
+    var next = function () {
+      if (rid !== 'r01') { if (gift) showGift(gift); else showInvitation(rid); }
+      else if (gift) showGift(gift);
+    };
+    if (rid !== 'r01') toast(C.rooms[rid].final_text, 4200);
+    // Игрок успел открыть письмо или другую шторку — подарок ждёт, пока она закроется.
+    setTimeout(function offer() {
+      if (S.room_choice_pending !== rid) { next(); return; }
+      if (!$('sheet').hidden) { setTimeout(offer, 700); return; }
+      showRoomChoice(rid, next);
+    }, reducedMotion() ? 300 : rid === 'r01' ? 900 : 1600);
+  }
+
+  // Награда за комнату на выбор из трёх: монеты, карандаши или вещь.
+  function showRoomChoice(rid, after) {
+    var opts = St.roomChoices(C, S, rid);
+    var node = h('div', 'choice-sheet');
+    node.appendChild(sheetHead('Выбери подарок', 'chest_b'));
+    var grid = h('div', 'reward-grid');
+    var picked = false;
+    opts.forEach(function (o, i) {
+      var b = h('button', 'card reward-card');
+      b.type = 'button';
+      b.setAttribute('data-pick', String(i));
+      var label;
+      if (o.coins) { b.appendChild(pic('coin')); label = '+' + o.coins; }
+      else if (o.pencils) { b.appendChild(pic('pencil')); label = '+' + o.pencils; }
+      else if (o.variant) {
+        var f = St.findVariant(C, o.variant);
+        b.classList.add('is-thing');
+        b.appendChild(pic(f.variant.sprite));
+        label = f.variant.title;
+      } else {
+        b.classList.add('is-thing', 'is-glow');
+        b.appendChild(pic(Scene.spriteOf(C, S, o.glow)));
+        label = 'Сияние';
+      }
+      b.appendChild(h('b', '', label));
+      b.setAttribute('aria-label', o.coins ? o.coins + ' монет' : o.pencils ? o.pencils + ' карандаша' : label);
+      b.addEventListener('click', function () {
+        if (picked) return;
+        picked = true;
+        var from = b.getBoundingClientRect();
+        var got = St.pickRoomReward(C, S, rid, i);
+        saveNow();
+        closeSheet(true);
+        if (got && got.variant) {
+          var fv = St.findVariant(C, got.variant);
+          renderHome({ fresh: fv.object });
+          Sound.play('chord');
+        } else if (got && got.glow) {
+          renderHome({ fresh: got.glow });
+          Sound.play('chord');
+        } else {
+          renderHome();
+          if (got) playRewards([{ type: got.coins ? 'coins' : 'pencils', n: got.coins || got.pencils }], from);
+        }
+        setTimeout(after, reducedMotion() ? 200 : 1200);
+      });
+      grid.appendChild(b);
+    });
+    node.appendChild(grid);
+    // Закрыли не выбрав — выбор подождёт до следующего входа.
+    openSheet(node, function () { if (!picked) after(); }, 'sheet-choice');
+    log('room_choice_show', { room_id: rid });
   }
 
   // Полная карточка «7 встреч»: подарок.
@@ -1295,6 +1496,8 @@
         var owned = St.isVariantOwned(C, S, id);
         if (lock && owned) lock.remove();
         cards[i].classList.toggle('is-premium', !owned);
+        var vv = St.findVariant(C, id).variant;
+        cards[i].classList.toggle('is-afford', !owned && !!vv.price_coins && S.coins >= vv.price_coins);
       }
       action.innerHTML = '';
       if (!preview) return;
@@ -1693,6 +1896,17 @@
     page.innerHTML = '';
     page.appendChild(h('h1', 'page-title', 'Лавка'));
 
+    // Сначала то, что покупается за монеты: оформление — цель для монет.
+    var s3 = section('Оформление', 'coin');
+    var grid = h('div', 'deco-grid');
+    St.openRooms(C, S).forEach(function (rid) {
+      C.rooms[rid].objects.forEach(function (oid) {
+        C.objects[oid].variants.forEach(function (v) { if (v.premium && v.price_coins) grid.appendChild(decoCard(oid, v)); });
+      });
+    });
+    s3.appendChild(grid);
+    page.appendChild(s3);
+
     var s1 = section('Карандаши', 'pencil');
     s1.appendChild(pencilOffers(null));
     page.appendChild(s1);
@@ -1703,16 +1917,6 @@
       skus.forEach(function (k) { s2.appendChild(bundleCard(k)); });
       page.appendChild(s2);
     }
-
-    var s3 = section('Оформление', 'coin');
-    var grid = h('div', 'deco-grid');
-    St.openRooms(C, S).forEach(function (rid) {
-      C.rooms[rid].objects.forEach(function (oid) {
-        C.objects[oid].variants.forEach(function (v) { if (v.premium && v.price_coins) grid.appendChild(decoCard(oid, v)); });
-      });
-    });
-    s3.appendChild(grid);
-    page.appendChild(s3);
     if (!Platform.canPay) page.appendChild(h('p', 'shop-note', 'Стенд: покупки тестовые, голоса не списываются.'));
     page.scrollTop = y;
   }
@@ -1752,7 +1956,8 @@
     var owned = St.isVariantOwned(C, S, v.id);
     var restored = St.isObjectRestored(C, S, oid);
     var worn = S.object_variants[oid] === v.id;
-    var b = h('button', 'deco' + (owned ? ' is-owned' : '') + (restored ? '' : ' is-locked') + (worn ? ' is-worn' : ''));
+    var afford = !owned && restored && S.coins >= v.price_coins;
+    var b = h('button', 'deco' + (owned ? ' is-owned' : '') + (restored ? '' : ' is-locked') + (worn ? ' is-worn' : '') + (afford ? ' is-afford' : ''));
     b.type = 'button';
     b.setAttribute('data-v', v.id);
     b.appendChild(pic(v.sprite, 'deco-art'));
@@ -1980,7 +2185,9 @@
     Platform.init();
     showScreen('home');
     renderHome();
-    if (away >= 2 && hallDone() && $('sheet').hidden) showWelcome(away);
+    var pend = S.room_choice_pending;
+    if (pend && C.rooms[pend] && St.isRoomComplete(C, S, pend)) showRoomChoice(pend, function () {});
+    else if (away >= 2 && hallDone() && $('sheet').hidden) showWelcome(away);
     cloudStart();
     // Новый день мог наступить, пока вкладка открыта.
     setInterval(function () { if (dayNow !== St.today()) onNewDay(); }, 60000);

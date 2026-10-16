@@ -62,6 +62,10 @@
       stamps: { card: 0, days: [] },
       daily: { start: null, opened: [] },
       ads: { day: null, n: 0 },
+      rng: seedRng(),
+      hints: {},
+      glows: [],
+      room_choice_pending: null,
       settings: { sound: true, vibration: true, reduced_motion: false },
       log: []
     };
@@ -79,9 +83,9 @@
     var base = emptyState();
     if (!isObj(s.settings)) s.settings = base.settings;
     ['completed_puzzles', 'applied_stages', 'completed_rooms', 'seen_variant_choice', 'visits', 'log',
-      'owned_variants', 'owned_skus', 'granted', 'orders']
+      'owned_variants', 'owned_skus', 'granted', 'orders', 'glows']
       .forEach(function (key) { if (!Array.isArray(s[key])) s[key] = []; });
-    ['object_variants', 'drafts', 'story_flags'].forEach(function (key) { if (!isObj(s[key])) s[key] = {}; });
+    ['object_variants', 'drafts', 'story_flags', 'hints'].forEach(function (key) { if (!isObj(s[key])) s[key] = {}; });
     ['stamps', 'daily', 'ads'].forEach(function (key) { if (!isObj(s[key])) s[key] = base[key]; });
     if (!Array.isArray(s.stamps.days)) s.stamps.days = [];
     s.stamps.card = s.stamps.card | 0;
@@ -89,6 +93,9 @@
     if (typeof s.daily.start !== 'string') s.daily.start = null;
     ['coins', 'pencils'].forEach(function (key) { s[key] = Math.max(0, s[key] | 0); });
     if (typeof s.current_room !== 'string') s.current_room = 'r01';
+    if (typeof s.rng !== 'number' || !isFinite(s.rng)) s.rng = seedRng();
+    s.rng = s.rng >>> 0;
+    if (typeof s.room_choice_pending !== 'string') s.room_choice_pending = null;
     s.schema_version = SCHEMA_VERSION;
     if (C && from < 2) backfill(C, s);
     return s;
@@ -232,6 +239,166 @@
     return got;
   }
 
+  /* ---------- щедрость: монеты по полю, сундучки, выбор за комнату ---------- */
+
+  // Случайность живёт в сейве (mulberry32): перезагрузка не перебросит сундучок,
+  // а тесты задают s.rng и получают одно и то же.
+  function seedRng() { return (Math.random() * 4294967296) >>> 0; }
+  function rand(s) {
+    var t = s.rng = (s.rng + 0x6D2B79F5) >>> 0;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  }
+
+  // Таблица [[до площади, значение], ...]: первое подходящее.
+  function byArea(table, area, dflt) {
+    for (var i = 0; i < (table || []).length; i++) if (area <= table[i][0]) return table[i][1];
+    return dflt;
+  }
+  function area(p) { return p.rows.length * p.rows[0].length; }
+
+  // Монеты за поле растут с его площадью (5×5 — 10, 10×10 — 40).
+  function puzzleCoins(C, pid) {
+    var E = C.economy;
+    return byArea(E.coins_by_area, area(C.puzzles[pid]), E.coins_per_puzzle);
+  }
+
+  function fnv(str) {
+    var h = 2166136261;
+    for (var i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
+    return h >>> 0;
+  }
+
+  // Монетки, спрятанные в закрашиваемых клетках поля: всегда одни и те же
+  // для картинки. Номера клеток r*W+c по возрастанию.
+  function fieldCoins(C, pid) {
+    var F = C.economy.field_coins, p = C.puzzles[pid];
+    if (!F || !p || p.difficulty === 'tutorial') return [];
+    var W = p.rows[0].length, n = byArea(F.by_area, area(p), F.max), cells = [], out = [], h = fnv(pid);
+    p.rows.forEach(function (row, r) { for (var c = 0; c < W; c++) if (row[c] === '#') cells.push(r * W + c); });
+    while (out.length < n && cells.length) {
+      h = Math.imul(h ^ (h >>> 13), 0x5bd1e995) >>> 0;
+      out.push(cells.splice(h % cells.length, 1)[0]);
+    }
+    return out.sort(function (a, b) { return a - b; });
+  }
+
+  // Найденные монетки: клетка закрашена на доске (board = null — все разом,
+  // при победе). Каждая выдаётся один раз.
+  function collectFieldCoins(C, s, pid, board) {
+    var p = C.puzzles[pid], F = C.economy.field_coins, got = [];
+    if (!p || has(s.completed_puzzles, pid) && board) return got;
+    var W = p.rows[0].length;
+    fieldCoins(C, pid).forEach(function (cell, i) {
+      var r = (cell / W) | 0, c = cell % W;
+      if (board && !(board[r] && board[r][c] === 1)) return;
+      if (grant(s, 'f:' + pid + ':' + i, F.coins, 0).length) got.push({ r: r, c: c, n: F.coins });
+    });
+    if (got.length && board) touch(s);
+    return got;
+  }
+
+  // Бесплатные подсказки: free_hints на поле, обучение — без счёта.
+  function freeHintsLeft(C, s, pid) {
+    var n = C.economy.free_hints, p = C.puzzles[pid];
+    if (n === undefined || !p || p.difficulty === 'tutorial') return Infinity;
+    return Math.max(0, n - (s.hints[pid] | 0));
+  }
+
+  function useFreeHint(C, s, pid) {
+    var left = freeHintsLeft(C, s, pid);
+    if (left <= 0) return false;
+    if (left !== Infinity) s.hints[pid] = (s.hints[pid] | 0) + 1;
+    logEvent(s, 'hint', { puzzle_id: pid, left: left === Infinity ? null : left - 1 });
+    touch(s);
+    return true;
+  }
+
+  function skuVariants(C) {
+    var out = [];
+    Object.keys(C.skus || {}).forEach(function (k) { (C.skus[k].grants.variants || []).forEach(function (v) { out.push(v); }); });
+    return out;
+  }
+
+  // Сундучок за готовый предмет: монеты, карандаш или редкое «Сияние» на
+  // этом предмете. Раз в комнату (к rare_by-му предмету) сияние гарантировано.
+  function openChest(C, s, oid) {
+    var K = C.economy.chest, rid = C.objects[oid].room, key = 'c:' + oid;
+    if (!K || has(s.granted, key)) return null;
+    s.granted.push(key);
+    var roll = rand(s), out = { object_id: oid, kind: 'coins', coins: 0, pencils: 0 };
+    var guaranteed = !has(s.granted, 'cr:' + rid) && restoredCount(C, s, rid) >= K.rare_by;
+    if (guaranteed || roll < K.rare) {
+      out.kind = 'rare';
+      out.coins = K.rare_coins;
+      add(s.glows, oid);
+      add(s.granted, 'cr:' + rid);
+    } else if (roll < K.rare + K.pencil) {
+      out.kind = 'pencil';
+      out.pencils = 1;
+      out.coins = K.pencil_coins;
+    } else {
+      out.coins = K.coins_min + 5 * Math.floor(rand(s) * ((K.coins_max - K.coins_min) / 5 + 1));
+    }
+    s.coins += out.coins;
+    s.pencils += out.pencils;
+    logEvent(s, 'chest', { object_id: oid, kind: out.kind, coins: out.coins, pencils: out.pencils });
+    return out;
+  }
+
+  // Награда за комнату на выбор: монеты, карандаши или вещь комнаты.
+  // Вещь — самое дешёвое платное за монеты оформление, которого нет ни у
+  // игрока, ни в наборах за голоса; если такого нет — «Сияние» на предмете.
+  function roomChoices(C, s, rid) {
+    var R = C.economy.room_choice, sv = skuVariants(C), best = null, glow = null;
+    C.rooms[rid].objects.forEach(function (oid) {
+      if (!glow && !has(s.glows, oid)) glow = oid;
+      C.objects[oid].variants.forEach(function (v) {
+        if (v.premium && v.price_coins && !has(s.owned_variants, v.id) && !has(sv, v.id) &&
+          (!best || v.price_coins < best.price_coins)) best = v;
+      });
+    });
+    var third = best ? { variant: best.id } : glow ? { glow: glow } : { coins: R.coins * 2 };
+    return [{ coins: R.coins }, { pencils: R.pencils }, third];
+  }
+
+  function pickRoomReward(C, s, rid, i) {
+    if (s.room_choice_pending !== rid) return null;
+    var opt = roomChoices(C, s, rid)[i];
+    if (!opt) return null;
+    s.room_choice_pending = null;
+    var key = 'rc:' + rid;
+    if (has(s.granted, key)) { touch(s); return null; }
+    s.granted.push(key);
+    if (opt.coins) s.coins += opt.coins;
+    if (opt.pencils) s.pencils += opt.pencils;
+    if (opt.glow) add(s.glows, opt.glow);
+    if (opt.variant) {
+      var f = findVariant(C, opt.variant);
+      add(s.owned_variants, opt.variant);
+      s.object_variants[f.object] = opt.variant;
+      add(s.seen_variant_choice, f.object);
+    }
+    logEvent(s, 'room_choice', { room_id: rid, pick: i, coins: opt.coins || 0, pencils: opt.pencils || 0,
+      variant_id: opt.variant || null, glow: opt.glow || null });
+    touch(s);
+    return opt;
+  }
+
+  // Самое дешёвое не купленное оформление за монеты на восстановленном
+  // предмете, на которое уже хватает, — для значка «Хватает!» в комнате.
+  function affordableVariant(C, s, rid) {
+    var best = null;
+    C.rooms[rid].objects.forEach(function (oid) {
+      if (!isObjectRestored(C, s, oid)) return;
+      C.objects[oid].variants.forEach(function (v) {
+        if (v.premium && v.price_coins && !has(s.owned_variants, v.id) && (!best || v.price_coins < best.price_coins)) best = v;
+      });
+    });
+    return best && s.coins >= best.price_coins ? { variant: best.id, object_id: findVariant(C, best.id).object, price: best.price_coins } : null;
+  }
+
   /* ---------- черновики и победа ---------- */
 
   function saveDraft(s, pid, board) {
@@ -279,17 +446,29 @@
     var roomDone = !!rid && !wasRoomComplete && isRoomComplete(C, s, rid);
     if (roomDone) add(s.completed_rooms, rid);
 
-    rewards = rewards.concat(grant(s, 'p:' + pid, E.coins_per_puzzle, 0));
+    rewards = rewards.concat(grant(s, 'p:' + pid, puzzleCoins(C, pid), 0));
+    // Не найденные по ходу монетки поля (подсказка, карандаш) — при победе.
+    var rest = collectFieldCoins(C, s, pid, null).reduce(function (n, f) { return n + f.n; }, 0);
+    if (rest) rewards.push({ type: 'coins', n: rest, key: 'f:' + pid });
+    delete s.hints[pid];
     if (p.difficulty === 'tutorial') rewards = rewards.concat(grant(s, 't:tutorial', 0, E.tutorial_pencils));
     rewards = rewards.concat(grant(s, 'd:' + day, E.coins_daily_first, 0));
+    var chest = null;
+    if (objectDone) {
+      var ob = E.object_bonus || [];
+      rewards = rewards.concat(grant(s, 'o:' + oid, ob[Math.min(ob.length, C.objects[oid].puzzles.length) - 1] || 0, 0));
+      chest = openChest(C, s, oid);
+    }
     if (roomDone) rewards = rewards.concat(grant(s, 'r:' + rid, E.room_reward.coins, E.room_reward.pencils));
+    if (roomDone && E.room_choice && !has(s.granted, 'rc:' + rid)) s.room_choice_pending = rid;
     if (roomDone && rid === C.daily.after_room && !s.daily.start) s.daily.start = day;
     addStamp(C, s, day, rewards);
 
     logEvent(s, 'puzzle_complete', { puzzle_id: pid, object_id: oid, object_done: objectDone, room_done: roomDone, day: day });
     touch(s);
     return { duplicate: false, object_done: objectDone, room_done: roomDone, object_id: oid, room_id: rid,
-      stage: oid ? objectStage(C, s, oid) : 0, rewards: rewards };
+      stage: oid ? objectStage(C, s, oid) : 0, rewards: rewards, chest: chest,
+      room_choice: s.room_choice_pending === rid && roomDone };
   }
 
   function chooseVariant(C, s, oid, vid) {
@@ -571,6 +750,9 @@
     playableObjects: playableObjects, isRoomComplete: isRoomComplete, restoredCount: restoredCount,
     canStartObject: canStartObject, activeDraftObjects: activeDraftObjects,
     findVariant: findVariant, isVariantOwned: isVariantOwned,
+    rand: rand, puzzleCoins: puzzleCoins, fieldCoins: fieldCoins, collectFieldCoins: collectFieldCoins,
+    freeHintsLeft: freeHintsLeft, useFreeHint: useFreeHint, openChest: openChest,
+    roomChoices: roomChoices, pickRoomReward: pickRoomReward, affordableVariant: affordableVariant,
     saveDraft: saveDraft, completePuzzle: completePuzzle, chooseVariant: chooseVariant,
     closeVariantChoice: closeVariantChoice, buyVariant: buyVariant, buyPencil: buyPencil, usePencil: usePencil,
     canOfferSku: canOfferSku, applyOrder: applyOrder, adsLeft: adsLeft, rewardedGrant: rewardedGrant,

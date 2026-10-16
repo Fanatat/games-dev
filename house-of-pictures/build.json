@@ -1,14 +1,14 @@
 {
  "game": "house-of-pictures",
- "build_number": "004",
- "app_build": "0.1.0+b004",
- "git_branch": "worktree-p0-hallway",
- "git_sha": "d319dff",
+ "build_number": "005",
+ "app_build": "0.1.0+b005",
+ "git_branch": "worktree-release-polish",
+ "git_sha": "1b116fe",
  "dirty": false,
  "content_version": 3,
  "api": "https://api.vanatat.ru/hop",
- "built_at": "2026-10-16T15:49:04+00:00",
- "total_bytes": 4681213,
+ "built_at": "2026-10-16T20:00:42+00:00",
+ "total_bytes": 4750374,
  "files": [
   {
    "path": "assets/art/armchair_a.webp",
@@ -124,6 +124,16 @@
    "path": "assets/art/cat.webp",
    "bytes": 52060,
    "sha256": "19ef5cdf59b3eb9d21c617b020c0b510012a78268b6f2b571ec9da7a4ab19c19"
+  },
+  {
+   "path": "assets/art/chest_a.webp",
+   "bytes": 19602,
+   "sha256": "d895a796b1a0c85c0c3f017ae227f811544b62f61dab67505b25f0551fcab12a"
+  },
+  {
+   "path": "assets/art/chest_b.webp",
+   "bytes": 20242,
+   "sha256": "f62bf4ad9a97ad2870fc6cfe5e416363ca92d98fa7f54c25cb2edc488059f817"
   },
   {
    "path": "assets/art/clock_a.webp",
@@ -682,18 +692,18 @@
   },
   {
    "path": "data/content.js",
-   "bytes": 67507,
-   "sha256": "5ac606d4d22371bbc57bfb2b844979daca837fde37ce5383c9a60ab66107e790"
+   "bytes": 64724,
+   "sha256": "a1d733a0f697df3a4cffa1c3630cd124fe7ca36fe46e5ea44bcd3540dae812a2"
   },
   {
    "path": "index.html",
-   "bytes": 10517,
-   "sha256": "017d823adbed75ba61d1c3c06744fbad6dc4887e82e7bb7b9344edf18951d2b2"
+   "bytes": 10745,
+   "sha256": "36f9469962e875839244032188040c3d569fc5e035264b0a7c26a2c86dd8ba4f"
   },
   {
    "path": "src/app.js",
-   "bytes": 85412,
-   "sha256": "a1fdd08e912c9441e557c4fad85bda08b99da28368d518249b1414bccf51b062"
+   "bytes": 95736,
+   "sha256": "b40b6ccbcb5a054eb8ad14067fe5d703afd2db1e5b74c6b56542d166b291b571"
   },
   {
    "path": "src/cloud.js",
@@ -717,23 +727,23 @@
   },
   {
    "path": "src/scene.js",
-   "bytes": 11125,
-   "sha256": "0ad49501795929dd65cc89954e98684608d26beefe1f6f337d05adb663789d81"
+   "bytes": 14374,
+   "sha256": "932fec21e4fba484b346faeeebc34a37c6a2fe364962c863d383eed794257291"
   },
   {
    "path": "src/sound.js",
-   "bytes": 4779,
-   "sha256": "da492d042ba73815f05175a12b55fe311fff4b139c0b0bd61fa686add3db76d6"
+   "bytes": 5642,
+   "sha256": "ccfd2c60af275150c3a69de24e7baadc3f438061885354d59683de9fa780ce8b"
   },
   {
    "path": "src/state.js",
-   "bytes": 26443,
-   "sha256": "929e1a7c07156933db6a538f6d521ff1a2ec862a22ccde18ac059770942658f2"
+   "bytes": 35315,
+   "sha256": "f2616550f80fa8bf00b3ce4f65dd102881d66a26c2ab5261112d381b66713295"
   },
   {
    "path": "src/styles.css",
-   "bytes": 50890,
-   "sha256": "02bd390955ce06158230aa6aa508953f37bc7f5519c91ba72e6b5f17a34eeac3"
+   "bytes": 59454,
+   "sha256": "96267e0dd18f16fa284a48f299bf5803e21d127d73c7cd5d0dee06f49ba70a8a"
   },
   {
    "path": "src/track.js",

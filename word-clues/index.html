@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="g1f-build" content="0.1.0+b001 · 5b97958">
+<meta name="theme-color" content="#F5EEDD">
+<title>Слова по уликам</title>
+<link rel="stylesheet" href="src/styles.css?v=f72a703c3c">
+</head>
+<body>
+<div id="app">
+
+  <!-- Первый запуск: шкатулка (ТЗ §5, 0–5 с) -->
+  <section class="screen" id="scr-box" hidden>
+    <div class="box-art art" data-art="box_intro" data-icon="📦"></div>
+    <div class="box-note">
+      <p class="note-hand" id="box-note"></p>
+      <button class="btn-main" id="btn-open">Открыть</button>
+    </div>
+  </section>
+
+  <!-- Продолжение / главная -->
+  <section class="screen" id="scr-home" hidden>
+    <div class="home-scroll">
+      <header class="home-head">
+        <div>
+          <h1 id="home-town">Тихоречье</h1>
+          <p class="muted" id="home-chapter"></p>
+        </div>
+        <button class="icon-btn" id="btn-settings" aria-label="Настройки"></button>
+      </header>
+      <div class="card place-card">
+        <div class="place-art art" id="home-art" data-art="bg_town" data-icon="🏞️"></div>
+        <div class="place-body">
+          <p class="place-kicker muted" id="home-kicker"></p>
+          <h2 id="home-question"></h2>
+          <p class="muted" id="home-sub"></p>
+          <button class="btn-main" id="btn-continue">Продолжить историю</button>
+        </div>
+      </div>
+      <button class="card tile" id="btn-atlas">
+        <span class="tile-icon" id="atlas-icon"></span>
+        <span class="tile-text"><b>Мой атлас</b><span class="muted" id="atlas-sub"></span></span>
+      </button>
+      <div class="card soft" id="home-next" hidden>
+        <b id="home-next-title"></b>
+        <span class="muted" id="home-next-sub"></span>
+      </div>
+      <p class="save-line muted" id="home-save"></p>
+    </div>
+  </section>
+
+  <!-- Вступление к истории -->
+  <section class="screen" id="scr-intro" hidden>
+    <div class="intro-scroll">
+      <div class="intro-art art" id="intro-art" data-icon="🏞️"></div>
+      <div class="intro-body">
+        <p class="muted" id="intro-kicker"></p>
+        <h2 id="intro-title"></h2>
+        <p class="intro-text" id="intro-text"></p>
+        <button class="btn-main" id="btn-intro-go">Искать улики</button>
+        <button class="btn-link" id="btn-intro-home">На главную</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Поле -->
+  <section class="screen" id="scr-field" hidden>
+    <header class="field-head">
+      <button class="icon-btn" id="btn-back" aria-label="На главную"></button>
+      <div class="field-title">
+        <b id="field-title"></b>
+        <span class="muted" id="field-sub"></span>
+      </div>
+      <div class="dots" id="dots" aria-hidden="true"></div>
+    </header>
+    <div class="scene" id="scene">
+      <div class="scene-bg art" id="scene-bg" data-icon="🏞️"></div>
+      <div class="scene-items" id="scene-items"></div>
+    </div>
+    <div class="clue-card" id="clue-card" aria-live="polite">
+      <button class="clue-nav" id="clue-prev" aria-label="Предыдущая улика"></button>
+      <div class="clue-main" id="clue-main">
+        <p class="clue-text" id="clue-text"></p>
+        <p class="clue-extra" id="clue-extra" hidden></p>
+        <p class="clue-meta muted" id="clue-meta"></p>
+      </div>
+      <div class="clue-reveal" id="clue-reveal" hidden>
+        <span class="reveal-icon art" id="reveal-icon"></span>
+        <p id="reveal-text"></p>
+      </div>
+      <button class="clue-nav" id="clue-next" aria-label="Следующая улика"></button>
+    </div>
+    <div class="board-wrap" id="board-wrap">
+      <div class="board" id="board" tabindex="0" aria-label="Поле букв. Стрелки — выбор клетки, пробел — добавить, Enter — проверить, Escape — сбросить"></div>
+      <svg class="board-lines" id="board-lines" aria-hidden="true"></svg>
+      <div class="toast" id="toast" hidden></div>
+    </div>
+    <footer class="field-foot">
+      <button class="btn-hint" id="btn-hint"><span class="ico" id="hint-ico"></span><span>Подсказка</span><span class="badge" id="hint-badge" hidden></span></button>
+      <span class="loupes" id="loupes" title="Лупы"></span>
+      <button class="btn-accept" id="btn-accept" hidden>Принять ответ</button>
+    </footer>
+    <p class="save-warn" id="field-save" hidden>Сейчас прогресс не сохраняется</p>
+  </section>
+
+  <!-- Итог истории -->
+  <section class="screen" id="scr-result" hidden>
+    <div class="result-scroll">
+      <div class="scene result-scene" id="result-scene">
+        <div class="scene-bg art" id="result-bg" data-icon="🏞️"></div>
+        <div class="scene-items" id="result-items"></div>
+      </div>
+      <div class="result-body">
+        <p class="muted" id="result-kicker">История разгадана</p>
+        <h2 id="result-title"></h2>
+        <p id="result-ending"></p>
+        <div class="card keepsake" id="result-keepsake">
+          <span class="keepsake-img art" id="keepsake-img"></span>
+          <span><b id="keepsake-title"></b><span class="muted" id="keepsake-note"></span><span class="reward-line" id="reward-line"></span></span>
+        </div>
+        <div class="card question" id="result-question-card">
+          <span class="muted">Следующий вопрос</span>
+          <b id="result-question"></b>
+        </div>
+        <div class="card soft" id="demo-end" hidden>
+          <b id="demo-end-title"></b>
+          <span id="demo-end-text"></span>
+        </div>
+        <button class="btn-main" id="btn-next">Следующая история</button>
+        <div class="link-row">
+          <button class="btn-link" id="btn-res-atlas">В атлас</button>
+          <button class="btn-link" id="btn-res-home">На сегодня всё</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Атлас -->
+  <section class="screen" id="scr-atlas" hidden>
+    <header class="field-head">
+      <button class="icon-btn" id="btn-atlas-back" aria-label="Назад"></button>
+      <div class="field-title"><b>Мой атлас</b><span class="muted" id="atlas-page-sub"></span></div>
+    </header>
+    <div class="atlas-scroll">
+      <div class="atlas-cover art" data-art="atlas_cover" data-icon="📔"></div>
+      <div class="wallet" id="wallet"></div>
+      <h3 class="atlas-h">Первые открытия</h3>
+      <div class="atlas-grid" id="atlas-grid"></div>
+    </div>
+  </section>
+
+  <!-- Шторка: помощь / настройки / подтверждение -->
+  <div class="sheet-back" id="sheet-back" hidden></div>
+  <div class="sheet" id="sheet" role="dialog" aria-modal="true" hidden></div>
+</div>
+
+<script>window.G1F_ART={};</script>
+<script src="data/content.js?v=86685e7d34"></script>
+<script src="src/logic.js?v=920eff9120"></script>
+<script src="src/platform.js?v=0aadf931b4"></script>
+<script src="src/analytics.js?v=8c7b03920c"></script>
+<script src="src/state.js?v=5ef12f1b16"></script>
+<script src="src/sound.js?v=a77c31e1d3"></script>
+<script src="src/board.js?v=4b0cb85a86"></script>
+<script src="src/app.js?v=3c63eb085e"></script>
+</body>
+</html>

@@ -1,0 +1,25 @@
+{
+ "build": "0.1.0+b001 · 5b97958",
+ "art": [],
+ "files": {
+  "assets/sfx/CREDITS.md": "4bec6ba6a7db1b98fc13dbcc5129fcc613abf870c18c8d6c1ed2121e5ae97da3",
+  "assets/sfx/chapter.mp3": "e7b0baf2f4ea9292aa760a74958f96821d5622594b3862f676a0c34ad1efc7f2",
+  "assets/sfx/found.mp3": "55ee33ee3e93e6fa33634601565a6af45b4ba88e8519511e298b5c7a2b60ce52",
+  "assets/sfx/hint.mp3": "946a6f9cfae4add67c18dbda5a7d1956d38194ea416cf7dbf0a088bbeb788672",
+  "assets/sfx/reward.mp3": "e0f9e3ebe0cd3dd14de58a1ad0e8150ece430148f72c4a451d1504d4a4e3e164",
+  "assets/sfx/step.mp3": "2d6764c07e8f2d20e9501675b503801dd47b4225e57b8f6979fe3a33e17d0b48",
+  "assets/sfx/tap.mp3": "8cb413ca2f49b945861fdd7b69e452ff0c222882011be7bfeae92baaec2614cc",
+  "assets/sfx/win.mp3": "468d5f3b8bf8c8ea8bcef52906b0da44ab35547d763035470621e2c9309cde0d",
+  "assets/sfx/wrong.mp3": "cd172cec43bb120ad724e809a543e2e1608579441897b249ad916fc68b18f924",
+  "data/content.js": "86685e7d3419cc30236a8e86284a3aa5c029b4dfaa0352381ef1cfbf009213b6",
+  "index.html": "d627d0f231e3d7ab0999b56e44af8c79f504702d5c29f9ea72a33a47aa500fb1",
+  "src/analytics.js": "8c7b03920cf311c2b01e5c7fde1ba8e7fc0f22b599bc3c9f88d8ce681368f471",
+  "src/app.js": "3c63eb085edb6e45bec643eb3d76204bdfa34a830ed76fe83b7b747c94c3f9c7",
+  "src/board.js": "4b0cb85a86cce9a73d3ca6553971064640997e14ec57329b93950b55e119543a",
+  "src/logic.js": "920eff9120ac06374503c74f338961fe5d0dd68d20f2d088ad3440ccbb8564eb",
+  "src/platform.js": "0aadf931b45c38b9b291bd8b687d2a1a662fa0f0f8a5a55d6057ade57d634de6",
+  "src/sound.js": "a77c31e1d39cdba7eb2ca8b89464816a80198fd2258b9c61c8432ab1187ac70b",
+  "src/state.js": "5ef12f1b1621d4103e70ad13168a056c8065131c709cc6e1f5a2322b762ee8a6",
+  "src/styles.css": "f72a703c3c07aff5c24be760a38b63348304fbe0a02dd29148b7a37b7fff85b3"
+ }
+}

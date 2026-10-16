@@ -614,16 +614,18 @@
     grid.innerHTML = '';
     S.stories.forEach(function (s) {
       var has = got.indexOf(s.reward.atlas_item_id) >= 0;
-      var el = document.createElement('div');
+      var el = document.createElement('button');
       el.className = 'slot' + (has ? ' got' : '');
+      el.addEventListener('click', function () { openSlot(s, has); });
       el.innerHTML = '<span class="slot-img art"></span><b>' + esc(has ? s.item_title : '?') + '</b><span class="muted">' + esc(s.place) + '</span>';
       if (has) art(el.querySelector('.slot-img'), s.keepsake_img, s.keepsake_icon);
       else el.querySelector('.slot-img').innerHTML = icon('lock');
       grid.appendChild(el);
     });
     for (var i = S.stories.length; i < TOTAL_SLOTS; i++) {
-      var sl = document.createElement('div');
+      var sl = document.createElement('button');
       sl.className = 'slot soon';
+      sl.addEventListener('click', function () { openSlot(null, false); });
       sl.innerHTML = '<span class="slot-img"></span><b>Скоро</b><span class="muted">Новое место</span>';
       grid.appendChild(sl);
     }
@@ -719,6 +721,19 @@
     A.flush();
   }
 
+  // Карточка атласа: что это за находка или как её получить.
+  function openSlot(s, has) {
+    window.Sound.play('tap');
+    var html;
+    if (s && has) html = '<div class="slot-big art" id="slot-big"></div><h3>' + esc(s.item_title) + '</h3>' +
+      '<p class="muted">' + esc(s.keepsake_note) + ' · ' + esc(s.place) + '</p><p>Находка из истории «' + esc(s.title) + '».</p>';
+    else if (s) html = '<h3>Пока закрыто</h3><p>Находка появится здесь, когда вы разгадаете историю «' + esc(s.title) + '» (' + esc(s.place) + ').</p>';
+    else html = '<h3>Скоро</h3><p>Новые места Тихоречья и их находки появятся в следующих главах.</p>';
+    openSheet('slot', html + '<button class="btn-link" data-close>Закрыть</button>', function (el) {
+      if (s && has) art(el.querySelector('#slot-big'), s.keepsake_img, s.keepsake_icon);
+    });
+  }
+
   /* ---------- кнопки ---------- */
   function bind() {
     $('btn-back').innerHTML = icon('back');
@@ -758,6 +773,7 @@
     $('btn-res-atlas').addEventListener('click', function () { showAtlas('result'); });
     $('btn-res-home').addEventListener('click', showHome);
     $('btn-atlas-back').addEventListener('click', showHome);
+    $('btn-atlas-home').addEventListener('click', function () { window.Sound.play('tap'); showHome(); });
     $('btn-survey').addEventListener('click', function () { window.Sound.play('tap'); showSurvey('home'); });
     $('btn-survey-end').addEventListener('click', function () { window.Sound.play('tap'); showSurvey('result'); });
     $('btn-survey-back').addEventListener('click', surveyBack);

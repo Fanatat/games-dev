@@ -44,5 +44,5 @@
     document.body.appendChild(a); a.click(); a.remove();
   }
 
-  root.Analytics = { event: event, flush: persist, exportJson: exportJson, get events() { return buf; }, sessionId: sessionId };
+  root.Analytics = { event: event, flush: persist, exportJson: exportJson, get events() { return buf; }, sessionId: sessionId, playerKey: playerKey };
 })(this);

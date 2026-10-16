@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-<meta name="g1f-build" content="0.1.0+b002 · 62a0e00">
+<meta name="g1f-build" content="0.1.0+b003 · dd84e0a">
 <meta name="theme-color" content="#F5EEDD">
 <title>Слова по уликам</title>
-<link rel="stylesheet" href="src/styles.css?v=f72a703c3c">
+<link rel="stylesheet" href="src/styles.css?v=b1e32d0a64">
 </head>
 <body>
 <div id="app">
@@ -42,6 +42,10 @@
       <button class="card tile" id="btn-atlas">
         <span class="tile-icon" id="atlas-icon"></span>
         <span class="tile-text"><b>Мой атлас</b><span class="muted" id="atlas-sub"></span></span>
+      </button>
+      <button class="card tile" id="btn-survey">
+        <span class="tile-icon" id="survey-icon"></span>
+        <span class="tile-text"><b>Отзыв о тесте</b><span class="muted" id="survey-sub">6 коротких вопросов · 1 минута</span></span>
       </button>
       <div class="card soft" id="home-next" hidden>
         <b id="home-next-title"></b>
@@ -128,6 +132,11 @@
           <b id="demo-end-title"></b>
           <span id="demo-end-text"></span>
         </div>
+        <div class="card survey-ask" id="survey-ask" hidden>
+          <b>Помогите игре</b>
+          <span class="muted">Это тестовая версия. Шесть коротких вопросов — минута, а нам очень поможет.</span>
+          <button class="btn-main" id="btn-survey-end">Ответить на вопросы</button>
+        </div>
         <button class="btn-main" id="btn-next">Следующая история</button>
         <div class="link-row">
           <button class="btn-link" id="btn-res-atlas">В атлас</button>
@@ -151,6 +160,25 @@
     </div>
   </section>
 
+  <!-- Анкета для теста на друзьях -->
+  <section class="screen" id="scr-survey" hidden>
+    <header class="field-head">
+      <button class="icon-btn" id="btn-survey-back" aria-label="Назад"></button>
+      <div class="field-title"><b>Отзыв о тесте</b><span class="muted">6 коротких вопросов · 1 минута</span></div>
+    </header>
+    <div class="survey-scroll">
+      <p class="survey-lead">Спасибо, что поиграли! Отвечайте честно: «скучно» и «непонятно» помогают больше, чем похвала. Можно пропускать вопросы.</p>
+      <div id="survey-qs"></div>
+      <div class="card survey-send">
+        <button class="btn-main" id="btn-survey-tg">Отправить в Telegram</button>
+        <button class="btn-link" id="btn-survey-copy">Скопировать ответы</button>
+        <p class="muted small" id="survey-status" aria-live="polite"></p>
+        <textarea class="survey-out" id="survey-out" readonly hidden aria-label="Текст ответов"></textarea>
+      </div>
+      <p class="muted small">Telegram откроет чат с автором игры, текст уже будет вписан — останется нажать «Отправить». Вместе с ответами уходят замеры игры: сколько историй пройдено, время на улики, подсказки, тип устройства и размер экрана. Имени и контактов игра не собирает.</p>
+    </div>
+  </section>
+
   <!-- Шторка: помощь / настройки / подтверждение -->
   <div class="sheet-back" id="sheet-back" hidden></div>
   <div class="sheet" id="sheet" role="dialog" aria-modal="true" hidden></div>
@@ -160,10 +188,11 @@
 <script src="data/content.js?v=86685e7d34"></script>
 <script src="src/logic.js?v=920eff9120"></script>
 <script src="src/platform.js?v=0aadf931b4"></script>
-<script src="src/analytics.js?v=8c7b03920c"></script>
+<script src="src/analytics.js?v=a02a075ad0"></script>
 <script src="src/state.js?v=5ef12f1b16"></script>
 <script src="src/sound.js?v=a77c31e1d3"></script>
 <script src="src/board.js?v=4b0cb85a86"></script>
-<script src="src/app.js?v=3c63eb085e"></script>
+<script src="src/survey.js?v=0ee118e348"></script>
+<script src="src/app.js?v=4ca6def442"></script>
 </body>
 </html>

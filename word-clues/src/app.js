@@ -21,6 +21,7 @@
     star: '<path d="M12 4l2.4 5 5.4.6-4 3.7 1.1 5.3L12 16l-4.9 2.6 1.1-5.3-4-3.7 5.4-.6z"/>',
     bulb: '<path d="M9 17h6M10 20h4"/><path d="M12 4a5 5 0 0 0-3 9c.6.5 1 1.3 1 2h4c0-.7.4-1.5 1-2a5 5 0 0 0-3-9z"/>',
     check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+    chat: '<path d="M5 5h14a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1h-8l-4 3.5V16H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z"/><path d="M8 9.5h8M8 12.5h5"/>',
   };
   function icon(name) {
     return '<svg class="i" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + ICONS[name] + '</svg>';
@@ -123,6 +124,7 @@
       toggleRow('reduced_motion', 'Меньше движения', 'Без волн и покачиваний') +
       toggleRow('large_text', 'Крупный текст', 'Улики и кнопки крупнее') +
       (P.params.has('journal') ? '<button class="opt" id="opt-journal"><span><b>Журнал событий</b><span class="muted">Скачать JSON для разбора плейтеста</span></span></button>' : '') +
+      '<button class="opt" id="opt-survey"><span><b>Отзыв о тесте</b><span class="muted">6 коротких вопросов автору игры</span></span></button>' +
       '<button class="opt danger" id="opt-reset"><span><b>Начать заново</b><span class="muted">Сотрёт истории, атлас и лупы</span></span></button>' +
       '<p class="muted small">Сборка ' + esc(build) + ' · ' + esc(C.content_version) + '</p>' +
       '<button class="btn-link" data-close>Закрыть</button>';
@@ -139,6 +141,7 @@
       var j = el.querySelector('#opt-journal');
       if (j) j.addEventListener('click', function () { A.exportJson(); });
       el.querySelector('#opt-reset').addEventListener('click', confirmReset);
+      el.querySelector('#opt-survey').addEventListener('click', function () { showSurvey('settings'); });
     });
   }
   function confirmReset() {
@@ -200,6 +203,7 @@
       $('home-next-title').textContent = 'Дальше: ' + after.place;
       $('home-next-sub').textContent = 'Откроется после истории «' + t.story.title + '»';
     } else nx.hidden = true;
+    surveySub();
     saveLine($('home-save'));
     show('scr-home');
   }
@@ -570,6 +574,7 @@
     $('result-question').textContent = s.next_question;
     var end = !next;
     $('demo-end').hidden = !end;
+    $('survey-ask').hidden = !end;
     if (end) {
       $('result-question').textContent = C.demo_end.question;
       $('demo-end-title').textContent = C.demo_end.title;
@@ -625,6 +630,95 @@
     show('scr-atlas');
   }
 
+  /* ---------- анкета для теста на друзьях ---------- */
+  // Сервера у прототипа нет: ответы и выжимка журнала уходят автору одним сообщением
+  // в Telegram (ссылка с вписанным текстом), запасной путь — копирование.
+  var SV = window.Survey, SURVEY_KEY = 'g1f1.survey.v1', surveyFrom = 'home';
+  var survey = { answers: {}, sent: 0 };
+  try { var sv0 = JSON.parse(localStorage.getItem(SURVEY_KEY) || 'null'); if (sv0 && sv0.answers) survey = sv0; } catch (e) { /* без черновика */ }
+  function surveySave() { try { localStorage.setItem(SURVEY_KEY, JSON.stringify(survey)); } catch (e) { /* не важнее игры */ } }
+  function surveyText() {
+    return SV.message({ answers: survey.answers, events: A.events, content: C,
+      build: (document.querySelector('meta[name="g1f-build"]') || {}).content || 'dev',
+      code: String(A.playerKey || '').slice(0, 5).toUpperCase(), env: SV.env(navigator, window) });
+  }
+  function surveySub() {
+    $('survey-sub').textContent = survey.sent ? 'Спасибо! Можно дополнить и отправить ещё раз' : '6 коротких вопросов · 1 минута';
+  }
+  function renderSurvey() {
+    var a = survey.answers, box = $('survey-qs');
+    box.innerHTML = '';
+    SV.QUESTIONS.forEach(function (q, i) {
+      var f = document.createElement('fieldset');
+      f.className = 'sq';
+      var h = '<legend><span class="sq-n">' + (i + 1) + '</span><span>' + esc(q.title) +
+        (q.type === 'many' ? ' <span class="muted small">можно несколько</span>' : '') + '</span></legend>';
+      if (q.opts) h += '<div class="chips">' + q.opts.map(function (o, k) {
+        var on = q.type === 'many' ? (a[q.id] || []).indexOf(k) >= 0 : a[q.id] === k;
+        return '<button type="button" class="chip" data-q="' + q.id + '" data-k="' + k + '" aria-pressed="' + on + '">' + esc(o) + '</button>';
+      }).join('') + '</div>';
+      var tk = q.type === 'text' ? q.id : q.text ? q.id + '_text' : null;
+      if (tk) h += '<textarea class="sq-text" data-t="' + tk + '" rows="' + (q.type === 'text' ? 4 : 2) + '" maxlength="500" placeholder="' +
+        esc(q.type === 'text' ? 'Ваш ответ' : q.text) + '">' + esc(a[tk] || '') + '</textarea>';
+      f.innerHTML = h;
+      box.appendChild(f);
+    });
+  }
+  function onSurveyChip(b) {
+    var q = SV.QUESTIONS.filter(function (x) { return x.id === b.dataset.q; })[0], k = +b.dataset.k, a = survey.answers;
+    if (q.type === 'many') {
+      var list = (a[q.id] || []).filter(function (x) { return x !== k; });
+      if (b.getAttribute('aria-pressed') !== 'true') list.push(k);
+      a[q.id] = list.sort();
+      b.setAttribute('aria-pressed', list.indexOf(k) >= 0);
+    } else {
+      a[q.id] = k;
+      b.parentNode.querySelectorAll('.chip').forEach(function (c) { c.setAttribute('aria-pressed', c === b); });
+    }
+    surveySave();
+    window.Sound.play('tap');
+  }
+  function showSurvey(from) {
+    surveyFrom = from || 'home';
+    A.event('survey_open', { from: surveyFrom, sent_before: !!survey.sent });
+    renderSurvey();
+    $('survey-status').textContent = '';
+    $('survey-out').hidden = true;
+    show('scr-survey');
+  }
+  function surveyBack() {
+    if (surveyFrom === 'result' && resultStory) show('scr-result'); else showHome();
+  }
+  function showSurveyText(text) {
+    var out = $('survey-out');
+    out.value = text; out.hidden = false;
+    out.focus(); out.select();
+  }
+  function surveySend(how) {
+    var st = $('survey-status');
+    if (!SV.answered(survey.answers)) { st.textContent = 'Ответьте хотя бы на один вопрос — тогда будет что отправить.'; return; }
+    var text = surveyText(), copied = false;
+    var done = function () {
+      st.textContent = how === 'tg'
+        ? 'Спасибо! Нажмите «Отправить» в Telegram.' + (copied ? ' Если поле сообщения пустое — вставьте текст, он уже скопирован.' : ' Если поле сообщения пустое — скопируйте текст ниже.')
+        : copied ? 'Скопировано. Пришлите текст автору в Telegram @' + SV.TG + ' или туда, где вам дали ссылку.' : 'Выделите текст ниже и скопируйте его.';
+      if (!copied) showSurveyText(text);
+    };
+    try {
+      navigator.clipboard.writeText(text).then(function () { copied = true; done(); }, done);
+    } catch (e) { done(); }
+    if (how === 'tg') {
+      var url = SV.tgLink(text), w = null;
+      try { w = window.open(url, '_blank'); } catch (e) { w = null; }
+      if (!w) location.href = url;
+    }
+    survey.sent = Date.now();
+    surveySave();
+    surveySub();
+    A.event('survey_sent', { how: how, chars: text.length, fun: survey.answers.fun == null ? null : survey.answers.fun + 1 });
+    A.flush();
+  }
+
   /* ---------- кнопки ---------- */
   function bind() {
     $('btn-back').innerHTML = icon('back');
@@ -634,6 +728,8 @@
     $('clue-next').innerHTML = icon('right');
     $('hint-ico').innerHTML = icon('bulb');
     $('atlas-icon').innerHTML = icon('book');
+    $('survey-icon').innerHTML = icon('chat');
+    $('btn-survey-back').innerHTML = icon('back');
     $('btn-accept').innerHTML = icon('check') + '<span>Принять ответ</span>';
 
     $('btn-open').addEventListener('click', function () {
@@ -662,6 +758,16 @@
     $('btn-res-atlas').addEventListener('click', function () { showAtlas('result'); });
     $('btn-res-home').addEventListener('click', showHome);
     $('btn-atlas-back').addEventListener('click', showHome);
+    $('btn-survey').addEventListener('click', function () { window.Sound.play('tap'); showSurvey('home'); });
+    $('btn-survey-end').addEventListener('click', function () { window.Sound.play('tap'); showSurvey('result'); });
+    $('btn-survey-back').addEventListener('click', surveyBack);
+    $('survey-qs').addEventListener('click', function (e) { var b = e.target.closest('.chip'); if (b) onSurveyChip(b); });
+    $('survey-qs').addEventListener('input', function (e) {
+      var t = e.target.closest('[data-t]');
+      if (t) { survey.answers[t.dataset.t] = t.value; surveySave(); }
+    });
+    $('btn-survey-tg').addEventListener('click', function () { surveySend('tg'); });
+    $('btn-survey-copy').addEventListener('click', function () { surveySend('copy'); });
     $('sheet-back').addEventListener('click', closeSheet);
     $('sheet').addEventListener('click', function (e) { if (e.target.closest('[data-close]')) closeSheet(); });
     document.addEventListener('keydown', function (e) {
@@ -689,5 +795,6 @@
 
   // Для автотестов: состояние и текущий экран, без обхода правил поля.
   window.__g1f = { state: S, get screen() { return screen; }, get sheet() { return sheetKind; },
-    content: C, board: window.Board, revealNow: endReveal };
+    content: C, board: window.Board, revealNow: endReveal,
+    surveyText: surveyText, get survey() { return survey; } };
 })();

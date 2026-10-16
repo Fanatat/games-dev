@@ -186,6 +186,25 @@ p { margin: 0; }
 .link-row { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; }
 .link-row .btn-link { margin: 0; }
 
+/* ---------- анкета для теста ---------- */
+.survey-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 4px 16px 28px;
+  display: flex; flex-direction: column; gap: 18px; }
+.survey-lead { font-family: var(--font); font-size: 17px; line-height: 1.4; }
+#survey-qs { display: flex; flex-direction: column; gap: 26px; }
+.sq { border: 0; margin: 0; padding: 0; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.sq legend { padding: 0; margin-bottom: 8px; font-weight: 600; display: flex; gap: 8px; align-items: baseline; }
+.sq-n { flex: none; width: 22px; height: 22px; border-radius: 50%; background: var(--green); color: #fff;
+  font-size: 13px; line-height: 22px; text-align: center; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { min-height: 44px; padding: 8px 14px; border-radius: 22px; border: 1px solid var(--line); background: var(--surface); text-align: left; }
+.chip[aria-pressed="true"] { background: var(--green); border-color: var(--green); color: #fff; }
+.sq-text, .survey-out { display: block; width: 100%; font: inherit; font-size: 16px; padding: 10px 12px; border-radius: 12px;
+  border: 1px solid var(--line); background: var(--surface); color: var(--text); resize: vertical; }
+.survey-out { min-height: 180px; font-size: 13px; margin-top: 6px; }
+.survey-send { padding: 14px; display: flex; flex-direction: column; gap: 4px; }
+.survey-ask { padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; border-color: var(--amber); }
+.survey-ask .btn-main { margin-top: 6px; }
+
 /* ---------- атлас ---------- */
 .atlas-scroll { padding: 4px 16px 24px; }
 .atlas-cover { aspect-ratio: 16 / 9; border-radius: var(--r); background: linear-gradient(160deg, #6E8F6F, #3F6150); }
@@ -244,7 +263,7 @@ p { margin: 0; }
   #scr-field .board-wrap { grid-area: board; width: min(56vw, 100vh); }
   #scr-field .field-foot { grid-area: foot; padding-bottom: 6px; }
   #scr-field .save-warn { position: absolute; left: 0; bottom: 0; }
-  .home-scroll, .result-scroll, .atlas-scroll, .intro-scroll { max-width: 560px; margin: 0 auto; width: 100%; }
+  .home-scroll, .result-scroll, .atlas-scroll, .intro-scroll, .survey-scroll { max-width: 560px; margin: 0 auto; width: 100%; }
   .place-art, .intro-art, .result-scene { aspect-ratio: auto; height: 34vh; max-height: none; }
   .atlas-cover { aspect-ratio: auto; height: 30vh; }
   .intro-body { padding: 12px 20px 16px; }

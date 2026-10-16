@@ -7,9 +7,10 @@
    Клавиатура: стрелки — клетка, пробел — начать/добавить, Enter — проверить, Escape — сброс. */
 (function (root) {
   'use strict';
-  var COLORS = ['#356851', '#B5652E', '#3F6E8C', '#8A5A9E', '#7A7B2E'];
+  var COLORS = ['#356851', '#B5652E', '#3F6E8C', '#8A5A9E', '#7A7B2E', '#9C3D4A', '#2E7C80'];
   var boardEl, wrapEl, svgEl, story = null, cells = [], h = {};
-  var dragging = false, path = [], found = {}, hintPaths = {}, cursor = null, kbSelecting = false;
+  var dragging = false, path = [], found = {}, hintPaths = {}, extraPaths = {}, cursor = null, kbSelecting = false;
+  var GOLD = '#C9962B';
   var MAX_CELL = 64;
 
   function mount() {
@@ -31,7 +32,7 @@
   }
 
   function render(s, foundPaths, handlers) {
-    story = s; h = handlers || {}; found = {}; hintPaths = {}; path = []; dragging = false; cursor = null;
+    story = s; h = handlers || {}; found = {}; hintPaths = {}; extraPaths = {}; path = []; dragging = false; cursor = null;
     boardEl.style.gridTemplateColumns = 'repeat(' + s.cols + ', 1fr)';
     boardEl.style.gridTemplateRows = 'repeat(' + s.rows + ', 1fr)';
     boardEl.innerHTML = '';
@@ -119,6 +120,7 @@
     for (var id in hintPaths) out += poly(hintPaths[id], 'line-hint', '#D59C45', cw * 0.42);
     if (demoCells && demoEl) out += poly(demoCells.slice(0, demoEl), 'line-demo', '#D59C45', cw * 0.3);
     for (var fid in found) out += poly(found[fid], 'line-found', COLORS[idx[fid] % COLORS.length], cw * 0.36);
+    for (var xid in extraPaths) out += poly(extraPaths[xid].p, extraPaths[xid].cls, extraPaths[xid].color, cw * 0.36);
     if (path.length) out += poly(path.map(function (p) { return [p.r, p.c]; }), 'line-active', '#2B352F', cw * 0.3);
     svgEl.innerHTML = out;
   }
@@ -142,6 +144,33 @@
     });
     drawLines();
   }
+
+  /* ---------- бонусные слова, тайник, золотая буква ---------- */
+  // Бонусное слово: линия вспыхивает и гаснет, буквы подпрыгивают.
+  var flashN = 0;
+  function flashBonus(p) {
+    var key = 'b' + (++flashN);
+    extraPaths[key] = { p: p, cls: 'line-bonus', color: GOLD };
+    drawLines();
+    p.forEach(function (q, i) {
+      var el = cells[q[0]][q[1]];
+      if (document.body.classList.contains('rm')) return;
+      el.style.animationDelay = (i * 40) + 'ms';
+      el.classList.remove('wave'); void el.offsetWidth; el.classList.add('wave');
+    });
+    setTimeout(function () { delete extraPaths[key]; drawLines(); }, 900);
+  }
+  // Тайник остаётся на поле пунктиром золотого цвета.
+  function markCache(p) {
+    extraPaths.cache = { p: p, cls: 'line-cache', color: GOLD };
+    p.forEach(function (q) { cells[q[0]][q[1]].classList.add('found'); });
+    drawLines();
+  }
+  function setGold(cell, on) {
+    boardEl.querySelectorAll('.gold').forEach(function (e) { e.classList.remove('gold'); });
+    if (cell && on) cells[cell[0]][cell[1]].classList.add('gold');
+  }
+  function cellRect(p) { return cells[p[0]] && cells[p[0]][p[1]] ? cells[p[0]][p[1]].getBoundingClientRect() : null; }
 
   /* ---------- подсказки на поле ---------- */
   function showStart(p) {
@@ -344,7 +373,8 @@
     }
   }
 
-  root.Board = { mount: mount, render: render, fit: fit, markFound: markFound, showStart: showStart, clearStart: clearStart,
+  root.Board = { mount: mount, render: render, fit: fit, markFound: markFound,
+    flashBonus: flashBonus, markCache: markCache, setGold: setGold, cellRect: cellRect, showStart: showStart, clearStart: clearStart,
     showPath: showPath, clearHints: clearHints, pointAt: pointAt, demoTrace: demoTrace, stopPointer: stopPointer,
     get demoing() { return demoing(); }, get demoCells() { return demoCells ? demoCells.slice() : null; }, redraw: drawLines,
     get dragging() { return dragging || kbSelecting; }, COLORS: COLORS };

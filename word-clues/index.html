@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-<meta name="g1f-build" content="0.1.0+b008 · 1dc9073">
+<meta name="g1f-build" content="0.1.0+b009 · 743d1e1">
 <meta name="g1f-telemetry" content="">
 <meta name="theme-color" content="#F5EEDD">
 <title>Слова по уликам</title>
-<link rel="stylesheet" href="src/styles.css?v=809a8f009b">
+<link rel="stylesheet" href="src/styles.css?v=ac4a30f7ae">
 </head>
 <body>
 <div id="app">
@@ -44,6 +44,11 @@
         <span class="tile-icon" id="atlas-icon"></span>
         <span class="tile-text"><b>Мой атлас</b><span class="muted" id="atlas-sub"></span></span>
       </button>
+      <button class="card tile" id="btn-town">
+        <span class="tile-icon lamp art" data-art="street_lamp" data-icon="🏮"></span>
+        <span class="tile-text"><b>Фонари Тихоречья</b><span class="muted" id="town-tile-sub"></span></span>
+      </button>
+      <div class="secret-strip card soft" id="home-secret" hidden></div>
       <div class="card soft" id="home-next" hidden>
         <b id="home-next-title"></b>
         <span class="muted" id="home-next-sub"></span>
@@ -60,6 +65,7 @@
         <p class="muted" id="intro-kicker"></p>
         <h2 id="intro-title"></h2>
         <p class="intro-text" id="intro-text"></p>
+        <p class="intro-new" id="intro-new" hidden></p>
         <button class="btn-main" id="btn-intro-go">Искать улики</button>
         <button class="btn-link" id="btn-intro-home">На главную</button>
       </div>
@@ -74,6 +80,7 @@
         <b id="field-title"></b>
         <span class="muted" id="field-sub"></span>
       </div>
+      <button class="chip" id="chip-atlas" aria-label="Атлас"></button>
       <div class="dots" id="dots" aria-hidden="true"></div>
     </header>
     <div class="scene" id="scene">
@@ -99,6 +106,8 @@
       <div class="toast" id="toast" hidden></div>
     </div>
     <footer class="field-foot">
+      <button class="chip" id="chip-bonus" hidden aria-label="Бонусные слова"></button>
+      <button class="chip" id="chip-cache" hidden aria-label="Тайник"></button>
       <button class="btn-hint" id="btn-hint"><span class="ico" id="hint-ico"></span><span>Подсказка</span><span class="badge" id="hint-badge" hidden></span></button>
       <span class="loupes" id="loupes" title="Лупы"></span>
       <button class="btn-accept" id="btn-accept" hidden>Принять ответ</button>
@@ -114,6 +123,7 @@
         <div class="scene-items" id="result-items"></div>
       </div>
       <div class="result-body">
+        <button class="chip res-atlas-chip" id="res-atlas-chip" aria-label="Атлас"></button>
         <p class="muted" id="result-kicker">История разгадана</p>
         <h2 id="result-title"></h2>
         <p id="result-ending"></p>
@@ -121,6 +131,9 @@
           <span class="keepsake-img art" id="keepsake-img"></span>
           <span><b id="keepsake-title"></b><span class="muted" id="keepsake-note"></span><span class="reward-line" id="reward-line"></span></span>
         </div>
+        <div class="reward-big" id="reward-big"></div>
+        <div class="secret-strip card soft" id="result-secret" hidden></div>
+        <button class="btn-lantern" id="btn-lantern" hidden></button>
         <div class="card question" id="result-question-card">
           <span class="muted">Следующий вопрос</span>
           <b id="result-question"></b>
@@ -129,11 +142,14 @@
           <b id="demo-end-title"></b>
           <span id="demo-end-text"></span>
         </div>
-        <button class="btn-main" id="btn-next">Следующая история</button>
-        <div class="link-row">
-          <button class="btn-link" id="btn-res-atlas">В атлас</button>
-          <button class="btn-link" id="btn-res-home">На сегодня всё</button>
-        </div>
+      </div>
+    </div>
+    <!-- главная кнопка — под прокруткой, а не поверх наград (оценка b007, п. 21) -->
+    <div class="result-foot">
+      <button class="btn-main" id="btn-next">Следующая история</button>
+      <div class="link-row">
+        <button class="btn-link" id="btn-res-atlas">В атлас</button>
+        <button class="btn-link" id="btn-res-home">На сегодня всё</button>
       </div>
     </div>
   </section>
@@ -155,20 +171,36 @@
   </section>
 
 
+  <!-- Фонари Тихоречья: на что тратить марки -->
+  <section class="screen" id="scr-town" hidden>
+    <header class="field-head">
+      <button class="icon-btn" id="btn-town-back" aria-label="Назад"></button>
+      <div class="field-title"><b>Фонари Тихоречья</b><span class="muted" id="town-sub"></span></div>
+    </header>
+    <div class="town-scroll">
+      <div class="town-map">
+        <div class="town-bg art" data-art="bg_town" data-icon="🏞️"></div>
+        <div class="town-lamps" id="town-lamps"></div>
+      </div>
+      <p class="atlas-note muted">Зажгите фонарь у каждого места, где разгадана история. Фонарь стоит 30 марок и даёт лупу.</p>
+      <div class="town-list" id="town-list"></div>
+    </div>
+  </section>
+
   <!-- Шторка: помощь / настройки / подтверждение -->
   <div class="sheet-back" id="sheet-back" hidden></div>
   <div class="sheet" id="sheet" role="dialog" aria-modal="true" hidden></div>
 </div>
 
-<script>window.G1F_ART={"address": "0b0fe89d6c", "album": "ac097aff22", "atlas_cover": "bd6fa2f89a", "bell": "a54ab85968", "berth": "f55866633a", "bg_s001": "938f6a02ed", "bg_s002": "ee15feae63", "bg_s003": "b287794909", "bg_s004": "d2a71f1412", "bg_s005": "7a3cfc770b", "bg_s006": "1c43bd31ac", "bg_s007": "ca275fe270", "bg_s008": "cf14e3da8c", "bg_s009": "7cd94a8457", "bg_s010": "76e4a22597", "bg_town": "64e40b6e8b", "boat": "4c4ed306e5", "bottle": "e34350e333", "bottle_note": "9324704d8e", "box_intro": "49c7320f0e", "clock": "e46186b137", "clock_hand": "fa360cd6de", "clock_token": "abd0bde00e", "club_list": "6b5582abfd", "compartment": "1748f95461", "compass": "455cf6ff49", "conductor": "a4bc5f39c5", "curtain": "ebbcce5ace", "desk": "c0bd5782fa", "envelope": "f4f8c2c5cf", "flower_card": "fda8b44575", "future_letters": "167e1c0fb2", "garden_bed": "cf2f0834a3", "gate": "8f51149364", "glass": "b768e62447", "globe": "4f8ab0cc80", "herbarium": "296c06a467", "herbarium_leaf": "0c6f495f63", "hive": "f536791e6a", "key": "82da45ac66", "lamp": "49ef7c4921", "lantern": "22de97032d", "lantern_parcel": "a6246bde27", "letter": "91a08cd99d", "logbook": "401750a7ea", "map": "0d35f23029", "meeting": "7b198051ed", "oar": "1a25f8d1b7", "parcel": "72e10274b9", "pendulum": "b1745cc54f", "pillar": "e5f911f01b", "pointer": "10b78625c9", "postmark": "3996dc6191", "pot": "ca160af546", "railing": "bea7b0af69", "rails": "8698675a21", "register": "3265015fbe", "river_letter": "cbb76f3ae7", "scales": "0175ccbdce", "scarecrow": "4f528d442d", "school_bell": "229f8a6d6c", "seeds": "5854a91516", "signpost": "894b4afbd1", "sprout": "6a2437079d", "square_lantern": "d4215f8f8a", "stamp": "f9ef8a6caa", "suitcase": "5eec3ff806", "suitcase_garden": "7e2f1bc0c2", "ticket": "05313bdee5", "tower": "1143d7e143", "vera": "f27b3f27ef", "watering_can": "d48ec7f0ee", "weight": "f13b450de2", "window": "bec33ad897"};</script>
-<script src="data/content.js?v=5429b52e07"></script>
+<script>window.G1F_ART={"address": "0b0fe89d6c", "album": "ac097aff22", "atlas_cover": "bd6fa2f89a", "bank_stone": "c4a43ad3ae", "bell": "a54ab85968", "berth": "f55866633a", "bg_s001": "938f6a02ed", "bg_s002": "ee15feae63", "bg_s003": "b287794909", "bg_s004": "d2a71f1412", "bg_s005": "7a3cfc770b", "bg_s006": "1c43bd31ac", "bg_s007": "ca275fe270", "bg_s008": "cf14e3da8c", "bg_s009": "7cd94a8457", "bg_s010": "76e4a22597", "bg_town": "64e40b6e8b", "blackboard": "4cfe43ebe9", "boat": "4c4ed306e5", "bottle": "e34350e333", "bottle_note": "9324704d8e", "box_intro": "49c7320f0e", "chain": "35630f9978", "clock": "e46186b137", "clock_hand": "fa360cd6de", "clock_token": "abd0bde00e", "club_list": "6b5582abfd", "compartment": "1748f95461", "compass": "455cf6ff49", "conductor": "a4bc5f39c5", "curtain": "ebbcce5ace", "desk": "c0bd5782fa", "envelope": "f4f8c2c5cf", "flower_card": "fda8b44575", "future_letters": "167e1c0fb2", "garden_bed": "cf2f0834a3", "gate": "8f51149364", "glass": "b768e62447", "globe": "4f8ab0cc80", "golden_stamp": "a3e31e2817", "herbarium": "296c06a467", "herbarium_leaf": "0c6f495f63", "hive": "f536791e6a", "key": "82da45ac66", "lamp": "49ef7c4921", "lantern": "22de97032d", "lantern_parcel": "a6246bde27", "letter": "91a08cd99d", "logbook": "401750a7ea", "mailbox": "32128e7075", "map": "0d35f23029", "meeting": "7b198051ed", "name_list": "6287c98384", "oar": "1a25f8d1b7", "parcel": "72e10274b9", "pendulum": "b1745cc54f", "pillar": "e5f911f01b", "pointer": "10b78625c9", "postmark": "3996dc6191", "pot": "ca160af546", "railing": "bea7b0af69", "rails": "8698675a21", "register": "3265015fbe", "reward_parcel": "b296426721", "river_letter": "cbb76f3ae7", "scales": "0175ccbdce", "scarecrow": "4f528d442d", "school_bell": "229f8a6d6c", "seeds": "5854a91516", "signpost": "894b4afbd1", "spoon": "d11f7f8766", "sprout": "6a2437079d", "square_lantern": "d4215f8f8a", "stamp": "f9ef8a6caa", "street_lamp": "f98e2857b9", "suitcase": "5eec3ff806", "suitcase_garden": "7e2f1bc0c2", "ticket": "05313bdee5", "tower": "1143d7e143", "vera": "f27b3f27ef", "watering_can": "d48ec7f0ee", "weight": "f13b450de2", "window": "bec33ad897"};</script>
+<script src="data/content.js?v=e0d0b71f22"></script>
 <script src="src/logic.js?v=751efbcdcd"></script>
 <script src="vendor/vk-bridge.min.js?v=827ba6f457"></script>
 <script src="src/platform.js?v=72ba59916e"></script>
 <script src="src/analytics.js?v=839724c152"></script>
-<script src="src/state.js?v=469cf67332"></script>
+<script src="src/state.js?v=f92352c322"></script>
 <script src="src/sound.js?v=a77c31e1d3"></script>
-<script src="src/board.js?v=83a59c9839"></script>
-<script src="src/app.js?v=7c5ecfc4f1"></script>
+<script src="src/board.js?v=6de0a67091"></script>
+<script src="src/app.js?v=69336b00b6"></script>
 </body>
 </html>

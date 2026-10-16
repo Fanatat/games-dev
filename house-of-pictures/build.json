@@ -1,0 +1,238 @@
+{
+ "game": "house-of-pictures",
+ "build_number": "001",
+ "app_build": "0.1.0+b001",
+ "git_branch": "worktree-p0-hallway",
+ "git_sha": "dc33519",
+ "dirty": false,
+ "content_version": 1,
+ "built_at": "2026-10-16T03:29:18+00:00",
+ "total_bytes": 1052541,
+ "files": [
+  {
+   "path": "assets/art/bg_hallway.webp",
+   "bytes": 157234,
+   "sha256": "12ace862b39512e8274bcf0d716d62715601bf23b9b75aed1697fa330e481813"
+  },
+  {
+   "path": "assets/art/bird.webp",
+   "bytes": 32080,
+   "sha256": "565b1751dfd3a7a84a7282944cd37b2b7ce9ec65154addd4390dffadfb4f9a84"
+  },
+  {
+   "path": "assets/art/cat.webp",
+   "bytes": 52060,
+   "sha256": "19ef5cdf59b3eb9d21c617b020c0b510012a78268b6f2b571ec9da7a4ab19c19"
+  },
+  {
+   "path": "assets/art/flower_a.webp",
+   "bytes": 41756,
+   "sha256": "938917a063746a6430fdf95f0b6c854bf9207e819f28508c7371830edbd6e4e9"
+  },
+  {
+   "path": "assets/art/flower_b.webp",
+   "bytes": 43866,
+   "sha256": "c439c962c357ad31dd6ec73c1b56ee85026ddd5ea78d811b98172486b1bd6091"
+  },
+  {
+   "path": "assets/art/invitation.webp",
+   "bytes": 74414,
+   "sha256": "889f720157809c8bbc31fc414597a72195c018cf50fb8d9d63e1e0d2f6eda407"
+  },
+  {
+   "path": "assets/art/lamp_a.webp",
+   "bytes": 37164,
+   "sha256": "842a739bc83af43c5262d73082f36cf503381acb583b9553bc25d730b1bb3160"
+  },
+  {
+   "path": "assets/art/lamp_b.webp",
+   "bytes": 34402,
+   "sha256": "ce9f49157434846b1985803a62cd830aeed7426b7179946da08699ed4363580b"
+  },
+  {
+   "path": "assets/art/letter.webp",
+   "bytes": 34462,
+   "sha256": "14432507e83e8b324d8402c0c95f7ab5a545a65bd1bf5429966f0cf70c13dfe5"
+  },
+  {
+   "path": "assets/art/rug_a.webp",
+   "bytes": 41766,
+   "sha256": "f2b0922659063a8d254dc43347114ded152d7a867cf44efb7e9a6fb769d3f88d"
+  },
+  {
+   "path": "assets/art/rug_b.webp",
+   "bytes": 41324,
+   "sha256": "f8e6aea8d2329efdb43c9aeb4039ef92f358a92a03743a901db42112dbee2b83"
+  },
+  {
+   "path": "assets/art/shelf_a.webp",
+   "bytes": 46008,
+   "sha256": "5442efb582799f2aa812f81461fd3f9a2b1e6124eaf1147e461c223d48cbcf68"
+  },
+  {
+   "path": "assets/art/shelf_b.webp",
+   "bytes": 46682,
+   "sha256": "c6b076b63eb3e3fe683d74eeb7787393e9145736507203cfb15187751d591ac2"
+  },
+  {
+   "path": "assets/sfx/CREDITS.md",
+   "bytes": 1150,
+   "sha256": "62d02465281a33ea14a88ffd41c0f0c8a36a80c4de9cdcf548f94faadeafbb63"
+  },
+  {
+   "path": "assets/sfx/cross_tick_1.mp3",
+   "bytes": 2880,
+   "sha256": "99147c299aea95870f6532b638dd4021b297954e2de8a1455fe5196298ddbb73"
+  },
+  {
+   "path": "assets/sfx/cross_tick_2.mp3",
+   "bytes": 2592,
+   "sha256": "3ed3032aec06a32a4eba729b43f0624146f8b4f042aeafeb05aae30d35999ede"
+  },
+  {
+   "path": "assets/sfx/erase_slide_1.mp3",
+   "bytes": 3744,
+   "sha256": "e506546ce3625ad93a0807caef8c47db6c9dc18d83a678d54172263246a28e8a"
+  },
+  {
+   "path": "assets/sfx/fill_soft_1.mp3",
+   "bytes": 2880,
+   "sha256": "95f588f0eafad12585a12f4abba98bf1a3073f0a02627615447591a9c7db145e"
+  },
+  {
+   "path": "assets/sfx/fill_soft_2.mp3",
+   "bytes": 2016,
+   "sha256": "dd3d69e844dbf86db4c30107964baaa3216fdd812ab11989c3a1c30d6252ca7e"
+  },
+  {
+   "path": "assets/sfx/fill_soft_3.mp3",
+   "bytes": 2016,
+   "sha256": "aa334b2c094cbd81001be4f8d7c896757411ed58acad1d08c379c4da31dfdcf8"
+  },
+  {
+   "path": "assets/sfx/hint_sparkle.mp3",
+   "bytes": 11808,
+   "sha256": "3156c732dfe35aa73db2b1b82b9573366ec88f3e3c477f51811f9cffe2e4deca"
+  },
+  {
+   "path": "assets/sfx/line_marimba_A5.mp3",
+   "bytes": 15552,
+   "sha256": "5fb5cf590e94edd8fc5ab96697d432420d0b87714c8cd66002e3fdb1cb6a5bcd"
+  },
+  {
+   "path": "assets/sfx/line_marimba_B5.mp3",
+   "bytes": 14688,
+   "sha256": "f7e8bcc933e62074d76e3551318cb1150f7ea4b1fb89e40e1f6b7aa28dc508ef"
+  },
+  {
+   "path": "assets/sfx/line_marimba_D5.mp3",
+   "bytes": 15552,
+   "sha256": "c0b43f11212c9e7529b918ab454458c5322a057cd2ade27db9b235047a9d2fe0"
+  },
+  {
+   "path": "assets/sfx/line_marimba_D6.mp3",
+   "bytes": 12384,
+   "sha256": "a2e6ffda9588b04d79c0d1429fdc75f6195b9d636bda1e52829c8ce1b834e879"
+  },
+  {
+   "path": "assets/sfx/line_marimba_E5.mp3",
+   "bytes": 15552,
+   "sha256": "305f14fdacaedfc0de206a53539ea2f4c600cf147f00a8b9f54e90dbb1e7065c"
+  },
+  {
+   "path": "assets/sfx/line_marimba_G5.mp3",
+   "bytes": 15552,
+   "sha256": "4077473fb2a5e2a0502f5b2ad8b66388e73e43557320d79ed864396f641a2a03"
+  },
+  {
+   "path": "assets/sfx/reward_bell.mp3",
+   "bytes": 17856,
+   "sha256": "9385e932a7b69434e78b9bc65f7ea6c32d9908ec35d2211dee8974996542f08e"
+  },
+  {
+   "path": "assets/sfx/reward_chord.mp3",
+   "bytes": 20160,
+   "sha256": "9d7ca00ad07fc5d3fbb9eaead3fbe2d9c84033200cc1ded188730c199a1e3731"
+  },
+  {
+   "path": "assets/sfx/ui_back.mp3",
+   "bytes": 2304,
+   "sha256": "28edb7adf8f110b00c032815c5ffefd3345be7cc77f03365d4bf9e0b9ed94fd4"
+  },
+  {
+   "path": "assets/sfx/ui_tap_1.mp3",
+   "bytes": 2304,
+   "sha256": "bdd2b0754ed4c2164ae94c4f9f9cfa57b769e679a922be6fcfc7f9c05331cfe3"
+  },
+  {
+   "path": "assets/sfx/ui_toggle.mp3",
+   "bytes": 2304,
+   "sha256": "53d503fc3d0ece7c48a2e96fd410ca5eb0431e7e26630ba81ff8052cd479fdb4"
+  },
+  {
+   "path": "assets/sfx/unlock_glock.mp3",
+   "bytes": 22752,
+   "sha256": "2daa4f0189c5b239d85193dedc8e426d9381bb3c273ba6efc73dcb01ca1a11db"
+  },
+  {
+   "path": "assets/sfx/win_marimba.mp3",
+   "bytes": 23904,
+   "sha256": "5b3a4179d78f152dbe66d3792aeb60e0af77ee301649fd4f56194a1661477d68"
+  },
+  {
+   "path": "data/content.js",
+   "bytes": 6299,
+   "sha256": "4b35345602368dc3a99a4ab19e9a94bd6113a73c8294ae2c052ffabf570803d4"
+  },
+  {
+   "path": "index.html",
+   "bytes": 6984,
+   "sha256": "d072defe2b0544f2d13fb8711c5a4913aad566b3253d8da323081ab2a468c436"
+  },
+  {
+   "path": "src/app.js",
+   "bytes": 35451,
+   "sha256": "934e8254750a59797aec15e8ebdbd9db157581fb1bb3ad50fae7d32b2a44e1ba"
+  },
+  {
+   "path": "src/platform.js",
+   "bytes": 1735,
+   "sha256": "ca610363729026902a140344c3420e35615caf7bab47c54db308ff18f16aa355"
+  },
+  {
+   "path": "src/puzzle/nonogram.js",
+   "bytes": 46084,
+   "sha256": "3f68ee7ab09fcae8565b03c127d43811d8956e53f83e2b6341cab11d868d32ae"
+  },
+  {
+   "path": "src/puzzle/nonogram_logic.js",
+   "bytes": 5183,
+   "sha256": "4187ec37d437f66dc8eeae574795395344f852f760bc4c9cb696dadc5cfacc95"
+  },
+  {
+   "path": "src/scene.js",
+   "bytes": 8122,
+   "sha256": "f1a3a64c41a81a0e479a56fe69ec48b398ca0951e076bccaba55ab48c22d3105"
+  },
+  {
+   "path": "src/sound.js",
+   "bytes": 4779,
+   "sha256": "da492d042ba73815f05175a12b55fe311fff4b139c0b0bd61fa686add3db76d6"
+  },
+  {
+   "path": "src/state.js",
+   "bytes": 10137,
+   "sha256": "0eccac6aa38595650b9b7c1aa85570090b13e86446fe83d69506fa783aea95d7"
+  },
+  {
+   "path": "src/styles.css",
+   "bytes": 30171,
+   "sha256": "0cd43ae42820b75598784d3f63dc42ffbb8fa923a2977c5ea185221008fe4c15"
+  },
+  {
+   "path": "src/vendor/vk-bridge.min.js",
+   "bytes": 4428,
+   "sha256": "827ba6f457cd9e73519b58b2c66564caf138645202f1bba37dca0b567f601bb4"
+  }
+ ]
+}

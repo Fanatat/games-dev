@@ -1,0 +1,1060 @@
+/* ============================================================
+   Nonogram — подсказки, состояние доски, ввод, проверка победы.
+   Перенесено из game2 (main@3ee88c1, nonogram.js) для «Дома картинок».
+   Изменения форка: отмена последнего жеста (undo), пересчёт размера
+   по видимости своего контейнера, а не по экрану #game старой игры.
+   ============================================================ */
+
+window.Nonogram = (function () {
+
+  var _level      = null;
+  var _boardState = [];
+  var _clues      = null;    // кэш подсказок текущего уровня
+  var _mode       = 1;       // 1=закрасить, 2=крестик
+  var _isDragging = false;
+  var _dragAction = null;    // 'set' | 'clear'
+  var _dragValue  = 1;       // значение, которое ставит 'set' в этом штрихе (1 или 2)
+  var _lastCell   = null;
+  var _onWin      = null;
+  var _onMove     = null;    // колбэк main.js для дебаунс-сейва и звука;
+                             // аргумент — что случилось: 'fill' | 'cross' |
+                             // 'erase' | 'auto' | 'hint' | 'reveal'
+  var _onLineClosed = null;  // колбэк main.js (Задача H: звук «ряд закрыт»)
+  var _won        = false;
+  var _paused     = false;   // true во время рекламы — блокирует ввод
+  var _strokeSnapshot = null; // снимок доски в начале штриха для отмены при pinch
+  // Форк: стек отмены — снимок доски до каждого жеста/подсказки, изменившего поле.
+  var _undoStack = [];
+  var UNDO_MAX = 60;
+  // ТЗ №57: счётчик ходов игрока для аналитики (level_win.moves). Ход —
+  // один штрих (тап или протяжка), изменивший хотя бы одну клетку; подсказки,
+  // «Проверить», авто-крестики и восстановление черновика ходами не считаются.
+  // Сброс в render(). На игру не влияет — только читается через getMoves().
+  var _moves = 0;
+  var _strokeCounted = false; // текущий штрих уже засчитан ходом
+
+  // ТЗ №54: DOM-кэш поля — renderCell/подсказки зовутся на каждый ход и
+  // каждый авто-крестик, querySelector по атрибутам на 15×15 — лишняя работа.
+  var _cellEls    = [];      // [r][c] → .grid-cell
+  var _rowClueEls = [];      // [r]    → .row-clue
+  var _colClueEls = [];      // [c]    → .col-clue
+  var LINE_FLASH_STEP_MS = 28;
+  var LINE_FLASH_MS      = 360;
+  var WIN_WAVE_STEP_MS   = 22;
+  var WIN_WAVE_MAX_MS    = 480;
+
+  // ---- Зум / пан ----
+  // Зум меняет РЕАЛЬНЫЙ размер клетки (--cell) и перекладку, а не CSS-
+  // scale() поверх готовой картинки — иначе GPU-слой (will-change:transform)
+  // растрирует текст один раз и растягивает битмап, отсюда размытые цифры.
+  // Transform на _viewport остаётся ТОЛЬКО translate (пан).
+  var _scale      = 1;
+  var _tx         = 0;       // translate X
+  var _ty         = 0;       // translate Y
+  var _baseCell   = 32;       // px клетки при scale=1 — считается в render() от реального контейнера
+  var _rowClueW   = 0;        // px --clue-col-w — от числа подсказок, не от размера контейнера
+  var _viewport   = null;    // div-обёртка с transform
+  var _container  = null;    // puzzle-container (родитель)
+  var _puzzleEl   = null;    // .puzzle — на нём выставляется --cell
+
+  // Состояние pinch
+  var _pinch        = null;   // { dist, cx, cy, tx, ty, scale }
+  var _pinchActive  = false;  // true пока активен жест двумя пальцами
+  var _dragPointerId = null;  // pointerId пальца, рисующего кисть
+  // Состояние пан (средняя кнопка / пробел)
+  var _panning    = false;
+  var _panStart   = null;
+  var _spaceDown  = false;
+
+  /* ----------------------------------------------------------
+     calcClues — единственный источник числовых подсказок
+  ---------------------------------------------------------- */
+  function calcClues(solution) {
+    var H = solution.length, W = solution[0].length;
+    var rows = [], cols = [];
+
+    for (var r = 0; r < H; r++) {
+      var clue = [], run = 0;
+      for (var c = 0; c < W; c++) {
+        if (solution[r][c]) { run++; }
+        else if (run) { clue.push(run); run = 0; }
+      }
+      if (run) clue.push(run);
+      rows.push(clue.length ? clue : [0]);
+    }
+
+    for (var cc = 0; cc < W; cc++) {
+      var clue2 = [], run2 = 0;
+      for (var rr = 0; rr < H; rr++) {
+        if (solution[rr][cc]) { run2++; }
+        else if (run2) { clue2.push(run2); run2 = 0; }
+      }
+      if (run2) clue2.push(run2);
+      cols.push(clue2.length ? clue2 : [0]);
+    }
+
+    return { rows: rows, cols: cols };
+  }
+
+  /* ----------------------------------------------------------
+     checkWin — строгое равенство закрашенных клеток и решения.
+     Крестики (state=2) трактуются как пустые (0).
+     Лишняя закраска → false. Недостающая → false.
+     Возвращает явный true/false, никаких побочных эффектов.
+  ---------------------------------------------------------- */
+  function checkWin(boardState, solution) {
+    var H = solution.length, W = solution[0].length;
+    for (var r = 0; r < H; r++) {
+      for (var c = 0; c < W; c++) {
+        var filled = (boardState[r][c] === 1) ? 1 : 0; // crosses → 0
+        if (filled !== solution[r][c]) return false;
+      }
+    }
+    return true;
+  }
+
+  /* ---- Режим ввода ---- */
+  function setMode(m) { _mode = m; }
+
+  /* ----------------------------------------------------------
+     Зум / пан
+  ---------------------------------------------------------- */
+
+  var SCALE_MIN = 1, SCALE_MAX = 4;
+
+  function applyTransform() {
+    if (!_viewport || !_puzzleEl) return;
+    // Реальный релейаут в текущем масштабе (Фикс 6) — не CSS scale().
+    var eff = Math.round(_baseCell * _scale);
+    _puzzleEl.style.setProperty('--cell', eff + 'px');
+
+    // Ограничиваем пан: не уходим за края контейнера.
+    // scrollWidth/Height читаем ПОСЛЕ установки --cell — это уже фактический размер.
+    if (_container) {
+      var cw = _container.clientWidth;
+      var ch = _container.clientHeight;
+      var vw = _viewport.scrollWidth;
+      var vh = _viewport.scrollHeight;
+      var maxTx = Math.max(0, (vw - cw) / 2);
+      var maxTy = Math.max(0, (vh - ch) / 2);
+      _tx = Math.max(-maxTx, Math.min(maxTx, _tx));
+      _ty = Math.max(-maxTy, Math.min(maxTy, _ty));
+    }
+    _viewport.style.transform = 'translate(' + _tx + 'px,' + _ty + 'px)';
+  }
+
+  /* ----------------------------------------------------------
+     zoomAtPoint — зум с сохранением точки (clientX, clientY) на месте.
+     Общий механизм для колеса мыши и pinch (Фикс 3): вместо зума
+     к центру контейнера, считаем сдвиг translate так, чтобы контентная
+     точка под курсором/пальцами осталась под ним же после смены масштаба.
+  ---------------------------------------------------------- */
+  function zoomAtPoint(newScale, clientX, clientY) {
+    newScale = Math.max(SCALE_MIN, Math.min(SCALE_MAX, newScale));
+    if (!_viewport) { _scale = newScale; return; }
+    var rect = _viewport.getBoundingClientRect();
+    var ratioX = rect.width  ? (clientX - rect.left) / rect.width  : 0.5;
+    var ratioY = rect.height ? (clientY - rect.top)  / rect.height : 0.5;
+    var factor = newScale / _scale;
+    var dW = rect.width  * (factor - 1);
+    var dH = rect.height * (factor - 1);
+    _tx -= dW * (ratioX - 0.5);
+    _ty -= dH * (ratioY - 0.5);
+    _scale = newScale;
+    applyTransform();
+  }
+
+  function pinchDist(touches) {
+    var dx = touches[0].clientX - touches[1].clientX;
+    var dy = touches[0].clientY - touches[1].clientY;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+
+  function pinchCenter(touches) {
+    return {
+      x: (touches[0].clientX + touches[1].clientX) / 2,
+      y: (touches[0].clientY + touches[1].clientY) / 2,
+    };
+  }
+
+  function onTouchStart(e) {
+    if (e.touches.length < 2) return;
+    // Два пальца: помечаем pinch РАНЬШЕ, чем сработает pointerdown второго пальца
+    _pinchActive = true;
+    e.preventDefault();
+    if (_isDragging) {
+      _isDragging = false; _dragAction = null; _lastCell = null; _dragPointerId = null;
+      window.removeEventListener('pointermove',   onPointerMove);
+      window.removeEventListener('pointerup',     onPointerUp);
+      window.removeEventListener('pointercancel', onPointerUp);
+      cancelStroke();
+    }
+    var c0 = pinchCenter(e.touches);
+    _pinch = {
+      dist: pinchDist(e.touches),
+      cx:   c0.x,
+      cy:   c0.y,
+    };
+  }
+
+  function onTouchMove(e) {
+    if (!_pinch || e.touches.length < 2) return;
+    e.preventDefault();
+    var newDist = pinchDist(e.touches);
+    var ratio    = newDist / _pinch.dist;
+    var newScale = _scale * ratio;
+
+    // Зум к точке, где был центр жеста мгновение назад (честная привязка,
+    // а не к центру контейнера), затем отдельно — пан на сдвиг центра
+    // жеста (палец/пальцы уехали в сторону).
+    zoomAtPoint(newScale, _pinch.cx, _pinch.cy);
+
+    var center = pinchCenter(e.touches);
+    _tx += center.x - _pinch.cx;
+    _ty += center.y - _pinch.cy;
+    applyTransform();
+
+    _pinch.dist = newDist;
+    _pinch.cx   = center.x;
+    _pinch.cy   = center.y;
+  }
+
+  function onTouchEnd(e) {
+    if (e.touches.length < 2) _pinch = null;
+    if (e.touches.length === 0) _pinchActive = false;
+  }
+
+  // Колесо мыши — зум К ТОЧКЕ ПОД КУРСОРОМ (Фикс 3), не к центру поля.
+  function onWheel(e) {
+    e.preventDefault();
+    var delta = e.deltaY > 0 ? 0.9 : 1.1;
+    zoomAtPoint(_scale * delta, e.clientX, e.clientY);
+  }
+
+  // Средняя кнопка мыши — пан
+  function onMouseDown(e) {
+    if (e.button !== 1 && !_spaceDown) return;
+    e.preventDefault();
+    _panning  = true;
+    _panStart = { x: e.clientX - _tx, y: e.clientY - _ty };
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup',   onMouseUp);
+  }
+
+  function onMouseMove(e) {
+    if (!_panning) return;
+    _tx = e.clientX - _panStart.x;
+    _ty = e.clientY - _panStart.y;
+    applyTransform();
+  }
+
+  function onMouseUp() {
+    _panning = false;
+    window.removeEventListener('mousemove', onMouseMove);
+    window.removeEventListener('mouseup',   onMouseUp);
+  }
+
+  function onKeyDown(e) {
+    if (e.code === 'Space') { e.preventDefault(); _spaceDown = true; }
+  }
+
+  function onKeyUp(e) {
+    if (e.code === 'Space') _spaceDown = false;
+  }
+
+  function resetZoom() {
+    _scale = 1; _tx = 0; _ty = 0;
+    applyTransform();
+  }
+
+  /* ----------------------------------------------------------
+     computeBaseCell — Фикс 1/8: пересчитывает размер клетки «вписаться»
+     от РЕАЛЬНОГО размера контейнера. Используется и в render() (первое
+     открытие уровня), и в onWindowResize (пересчёт при смене размера
+     окна/iframe) — единая точка расчёта, дублировать негде.
+  ---------------------------------------------------------- */
+  function computeBaseCell() {
+    if (!_level || !_container || !_clues) return;
+    var W = _level.width, H = _level.height;
+    var maxRowLen = _clues.rows.reduce(function (m, r) { return Math.max(m, r.length); }, 0);
+    var maxColLen = _clues.cols.reduce(function (m, c) { return Math.max(m, c.length); }, 0);
+    var NUM_W = 16, NUM_H = 20, PAD = 12;
+    _rowClueW = maxRowLen * NUM_W + 8;
+    var colClueH = maxColLen * NUM_H + 6;
+
+    var contRect = _container.getBoundingClientRect();
+    var availW = contRect.width  - PAD * 2 - _rowClueW;
+    var availH = contRect.height - PAD * 2 - colClueH;
+    _baseCell = Math.max(8, Math.min(72, Math.floor(Math.min(availW / W, availH / H))));
+  }
+
+  /* ----------------------------------------------------------
+     Фикс 8: игра не знает заранее размер окна/iframe площадки (телефон,
+     прямой URL с произвольным ресайзом, VK-iframe с фиксированной
+     кабинетом высотой) — пересчитываем «вписаться» при каждом изменении
+     размера, а не только при открытии уровня. Дебаунс 150мс — resize
+     на десктопе сыплет событиями на каждый пиксель протяжки.
+     Масштаб/пан сбрасываем к новому «вписалось» — старый в новых
+     размерах контейнера может как не влезать, так и быть неоправданно
+     мелким, тащить его дальше нет смысла.
+  ---------------------------------------------------------- */
+  var _resizeTimer = null;
+  function onWindowResize() {
+    if (_resizeTimer) clearTimeout(_resizeTimer);
+    _resizeTimer = setTimeout(function () {
+      _resizeTimer = null;
+      if (!_level || !_container || !_puzzleEl) return;
+      if (!_container.offsetParent) return; // поле не видно — нечего пересчитывать
+      computeBaseCell();
+      _scale = 1; _tx = 0; _ty = 0;
+      applyTransform();
+    }, 150);
+  }
+  window.addEventListener('resize', onWindowResize);
+  window.addEventListener('orientationchange', onWindowResize);
+
+  function attachZoomHandlers(container) {
+    _container = container;
+    // Touch-события нужны с passive:false чтобы разрешить preventDefault
+    container.addEventListener('touchstart', onTouchStart, { passive: false });
+    container.addEventListener('touchmove',  onTouchMove,  { passive: false });
+    container.addEventListener('touchend',   onTouchEnd);
+    container.addEventListener('wheel',      onWheel,      { passive: false });
+    container.addEventListener('mousedown',  onMouseDown);
+    document.addEventListener('keydown',     onKeyDown);
+    document.addEventListener('keyup',       onKeyUp);
+  }
+
+  function detachZoomHandlers(container) {
+    if (!container) return;
+    container.removeEventListener('touchstart', onTouchStart);
+    container.removeEventListener('touchmove',  onTouchMove);
+    container.removeEventListener('touchend',   onTouchEnd);
+    container.removeEventListener('wheel',      onWheel);
+    container.removeEventListener('mousedown',  onMouseDown);
+    document.removeEventListener('keydown',     onKeyDown);
+    document.removeEventListener('keyup',       onKeyUp);
+  }
+
+  /* ---- Обновление DOM одной клетки ---- */
+  function cellEl(r, c) {
+    return (_cellEls[r] && _cellEls[r][c]) || null;
+  }
+
+  function renderCell(r, c) {
+    var el = cellEl(r, c);
+    if (!el) return;
+    var s = _boardState[r][c];
+    el.classList.toggle('is-filled', s === 1);
+    el.classList.toggle('is-cross',  s === 2);
+  }
+
+  /* ----------------------------------------------------------
+     Задача G — угасание подсказок закрытой строки/столбца.
+     «Закрыта» = закрашенные клетки (крестики как пустые) точно
+     совпадают с решением на всей линии — тот же критерий, что и
+     checkWin, но для одной линии. Прогресс без цифр (п.G) — просто
+     opacity, никаких счётчиков.
+  ---------------------------------------------------------- */
+  function isRowClosed(r) {
+    var row = _boardState[r], sol = _level.solution[r];
+    for (var c = 0; c < row.length; c++) {
+      if ((row[c] === 1 ? 1 : 0) !== sol[c]) return false;
+    }
+    return true;
+  }
+
+  function isColClosed(c) {
+    var H = _level.height;
+    for (var r = 0; r < H; r++) {
+      if ((_boardState[r][c] === 1 ? 1 : 0) !== _level.solution[r][c]) return false;
+    }
+    return true;
+  }
+
+  // silent=true — используется при массовом пересчёте (restore/clear/undo),
+  // чтобы звук «ряд закрыт» не играл за уже существующий прогресс.
+  function updateRowClueFade(r, silent) {
+    var el = _rowClueEls[r];
+    if (!el) return;
+    var wasClosed = el.classList.contains('is-closed');
+    var closed = isRowClosed(r);
+    el.classList.toggle('is-closed', closed);
+    if (!silent && closed && !wasClosed) onLineJustClosed('row', r);
+  }
+
+  function updateColClueFade(c, silent) {
+    var el = _colClueEls[c];
+    if (!el) return;
+    var wasClosed = el.classList.contains('is-closed');
+    var closed = isColClosed(c);
+    el.classList.toggle('is-closed', closed);
+    if (!silent && closed && !wasClosed) onLineJustClosed('col', c);
+  }
+
+  // ТЗ №54: закрытая линия пробегает волной от подсказки к краю поля —
+  // раньше отклик был только в бледнеющих цифрах. Таймаут, а не
+  // animationend — см. комментарий у shakeCell.
+  function onLineJustClosed(kind, idx) {
+    if (_onLineClosed) _onLineClosed();
+    var n = (kind === 'row') ? _level.width : _level.height;
+    var cells = [];
+    for (var i = 0; i < n; i++) {
+      var el = (kind === 'row') ? cellEl(idx, i) : cellEl(i, idx);
+      if (!el) continue;
+      el.classList.remove('is-line-flash');
+      el.style.setProperty('--flash-d', (i * LINE_FLASH_STEP_MS) + 'ms');
+      cells.push(el);
+    }
+    // reflow, чтобы повторная вспышка той же клетки (строка, затем столбец)
+    // перезапустила анимацию, а не слилась с текущей.
+    if (cells.length) void cells[0].offsetWidth;
+    cells.forEach(function (el) { el.classList.add('is-line-flash'); });
+    setTimeout(function () {
+      cells.forEach(function (el) { el.classList.remove('is-line-flash'); });
+    }, LINE_FLASH_MS + n * LINE_FLASH_STEP_MS);
+  }
+
+  // ТЗ №54: финал картинки — диагональная волна по всему полю. main.js
+  // показывает экран победы с задержкой, чтобы волна успела сыграть.
+  function playWinWave() {
+    if (!_level) return;
+    for (var r = 0; r < _level.height; r++) {
+      for (var c = 0; c < _level.width; c++) {
+        var el = cellEl(r, c);
+        if (!el) continue;
+        el.classList.remove('is-line-flash');
+        el.style.setProperty('--wave-d', Math.min((r + c) * WIN_WAVE_STEP_MS, WIN_WAVE_MAX_MS) + 'ms');
+        el.classList.add('is-win-wave');
+      }
+    }
+  }
+
+  function markWon() {
+    _won = true;
+    playWinWave();
+    if (_onWin) _onWin();
+  }
+
+  // Точечное обновление одной строки/столбца — вызывается на каждый ход.
+  function updateClueFade(r, c) {
+    if (!_level) return;
+    updateRowClueFade(r, false);
+    updateColClueFade(c, false);
+  }
+
+  // Полный пересчёт — после массовых операций (сброс поля, восстановление
+  // сохранённой доски, откат штриха), где задета не одна r/c-пара.
+  function refreshAllClueFade() {
+    if (!_level) return;
+    var H = _level.height, W = _level.width;
+    for (var r = 0; r < H; r++) updateRowClueFade(r, true);
+    for (var c = 0; c < W; c++) updateColClueFade(c, true);
+  }
+
+  /* ----------------------------------------------------------
+     Ввод: тап и кисть-протяжка
+     applyToCell возвращает true, если изменилось состояние
+     заливки (0↔1) — только тогда проверяем победу.
+     Смена крестика (0↔2) победу не триггерит.
+  ---------------------------------------------------------- */
+  function cellFromPoint(x, y) {
+    var el = document.elementFromPoint(x, y);
+    if (!el) return null;
+    if (!el.classList.contains('grid-cell')) {
+      el = el.closest ? el.closest('.grid-cell') : null;
+    }
+    if (!el) return null;
+    var r = parseInt(el.dataset.r, 10);
+    var c = parseInt(el.dataset.c, 10);
+    if (isNaN(r) || isNaN(c)) return null;
+    return { r: r, c: c };
+  }
+
+  // ТЗ №57: засчитать текущий штрих ходом — один раз на штрих, ДО _onMove,
+  // чтобы main.js в колбэке хода уже видел getMoves() >= 1 (first_move).
+  function countStroke() {
+    if (_strokeCounted) return;
+    _strokeCounted = true;
+    _moves++;
+  }
+
+  // Возвращает true, если изменение затронуло состояние закраски (1).
+  function applyToCell(r, c) {
+    var prev = _boardState[r][c];
+    if (_dragAction === 'set') {
+      if (prev === 0) {
+        _boardState[r][c] = _dragValue;
+        renderCell(r, c);
+        countStroke();
+        if (_onMove) _onMove(_dragValue === 1 ? 'fill' : 'cross');
+        return _dragValue === 1;
+      }
+    } else {
+      if (prev !== 0) {
+        _boardState[r][c] = 0;
+        renderCell(r, c);
+        countStroke();
+        if (_onMove) _onMove('erase');
+        return prev === 1;
+      }
+    }
+    return false;
+  }
+
+  // Сохраняет снимок доски в начале штриха.
+  function beginStroke() {
+    _strokeSnapshot = _boardState.map(function (row) { return row.slice(); });
+  }
+
+  // Откатывает все изменения штриха (включая авто-крестики) по снимку.
+  function cancelStroke() {
+    if (!_strokeSnapshot || !_level) return;
+    var H = _level.height, W = _level.width;
+    for (var r = 0; r < H; r++) {
+      for (var c = 0; c < W; c++) {
+        if (_boardState[r][c] !== _strokeSnapshot[r][c]) {
+          _boardState[r][c] = _strokeSnapshot[r][c];
+          renderCell(r, c);
+        }
+      }
+    }
+    _strokeSnapshot = null;
+    // ТЗ №57: откатанный штрих (второй палец — pinch) ходом не был.
+    if (_strokeCounted) { _strokeCounted = false; _moves--; }
+    refreshAllClueFade();
+  }
+
+  /* ----------------------------------------------------------
+     getValidPlacements(line, clue)
+     Перебирает все структурно допустимые расстановки блоков clue
+     на линии длины line.length.
+
+     Единственное ограничение из текущего состояния:
+       блок НЕ может накрывать крестик (state=2).
+     Заполненные клетки (state=1) НЕ влияют на допустимость —
+     расстановки перебираются по логике clue + позиции крестиков.
+
+     Возвращает массив bool[]-покрытий (true = клетка накрыта блоком).
+
+     Контрпример-тест: clue=[3], n=5, line=[1,1,1,0,0]
+       → 3 расстановки: [0-1-2],[1-2-3],[2-3-4]
+       → ни одна клетка не пуста во всех трёх → крестики НЕ ставятся ✓
+  ---------------------------------------------------------- */
+  function getValidPlacements(line, clue) {
+    var n = line.length;
+    var blocks = (clue.length === 1 && clue[0] === 0) ? [] : clue;
+    var k = blocks.length;
+    var results = [];
+    var covered = new Array(n).fill(false);
+
+    function recurse(bi, start) {
+      if (bi === k) {
+        // Все блоки размещены — непокрытых закрашенных клеток быть не должно
+        for (var i = start; i < n; i++) {
+          if (line[i] === 1) return;
+        }
+        results.push(covered.slice());
+        return;
+      }
+      var len = blocks[bi];
+      var maxPos = n - len;
+      for (var j = bi + 1; j < k; j++) maxPos -= (blocks[j] + 1);
+
+      for (var pos = start; pos <= maxPos; pos++) {
+        // Блок не должен накрывать крестик
+        var fits = true;
+        for (var p = pos; p < pos + len; p++) {
+          if (line[p] === 2) { fits = false; break; }
+        }
+        // Клетка сразу после блока не должна быть закрашена:
+        // следующий блок начнётся не раньше pos+len+1, и она окажется непокрытой
+        var gapOk = (pos + len >= n) || (line[pos + len] !== 1);
+
+        if (fits && gapOk) {
+          for (var p2 = pos; p2 < pos + len; p2++) covered[p2] = true;
+          recurse(bi + 1, pos + len + 1);
+          for (var p3 = pos; p3 < pos + len; p3++) covered[p3] = false;
+        }
+
+        // Нельзя перепрыгнуть через закрашенную клетку — она должна быть покрыта блоком
+        if (line[pos] === 1) break;
+      }
+    }
+
+    recurse(0, 0);
+    return results;
+  }
+
+  /* ----------------------------------------------------------
+     autoFillCrosses — ставит крестики только на клетки,
+     гарантированно пустые во ВСЕХ допустимых расстановках
+     (по логике подсказок, без обращения к _level.solution).
+  ---------------------------------------------------------- */
+  function autoFillCrosses(r, c) {
+    if (!_level || !_clues) return;
+    var W = _level.width, H = _level.height;
+
+    function processLine(line, clue, setCell) {
+      var placements = getValidPlacements(line, clue);
+      if (placements.length === 0) return;
+      var changed = false;
+      for (var i = 0; i < line.length; i++) {
+        if (line[i] !== 0) continue; // только пустые клетки
+        var alwaysEmpty = true;
+        for (var p = 0; p < placements.length; p++) {
+          if (placements[p][i]) { alwaysEmpty = false; break; }
+        }
+        if (alwaysEmpty) { setCell(i); changed = true; }
+      }
+      if (changed && _onMove) _onMove('auto');
+    }
+
+    processLine(
+      _boardState[r].slice(),
+      _clues.rows[r],
+      function (i) { _boardState[r][i] = 2; renderCell(r, i); }
+    );
+
+    var col = [];
+    for (var rr = 0; rr < H; rr++) col.push(_boardState[rr][c]);
+    processLine(
+      col,
+      _clues.cols[c],
+      function (i) { _boardState[i][c] = 2; renderCell(i, c); }
+    );
+  }
+
+  function boardDiffers(snap) {
+    for (var r = 0; r < _boardState.length; r++)
+      for (var c = 0; c < _boardState[r].length; c++)
+        if (_boardState[r][c] !== snap[r][c]) return true;
+    return false;
+  }
+
+  function pushUndo(snap) {
+    _undoStack.push(snap);
+    if (_undoStack.length > UNDO_MAX) _undoStack.shift();
+  }
+
+  function canUndo() { return !_won && _undoStack.length > 0; }
+
+  // Возвращает поле к состоянию до последнего жеста. Бесплатно и без лимита
+  // по времени (ТЗ 01 §12: «откат последнего жеста бесплатный»).
+  function undo() {
+    if (!canUndo() || _isDragging) return false;
+    var snap = _undoStack.pop();
+    for (var r = 0; r < _level.height; r++) {
+      for (var c = 0; c < _level.width; c++) {
+        if (_boardState[r][c] !== snap[r][c]) { _boardState[r][c] = snap[r][c]; renderCell(r, c); }
+      }
+    }
+    refreshAllClueFade();
+    if (_onMove) _onMove('undo');
+    return true;
+  }
+
+  function tryWin() {
+    if (_won) return;
+    if (checkWin(_boardState, _level.solution)) markWon();
+  }
+
+  function onPointerDown(e) {
+    e.preventDefault();
+    if (_won || _paused) return;
+    if (_pinchActive || _isDragging) return; // второй палец или pinch — игнорируем
+    var cell = cellFromPoint(e.clientX, e.clientY);
+    if (!cell) return;
+
+    // ПКМ — десктопный стандарт жанра: всегда крестик (независимо от
+    // тумблера режима), протяжка с зажатой ПКМ красит крестики кистью.
+    // ЛКМ/тач/перо — как раньше, красят по текущему режиму (_mode).
+    _dragValue  = (e.button === 2) ? 2 : _mode;
+    _dragPointerId = e.pointerId;
+    _dragAction = (_boardState[cell.r][cell.c] === 0) ? 'set' : 'clear';
+    _isDragging = true;
+    _lastCell   = { r: cell.r, c: cell.c };
+    _strokeCounted = false;
+    beginStroke();
+
+    var changed = applyToCell(cell.r, cell.c);
+    // Авто-крестик обязан быть обратимым (Фикс 5): line-solver перезапускаем
+    // только после 'set' (добавили информацию). После 'clear' — не гоняем,
+    // иначе тот же ошибочный расклад мгновенно ставит снятый крестик обратно
+    // в рамках того же тапа, и игрок физически не может его убрать.
+    if (_dragAction === 'set') autoFillCrosses(cell.r, cell.c);
+    updateClueFade(cell.r, cell.c);
+    if (changed) tryWin();
+
+    window.addEventListener('pointermove',   onPointerMove);
+    window.addEventListener('pointerup',     onPointerUp);
+    window.addEventListener('pointercancel', onPointerUp);
+  }
+
+  function onPointerMove(e) {
+    if (!_isDragging || e.pointerId !== _dragPointerId) return;
+    var cell = cellFromPoint(e.clientX, e.clientY);
+    if (!cell) return;
+    if (_lastCell && _lastCell.r === cell.r && _lastCell.c === cell.c) return;
+    _lastCell = { r: cell.r, c: cell.c };
+    var changed = applyToCell(cell.r, cell.c);
+    if (_dragAction === 'set') autoFillCrosses(cell.r, cell.c); // см. onPointerDown
+    updateClueFade(cell.r, cell.c);
+    if (changed) tryWin();
+  }
+
+  function onPointerUp(e) {
+    if (e && e.pointerId !== _dragPointerId) return;
+    _isDragging      = false;
+    _dragAction      = null;
+    _lastCell        = null;
+    _dragPointerId   = null;
+    if (_strokeSnapshot && boardDiffers(_strokeSnapshot)) pushUndo(_strokeSnapshot);
+    _strokeSnapshot  = null; // штрих зафиксирован
+    window.removeEventListener('pointermove',   onPointerMove);
+    window.removeEventListener('pointerup',     onPointerUp);
+    window.removeEventListener('pointercancel', onPointerUp);
+  }
+
+  /* ----------------------------------------------------------
+     render(level, container, onWin)
+  ---------------------------------------------------------- */
+  function render(level, container, onWin, onMove, onLineClosed) {
+    detachZoomHandlers(_container);
+    _level     = level;
+    _container = container; // нужен computeBaseCell() ниже; attachZoomHandlers переустановит тем же значением
+    _clues  = calcClues(level.solution);
+    _onWin  = onWin  || null;
+    _onMove = onMove || null;
+    _onLineClosed = onLineClosed || null;
+    _won    = false;
+    _mode   = 1;
+    _isDragging = false; _dragAction = null; _dragValue = 1; _lastCell = null;
+    _strokeSnapshot = null;
+    _moves = 0; _strokeCounted = false;
+    _undoStack = [];
+    _scale = 1; _tx = 0; _ty = 0; _pinch = null; _pinchActive = false;
+    _dragPointerId = null; _panning = false;
+
+    _boardState = [];
+    for (var ri = 0; ri < level.height; ri++) {
+      _boardState[ri] = [];
+      for (var ci = 0; ci < level.width; ci++) _boardState[ri][ci] = 0;
+    }
+
+    var clues = calcClues(level.solution);
+    var W = level.width, H = level.height;
+
+    // Фикс 1/8: считаем от РЕАЛЬНОГО контейнера (#puzzle-container уже
+    // показан — showScreen('game') зовётся до render()), не от
+    // window.innerWidth/innerHeight с захардкоженными отступами шапки/
+    // панели — в VK-iframe и на мобильном с адресной строкой это разные
+    // числа. Та же функция переиспользуется в onWindowResize().
+    computeBaseCell();
+    var cell = _baseCell;
+
+    var puzzle = document.createElement('div');
+    puzzle.className = 'puzzle';
+    puzzle.style.cssText = '--cell:' + cell + 'px;--clue-col-w:' + _rowClueW + 'px;';
+    _puzzleEl = puzzle;
+
+    var corner = document.createElement('div');
+    corner.className = 'puzzle-tl';
+    puzzle.appendChild(corner);
+
+    _cellEls = []; _rowClueEls = []; _colClueEls = [];
+
+    var colArea = document.createElement('div');
+    colArea.className = 'puzzle-col-clues';
+    for (var c = 0; c < W; c++) {
+      var ccDiv = document.createElement('div');
+      ccDiv.className = 'col-clue';
+      ccDiv.dataset.col = c;
+      _colClueEls[c] = ccDiv;
+      for (var i = 0; i < clues.cols[c].length; i++) {
+        var sp = document.createElement('span');
+        sp.textContent = clues.cols[c][i];
+        ccDiv.appendChild(sp);
+      }
+      colArea.appendChild(ccDiv);
+    }
+    puzzle.appendChild(colArea);
+
+    var rowArea = document.createElement('div');
+    rowArea.className = 'puzzle-row-clues';
+    for (var r = 0; r < H; r++) {
+      var rcDiv = document.createElement('div');
+      rcDiv.className = 'row-clue';
+      rcDiv.dataset.row = r;
+      _rowClueEls[r] = rcDiv;
+      for (var j = 0; j < clues.rows[r].length; j++) {
+        var sp2 = document.createElement('span');
+        sp2.textContent = clues.rows[r][j];
+        rcDiv.appendChild(sp2);
+      }
+      rowArea.appendChild(rcDiv);
+    }
+    puzzle.appendChild(rowArea);
+
+    var gridEl = document.createElement('div');
+    gridEl.className = 'puzzle-grid';
+    for (var r2 = 0; r2 < H; r2++) {
+      var rowEl = document.createElement('div');
+      rowEl.className = 'grid-row';
+      _cellEls[r2] = [];
+      for (var c2 = 0; c2 < W; c2++) {
+        var cellDiv = document.createElement('div');
+        cellDiv.className = 'grid-cell';
+        cellDiv.dataset.r = r2;
+        cellDiv.dataset.c = c2;
+        rowEl.appendChild(cellDiv);
+        _cellEls[r2][c2] = cellDiv;
+      }
+      gridEl.appendChild(rowEl);
+    }
+    gridEl.addEventListener('pointerdown', onPointerDown);
+    puzzle.appendChild(gridEl);
+
+    // Viewport-обёртка: transform здесь — ТОЛЬКО translate (пан).
+    // Масштаб — через --cell на _puzzleEl (Фикс 6), не scale().
+    _viewport = document.createElement('div');
+    _viewport.style.cssText = 'will-change:transform;display:inline-flex;';
+    _viewport.appendChild(puzzle);
+
+    // ТЗ №59 (Н-18): нулевые линии совпадают с решением с самого начала —
+    // их «0» гаснут сразу, а не после первого касания линии. Тихо (без
+    // звука и вспышки закрытия) и до вставки в DOM — без анимации угасания.
+    refreshAllClueFade();
+
+    container.innerHTML = '';
+    container.appendChild(_viewport);
+
+    attachZoomHandlers(container);
+  }
+
+  /* ----------------------------------------------------------
+     findHint()
+     Ищет одну неверную клетку с приоритетом:
+       1. Закрашена, но должна быть пустой (action:'clear') — блокирует победу
+       2. Не закрашена, но должна быть закрашенной (action:'fill')
+     Возвращает { r, c, action } или null если ошибок нет.
+  ---------------------------------------------------------- */
+  function findHint() {
+    if (!_level || _won) return null;
+    var H = _level.height, W = _level.width;
+    var sol = _level.solution;
+
+    // Приоритет: лишние закраски (мешают победе)
+    for (var r = 0; r < H; r++) {
+      for (var c = 0; c < W; c++) {
+        if (_boardState[r][c] === 1 && sol[r][c] === 0) {
+          return { r: r, c: c, action: 'clear' };
+        }
+      }
+    }
+    // Недостающие закраски
+    for (var r2 = 0; r2 < H; r2++) {
+      for (var c2 = 0; c2 < W; c2++) {
+        if (_boardState[r2][c2] !== 1 && sol[r2][c2] === 1) {
+          return { r: r2, c: c2, action: 'fill' };
+        }
+      }
+    }
+    return null;
+  }
+
+  /* ----------------------------------------------------------
+     applyHint(hint)
+     clear → снимает закраску и ставит крестик («точно пусто»)
+     fill  → закрашивает и проверяет победу
+  ---------------------------------------------------------- */
+  function applyHint(hint) {
+    if (!hint || _won) return;
+    pushUndo(getBoardState());
+    if (hint.action === 'clear') {
+      // Клетка была закрашена ошибочно (единственное место в свободном
+      // режиме, где мы явно знаем об ошибке) — короткий шейк, антистресс-
+      // тон, без красного (см. CSS .grid-cell.is-shake).
+      shakeCell(hint.r, hint.c);
+      _boardState[hint.r][hint.c] = 2;
+      renderCell(hint.r, hint.c);
+    } else {
+      _boardState[hint.r][hint.c] = 1;
+      renderCell(hint.r, hint.c);
+    }
+    if (_onMove) _onMove('hint');
+    autoFillCrosses(hint.r, hint.c);
+    updateClueFade(hint.r, hint.c);
+    if (checkWin(_boardState, _level.solution)) markWon();
+  }
+
+  // Таймаут, а не 'animationend' — под prefers-reduced-motion анимация не
+  // играет и событие не пришло бы, класс завис бы навсегда.
+  function shakeCell(r, c) {
+    var el = cellEl(r, c);
+    if (!el) return;
+    el.classList.add('is-shake');
+    setTimeout(function () { el.classList.remove('is-shake'); }, 150);
+  }
+
+  /* ----------------------------------------------------------
+     clearBoard() — свободный режим: ошибки не подсвечиваются,
+     игрок может запутаться, ему нужен явный сброс без потери
+     доступа к уровню. Очищает заливку И крестики, перерисовывает
+     клетки. Сохранение — забота вызывающей стороны (main.js).
+  ---------------------------------------------------------- */
+  function clearBoard() {
+    if (!_level) return;
+    pushUndo(getBoardState());
+    var H = _level.height, W = _level.width;
+    for (var r = 0; r < H; r++) {
+      for (var c = 0; c < W; c++) {
+        if (_boardState[r][c] !== 0) {
+          _boardState[r][c] = 0;
+          renderCell(r, c);
+        }
+      }
+    }
+    refreshAllClueFade();
+  }
+
+  /* ----------------------------------------------------------
+     ТЗ №51 — «Проверить»: чистые запросы состояния поля.
+     findErrors — лишняя закраска (клетка вне картинки). Крестик на
+     клетке вне картинки — верный, ошибкой не бывает.
+     ТЗ №58 (решение основателя 28.09, находка аудита Н-01): крестик на
+     клетке КАРТИНКИ — тоже ошибка, её снимает «Проверить»
+     (findWrongCrosses). Чаще всего такой крестик ставит сама игра:
+     лишняя закраска запускает авто-крестики по текущей доске, а снятие
+     закраски их не убирает. Чей крестик — игры или игрока — игра не
+     помнит, поэтому снимаются все такие. Тост «лишняя клетка»
+     (hasErrors) по-прежнему только про закраску — так он и звучит.
+  ---------------------------------------------------------- */
+  function findErrors() {
+    if (!_level) return [];
+    var H = _level.height, W = _level.width, sol = _level.solution;
+    var errors = [];
+    for (var r = 0; r < H; r++) {
+      for (var c = 0; c < W; c++) {
+        if (_boardState[r][c] === 1 && sol[r][c] === 0) errors.push({ r: r, c: c });
+      }
+    }
+    return errors;
+  }
+
+  function hasErrors() {
+    return findErrors().length > 0;
+  }
+
+  function findWrongCrosses() {
+    if (!_level) return [];
+    var H = _level.height, W = _level.width, sol = _level.solution;
+    var crosses = [];
+    for (var r = 0; r < H; r++) {
+      for (var c = 0; c < W; c++) {
+        if (_boardState[r][c] === 2 && sol[r][c] === 1) crosses.push({ r: r, c: c });
+      }
+    }
+    return crosses;
+  }
+
+  function hasWrongCrosses() {
+    return findWrongCrosses().length > 0;
+  }
+
+  function remainingCells() {
+    if (!_level) return 0;
+    var H = _level.height, W = _level.width, sol = _level.solution;
+    var n = 0;
+    for (var r = 0; r < H; r++) {
+      for (var c = 0; c < W; c++) {
+        if (sol[r][c] === 1 && _boardState[r][c] !== 1) n++;
+      }
+    }
+    return n;
+  }
+
+  // Исправляет все ошибочные клетки: лишняя закраска → крестик, крестик на
+  // клетке картинки → пустая (ТЗ №58); возвращает число исправленных клеток.
+  // Сначала правится вся доска, потом авто-крестики: иначе они считались бы
+  // по линии, где ещё стоит неисправленная ошибка, и снова легли бы на
+  // клетки картинки. На исправленной доске все отметки верны, решение —
+  // одна из допустимых раскладок линии, поэтому авто-крестик на картинку
+  // уже не встанет. Победу проверяем так же, как в applyHint — снятие
+  // ошибок само по себе победу не даёт (решение всё ещё неполное), но
+  // симметрия с applyHint дешевле специального случая.
+  function revealErrors() {
+    var errors = findErrors();
+    var crosses = findWrongCrosses();
+    var i, r, c;
+    for (i = 0; i < crosses.length; i++) {
+      r = crosses[i].r; c = crosses[i].c;
+      shakeCell(r, c);
+      _boardState[r][c] = 0;
+      renderCell(r, c);
+    }
+    for (i = 0; i < errors.length; i++) {
+      r = errors[i].r; c = errors[i].c;
+      shakeCell(r, c);
+      _boardState[r][c] = 2;
+      renderCell(r, c);
+    }
+    for (i = 0; i < errors.length; i++) autoFillCrosses(errors[i].r, errors[i].c);
+    var fixed = errors.concat(crosses);
+    for (i = 0; i < fixed.length; i++) updateClueFade(fixed[i].r, fixed[i].c);
+    if (fixed.length && _onMove) _onMove('reveal');
+    if (checkWin(_boardState, _level.solution)) markWon();
+    return fixed.length;
+  }
+
+  function setPaused(v) { _paused = !!v; }
+  function isWon() { return _won; }
+
+  // ТЗ №57: ходы игрока с последнего render() (см. _moves).
+  function getMoves() { return _moves; }
+
+  function getBoardState() {
+    // Возвращает плоский снимок для сохранения: [[0,1,2,...],...]
+    return _boardState.map(function (row) { return row.slice(); });
+  }
+
+  // Восстанавливает доску из сохранённого снимка после render().
+  function restoreBoard(matrix) {
+    if (!matrix || !_level) return;
+    var H = _level.height, W = _level.width;
+    for (var r = 0; r < H; r++) {
+      for (var c = 0; c < W; c++) {
+        var v = (matrix[r] && matrix[r][c]) || 0;
+        if (v !== 0) {
+          _boardState[r][c] = v;
+          renderCell(r, c);
+        }
+      }
+    }
+    refreshAllClueFade();
+  }
+
+  return {
+    calcClues:     calcClues,
+    checkWin:      checkWin,
+    render:        render,
+    setMode:       setMode,
+    findHint:      findHint,
+    applyHint:     applyHint,
+    clearBoard:    clearBoard,
+    setPaused:     setPaused,
+    isWon:         isWon,
+    getMoves:      getMoves,
+    getBoardState: getBoardState,
+    restoreBoard:  restoreBoard,
+    resetZoom:     resetZoom,
+    findErrors:      findErrors,
+    hasErrors:       hasErrors,
+    findWrongCrosses: findWrongCrosses,
+    hasWrongCrosses: hasWrongCrosses,
+    remainingCells:  remainingCells,
+    revealErrors:    revealErrors,
+    undo:            undo,
+    canUndo:         canUndo,
+  };
+})();

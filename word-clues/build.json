@@ -1,5 +1,5 @@
 {
- "build": "0.1.0+b005 · a75b154",
+ "build": "0.1.0+b006 · a00677d",
  "art": [
   "atlas_cover",
   "bg_s001",
@@ -62,16 +62,16 @@
   "assets/sfx/tap.mp3": "8cb413ca2f49b945861fdd7b69e452ff0c222882011be7bfeae92baaec2614cc",
   "assets/sfx/win.mp3": "468d5f3b8bf8c8ea8bcef52906b0da44ab35547d763035470621e2c9309cde0d",
   "assets/sfx/wrong.mp3": "cd172cec43bb120ad724e809a543e2e1608579441897b249ad916fc68b18f924",
-  "data/content.js": "86685e7d3419cc30236a8e86284a3aa5c029b4dfaa0352381ef1cfbf009213b6",
-  "index.html": "53929e40349435e7ac071796b862d61ecab3c23a765621cbb1a9d3ac33fdcf89",
+  "data/content.js": "abbf7d3680a32ed461a9a687627df2662cd8f2f0ba33fb54acce5c9ce5a34b11",
+  "index.html": "7d2e91ae8c1e6b7f070620fde5663ce95ded73b77bf1b6efb10bfde37250f42d",
   "src/analytics.js": "a02a075ad0bfd68da5163fcce47ec1d3f1da4114f4bc8261b30be1c0aaaeda2d",
-  "src/app.js": "578aa95f433e69ce103d90b1a3be91b1d3bbc424ecf7fddbe935ebf7cb567e02",
+  "src/app.js": "274ef667aba229b2b4c9e91a17f567f118ec897bd82d8561ca39764e7c747df9",
   "src/board.js": "4b0cb85a86cce9a73d3ca6553971064640997e14ec57329b93950b55e119543a",
   "src/logic.js": "920eff9120ac06374503c74f338961fe5d0dd68d20f2d088ad3440ccbb8564eb",
   "src/platform.js": "0aadf931b45c38b9b291bd8b687d2a1a662fa0f0f8a5a55d6057ade57d634de6",
   "src/sound.js": "a77c31e1d39cdba7eb2ca8b89464816a80198fd2258b9c61c8432ab1187ac70b",
   "src/state.js": "5ef12f1b1621d4103e70ad13168a056c8065131c709cc6e1f5a2322b762ee8a6",
   "src/styles.css": "3a627b45ee1d2c10aa58961ac612c30dbc88b96b7745d8550fb844266598340e",
-  "src/survey.js": "0ee118e3483a83bcb87e10f1353297ead4a4028015f4850209540b14479ac10d"
+  "src/survey.js": "a17501c9b4e08bd928fae1b30097bd9219057989603803102591ebc2abaadf5b"
  }
 }

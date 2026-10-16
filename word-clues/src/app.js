@@ -6,7 +6,7 @@
   var C = window.G1F_CONTENT, L = window.WordLogic, A = window.Analytics, P = window.Platform;
   var S = window.GameState.create(C, P.storage);
   var $ = function (id) { return document.getElementById(id); };
-  var TOTAL_SLOTS = 10; // разворот атласа: 3 находки P0 и 7 мест «Скоро»
+  var TOTAL_SLOTS = 10; // разворот атласа: по находке на каждую из 10 историй главы
   var IDLE_MS = 120000, GHOST_MS = 3000, REVEAL_MS = 2600, RESULT_DELAY = 1500;
 
   var ICONS = {

@@ -83,7 +83,8 @@
     by('clue_solved').forEach(function (e) { if (!solved[e.clue_id]) solved[e.clue_id] = e; });
     var wrong = {};
     by('word_attempt').forEach(function (e) { if (e.result === 'wrong') wrong[e.clue_id] = (wrong[e.clue_id] || 0) + 1; });
-    var HINT = { extra: 'доп', start: 'начало', path: 'путь', explain: 'разбор' };
+    var HINT = { extra: 'д', start: 'н', path: 'п', explain: 'р' };
+    var coded = false;
     stories.forEach(function (s) {
       var total = 0, parts = [], any = false;
       s.clues.forEach(function (c, i) {
@@ -94,13 +95,15 @@
         var p = (i + 1) + ' ' + mmss(e.active_ms);
         if (w) p += ' ош' + w;
         var h = (e.hints || []).map(function (k) { return HINT[k] || k; });
-        if (e.method === 'path' || e.method === 'explain') h.push('ответ показан');
-        if (h.length) p += ' [' + h.join(',') + ']';
+        if (e.method === 'path' || e.method === 'explain') h.push('!');
+        if (h.length) { p += ' [' + h.join('') + ']'; coded = true; }
         parts.push(p);
       });
       if (!any) return;
       out.push(s.id + (done[s.id] ? ' ✓ ' : ' … ') + mmss(total) + ': ' + parts.join(' · '));
     });
+
+    if (coded) out.push('[д — ещё улика, н — начало, п — путь, р — разбор, ! — ответ показан]');
 
     var next = by('story_next_clicked').filter(function (e) { return e.next_story_id; });
     if (done[stories[0] && stories[0].id]) {

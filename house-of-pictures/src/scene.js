@@ -1,13 +1,18 @@
 /* Сцена комнаты: фон и предметы по раскладке room.layout (доли квадрата).
    Состояние берётся из сейва; сцена ничего не меняет сама, только рисует и
-   сообщает о касаниях. Невосстановленная комната приглушена (насыщенность
-   фона растёт с числом готовых предметов), невосстановленный предмет —
-   бледный силуэт, доступный — силуэт с пульсирующим кольцом. */
+   сообщает о касаниях. Насыщенность фона растёт с каждой решённой картинкой
+   комнаты. Предмет по стадиям: ничего не решено — бледный силуэт (с кольцом,
+   если его можно начать); решена часть картинок — цветной спрайт стадии;
+   решены все — выбранное оформление. Прихожая дополнительно рисует свет,
+   знак птицы, следы, письмо и птицу; кот живёт в прихожей, пока в чайной
+   не восстановлено кресло. */
 window.Scene = (function () {
   'use strict';
 
   var ART = 'assets/art/';
   var SVGNS = 'http://www.w3.org/2000/svg';
+  // На каком предмете сидит кот в каждой комнате (кот рисуется сразу за ним).
+  var CAT_ON = { r01: 'r01_rug', r02: 'r02_armchair' };
 
   function el(tag, cls, attrs) {
     var e = document.createElement(tag);
@@ -23,11 +28,23 @@ window.Scene = (function () {
     if (p.rot) node.style.setProperty('--rot', p.rot + 'deg');
   }
 
-  function spriteOf(C, S, oid) {
+  function variantSprite(C, oid, vid) {
     var o = C.objects[oid];
-    var vid = S.object_variants[oid] || o.variants[0].id;
     var v = o.variants.filter(function (x) { return x.id === vid; })[0] || o.variants[0];
     return ART + v.sprite + '.webp';
+  }
+
+  // Спрайт готового предмета в выбранном оформлении.
+  function spriteOf(C, S, oid) {
+    return variantSprite(C, oid, S.object_variants[oid]);
+  }
+
+  // Спрайт предмета на стадии stage (0 — ничего не решено).
+  function stageSprite(C, S, oid, stage) {
+    var o = C.objects[oid];
+    if (stage >= o.puzzles.length) return spriteOf(C, S, oid);
+    if (stage > 0 && o.stage_sprites) return ART + o.stage_sprites[stage - 1] + '.webp';
+    return variantSprite(C, oid, o.variants[0].id);
   }
 
   // Знак птицы на стене — простой силуэт (проступает, когда горит лампа).
@@ -59,79 +76,102 @@ window.Scene = (function () {
   }
 
   /* opts: { before: true } — вид «до» (ничего не восстановлено),
-           interactive: false — без кнопок-hotspot (для «до/после»),
-           hide: oid — нарисовать этот предмет ещё не восстановленным (пока летит миниатюра),
-           fresh: oid | 'room' — проиграть появление предмета / прихода кота. */
+           interactive: false — без кнопок (для «до/после»),
+           hide: oid — нарисовать этот предмет на стадию раньше (пока летит миниатюра),
+           fresh: oid | 'room' — проиграть появление предмета / прихода кота,
+           preview: { oid, vid } — примерка оформления (ещё не куплено). */
   function render(host, C, S, rid, opts) {
     opts = opts || {};
     var room = C.rooms[rid], L = room.layout;
     var St = window.HopState;
-    var restored = {};
-    room.objects.forEach(function (oid) { restored[oid] = !opts.before && oid !== opts.hide && St.isObjectRestored(C, S, oid); });
-    var n = room.objects.filter(function (oid) { return restored[oid]; }).length;
-    var complete = n === room.objects.length;
+    var stage = {}, restored = {}, total = 0, solved = 0;
+    room.objects.forEach(function (oid) {
+      var n = C.objects[oid].puzzles.length;
+      var st = opts.before ? 0 : St.objectStage(C, S, oid);
+      if (oid === opts.hide && st > 0) st--;
+      stage[oid] = st;
+      restored[oid] = st >= n;
+      total += n; solved += st;
+    });
+    var complete = room.objects.every(function (oid) { return restored[oid]; });
 
     host.innerHTML = '';
-    host.style.setProperty('--life', (n / room.objects.length).toFixed(3));
+    host.setAttribute('data-room', rid);
+    host.style.setProperty('--life', (solved / total).toFixed(3));
     host.classList.toggle('is-complete', complete);
     host.classList.toggle('is-lit', !!restored.r01_lamp);
     host.classList.toggle('fresh-lamp', opts.fresh === 'r01_lamp');
 
-    var bg = el('img', 'scene-bg', { src: room.background, alt: '', draggable: 'false' });
-    host.appendChild(bg);
+    host.appendChild(el('img', 'scene-bg', { src: room.background, alt: '', draggable: 'false' }));
 
-    var light = el('div', 'scene-light');
-    light.style.setProperty('--lx', (L.light.x * 100) + '%');
-    light.style.setProperty('--ly', (L.light.y * 100) + '%');
-    light.style.setProperty('--lr', (L.light.r * 100) + '%');
-    host.appendChild(light);
+    var hall = rid === 'r01';
+    if (hall) {
+      var light = el('div', 'scene-light');
+      light.style.setProperty('--lx', (L.light.x * 100) + '%');
+      light.style.setProperty('--ly', (L.light.y * 100) + '%');
+      light.style.setProperty('--lr', (L.light.r * 100) + '%');
+      host.appendChild(light);
 
-    var sign = birdSign();
-    var signWrap = el('div', 'spr-sign' + (restored.r01_lamp ? ' is-shown' : ''));
-    place(signWrap, L.sign);
-    signWrap.appendChild(sign);
-    host.appendChild(signWrap);
+      var signWrap = el('div', 'spr-sign' + (restored.r01_lamp ? ' is-shown' : ''));
+      place(signWrap, L.sign);
+      signWrap.appendChild(birdSign());
+      host.appendChild(signWrap);
 
-    // Следы видны после коврика и до прихода кота.
-    var pawsOn = restored.r01_rug && !complete;
-    L.paws.forEach(function (pt, i) {
-      var w = el('div', 'spr-paw' + (pawsOn ? ' is-shown' : '') + (opts.fresh === 'r01_rug' ? ' is-fresh' : ''));
-      place(w, { x: pt[0], y: pt[1], w: 0.034 });
-      w.style.setProperty('--d', (i * 90) + 'ms');
-      w.style.setProperty('--rot', (i % 2 ? 18 : -10) + 'deg');
-      w.appendChild(paw());
-      host.appendChild(w);
-    });
+      // Следы видны после коврика и до прихода кота.
+      var pawsOn = restored.r01_rug && !complete;
+      L.paws.forEach(function (pt, i) {
+        var w = el('div', 'spr-paw' + (pawsOn ? ' is-shown' : '') + (opts.fresh === 'r01_rug' ? ' is-fresh' : ''));
+        place(w, { x: pt[0], y: pt[1], w: 0.034 });
+        w.style.setProperty('--d', (i * 90) + 'ms');
+        w.style.setProperty('--rot', (i % 2 ? 18 : -10) + 'deg');
+        w.appendChild(paw());
+        host.appendChild(w);
+      });
+    }
 
-    // Порядок слоёв: коврик (пол) → кот → консоль/лампа → полка → письмо → цветок → птица.
-    var order = ['r01_rug', 'r01_lamp', 'r01_shelf', 'r01_flower'];
+    // Кот: в прихожей — когда она готова и пока кресло в чайной не вернулось.
+    var armchair = !opts.before && C.objects.r02_armchair && St.isObjectRestored(C, S, 'r02_armchair') && opts.hide !== 'r02_armchair';
+    var catShown = hall ? complete && !armchair : rid === 'r02' && !!restored.r02_armchair;
+
+    var order = room.z || room.objects;
     order.forEach(function (oid) {
-      var st = opts.before ? (C.objects[oid].prerequisites.length ? 'locked' : 'available') : St.objectStatus(C, S, oid);
-      if (oid === opts.hide) st = 'in_progress';
-      var active = opts.interactive !== false && st !== 'locked';
       var o = C.objects[oid];
-      var wrap = el(active ? 'button' : 'div', 'obj obj-' + st + (opts.fresh === oid ? ' is-fresh' : ''), { 'data-obj': oid });
-      if (active) {
+      var st = opts.before ? (St.isRoomUnlocked(C, S, rid) && (o.unlock_after === 0 || (o.prerequisites && !o.prerequisites.length)) ? 'available' : 'locked')
+        : St.objectStatus(C, S, oid);
+      if (oid === opts.hide) st = stage[oid] > 0 ? 'in_progress' : 'available';
+      var inter = opts.interactive !== false;
+      var wrap = el(inter ? 'button' : 'div', 'obj obj-' + st + (opts.fresh === oid ? ' is-fresh' : ''), { 'data-obj': oid });
+      if (inter) {
         wrap.type = 'button';
-        wrap.setAttribute('aria-label', (st === 'available' || st === 'in_progress') ? o.verb + ': ' + o.title : o.title);
+        wrap.setAttribute('aria-label', st === 'locked' ? o.title + ' — пока закрыто'
+          : (st === 'available' || st === 'in_progress') ? o.verb + ': ' + o.title : o.title);
       }
       place(wrap, L[oid]);
-      var img = el('img', 'spr-obj', { src: spriteOf(C, S, oid), alt: '', draggable: 'false', 'data-obj': oid });
-      if (!restored[oid]) img.classList.add(st === 'locked' ? 'is-locked' : 'is-ghost');
+      var pv = opts.preview && opts.preview.oid === oid && restored[oid];
+      var src = pv ? variantSprite(C, oid, opts.preview.vid) : stageSprite(C, S, oid, stage[oid]);
+      var img = el('img', 'spr-obj', { src: src, alt: '', draggable: 'false', 'data-obj': oid });
+      if (stage[oid] === 0) img.classList.add(st === 'locked' ? 'is-locked' : 'is-ghost');
+      else if (!restored[oid]) img.classList.add('is-stage');
       wrap.appendChild(img);
-      if (active && (st === 'available' || st === 'in_progress')) wrap.appendChild(el('span', 'hs-ring'));
-      if (active && st === 'choose_variant') {
+      if (inter && (st === 'available' || st === 'in_progress')) wrap.appendChild(el('span', 'hs-ring'));
+      if (inter && st === 'choose_variant') {
         var dot = el('span', 'hs-badge');
         dot.innerHTML = '<svg class="ico"><use href="#i-palette"/></svg>';
         wrap.appendChild(dot);
       }
+      if (pv) {
+        wrap.classList.add('is-preview');
+        wrap.appendChild(el('span', 'pv-label')).textContent = 'Пример';
+      }
       host.appendChild(wrap);
-      if (oid === 'r01_rug') {
-        var cat = el('img', 'spr spr-cat' + (complete ? ' is-shown' : '') + (opts.fresh === 'room' ? ' is-arriving' : ''), { src: ART + 'cat.webp', alt: '', draggable: 'false' });
+
+      if (oid === CAT_ON[rid] && L.cat) {
+        var cat = el('img', 'spr spr-cat' + (catShown ? ' is-shown' : '') + (opts.fresh === (hall ? 'room' : 'r02_armchair') ? ' is-arriving' : ''),
+          { src: ART + 'cat.webp', alt: '', draggable: 'false' });
         place(cat, L.cat);
         host.appendChild(cat);
       }
-      if (oid === 'r01_shelf') {
+      if (hall && oid === 'r01_shelf') {
         var ready = complete && !opts.before && !S.story_flags.letter_opened;
         var letter = el(ready && opts.interactive !== false ? 'button' : 'div',
           'spr spr-letter' + (restored.r01_shelf ? ' is-shown' : '') + (opts.fresh === 'r01_shelf' ? ' is-fresh' : '') + (ready ? ' is-ready' : ''));
@@ -141,9 +181,11 @@ window.Scene = (function () {
         host.appendChild(letter);
       }
     });
-    var bird = el('img', 'spr spr-bird' + (restored.r01_flower ? ' is-shown' : '') + (opts.fresh === 'r01_flower' ? ' is-fresh' : ''), { src: ART + 'bird.webp', alt: '', draggable: 'false' });
-    place(bird, L.bird);
-    host.appendChild(bird);
+    if (hall) {
+      var bird = el('img', 'spr spr-bird' + (restored.r01_flower ? ' is-shown' : '') + (opts.fresh === 'r01_flower' ? ' is-fresh' : ''), { src: ART + 'bird.webp', alt: '', draggable: 'false' });
+      place(bird, L.bird);
+      host.appendChild(bird);
+    }
   }
 
   // Прямоугольник спрайта предмета на экране (цель полёта миниатюры).
@@ -152,5 +194,5 @@ window.Scene = (function () {
     return img ? img.getBoundingClientRect() : null;
   }
 
-  return { render: render, objectRect: objectRect, spriteOf: spriteOf };
+  return { render: render, objectRect: objectRect, spriteOf: spriteOf, stageSprite: stageSprite, variantSprite: variantSprite };
 })();

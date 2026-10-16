@@ -888,6 +888,33 @@ window.Nonogram = (function () {
     if (checkWin(_boardState, _level.solution)) markWon();
   }
 
+  /* Карандаш (P1): открывает целую строку или столбец по решению —
+     закраска и крестики. Линию, уже закрытую игроком, не трогает и
+     возвращает false: карандаш за неё не списывается. */
+  function lineClosed(kind, idx) {
+    if (!_level) return false;
+    return kind === 'row' ? isRowClosed(idx) : isColClosed(idx);
+  }
+
+  function revealLine(kind, idx) {
+    if (!_level || _won || lineClosed(kind, idx)) return false;
+    pushUndo(getBoardState());
+    var n = kind === 'row' ? _level.width : _level.height;
+    for (var i = 0; i < n; i++) {
+      var r = kind === 'row' ? idx : i, c = kind === 'row' ? i : idx;
+      var want = _level.solution[r][c] ? 1 : 2;
+      if (_boardState[r][c] !== want) { _boardState[r][c] = want; renderCell(r, c); }
+    }
+    if (_onMove) _onMove('pencil');
+    for (var j = 0; j < n; j++) {
+      var rr = kind === 'row' ? idx : j, cc = kind === 'row' ? j : idx;
+      autoFillCrosses(rr, cc);
+      updateClueFade(rr, cc);
+    }
+    if (checkWin(_boardState, _level.solution)) markWon();
+    return true;
+  }
+
   // Таймаут, а не 'animationend' — под prefers-reduced-motion анимация не
   // играет и событие не пришло бы, класс завис бы навсегда.
   function shakeCell(r, c) {
@@ -1056,5 +1083,7 @@ window.Nonogram = (function () {
     revealErrors:    revealErrors,
     undo:            undo,
     canUndo:         canUndo,
+    lineClosed:      lineClosed,
+    revealLine:      revealLine,
   };
 })();

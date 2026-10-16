@@ -1,7 +1,8 @@
-/* «Дом картинок», P0: одна прихожая из четырёх предметов.
-   Петля: дом → выбрать предмет → решить картинку → предмет прилетает на своё
-   место → выбрать оформление → следующий предмет. Финал: кот, письмо,
-   приглашение к чаю, честный конец демо, записка для следующего визита.
+/* «Дом картинок», P1: прихожая → чайная, письмо дня, «7 встреч», лавка.
+   Петля дня: зайти → письмо дня (штамп) → картинка предмета → предмет
+   прилетает на место → монеты и карандаши → оформление.
+   Интерфейс на значках: плашки монет и карандашей сверху, разделы Дом /
+   Письма / Лавка снизу (после прихожей), цена — монета или голоса.
 
    Сохранение: черновик поля — после каждого жеста (запись в localStorage
    с задержкой ≤300 мс и сразу при уходе со страницы); победа — сразу и ДО
@@ -12,7 +13,7 @@
   var C = window.HOP_CONTENT;
   var St = window.HopState;
   var N = window.Nonogram;
-  var RID = 'r01';
+  var ART = 'assets/art/';
   var SAVE_DELAY = 300;
 
   function $(id) { return document.getElementById(id); }
@@ -31,6 +32,13 @@
     s.appendChild(u);
     return s;
   }
+  function pic(name, cls) {
+    var i = h('img', cls || '');
+    i.src = name.indexOf('/') === -1 ? ART + name + '.webp' : name;
+    i.alt = '';
+    i.draggable = false;
+    return i;
+  }
   function button(cls, label, ico, onClick) {
     var b = h('button', cls);
     b.type = 'button';
@@ -38,6 +46,19 @@
     if (label) b.appendChild(h('span', '', label));
     b.addEventListener('click', onClick);
     return b;
+  }
+  // Цена: монета + число или «N голосов».
+  function priceTag(kind, n) {
+    var t = h('span', 'price price-' + kind);
+    if (kind === 'coins') { t.appendChild(pic('coin')); t.appendChild(h('b', '', String(n))); }
+    else t.appendChild(h('b', '', n + ' ' + plural(n, 'голос', 'голоса', 'голосов')));
+    return t;
+  }
+  function plural(n, one, few, many) {
+    var a = n % 10, b = n % 100;
+    if (a === 1 && b !== 11) return one;
+    if (a >= 2 && a <= 4 && (b < 12 || b > 14)) return few;
+    return many;
   }
 
   /* ---------------- хранилище и сейв ---------------- */
@@ -57,26 +78,131 @@
     }
   })();
 
-  var loaded = St.load(storage);
+  // Сдвиг дня для проверки на стенде: ?day=+N или кнопка «+1 день» (журнал).
+  var DAY_KEY = 'hop.dev.day';
+  (function () {
+    var n = Platform.dayShift;
+    try { if (!n && Platform.journal) n = +sessionStorage.getItem(DAY_KEY) || 0; } catch (e) { /* нет sessionStorage */ }
+    if (n) St.setDayOffset(n);
+  })();
+
+  var loaded = St.load(storage, C);
   var S = loaded.state;
   var saveTimer = null;
 
   function saveNow() {
     if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
     St.persist(storage, S);
+    scheduleCloud();
   }
   function scheduleSave() {
     if (saveTimer) return;
     saveTimer = setTimeout(saveNow, SAVE_DELAY);
   }
-  document.addEventListener('visibilitychange', function () { if (document.hidden) saveNow(); });
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden) saveNow();
+    else {
+      if (dayNow !== St.today()) onNewDay();
+      syncPurchases();
+    }
+  });
   window.addEventListener('pagehide', saveNow);
 
   function log(type, data) { St.logEvent(S, type, data); scheduleSave(); }
 
+  /* ---------------- облако (только ВК с адресом сервера) ----------------
+     Сейв уходит на сервер через несколько секунд после изменения и сразу при
+     сворачивании. Если другое устройство ушло дальше, его сейв принимается,
+     когда игрок дома (не посреди картинки и не в открытой шторке). Купленное
+     сверяется с журналом сервера: при запуске, после оплаты и при возврате
+     в игру; выдача одна по ключу vk-<номер заказа>. */
+
+  var CLOUD_DELAY = 8000; // сервер пускает игрока 30 раз в минуту
+  var cloud = { rev: 0, ready: false, busy: false, dirty: false, timer: null, pending: null, syncing: false, tries: 0 };
+
+  function scheduleCloud() {
+    if (!HopCloud.enabled || !cloud.ready) return;
+    cloud.dirty = true;
+    if (document.hidden) { cloudPush(true); return; }
+    if (!cloud.timer) cloud.timer = setTimeout(function () { cloud.timer = null; cloudPush(false); }, CLOUD_DELAY);
+  }
+  function cloudPush(keepalive) {
+    if (!cloud.ready || cloud.busy || cloud.pending || !cloud.dirty) return;
+    if (cloud.timer) { clearTimeout(cloud.timer); cloud.timer = null; }
+    cloud.busy = true;
+    cloud.dirty = false;
+    HopCloud.push(St.cloudSave(S), cloud.rev, keepalive).then(function (r) {
+      cloud.busy = false;
+      if (!r) { cloud.dirty = true; return; } // нет сети — уйдёт со следующим сохранением
+      cloud.rev = r.rev;
+      if (r.ok) { if (cloud.dirty) scheduleCloud(); return; }
+      if (St.preferRemote(S, r.save)) { cloud.pending = r.save; adoptPending(); return; }
+      cloud.dirty = true;
+      cloudPush(keepalive);
+    });
+  }
+  function adoptPending() {
+    if (!cloud.pending || screen === 'puzzle' || !$('sheet').hidden) return;
+    var next = St.adoptRemote(C, S, cloud.pending);
+    cloud.pending = null;
+    if (next) {
+      S = next;
+      S.content_version = C.content_version;
+      S.current_room = curRoom();
+      St.registerVisit(S);
+      St.logEvent(S, 'cloud_adopted', { completed: S.completed_puzzles.length });
+      St.persist(storage, S);
+      applySettings();
+      rerender();
+      toast('Прогресс загружен с другого устройства');
+    }
+    cloud.dirty = true;
+    cloudPush(false);
+    syncPurchases();
+  }
+  function cloudStart() {
+    if (!HopCloud.enabled) return;
+    HopCloud.load().then(function (r) {
+      if (!r) {
+        if (++cloud.tries < 4) setTimeout(cloudStart, 20000 * cloud.tries);
+        return;
+      }
+      cloud.rev = r.rev;
+      cloud.ready = true;
+      if (St.preferRemote(S, r.save)) { cloud.pending = r.save; adoptPending(); }
+      cloud.dirty = true;
+      cloudPush(false);
+      syncPurchases();
+    });
+  }
+  function syncPurchases() {
+    if (!HopCloud.enabled || cloud.syncing) return;
+    cloud.syncing = true;
+    HopCloud.purchases(S.pay_cursor || 0).then(function (rows) {
+      cloud.syncing = false;
+      if (!rows || !rows.length) return;
+      var got = 0, ids = [];
+      rows.forEach(function (p) {
+        S.pay_cursor = Math.max(S.pay_cursor || 0, +p.id || 0);
+        if (p.refund || !C.skus[p.item]) return;
+        var r = St.applyOrder(C, S, 'vk-' + String(p.order).replace(/^t/, ''), p.item);
+        if (r.ok) got++;
+        ids.push(p.id);
+      });
+      if (got) St.logEvent(S, 'orders_synced', { count: got });
+      saveNow();
+      HopCloud.confirm(ids);
+      if (!got) return;
+      Sound.play('chord');
+      rerender();
+      bump($('hud-pencils'));
+      toast(got > 1 ? 'Покупки получены' : 'Покупка получена');
+    });
+  }
+
   /* ---------------- настройки ---------------- */
 
-  var rmQuery = window.Platform.reducedMotionQuery;
+  var rmQuery = Platform.reducedMotionQuery;
   function reducedMotion() { return !!S.settings.reduced_motion || !!(rmQuery && rmQuery.matches); }
   function applySettings() {
     Sound.setEnabled(S.settings.sound !== false);
@@ -87,15 +213,44 @@
 
   var BUILD = (document.querySelector('meta[name="hop-build"]') || {}).content || 'dev';
 
-  /* ---------------- экраны, тост, лист ---------------- */
+  /* ---------------- что уже открыто игроку ---------------- */
+
+  function hallDone() { return St.isRoomComplete(C, S, C.daily.after_room); }
+  function showCurrencies() { return !!S.story_flags.tutorial_done || S.coins > 0 || S.pencils > 0; }
+  function adsOpen() { return St.isRoomComplete(C, S, C.economy.rewarded.after_room); }
+  function curRoom() {
+    var rid = S.current_room;
+    if (!C.rooms[rid] || !St.isRoomUnlocked(C, S, rid)) rid = St.roomOrder(C)[0];
+    return rid;
+  }
+
+  /* ---------------- экраны, тост, шторка ---------------- */
 
   var screen = 'home';
+  var SCREENS = ['home', 'letters', 'shop', 'puzzle'];
   function showScreen(name) {
     if (screen !== name) hideToast();
     screen = name;
     $('app').setAttribute('data-screen', name);
-    $('screen-home').hidden = name !== 'home';
-    $('screen-puzzle').hidden = name !== 'puzzle';
+    $('shell').hidden = name === 'puzzle';
+    SCREENS.forEach(function (s) { $('screen-' + s).hidden = s !== name; });
+    var tabs = $('tabbar').querySelectorAll('.tab');
+    for (var i = 0; i < tabs.length; i++) {
+      var on = tabs[i].getAttribute('data-tab') === name;
+      tabs[i].classList.toggle('is-on', on);
+      if (on) tabs[i].setAttribute('aria-current', 'page'); else tabs[i].removeAttribute('aria-current');
+    }
+    if (name === 'letters') renderLetters();
+    if (name === 'shop') renderShop();
+    renderHud();
+    if (name !== 'puzzle') adoptPending();
+  }
+  // Перерисовать открытый раздел дома (после покупки или смены сейва).
+  function rerender() {
+    renderHud();
+    if (screen === 'home') renderHome();
+    else if (screen === 'letters') renderLetters();
+    else if (screen === 'shop') renderShop();
   }
 
   var toastTimer = null;
@@ -140,34 +295,130 @@
     if (cb && !silent) cb();
   }
   $('sheet-backdrop').addEventListener('click', function () { Sound.play('back'); closeSheet(); });
-  function sheetHead(title) {
+  function sheetHead(title, art) {
     var head = h('div', 'sheet-head');
+    if (art) head.appendChild(pic(art, 'sheet-art'));
     head.appendChild(h('h2', 'sheet-title', title));
     head.appendChild(button('tile tile-round tile-ghost', '', 'close', function () { Sound.play('back'); closeSheet(); }));
     head.lastChild.setAttribute('aria-label', 'Закрыть');
     return head;
   }
 
+  /* ---------------- плашки валют и разделы ---------------- */
+
+  var hudShown = null; // { coins, pencils } — пока летят награды, плашки показывают старые числа
+
+  function renderHud() {
+    var cur = showCurrencies();
+    $('hud-coins').hidden = !cur;
+    $('hud-pencils').hidden = !cur;
+    $('hud-coins-n').textContent = String(hudShown ? hudShown.coins : S.coins);
+    $('hud-pencils-n').textContent = String(hudShown ? hudShown.pencils : S.pencils);
+    var tabsOn = hallDone();
+    if ($('tabbar').hidden === tabsOn) {
+      $('tabbar').hidden = !tabsOn;
+      if (tabsOn && !S.story_flags.tabs_seen) { $('tabbar').classList.add('is-new'); St.setFlag(S, 'tabs_seen'); scheduleSave(); }
+    }
+    $('tab-letters-dot').hidden = !St.lettersBadge(C, S, St.today());
+    $('pencil-n').textContent = String(S.pencils);
+  }
+
+  function bump(node) {
+    if (!node) return;
+    node.classList.remove('is-bump'); void node.offsetWidth; node.classList.add('is-bump');
+  }
+
+  $('hud-coins').addEventListener('click', function () { openShopFromHud(); });
+  $('hud-pencils').addEventListener('click', function () { openShopFromHud(); });
+  function openShopFromHud() {
+    Sound.play('tap');
+    if (!hallDone()) { toast('Лавка откроется, когда оживёт прихожая'); return; }
+    showScreen('shop');
+  }
+  $('tabbar').addEventListener('click', function (e) {
+    var t = e.target.closest('.tab');
+    if (!t) return;
+    var name = t.getAttribute('data-tab');
+    $('tabbar').classList.remove('is-new');
+    if (name === screen) return;
+    Sound.play('tap');
+    showScreen(name);
+    if (name === 'home') renderHome();
+    log('tab', { tab: name });
+  });
+  $('btn-settings').addEventListener('click', function () { Sound.play('tap'); openSettings(); });
+
+  /* Награды: значок с «+N» взлетает над предметом и летит к своей плашке. */
+  function playRewards(rewards, from) {
+    var coins = 0, pencils = 0;
+    rewards.forEach(function (r) { if (r.type === 'coins') coins += r.n; if (r.type === 'pencils') pencils += r.n; });
+    // Одинаковые награды (монеты за картинку и за первую картинку дня) летят одним значком.
+    var list = [];
+    if (coins) list.push({ type: 'coins', n: coins });
+    if (pencils) list.push({ type: 'pencils', n: pencils });
+    rewards.forEach(function (r) { if (r.type === 'stamp') list.push(r); });
+    if (!list.length) { renderHud(); return; }
+    var rm = reducedMotion();
+    hudShown = rm ? null : { coins: S.coins - coins, pencils: S.pencils - pencils };
+    renderHud();
+    var left = list.length;
+    list.forEach(function (r, i) {
+      var target = r.type === 'coins' ? $('hud-coins') : r.type === 'pencils' ? $('hud-pencils') : $('tabbar').querySelector('[data-tab="letters"]');
+      var land = function () {
+        if (hudShown) {
+          if (r.type === 'coins') hudShown.coins += r.n;
+          if (r.type === 'pencils') hudShown.pencils += r.n;
+        }
+        if (--left === 0) hudShown = null;
+        renderHud();
+        bump(target);
+        if (r.type !== 'stamp') Sound.play('tap');
+      };
+      if (rm || !target || target.offsetParent === null || !document.body.animate) { land(); return; }
+      setTimeout(function () { flyBadge(r, from, target, land); }, i * 260);
+    });
+    if (rm) hudShown = null;
+  }
+
+  function flyBadge(r, from, target, done) {
+    var b = h('div', 'fx-pop fx-' + r.type);
+    b.appendChild(pic(r.type === 'coins' ? 'coin' : r.type === 'pencils' ? 'pencil' : 'stamp'));
+    b.appendChild(h('b', '', r.type === 'stamp' ? r.n + '/' + r.of : '+' + r.n));
+    $('fx').appendChild(b);
+    var fx = from ? from.left + from.width / 2 : innerWidth / 2;
+    var fy = from ? from.top + from.height / 3 : innerHeight / 2;
+    var t = target.getBoundingClientRect();
+    var tx = t.left + t.width / 2, ty = t.top + t.height / 2;
+    b.style.left = fx + 'px'; b.style.top = fy + 'px';
+    var a = b.animate([
+      { transform: 'translate(-50%,-50%) scale(.6)', opacity: 0 },
+      { transform: 'translate(-50%,-150%) scale(1.15)', opacity: 1, offset: 0.25 },
+      { transform: 'translate(-50%,-150%) scale(1)', opacity: 1, offset: 0.5 },
+      { transform: 'translate(calc(-50% + ' + (tx - fx) + 'px), calc(-50% + ' + (ty - fy) + 'px)) scale(.55)', opacity: 0.9 }
+    ], { duration: 1100, easing: 'cubic-bezier(.4,.1,.3,1)', fill: 'forwards' });
+    var fin = function () { b.remove(); done(); };
+    a.onfinish = fin; a.oncancel = fin;
+  }
+
   /* ---------------- дом ---------------- */
 
-  var room = C.rooms[RID];
+  function room() { return C.rooms[curRoom()]; }
 
-  function thumb(oid, ghost) {
-    var w = h('span', 'thumb' + (ghost ? ' is-ghost' : ''));
-    var img = h('img');
-    img.src = Scene.spriteOf(C, S, oid);
-    img.alt = '';
-    w.appendChild(img);
+  function objectThumb(oid) {
+    var st = St.objectStage(C, S, oid);
+    var w = h('span', 'thumb' + (st === 0 ? ' is-ghost' : ''));
+    w.appendChild(pic(Scene.stageSprite(C, S, oid, st)));
     return w;
   }
 
-  function renderProgress() {
-    var host = $('room-progress');
-    host.innerHTML = '';
-    room.objects.forEach(function (oid) {
-      host.appendChild(thumb(oid, !St.isObjectRestored(C, S, oid)));
-    });
-    host.setAttribute('aria-label', 'Восстановлено ' + St.restoredCount(C, S, RID) + ' из ' + room.objects.length);
+  function stageDots(oid) {
+    var o = C.objects[oid];
+    var d = h('span', 'stage-dots');
+    if (o.puzzles.length < 2) return d;
+    var st = St.objectStage(C, S, oid);
+    d.setAttribute('aria-label', st + ' из ' + o.puzzles.length);
+    for (var i = 0; i < o.puzzles.length; i++) d.appendChild(h('i', i < st ? 'is-on' : ''));
+    return d;
   }
 
   function puzzleSize(pid) {
@@ -175,88 +426,71 @@
     return p.rows[0].length + '×' + p.rows.length;
   }
 
-  function nextVisitPending() {
-    var f = S.story_flags;
-    return !!(f.room_done_session && (f.session_count || 0) > f.room_done_session && !f.next_visit_seen);
-  }
+  function introFlag(rid) { return rid === 'r01' ? 'intro_seen' : 'intro_seen_' + rid; }
 
   function renderPanel() {
     var panel = $('home-panel');
     panel.innerHTML = '';
+    var rid = curRoom(), R = C.rooms[rid];
     var f = S.story_flags;
 
-    if (!f.intro_seen) {
+    if (!f[introFlag(rid)]) {
       var card = h('div', 'card card-letter');
-      card.appendChild(h('p', 'card-text', room.intro));
-      card.appendChild(h('p', 'card-sign', '— ' + room.intro_sign));
+      card.appendChild(h('p', 'card-text', R.intro));
+      card.appendChild(h('p', 'card-sign', '— ' + R.intro_sign));
       panel.appendChild(card);
-      var lamp = C.objects.r01_lamp;
-      panel.appendChild(button('btn-main', lamp.verb, 'play', function () {
-        St.setFlag(S, 'intro_seen'); log('intro_done');
-        startObject('r01_lamp');
-      }));
-      return;
-    }
-
-    if (nextVisitPending()) {
-      var note = h('div', 'card card-letter');
-      note.appendChild(h('p', 'card-text', room.next_visit_note));
-      panel.appendChild(note);
-      panel.appendChild(button('btn-main', 'Хорошо', 'check', function () {
-        St.setFlag(S, 'next_visit_seen'); log('next_visit_note_read'); saveNow(); renderHome();
-      }));
-      return;
-    }
-
-    if (St.isRoomComplete(C, S, RID)) {
-      var done = h('div', 'card');
-      if (!f.letter_opened) {
-        done.appendChild(h('p', 'card-text', room.final_text));
-        panel.appendChild(done);
-        panel.appendChild(button('btn-main', 'Открыть письмо', 'letter', function () { openLetter(); }));
-      } else {
-        done.appendChild(h('p', 'card-text', room.demo_end));
-        panel.appendChild(done);
-        var row = h('div', 'row-actions');
-        row.appendChild(button('btn-main', 'До / после', 'compare', openBeforeAfter));
-        var again = button('tile tile-round', '', 'letter', function () { openLetter(true); });
-        again.setAttribute('aria-label', 'Перечитать письмо');
-        row.appendChild(again);
-        panel.appendChild(row);
+      var first = St.playableObjects(C, S, rid)[0];
+      if (first) {
+        panel.appendChild(button('btn-main', C.objects[first].verb, 'play', function () {
+          St.setFlag(S, introFlag(rid)); log('intro_done', { room_id: rid });
+          startObject(first);
+        }));
       }
       return;
     }
 
-    var playable = St.playableObjects(C, S, RID).sort(function (a, b) {
+    if (St.isRoomComplete(C, S, rid)) { renderDonePanel(panel, rid); return; }
+
+    var playable = St.playableObjects(C, S, rid).sort(function (a, b) {
       return (St.objectStatus(C, S, b) === 'in_progress') - (St.objectStatus(C, S, a) === 'in_progress');
     });
+    if (!playable.length) {
+      // Всё доступное в работе у других предметов — сюда попадать не должны, но без тупика.
+      panel.appendChild(h('p', 'card card-text', 'Загляни в письма — там ждёт картинка.'));
+      return;
+    }
     if (playable.length === 1) {
       var oid = playable[0], o = C.objects[oid];
       var c1 = h('div', 'card card-goal');
-      c1.appendChild(thumb(oid, true));
+      c1.appendChild(objectThumb(oid));
       var tx = h('div', 'card-body');
       tx.appendChild(h('b', 'card-title', o.title));
       tx.appendChild(h('span', 'card-sub', o.pitch));
       c1.appendChild(tx);
-      c1.appendChild(h('span', 'size-chip', puzzleSize(St.nextPuzzle(C, S, oid))));
+      var side = h('span', 'goal-side');
+      side.appendChild(h('span', 'size-chip', puzzleSize(St.nextPuzzle(C, S, oid))));
+      side.appendChild(stageDots(oid));
+      c1.appendChild(side);
       panel.appendChild(c1);
       var cont = St.objectStatus(C, S, oid) === 'in_progress';
       panel.appendChild(button('btn-main', cont ? 'Продолжить' : o.verb, 'play', function () { startObject(oid); }));
       return;
     }
     panel.appendChild(h('h3', 'panel-title', 'Что вернём дальше?'));
-    var grid = h('div', 'choice-grid');
-    playable.forEach(function (oid) {
+    var grid = h('div', 'choice-grid' + (playable.length > 2 ? ' is-compact' : ''));
+    grid.style.setProperty('--n', Math.min(playable.length, 4));
+    playable.slice(0, 4).forEach(function (oid) {
       var o = C.objects[oid];
       var b = h('button', 'card card-choice');
       b.type = 'button';
       b.setAttribute('data-obj', oid);
-      b.appendChild(thumb(oid, true));
+      b.appendChild(objectThumb(oid));
       b.appendChild(h('b', 'card-title', o.title));
       b.appendChild(h('span', 'card-sub', o.pitch));
       var meta = h('span', 'choice-meta');
       meta.appendChild(h('span', 'size-chip', puzzleSize(St.nextPuzzle(C, S, oid))));
-      if (St.objectStatus(C, S, oid) === 'in_progress') meta.appendChild(h('span', 'wip-chip', 'начато'));
+      if (C.objects[oid].puzzles.length > 1) meta.appendChild(stageDots(oid));
+      else if (St.objectStatus(C, S, oid) === 'in_progress') meta.appendChild(h('span', 'wip-chip', 'начато'));
       b.appendChild(meta);
       b.addEventListener('click', function () { startObject(oid); });
       grid.appendChild(b);
@@ -264,11 +498,112 @@
     panel.appendChild(grid);
   }
 
+  // Готовая комната: письмо прихожей → дорога дальше → письмо дня.
+  function renderDonePanel(panel, rid) {
+    var R = C.rooms[rid], f = S.story_flags;
+    if (rid === 'r01' && !f.letter_opened) {
+      var done = h('div', 'card');
+      done.appendChild(h('p', 'card-text', R.final_text));
+      panel.appendChild(done);
+      panel.appendChild(button('btn-main', 'Открыть письмо', 'letter', function () { openLetter(); }));
+      return;
+    }
+    var next = R.next_room;
+    var row = h('div', 'row-actions');
+    if (next && C.rooms[next] && St.isRoomUnlocked(C, S, next) && !St.isRoomComplete(C, S, next)) {
+      panel.appendChild(roomCard(next));
+      row.appendChild(button('btn-main', R.invitation.button || C.rooms[next].title, 'chev', function () { goRoom(next); }));
+    } else {
+      panel.appendChild(dailyCard());
+      var L = todayOpen();
+      if (L) row.appendChild(button('btn-main', 'Письмо дня', 'letter', function () { Sound.play('tap'); showScreen('letters'); }));
+      else row.appendChild(button('btn-main', 'До / после', 'compare', function () { openBeforeAfter(rid); }));
+    }
+    if (row.firstChild && row.firstChild.textContent !== 'До / после') {
+      var ba = button('tile tile-round', '', 'compare', function () { openBeforeAfter(rid); });
+      ba.setAttribute('aria-label', 'До и после');
+      row.appendChild(ba);
+    }
+    if (rid === 'r01') {
+      var again = button('tile tile-round', '', 'letter', function () { openLetter(true); });
+      again.setAttribute('aria-label', 'Перечитать письмо');
+      row.appendChild(again);
+    }
+    panel.appendChild(row);
+  }
+
+  function roomCard(rid) {
+    var R = C.rooms[rid];
+    var c = h('div', 'card card-goal card-room');
+    var t = h('span', 'thumb thumb-room');
+    t.appendChild(pic(R.background));
+    c.appendChild(t);
+    var body = h('div', 'card-body');
+    body.appendChild(h('b', 'card-title', R.title));
+    body.appendChild(h('span', 'card-sub', St.restoredCount(C, S, rid) + ' из ' + R.objects.length + ' вещей'));
+    c.appendChild(body);
+    return c;
+  }
+
+  function todayOpen() {
+    var L = St.todayLetter(C, S, St.today());
+    return L && L.status === 'today' ? L : null;
+  }
+
+  // Карточка «письмо дня + 7 встреч» для готовой комнаты.
+  function dailyCard() {
+    var c = h('div', 'card card-daily');
+    var L = St.todayLetter(C, S, St.today());
+    var env = h('span', 'daily-env' + (L && L.status === 'today' && !L.opened ? ' is-new' : ''));
+    env.appendChild(pic(L && L.status === 'solved' ? 'stamp' : 'envelope'));
+    c.appendChild(env);
+    var body = h('div', 'card-body');
+    if (L && L.status === 'today') body.appendChild(h('b', 'card-title', L.opened ? 'Письмо ждёт ответа' : 'Пришло письмо'));
+    else if (L) body.appendChild(h('b', 'card-title', 'Новое письмо ' + untilTomorrow()));
+    else body.appendChild(h('b', 'card-title', 'Новые письма скоро'));
+    body.appendChild(stampsRow(true));
+    c.appendChild(body);
+    return c;
+  }
+
+  // Сколько осталось до московской полуночи.
+  function untilTomorrow() {
+    var msk = (Date.now() + St.getDayOffset() * 864e5 + 3 * 36e5) % 864e5;
+    var hrs = Math.max(1, Math.ceil((864e5 - msk) / 36e5));
+    return 'через ' + hrs + ' ч';
+  }
+
+  function stampsRow(compact) {
+    var size = C.stamps.card_size;
+    var row = h('span', 'stamps' + (compact ? ' is-compact' : ''));
+    if (!St.stampsActive(C, S) && S.stamps.card >= C.stamps.rewards.length) {
+      row.appendChild(pic('gift', 'stamps-gift is-done'));
+      row.appendChild(h('span', 'stamps-done', 'Все подарки получены'));
+      return row;
+    }
+    var n = S.stamps.days.length;
+    row.setAttribute('aria-label', 'Штампы: ' + n + ' из ' + size);
+    for (var i = 0; i < size; i++) {
+      var s = h('i', 'stamp' + (i < n ? ' is-on' : ''));
+      if (i < n) s.appendChild(pic('stamp'));
+      row.appendChild(s);
+    }
+    row.appendChild(pic('gift', 'stamps-gift'));
+    return row;
+  }
+
+  function renderPill() {
+    var rid = curRoom(), R = C.rooms[rid];
+    $('room-title').textContent = R.title;
+    $('room-count').textContent = St.restoredCount(C, S, rid) + '/' + R.objects.length;
+    $('room-pill').classList.toggle('has-more', St.openRooms(C, S).length > 1);
+  }
+
   function renderHome(sceneOpts) {
-    $('room-title').textContent = room.title;
-    Scene.render($('scene'), C, S, RID, sceneOpts);
-    renderProgress();
+    Scene.render($('scene'), C, S, curRoom(), sceneOpts);
+    renderPill();
     renderPanel();
+    renderHud();
   }
 
   $('scene').addEventListener('click', function (e) {
@@ -278,8 +613,9 @@
     var oid = t.getAttribute('data-obj');
     if (!oid) return;
     var st = St.objectStatus(C, S, oid);
+    var rid = curRoom();
     if (st === 'available' || st === 'in_progress') {
-      if (!S.story_flags.intro_seen) { St.setFlag(S, 'intro_seen'); log('intro_done'); }
+      if (!S.story_flags[introFlag(rid)]) { St.setFlag(S, introFlag(rid)); log('intro_done', { room_id: rid }); }
       startObject(oid);
     } else if (st === 'restored' || st === 'choose_variant') {
       Sound.play('tap');
@@ -287,14 +623,89 @@
       if (img) { img.classList.remove('is-wiggle'); void img.offsetWidth; img.classList.add('is-wiggle'); }
       log('object_tap', { object_id: oid });
       openVariantSheet(oid, { secret: true });
+    } else {
+      Sound.play('back');
+      toast(lockedHint(oid));
     }
   });
 
-  $('btn-settings').addEventListener('click', function () { Sound.play('tap'); openSettings(); });
+  function lockedHint(oid) {
+    var o = C.objects[oid];
+    if (o.unlock_after !== undefined) {
+      var need = o.unlock_after - St.restoredCount(C, S, o.room);
+      if (need > 0) return o.title + ': верни ещё ' + need + ' ' + plural(need, 'вещь', 'вещи', 'вещей');
+    }
+    var miss = (o.prerequisites || []).filter(function (p) { return !St.isObjectRestored(C, S, p); })
+      .map(function (p) { return C.objects[p].title.toLowerCase(); });
+    return miss.length ? o.title + ': сначала ' + miss.join(' и ') : o.title + ' пока спит';
+  }
+
+  /* ---------------- комнаты ---------------- */
+
+  $('room-pill').addEventListener('click', function () { Sound.play('tap'); openRooms(); });
+
+  function openRooms() {
+    var node = h('div', 'rooms-sheet');
+    node.appendChild(sheetHead('Комнаты'));
+    var list = h('div', 'room-list');
+    St.roomOrder(C).forEach(function (rid) {
+      var R = C.rooms[rid];
+      var open = St.isRoomUnlocked(C, S, rid);
+      var b = h('button', 'room-card' + (open ? '' : ' is-locked') + (rid === curRoom() ? ' is-here' : ''));
+      b.type = 'button';
+      b.setAttribute('data-room', rid);
+      var t = h('span', 'room-thumb');
+      t.appendChild(pic(R.background));
+      if (!open) t.appendChild(icon('lock'));
+      b.appendChild(t);
+      var body = h('span', 'card-body');
+      body.appendChild(h('b', 'card-title', R.title));
+      var n = St.restoredCount(C, S, rid);
+      body.appendChild(h('span', 'card-sub', open ? n + ' из ' + R.objects.length + (St.isRoomComplete(C, S, rid) ? ' ✓' : '')
+        : 'Откроется после: ' + C.rooms[R.requires].title));
+      var bar = h('span', 'bar');
+      var fill = h('i');
+      fill.style.width = Math.round(100 * n / R.objects.length) + '%';
+      bar.appendChild(fill);
+      body.appendChild(bar);
+      b.appendChild(body);
+      b.addEventListener('click', function () {
+        if (!open) { Sound.play('back'); toast('Сначала верни все вещи: ' + C.rooms[R.requires].title); return; }
+        closeSheet(true);
+        goRoom(rid);
+      });
+      list.appendChild(b);
+    });
+    // Следующая комната за последней — честное «скоро».
+    var soon = h('div', 'room-card is-locked is-soon');
+    var st = h('span', 'room-thumb');
+    st.appendChild(icon('lock'));
+    soon.appendChild(st);
+    var sb = h('span', 'card-body');
+    sb.appendChild(h('b', 'card-title', 'Оранжерея'));
+    sb.appendChild(h('span', 'card-sub', 'Скоро'));
+    soon.appendChild(sb);
+    list.appendChild(soon);
+    node.appendChild(list);
+    openSheet(node, null, 'sheet-rooms');
+  }
+
+  function goRoom(rid) {
+    Sound.play('tap');
+    var changed = St.setRoom(C, S, rid);
+    if (changed) log('room_enter', { room_id: rid });
+    saveNow();
+    if (screen !== 'home') showScreen('home');
+    renderHome();
+    if (changed) {
+      var sc = $('scene');
+      sc.classList.remove('is-entering'); void sc.offsetWidth; sc.classList.add('is-entering');
+    }
+  }
 
   /* ---------------- поле ---------------- */
 
-  var cur = null; // { pid, oid, tutorial }
+  var cur = null; // { pid, oid | null, letter | null, tutorial }
 
   function solutionOf(pid) {
     return C.puzzles[pid].rows.map(function (r) { return r.split('').map(function (ch) { return ch === '#' ? 1 : 0; }); });
@@ -307,15 +718,28 @@
     }
     var pid = St.nextPuzzle(C, S, oid);
     if (!pid) return;
+    var o = C.objects[oid];
+    var n = o.puzzles.length, st = St.objectStage(C, S, oid);
+    startPuzzle(pid, { oid: oid, title: o.title + (n > 1 ? ' · ' + (st + 1) + '/' + n : ''), preview: Scene.stageSprite(C, S, oid, st), ghost: st === 0 });
+  }
+
+  function startLetter(id) {
+    var L = letterById(id);
+    startPuzzle(id, { letter: id, title: L.title, preview: ART + 'envelope.webp', ghost: false });
+  }
+
+  function startPuzzle(pid, ctx) {
     Sound.play('tap');
-    var p = C.puzzles[pid], o = C.objects[oid];
-    cur = { pid: pid, oid: oid, tutorial: pid === 'r01_lamp_01' && !S.story_flags.tutorial_done, step: 0, firstMove: false };
+    pickCancel();
+    cur = { pid: pid, oid: ctx.oid || null, letter: ctx.letter || null, tutorial: pid === 'r01_lamp_01' && !S.story_flags.tutorial_done, step: 0, firstMove: false };
     showScreen('puzzle');
-    $('puzzle-title').textContent = o.title;
+    $('puzzle-title').textContent = ctx.title;
     $('puzzle-size').textContent = puzzleSize(pid);
     var prev = $('puzzle-preview');
     prev.innerHTML = '';
-    prev.appendChild(thumb(oid, true));
+    var t = h('span', 'thumb' + (ctx.ghost ? ' is-ghost' : ''));
+    t.appendChild(pic(ctx.preview));
+    prev.appendChild(t);
     $('reveal').hidden = true;
     $('reveal').innerHTML = '';
     setToolbarEnabled(true);
@@ -327,8 +751,18 @@
     if (d) N.restoreBoard(St.decodeBoard(d.board, sol[0].length, sol.length));
     setMode(1);
     updateUndo();
-    log('puzzle_start', { puzzle_id: pid, object_id: oid, resumed: !!d });
+    $('btn-pencil').hidden = cur.tutorial || !S.story_flags.tutorial_done;
+    renderHud();
+    log('puzzle_start', { puzzle_id: pid, object_id: cur.oid, resumed: !!d });
     coachStart();
+    if (!cur.tutorial && !$('btn-pencil').hidden && !S.story_flags.pencil_tip) {
+      St.setFlag(S, 'pencil_tip');
+      setTimeout(function () {
+        if (!cur) return;
+        toast('Карандаш открывает целую строку или столбец', 3800);
+        bump($('btn-pencil'));
+      }, 700);
+    }
   }
 
   // Толстая линия через каждые пять клеток (ТЗ 01 §12).
@@ -351,14 +785,15 @@
     $('mode-cross').setAttribute('aria-checked', String(m === 2));
     coachCheck();
   }
-  $('mode-fill').addEventListener('click', function () { if (mode !== 1) Sound.play('toggle'); setMode(1); });
-  $('mode-cross').addEventListener('click', function () { if (mode !== 2) Sound.play('toggle'); setMode(2); });
-  $('btn-undo').addEventListener('click', function () { N.undo(); });
-  $('btn-hint').addEventListener('click', doHint);
+  $('mode-fill').addEventListener('click', function () { pickCancel(); if (mode !== 1) Sound.play('toggle'); setMode(1); });
+  $('mode-cross').addEventListener('click', function () { pickCancel(); if (mode !== 2) Sound.play('toggle'); setMode(2); });
+  $('btn-undo').addEventListener('click', function () { pickCancel(); N.undo(); });
+  $('btn-hint').addEventListener('click', function () { pickCancel(); doHint(); });
   $('btn-home').addEventListener('click', goHomeFromPuzzle);
+  $('btn-pencil').addEventListener('click', pencilTap);
 
   function setToolbarEnabled(on) {
-    ['mode-fill', 'mode-cross', 'btn-hint'].forEach(function (id) { $(id).disabled = !on; });
+    ['mode-fill', 'mode-cross', 'btn-hint', 'btn-pencil'].forEach(function (id) { $(id).disabled = !on; });
     if (!on) $('btn-undo').disabled = true;
   }
   function updateUndo() { $('btn-undo').disabled = !N.canUndo(); }
@@ -369,6 +804,7 @@
     else if (kind === 'cross') Sound.play('cross');
     else if (kind === 'erase') Sound.play('erase');
     else if (kind === 'undo') Sound.play('back');
+    else if (kind === 'pencil') Sound.play('hint');
     if (!cur.firstMove && (kind === 'fill' || kind === 'cross')) {
       cur.firstMove = true;
       log('first_move', { puzzle_id: cur.pid });
@@ -386,12 +822,14 @@
   function goHomeFromPuzzle() {
     if (!cur) return;
     Sound.play('back');
+    pickCancel();
     if (!N.isWon()) { St.saveDraft(S, cur.pid, N.getBoardState()); }
     saveNow();
     coachHide();
+    var wasLetter = !!cur.letter;
     cur = null;
-    showScreen('home');
-    renderHome();
+    showScreen(wasLetter ? 'letters' : 'home');
+    if (!wasLetter) renderHome();
   }
 
   document.addEventListener('keydown', function (e) {
@@ -401,13 +839,102 @@
     }
     if (screen !== 'puzzle' || !cur) return;
     var k = e.key.toLowerCase();
-    if ((e.ctrlKey || e.metaKey) && k === 'z') { e.preventDefault(); N.undo(); return; }
+    if (pick && k === 'escape') { pickCancel(); return; }
+    if (pick && k === 'enter') { pickConfirm(); return; }
+    if ((e.ctrlKey || e.metaKey) && k === 'z') { e.preventDefault(); pickCancel(); N.undo(); return; }
     if (e.ctrlKey || e.metaKey || e.altKey) return;
-    if (k === 'x' || k === 'ч') setMode(mode === 1 ? 2 : 1);
-    else if (k === 'z' || k === 'я') N.undo();
-    else if (k === 'h' || k === 'р') doHint();
+    if (k === 'x' || k === 'ч') { pickCancel(); setMode(mode === 1 ? 2 : 1); }
+    else if (k === 'z' || k === 'я') { pickCancel(); N.undo(); }
+    else if (k === 'h' || k === 'р') { pickCancel(); doHint(); }
+    else if ((k === 'p' || k === 'з') && !$('btn-pencil').hidden) pencilTap();
     else if (k === 'escape') goHomeFromPuzzle();
   });
+
+  /* ---------------- карандаш: открыть строку или столбец ---------------- */
+
+  var pick = null; // { kind, idx, r, c } | {} — режим выбора линии
+
+  function pencilTap() {
+    if (!cur || N.isWon()) return;
+    if (pick) { pickCancel(); return; }
+    Sound.play('tap');
+    if (S.pencils <= 0) { openPencilOffer(); return; }
+    pick = {};
+    N.setPaused(true);
+    $('puzzle-container').classList.add('is-picking');
+    $('btn-pencil').classList.add('is-on');
+    $('toolbar').hidden = true;
+    $('pick-bar').hidden = false;
+    $('pick-ok').disabled = true;
+    $('pick-text').textContent = 'Выбери строку или столбец';
+  }
+
+  function pickSelect(kind, idx) {
+    if (!pick) return;
+    clearPickMarks();
+    pick.kind = kind; pick.idx = idx;
+    var box = $('puzzle-container');
+    var clue = box.querySelector(kind === 'row' ? '.row-clue[data-row="' + idx + '"]' : '.col-clue[data-col="' + idx + '"]');
+    if (clue) clue.classList.add('is-pick');
+    var cells = box.querySelectorAll(kind === 'row' ? '.grid-cell[data-r="' + idx + '"]' : '.grid-cell[data-c="' + idx + '"]');
+    for (var i = 0; i < cells.length; i++) cells[i].classList.add('is-pick');
+    $('pick-text').textContent = (kind === 'row' ? 'Строка ' : 'Столбец ') + (idx + 1);
+    $('pick-ok').disabled = false;
+    Sound.play('toggle');
+  }
+
+  function clearPickMarks() {
+    var old = $('puzzle-container').querySelectorAll('.is-pick');
+    for (var i = 0; i < old.length; i++) old[i].classList.remove('is-pick');
+  }
+
+  function pickCancel() {
+    if (!pick) return;
+    pick = null;
+    clearPickMarks();
+    N.setPaused(false);
+    $('puzzle-container').classList.remove('is-picking');
+    $('btn-pencil').classList.remove('is-on');
+    $('toolbar').hidden = false;
+    $('pick-bar').hidden = true;
+  }
+
+  function pickConfirm() {
+    if (!pick || pick.kind === undefined || !cur) return;
+    var kind = pick.kind, idx = pick.idx;
+    if (N.lineClosed(kind, idx)) { toast('Эта линия уже готова — выбери другую'); return; }
+    if (!St.usePencil(S, cur.pid, kind + ':' + idx)) { pickCancel(); openPencilOffer(); return; }
+    saveNow();
+    pickCancel();
+    renderHud();
+    flashLine(kind, idx);
+    N.revealLine(kind, idx);
+  }
+
+  $('pick-cancel').addEventListener('click', function () { Sound.play('back'); pickCancel(); });
+  $('pick-ok').addEventListener('click', pickConfirm);
+  // Во время выбора поле не принимает ходов (N.setPaused); касание числа или
+  // клетки выбирает линию, повторное касание той же клетки — её столбец.
+  $('puzzle-container').addEventListener('click', function (e) {
+    if (!pick) return;
+    var rc = e.target.closest('.row-clue'), cc = e.target.closest('.col-clue'), cell = e.target.closest('.grid-cell');
+    if (rc) pickSelect('row', +rc.dataset.row);
+    else if (cc) pickSelect('col', +cc.dataset.col);
+    else if (cell) {
+      var r = +cell.dataset.r, c = +cell.dataset.c;
+      if (pick.r === r && pick.c === c) pickSelect(pick.kind === 'row' ? 'col' : 'row', pick.kind === 'row' ? c : r);
+      else pickSelect('row', r);
+      pick.r = r; pick.c = c;
+    }
+  });
+
+  function openPencilOffer() {
+    var node = h('div', 'offer-sheet');
+    node.appendChild(sheetHead('Карандаши закончились', 'pencil'));
+    node.appendChild(h('p', 'secret', 'Карандаш открывает целую строку или столбец.'));
+    node.appendChild(pencilOffers(function () { closeSheet(true); renderHud(); }));
+    openSheet(node, null, 'sheet-offer');
+  }
 
   /* ---------------- обучение действием (лампа) ---------------- */
 
@@ -545,48 +1072,66 @@
 
   function onWin() {
     if (!cur) return;
-    var pid = cur.pid, oid = cur.oid;
+    pickCancel();
+    var pid = cur.pid;
     var res = St.completePuzzle(C, S, pid);
+    if (res.duplicate) res = { object_done: false, room_done: false, stage: cur.oid ? St.objectStage(C, S, cur.oid) : 0, rewards: [] };
     if (cur.tutorial) { St.setFlag(S, 'tutorial_done'); log('tutorial_done'); }
-    if (res.room_done) St.setFlag(S, 'room_done_session', S.story_flags.session_count || 1);
     saveNow(); // награда записана до любой анимации
     coachHide();
     setToolbarEnabled(false);
     Sound.play('win');
     var rm = reducedMotion();
-    setTimeout(function () { showReveal(pid, oid, res); }, rm ? 120 : 620);
+    var ctx = { pid: pid, oid: cur.oid, letter: cur.letter, res: res };
+    setTimeout(function () { showReveal(ctx); }, rm ? 120 : 620);
   }
 
-  function pixelCanvas(pid) {
-    var sol = solutionOf(pid);
-    var H = sol.length, W = sol[0].length, k = 24;
+  // Картинка из клеток: тёмная для предметов, цветная для писем.
+  function pixelCanvas(pid, color) {
+    var p = C.puzzles[pid];
+    var H = p.rows.length, W = p.rows[0].length, k = 24;
     var cv = document.createElement('canvas');
     cv.width = W * k; cv.height = H * k;
     var g = cv.getContext('2d');
-    g.fillStyle = '#3b2c22';
-    for (var r = 0; r < H; r++) for (var c = 0; c < W; c++) if (sol[r][c]) g.fillRect(c * k, r * k, k, k);
+    for (var r = 0; r < H; r++) for (var c = 0; c < W; c++) {
+      var ch = color && p.pic ? p.pic[r][c] : p.rows[r][c];
+      if (ch === '.') continue;
+      g.fillStyle = color && p.palette ? p.palette[ch] : '#3b2c22';
+      g.fillRect(c * k, r * k, k, k);
+    }
     cv.className = 'reveal-pixels';
     return cv;
   }
 
   var revealState = null;
-  function showReveal(pid, oid, res) {
+  function showReveal(ctx) {
     var box = $('reveal');
     box.innerHTML = '';
     var stage = h('div', 'reveal-stage');
-    stage.appendChild(pixelCanvas(pid));
-    var img = h('img', 'reveal-sprite');
-    img.src = Scene.spriteOf(C, S, oid);
-    img.alt = C.objects[oid].title;
-    stage.appendChild(img);
+    stage.appendChild(pixelCanvas(ctx.pid));
+    var title;
+    if (ctx.letter) {
+      var col = pixelCanvas(ctx.pid, true);
+      col.className = 'reveal-sprite reveal-color';
+      stage.appendChild(col);
+      title = C.puzzles[ctx.pid].title + '!';
+    } else {
+      var o = C.objects[ctx.oid], n = o.puzzles.length;
+      var img = h('img', 'reveal-sprite');
+      img.src = Scene.stageSprite(C, S, ctx.oid, ctx.res.stage);
+      img.alt = o.title;
+      stage.appendChild(img);
+      title = n > 1 && !ctx.res.object_done ? o.title + ' · ' + ctx.res.stage + ' из ' + n : o.title + '!';
+    }
     box.appendChild(stage);
-    box.appendChild(h('div', 'reveal-title', C.objects[oid].title + '!'));
+    box.appendChild(h('div', 'reveal-title', title));
     box.hidden = false;
     var rm = reducedMotion();
-    revealState = { pid: pid, oid: oid, res: res, done: false };
+    revealState = ctx;
+    ctx.done = false;
     requestAnimationFrame(function () { box.classList.add('is-on'); });
     setTimeout(function () { box.classList.add('to-sprite'); }, rm ? 0 : 380);
-    revealState.timer = setTimeout(finishReveal, rm ? 700 : 1500);
+    ctx.timer = setTimeout(finishReveal, rm ? 700 : 1500);
   }
   $('reveal').addEventListener('click', function () { finishReveal(); });
 
@@ -600,8 +1145,10 @@
     $('reveal').classList.remove('is-on', 'to-sprite');
     $('reveal').hidden = true;
     cur = null;
+    if (rs.letter) { letterSolved(rs, from); return; }
+    if (curRoom() !== C.objects[rs.oid].room) St.setRoom(C, S, C.objects[rs.oid].room);
     showScreen('home');
-    // Сначала комната «до» этого предмета, затем полёт и появление.
+    // Сначала комната «до» этой картинки, затем полёт и появление.
     renderHome({ hide: rs.oid });
     $('scene').classList.add('is-busy');
     var to = Scene.objectRect($('scene'), rs.oid);
@@ -628,30 +1175,95 @@
   }
 
   function arrive(rs) {
-    renderHome({ fresh: rs.oid });
+    var o = C.objects[rs.oid], res = rs.res;
+    var fresh = res.object_done ? rs.oid : null;
+    renderHome({ fresh: fresh || rs.oid });
     Sound.play('reward');
     Sound.buzz(20);
-    toast(C.objects[rs.oid].done_text, 4200);
-    var newly = St.playableObjects(C, S, RID).filter(function (oid) { return St.objectStatus(C, S, oid) === 'available'; });
-    if (newly.length && !rs.res.room_done) setTimeout(function () { Sound.play('unlock'); }, 600);
+    playRewards(res.rewards, Scene.objectRect($('scene'), rs.oid));
+    var gift = res.rewards.filter(function (r) { return r.type === 'gift'; })[0];
+    if (!res.object_done) {
+      var left = o.puzzles.length - res.stage;
+      toast(o.title + ': ещё ' + left + ' ' + plural(left, 'картинка', 'картинки', 'картинок'), 3600);
+      $('scene').classList.remove('is-busy');
+      if (gift) setTimeout(function () { showGift(gift); }, 1600);
+      return;
+    }
+    toast(o.done_text, 4200);
+    var newly = St.playableObjects(C, S, o.room).filter(function (oid) { return St.objectStatus(C, S, oid) === 'available'; });
+    if (newly.length && !res.room_done) setTimeout(function () { Sound.play('unlock'); }, 600);
     setTimeout(function () {
       $('scene').classList.remove('is-busy');
       openVariantSheet(rs.oid, {
         afterReveal: true,
-        story: C.objects[rs.oid].done_text,
-        onDone: function () { if (rs.res.room_done) roomFinale(); }
+        story: o.done_text,
+        onDone: function () {
+          if (res.room_done) roomFinale(res.room_id, gift);
+          else if (gift) showGift(gift);
+        }
       });
     }, reducedMotion() ? 400 : 1400);
   }
 
-  function roomFinale() {
-    log('room_complete', { room_id: RID });
+  function roomFinale(rid, gift) {
+    log('room_complete', { room_id: rid });
     saveNow();
-    renderHome({ fresh: 'room' });
+    renderHome({ fresh: rid === 'r01' ? 'room' : 'r02_armchair' });
     Sound.play('chord');
+    if (rid !== 'r01') {
+      toast(C.rooms[rid].final_text, 4200);
+      setTimeout(function () { if (gift) showGift(gift); else showInvitation(rid); }, reducedMotion() ? 300 : 1600);
+    }
+    else if (gift) setTimeout(function () { showGift(gift); }, 900);
+  }
+
+  // Полная карточка «7 встреч»: подарок.
+  function showGift(g) {
+    Sound.play('chord');
+    var node = h('div', 'gift-sheet');
+    node.appendChild(sheetHead('Подарок за 7 встреч'));
+    var box = h('div', 'gift-box');
+    box.appendChild(pic('gift', 'gift-art'));
+    node.appendChild(box);
+    var items = h('div', 'gift-items');
+    g.variants.forEach(function (vid) {
+      var f = St.findVariant(C, vid);
+      var it = h('div', 'gift-item');
+      it.appendChild(pic(f.variant.sprite));
+      it.appendChild(h('span', '', f.variant.title));
+      items.appendChild(it);
+    });
+    if (g.pencils) {
+      var p = h('div', 'gift-item');
+      p.appendChild(pic('pencil'));
+      p.appendChild(h('span', '', '+' + g.pencils));
+      items.appendChild(p);
+    }
+    node.appendChild(items);
+    var vid0 = g.variants[0];
+    node.appendChild(button('btn-main', 'Поставить', 'check', function () {
+      var f = St.findVariant(C, vid0);
+      closeSheet(true);
+      if (f && St.isObjectRestored(C, S, f.object)) {
+        St.chooseVariant(C, S, f.object, vid0);
+        saveNow();
+        goRoom(C.objects[f.object].room);
+        renderHome({ fresh: f.object });
+      } else renderHome();
+    }));
+    openSheet(node, function () { renderHome(); }, 'sheet-gift');
+    log('gift', { variants: g.variants });
   }
 
   /* ---------------- оформление ---------------- */
+
+  function variantLock(v) {
+    if (!v.premium || St.isVariantOwned(C, S, v.id)) return null;
+    if (v.price_coins) return priceTag('coins', v.price_coins);
+    var t = h('span', 'price price-lock');
+    t.appendChild(pic(v.gift ? 'stamp' : 'gift'));
+    return t;
+  }
 
   function openVariantSheet(oid, opts) {
     opts = opts || {};
@@ -662,38 +1274,96 @@
     // Тост с историей предмета уходит в шторку: поверх неё он закрыл бы заголовок.
     if (opts.story) { hideToast(); node.appendChild(h('p', 'secret', opts.story)); }
     var grid = h('div', 'variant-grid');
+    grid.style.setProperty('--n', o.variants.length);
+    var action = h('div', 'variant-action');
+    var preview = null;
+
+    function rerender() {
+      Scene.render($('scene'), C, S, curRoom(), preview ? { preview: { oid: oid, vid: preview } } : undefined);
+      renderPill();
+    }
     function paint() {
       var curV = S.object_variants[oid];
       var cards = grid.querySelectorAll('.variant');
       for (var i = 0; i < cards.length; i++) {
-        var on = cards[i].getAttribute('data-v') === curV;
+        var id = cards[i].getAttribute('data-v');
+        var on = preview ? id === preview : id === curV;
         cards[i].classList.toggle('is-selected', on);
+        cards[i].classList.toggle('is-trying', !!preview && id === preview);
         cards[i].setAttribute('aria-pressed', String(on));
+        var lock = cards[i].querySelector('.price');
+        var owned = St.isVariantOwned(C, S, id);
+        if (lock && owned) lock.remove();
+        cards[i].classList.toggle('is-premium', !owned);
+      }
+      action.innerHTML = '';
+      if (!preview) return;
+      var v = St.findVariant(C, preview).variant;
+      if (v.price_coins) {
+        var buy = h('button', 'btn-buy');
+        buy.type = 'button';
+        buy.appendChild(h('span', '', 'Купить'));
+        buy.appendChild(priceTag('coins', v.price_coins));
+        if (S.coins < v.price_coins) buy.classList.add('is-short');
+        buy.addEventListener('click', function () {
+          var r = St.buyVariant(C, S, v.id);
+          if (r.ok) {
+            Sound.play('reward');
+            preview = null;
+            saveNow();
+            paint(); rerender(); renderHud(); bump($('hud-coins'));
+            var w = Scene.objectRect($('scene'), oid);
+            if (w) { var img = $('scene').querySelector('img.spr-obj[data-obj="' + oid + '"]'); if (img) { img.classList.remove('is-wiggle'); void img.offsetWidth; img.classList.add('is-wiggle'); } }
+            return;
+          }
+          if (r.reason === 'coins') { Sound.play('back'); toast('Не хватает ' + r.need + ' ' + plural(r.need, 'монеты', 'монет', 'монет') + '. Монеты — за картинки и письма'); bump($('hud-coins')); }
+        });
+        action.appendChild(buy);
+      } else if (v.sku) {
+        var d = C.skus[v.sku];
+        var sb = h('button', 'btn-buy btn-buy-sku');
+        sb.type = 'button';
+        sb.appendChild(pic('gift'));
+        sb.appendChild(h('span', '', d.title));
+        sb.appendChild(priceTag('votes', d.votes));
+        sb.addEventListener('click', function () { buySku(v.sku, function () { preview = null; paint(); rerender(); }); });
+        action.appendChild(sb);
+      } else if (v.gift) {
+        var g = h('div', 'variant-gift');
+        g.appendChild(h('span', 'card-sub', 'Подарок за 7 встреч'));
+        g.appendChild(stampsRow(true));
+        action.appendChild(g);
       }
     }
     o.variants.forEach(function (v) {
       var b = h('button', 'variant');
       b.type = 'button';
       b.setAttribute('data-v', v.id);
-      var im = h('img');
-      im.src = 'assets/art/' + v.sprite + '.webp';
-      im.alt = '';
-      b.appendChild(im);
+      b.appendChild(pic(v.sprite));
       b.appendChild(h('span', 'variant-title', v.title));
       var mark = h('span', 'variant-check');
       mark.appendChild(icon('check'));
       b.appendChild(mark);
+      var lock = variantLock(v);
+      if (lock) b.appendChild(lock);
       b.addEventListener('click', function () {
-        if (S.object_variants[oid] !== v.id) Sound.play('toggle');
-        St.chooseVariant(C, S, oid, v.id);
-        scheduleSave();
+        if (St.isVariantOwned(C, S, v.id)) {
+          if (S.object_variants[oid] !== v.id || preview) Sound.play('toggle');
+          preview = null;
+          St.chooseVariant(C, S, oid, v.id);
+          scheduleSave();
+        } else {
+          Sound.play('toggle');
+          preview = v.id;
+          log('variant_preview', { variant_id: v.id });
+        }
         paint();
-        Scene.render($('scene'), C, S, RID);
-        renderProgress();
+        rerender();
       });
       grid.appendChild(b);
     });
     node.appendChild(grid);
+    node.appendChild(action);
     node.appendChild(button('btn-main', 'Готово', 'check', function () { Sound.play('tap'); closeSheet(); }));
     paint();
     openSheet(node, function () {
@@ -704,7 +1374,7 @@
     }, 'sheet-variants');
   }
 
-  /* ---------------- письмо, приглашение, конец демо ---------------- */
+  /* ---------------- письмо прихожей и приглашения ---------------- */
 
   function openLetter(reread) {
     Sound.play('tap');
@@ -713,58 +1383,42 @@
     var env = h('button', 'envelope');
     env.type = 'button';
     env.setAttribute('aria-label', 'Распечатать');
-    var im = h('img');
-    im.src = 'assets/art/letter.webp';
-    im.alt = '';
-    env.appendChild(im);
+    env.appendChild(pic('letter'));
     node.appendChild(env);
-    var go = button('btn-main', 'Распечатать', 'letter', showInvitation);
-    env.addEventListener('click', showInvitation);
+    var go = button('btn-main', 'Распечатать', 'letter', function () { showInvitation('r01'); });
+    env.addEventListener('click', function () { showInvitation('r01'); });
     node.appendChild(go);
     openSheet(node, function () { renderHome(); }, 'sheet-letter');
     if (!S.story_flags.letter_opened) { St.setFlag(S, 'letter_opened'); log('letter_open'); saveNow(); }
-    if (reread) showInvitation();
+    if (reread) showInvitation('r01');
   }
 
-  function showInvitation() {
+  function showInvitation(rid) {
     Sound.play('reward');
-    var inv = room.invitation;
+    var R = C.rooms[rid], inv = R.invitation;
     var node = h('div', 'invite-sheet');
     var card = h('div', 'invite');
-    var im = h('img', 'invite-art');
-    im.src = 'assets/art/invitation.webp';
-    im.alt = '';
-    card.appendChild(im);
+    card.appendChild(pic('invitation', 'invite-art'));
     var body = h('div', 'invite-body');
     body.appendChild(h('h2', 'invite-title', inv.title));
     body.appendChild(h('p', 'invite-text', inv.text));
     body.appendChild(h('p', 'invite-sign', '— ' + inv.sign));
     card.appendChild(body);
     node.appendChild(card);
-    node.appendChild(button('btn-main', 'Пойти к чаю', 'play', showDemoEnd));
+    var next = R.next_room && C.rooms[R.next_room];
+    if (next) {
+      node.appendChild(button('btn-main', inv.button, 'chev', function () { closeSheet(true); goRoom(R.next_room); }));
+    } else {
+      node.appendChild(button('btn-main', inv.button || 'Хорошо', 'check', function () { Sound.play('tap'); closeSheet(); }));
+    }
     openSheet(node, function () { renderHome(); }, 'sheet-invite');
-    log('invitation_view');
+    St.setFlag(S, 'invitation_seen_' + rid);
+    log('invitation_view', { room_id: rid });
+    saveNow();
   }
 
-  function showDemoEnd() {
-    Sound.play('tap');
-    var node = h('div', 'demo-end');
-    node.appendChild(sheetHead(room.next_room_title));
-    var door = h('div', 'door-closed');
-    door.appendChild(icon('lock'));
-    node.appendChild(door);
-    node.appendChild(h('p', 'card-text', room.demo_end));
-    var row = h('div', 'row-actions');
-    row.appendChild(button('btn-main', 'До / после', 'compare', openBeforeAfter));
-    var home = button('tile tile-round', '', 'home', function () { Sound.play('back'); closeSheet(); });
-    home.setAttribute('aria-label', 'Домой');
-    row.appendChild(home);
-    node.appendChild(row);
-    openSheet(node, function () { renderHome(); }, 'sheet-demo');
-    if (!S.story_flags.demo_end_seen) { St.setFlag(S, 'demo_end_seen'); log('demo_end'); saveNow(); }
-  }
-
-  function openBeforeAfter() {
+  function openBeforeAfter(rid) {
+    rid = rid || curRoom();
     Sound.play('tap');
     var node = h('div', 'ba-sheet');
     node.appendChild(sheetHead('Было и стало'));
@@ -773,9 +1427,8 @@
     var before = h('div', 'scene ba-before');
     box.appendChild(after);
     box.appendChild(before);
-    var lblB = h('span', 'ba-label ba-label-b', 'До');
-    var lblA = h('span', 'ba-label ba-label-a', 'После');
-    box.appendChild(lblB); box.appendChild(lblA);
+    box.appendChild(h('span', 'ba-label ba-label-b', 'До'));
+    box.appendChild(h('span', 'ba-label ba-label-a', 'После'));
     var range = h('input', 'ba-range');
     range.type = 'range'; range.min = '0'; range.max = '100'; range.value = '50';
     range.setAttribute('aria-label', 'Сравнить до и после');
@@ -785,9 +1438,9 @@
     node.appendChild(box);
     node.appendChild(range);
     openSheet(node, function () { renderHome(); }, 'sheet-ba');
-    Scene.render(after, C, S, RID, { interactive: false });
-    Scene.render(before, C, S, RID, { interactive: false, before: true });
-    log('before_after_open');
+    Scene.render(after, C, S, rid, { interactive: false });
+    Scene.render(before, C, S, rid, { interactive: false, before: true });
+    log('before_after_open', { room_id: rid });
     if (!reducedMotion()) {
       // Шторка сама проезжает туда-обратно один раз — видно, что её можно двигать.
       var t0 = performance.now();
@@ -800,6 +1453,424 @@
       })(t0);
       range.addEventListener('pointerdown', function () { range.dataset.touched = '1'; });
     }
+  }
+
+  /* ---------------- письма дня ---------------- */
+
+  function letterById(id) { return C.daily.letters.filter(function (L) { return L.id === id; })[0]; }
+
+  function postcard(id, big) {
+    var w = h('div', 'postcard' + (big ? ' is-big' : ''));
+    var cv = pixelCanvas(id, true);
+    cv.className = 'postcard-pic';
+    w.appendChild(cv);
+    return w;
+  }
+
+  // Чтобы вернуться завтра: закладка ВК и напоминание о письме. Только в ВК,
+  // только по нажатию; согласился — кнопка больше не показывается.
+  function remindRow() {
+    if (Platform.name !== 'vk') return null;
+    var acts = [];
+    if (!Platform.isFavorite && !S.story_flags.fav_added) acts.push(['fav', 'star', 'В избранное', Platform.addFavorite, 'fav_added']);
+    if (!Platform.notifyOn && !S.story_flags.notify_ok) acts.push(['notify', 'bell', 'Напомнить', Platform.allowNotify, 'notify_ok']);
+    if (!acts.length) return null;
+    var row = h('div', 'remind-row');
+    acts.forEach(function (a) {
+      var b = button('btn-small btn-remind', a[2], a[1], function () {
+        Sound.play('tap');
+        b.disabled = true;
+        a[3]().then(function (ok) {
+          log('remind', { kind: a[0], ok: ok });
+          if (!ok) { b.disabled = false; return; }
+          S.story_flags[a[4]] = true;
+          saveNow();
+          toast(a[0] === 'fav' ? 'Игра в избранном' : 'Напомним о новом письме');
+          if (screen === 'letters') renderLetters();
+        });
+      });
+      b.setAttribute('data-act', a[0]);
+      row.appendChild(b);
+    });
+    return row;
+  }
+
+  function renderLetters() {
+    var page = $('letters-page');
+    page.innerHTML = '';
+    page.appendChild(h('h1', 'page-title', 'Письма'));
+    var day = St.today();
+
+    if (!S.daily.start) {
+      var lock = h('div', 'card card-lock');
+      lock.appendChild(pic('envelope', 'lock-art'));
+      lock.appendChild(icon('lock'));
+      lock.appendChild(h('p', 'card-text', 'Письма начнут приходить, когда оживёт прихожая.'));
+      page.appendChild(lock);
+      return;
+    }
+
+    // «7 встреч»
+    var sc = h('section', 'card card-stamps');
+    var head = h('div', 'card-head');
+    head.appendChild(pic('stamp', 'head-ico'));
+    head.appendChild(h('b', 'card-title', '7 встреч'));
+    sc.appendChild(head);
+    sc.appendChild(stampsRow(false));
+    if (St.stampsActive(C, S)) sc.appendChild(h('p', 'card-sub', 'Штамп — за первую картинку дня. Пропуск не сбрасывает.'));
+    page.appendChild(sc);
+
+    // Письмо дня
+    var list = St.dailyLetters(C, S, day);
+    var T = St.todayLetter(C, S, day);
+    var tc = h('section', 'card card-today');
+    if (T && T.status === 'today') {
+      var L = letterById(T.id);
+      if (!T.opened) {
+        var env = h('button', 'envelope envelope-today');
+        env.type = 'button';
+        env.setAttribute('aria-label', 'Открыть письмо');
+        env.setAttribute('data-letter-id', T.id);
+        env.appendChild(pic('envelope'));
+        env.addEventListener('click', function () { openDailyLetter(T.id); });
+        tc.appendChild(env);
+        tc.appendChild(button('btn-main', 'Открыть письмо', 'letter', function () { openDailyLetter(T.id); }));
+      } else {
+        tc.appendChild(noteBody(L));
+        tc.appendChild(button('btn-main', 'Разгадать ' + puzzleSize(T.id), 'play', function () { startLetter(T.id); }));
+      }
+    } else if (T && T.status === 'solved') {
+      var L2 = letterById(T.id);
+      tc.appendChild(postcard(T.id, true));
+      tc.appendChild(h('b', 'card-title', L2.title));
+      var nx = h('p', 'card-sub next-letter');
+      nx.appendChild(icon('clock'));
+      nx.appendChild(h('span', '', 'Новое письмо ' + untilTomorrow()));
+      tc.appendChild(nx);
+      var rm = remindRow();
+      if (rm) tc.appendChild(rm);
+    } else {
+      tc.appendChild(pic('envelope', 'lock-art'));
+      tc.appendChild(h('p', 'card-text', 'Новые письма скоро. Пока можно ответить на прежние.'));
+    }
+    page.appendChild(tc);
+
+    // Альбом: решённые — открытки, пришедшие раньше — конверты с остатком дней.
+    var older = list.filter(function (l) { return (l.status === 'solved' && (!T || l.id !== T.id)) || l.status === 'open'; }).reverse();
+    if (older.length) {
+      page.appendChild(h('h2', 'page-sub', 'Альбом'));
+      var grid = h('div', 'album');
+      older.forEach(function (l) {
+        var b = h('button', 'album-item is-' + l.status);
+        b.type = 'button';
+        b.setAttribute('data-letter-id', l.id);
+        var Lx = letterById(l.id);
+        if (l.status === 'solved') {
+          b.appendChild(postcard(l.id));
+          b.setAttribute('aria-label', Lx.title);
+          b.addEventListener('click', function () { openPostcard(l.id); });
+        } else {
+          b.appendChild(pic('envelope'));
+          var leftDays = C.daily.keep_days - St.daysBetween(l.day, day);
+          b.appendChild(h('span', 'days-left', leftDays + ' дн.'));
+          b.setAttribute('aria-label', 'Письмо, осталось ' + leftDays + ' дн.');
+          b.addEventListener('click', function () { openDailyLetter(l.id); });
+        }
+        grid.appendChild(b);
+      });
+      page.appendChild(grid);
+    }
+  }
+
+  function noteBody(L) {
+    var note = h('div', 'note');
+    note.appendChild(h('p', 'card-text', L.text));
+    note.appendChild(h('p', 'card-sign', '— ' + L.from));
+    return note;
+  }
+
+  function openDailyLetter(id) {
+    Sound.play('reward');
+    var L = letterById(id);
+    var first = St.openLetterEnvelope(S, id);
+    if (first) { log('daily_open', { id: id }); saveNow(); }
+    var node = h('div', 'daily-sheet');
+    node.appendChild(sheetHead('Письмо', 'envelope'));
+    var card = h('div', 'card card-letter');
+    card.appendChild(noteBody(L));
+    node.appendChild(card);
+    node.appendChild(button('btn-main', 'Разгадать ' + puzzleSize(id), 'play', function () { closeSheet(true); startLetter(id); }));
+    openSheet(node, function () { renderLetters(); renderHud(); }, 'sheet-daily');
+    renderHud();
+  }
+
+  function openPostcard(id, rewards) {
+    var L = letterById(id);
+    var node = h('div', 'postcard-sheet');
+    node.appendChild(sheetHead(L.title));
+    node.appendChild(postcard(id, true));
+    node.appendChild(noteBody(L));
+    node.appendChild(button('btn-main', 'Готово', 'check', function () { Sound.play('tap'); closeSheet(); }));
+    openSheet(node, function () {
+      renderLetters(); renderHud();
+      if (rewards) {
+        var gift = rewards.filter(function (r) { return r.type === 'gift'; })[0];
+        if (gift) showGift(gift);
+      }
+    }, 'sheet-postcard');
+  }
+
+  function letterSolved(rs, from) {
+    showScreen('letters');
+    Sound.play('reward');
+    Sound.buzz(20);
+    log('daily_solved', { id: rs.pid });
+    openPostcard(rs.pid, rs.res.rewards);
+    playRewards(rs.res.rewards, from);
+  }
+
+  /* ---------------- лавка ---------------- */
+
+  function section(title, art) {
+    var s = h('section', 'shop-sec');
+    var head = h('h2', 'page-sub');
+    if (art) head.appendChild(pic(art, 'head-ico'));
+    head.appendChild(h('span', '', title));
+    s.appendChild(head);
+    return s;
+  }
+
+  // Карандаши: за монеты, за голоса и за ролик.
+  function pencilOffers(after) {
+    var grid = h('div', 'offers');
+    var one = offer('pencil', '×1', priceTag('coins', C.economy.pencil_price), function () {
+      var r = St.buyPencil(C, S);
+      if (!r.ok) { Sound.play('back'); toast('Не хватает ' + r.need + ' ' + plural(r.need, 'монеты', 'монет', 'монет')); bump($('hud-coins')); return; }
+      Sound.play('reward'); saveNow(); renderHud(); bump($('hud-pencils'));
+      if (after) after();
+      else if (screen === 'shop') renderShop();
+    });
+    one.setAttribute('data-offer', 'pencil_coins');
+    grid.appendChild(one);
+    if (C.skus.pencils_10) {
+      var ten = offer('pencil', '×10', priceTag('votes', C.skus.pencils_10.votes), function () { buySku('pencils_10', after); });
+      ten.setAttribute('data-offer', 'pencils_10');
+      ten.classList.add('is-pack');
+      grid.appendChild(ten);
+    }
+    if (adsOpen()) {
+      var left = St.adsLeft(C, S, St.today());
+      var R = C.economy.rewarded;
+      [['pencil', '+' + R.pencils, 'pencil'], ['coin', '+' + R.coins, 'coins']].forEach(function (a) {
+        var tag = h('span', 'price price-ad');
+        tag.appendChild(icon('video'));
+        tag.appendChild(h('b', '', left + '/' + R.per_day));
+        var b = offer(a[0], a[1], tag, function () { watchAd(a[2], after); });
+        b.setAttribute('data-offer', 'ad_' + a[2]);
+        b.classList.add('is-ad');
+        if (left <= 0) b.disabled = true;
+        grid.appendChild(b);
+      });
+    }
+    return grid;
+  }
+
+  function offer(art, label, price, onClick) {
+    var b = h('button', 'offer');
+    b.type = 'button';
+    var top = h('span', 'offer-art');
+    top.appendChild(pic(art));
+    top.appendChild(h('b', 'offer-n', label));
+    b.appendChild(top);
+    b.appendChild(price);
+    b.addEventListener('click', function () { Sound.play('tap'); onClick(); });
+    return b;
+  }
+
+  function renderShop() {
+    var page = $('shop-page');
+    var y = page.scrollTop;
+    page.innerHTML = '';
+    page.appendChild(h('h1', 'page-title', 'Лавка'));
+
+    var s1 = section('Карандаши', 'pencil');
+    s1.appendChild(pencilOffers(null));
+    page.appendChild(s1);
+
+    var skus = Object.keys(C.skus).filter(function (k) { return C.skus[k].grants.variants && St.canOfferSku(C, S, k); });
+    if (skus.length) {
+      var s2 = section('Наборы', 'gift');
+      skus.forEach(function (k) { s2.appendChild(bundleCard(k)); });
+      page.appendChild(s2);
+    }
+
+    var s3 = section('Оформление', 'coin');
+    var grid = h('div', 'deco-grid');
+    St.openRooms(C, S).forEach(function (rid) {
+      C.rooms[rid].objects.forEach(function (oid) {
+        C.objects[oid].variants.forEach(function (v) { if (v.premium && v.price_coins) grid.appendChild(decoCard(oid, v)); });
+      });
+    });
+    s3.appendChild(grid);
+    page.appendChild(s3);
+    if (!Platform.canPay) page.appendChild(h('p', 'shop-note', 'Стенд: покупки тестовые, голоса не списываются.'));
+    page.scrollTop = y;
+  }
+
+  function bundleCard(sku) {
+    var d = C.skus[sku];
+    var c = h('div', 'card bundle');
+    c.setAttribute('data-sku', sku);
+    var top = h('div', 'bundle-top');
+    top.appendChild(pic('gift', 'bundle-ico'));
+    var body = h('div', 'card-body');
+    body.appendChild(h('b', 'card-title', d.title));
+    body.appendChild(h('span', 'card-sub', d.text));
+    top.appendChild(body);
+    c.appendChild(top);
+    var items = h('div', 'bundle-items');
+    (d.grants.variants || []).forEach(function (vid) {
+      var f = St.findVariant(C, vid);
+      items.appendChild(pic(f.variant.sprite));
+    });
+    if (d.grants.pencils) {
+      var p = h('span', 'bundle-pencils');
+      p.appendChild(pic('pencil'));
+      p.appendChild(h('b', '', '×' + d.grants.pencils));
+      items.appendChild(p);
+    }
+    c.appendChild(items);
+    var b = h('button', 'btn-buy btn-buy-sku');
+    b.type = 'button';
+    b.appendChild(priceTag('votes', d.votes));
+    b.addEventListener('click', function () { buySku(sku); });
+    c.appendChild(b);
+    return c;
+  }
+
+  function decoCard(oid, v) {
+    var owned = St.isVariantOwned(C, S, v.id);
+    var restored = St.isObjectRestored(C, S, oid);
+    var worn = S.object_variants[oid] === v.id;
+    var b = h('button', 'deco' + (owned ? ' is-owned' : '') + (restored ? '' : ' is-locked') + (worn ? ' is-worn' : ''));
+    b.type = 'button';
+    b.setAttribute('data-v', v.id);
+    b.appendChild(pic(v.sprite, 'deco-art'));
+    b.appendChild(h('span', 'deco-title', v.title));
+    if (worn) { var ck = h('span', 'variant-check'); ck.appendChild(icon('check')); b.appendChild(ck); }
+    if (owned) b.appendChild(h('span', 'deco-state', worn ? 'Стоит' : 'Есть'));
+    else if (!restored) { var l = h('span', 'price price-lock'); l.appendChild(icon('lock')); b.appendChild(l); }
+    else b.appendChild(priceTag('coins', v.price_coins));
+    b.addEventListener('click', function () {
+      if (!restored) { Sound.play('back'); toast('Сначала верни: ' + C.objects[oid].title.toLowerCase()); return; }
+      // Примерка в комнате: открываем предмет со шторкой оформлений.
+      goRoom(C.objects[oid].room);
+      openVariantSheet(oid, {});
+      if (!owned) { var card = $('sheet').querySelector('.variant[data-v="' + v.id + '"]'); if (card) card.click(); }
+    });
+    return b;
+  }
+
+  /* Покупка набора за голоса. В ВК — окно оплаты ВК; на стенде — тестовая
+     покупка без денег (чтобы проверить выдачу и интерфейс). */
+  function buySku(sku, after) {
+    var d = C.skus[sku];
+    if (!St.canOfferSku(C, S, sku)) { toast('Уже куплено'); return; }
+    log('buy_start', { sku: sku });
+    if (Platform.canPay) {
+      Platform.buy(sku).then(function (r) {
+        if (r.ok) grantOrder('vk-' + r.order_id, sku, after);
+        else if (r.reason !== 'cancel') toast('Покупка не прошла. Голоса не списаны');
+        log('buy_result', { sku: sku, ok: r.ok, reason: r.reason || null });
+        // Сдвинуть курсор журнала; если ответ окна потерялся — выдать по журналу.
+        setTimeout(syncPurchases, 1500);
+      });
+      return;
+    }
+    var node = h('div', 'test-buy');
+    node.appendChild(sheetHead(d.title, d.icon === 'pencil' ? 'pencil' : 'gift'));
+    node.appendChild(h('p', 'secret', d.text));
+    node.appendChild(h('p', 'test-note', 'Тестовая покупка: на стенде голоса не списываются. В ВК здесь откроется окно оплаты.'));
+    var b = h('button', 'btn-buy btn-buy-sku');
+    b.type = 'button';
+    b.appendChild(h('span', '', 'Купить'));
+    b.appendChild(priceTag('votes', d.votes));
+    b.addEventListener('click', function () { closeSheet(true); grantOrder('test-' + Date.now(), sku, after); });
+    node.appendChild(b);
+    openSheet(node, null, 'sheet-buy');
+  }
+
+  function grantOrder(orderId, sku, after) {
+    var r = St.applyOrder(C, S, orderId, sku);
+    if (!r.ok) { if (r.reason === 'duplicate') toast('Эта покупка уже получена'); return; }
+    saveNow();
+    Sound.play('chord');
+    renderHud();
+    if (r.pencils) bump($('hud-pencils'));
+    if (screen === 'shop') renderShop();
+    else if (screen === 'home') renderHome();
+    var d = C.skus[sku];
+    var node = h('div', 'gift-sheet');
+    node.appendChild(sheetHead('Спасибо!'));
+    var items = h('div', 'gift-items');
+    r.variants.forEach(function (vid) {
+      var f = St.findVariant(C, vid);
+      var it = h('div', 'gift-item');
+      it.appendChild(pic(f.variant.sprite));
+      it.appendChild(h('span', '', f.variant.title));
+      items.appendChild(it);
+    });
+    if (r.pencils) {
+      var p = h('div', 'gift-item');
+      p.appendChild(pic('pencil'));
+      p.appendChild(h('span', '', '+' + r.pencils));
+      items.appendChild(p);
+    }
+    node.appendChild(items);
+    if (r.variants.length) node.appendChild(h('p', 'secret', 'Вещи уже стоят в комнатах. Ещё не возвращённые появятся в своём оформлении.'));
+    node.appendChild(button('btn-main', 'Готово', 'check', function () { Sound.play('tap'); closeSheet(); }));
+    openSheet(node, function () { if (after) after(); }, 'sheet-gift');
+    log('order_applied', { sku: sku, order_id: String(orderId), title: d.title });
+  }
+
+  /* Ролик за награду — только по нажатию игрока, не больше 3 в день. */
+  function watchAd(kind, after) {
+    if (St.adsLeft(C, S, St.today()) <= 0) { toast('На сегодня ролики закончились'); return; }
+    var done = function (ok) {
+      if (!ok) { toast('Ролик не досмотрен — награды нет'); return; }
+      var r = St.rewardedGrant(C, S, kind);
+      if (!r.ok) return;
+      saveNow();
+      Sound.play('reward');
+      renderHud();
+      bump(kind === 'pencil' ? $('hud-pencils') : $('hud-coins'));
+      if (after) after();
+      if (screen === 'shop') renderShop();
+    };
+    log('ad_start', { kind: kind });
+    if (Platform.canAds) { Platform.showRewarded().then(done); return; }
+    // Стенд: тестовый «ролик» на две секунды.
+    var node = h('div', 'ad-test');
+    node.appendChild(sheetHead('Ролик (тест)'));
+    var bar = h('div', 'ad-bar');
+    bar.appendChild(h('i'));
+    node.appendChild(bar);
+    node.appendChild(h('p', 'test-note', 'На стенде вместо рекламы — пауза в 2 секунды.'));
+    openSheet(node, function () { clearTimeout(t); }, 'sheet-ad');
+    var t = setTimeout(function () { closeSheet(true); done(true); }, reducedMotion() ? 300 : 2000);
+  }
+
+  /* ---------------- новый день ---------------- */
+
+  var dayNow = St.today();
+  function onNewDay() {
+    dayNow = St.today();
+    if (St.registerVisit(S)) log('day_start', { day: dayNow });
+    saveNow();
+    if (screen === 'home') renderHome();
+    else if (screen === 'letters') renderLetters();
+    else if (screen === 'shop') renderShop();
+    renderHud();
   }
 
   /* ---------------- настройки ---------------- */
@@ -837,15 +1908,24 @@
     if (Platform.journal) {
       var dev = h('div', 'dev-row');
       dev.appendChild(button('btn-small', 'Журнал', null, exportJournal));
+      dev.appendChild(button('btn-small', '+1 день', null, function () {
+        var n = St.getDayOffset() + 1;
+        St.setDayOffset(n);
+        try { sessionStorage.setItem(DAY_KEY, String(n)); } catch (e) { /* нет sessionStorage */ }
+        closeSheet(true);
+        onNewDay();
+        toast('День: ' + St.today());
+      }));
       var reset = button('btn-small btn-danger', 'Сбросить прогресс', null, function () {
         if (!reset.dataset.armed) { reset.dataset.armed = '1'; reset.lastChild.textContent = 'Точно сбросить?'; return; }
         storage.removeItem(St.STORAGE_KEY);
+        try { sessionStorage.removeItem(DAY_KEY); } catch (e) { /* нет sessionStorage */ }
         location.reload();
       });
       dev.appendChild(reset);
       node.appendChild(dev);
     }
-    node.appendChild(h('p', 'build-stamp', 'Сборка ' + BUILD + ' · контент ' + C.content_version));
+    node.appendChild(h('p', 'build-stamp', 'Сборка ' + BUILD + ' · контент ' + C.content_version + (St.getDayOffset() ? ' · день ' + St.today() : '')));
     openSheet(node, null, 'sheet-settings');
   }
 
@@ -863,22 +1943,30 @@
 
   function boot() {
     if (loaded.recovered_from_broken) St.logEvent(S, 'save_recovered_from_broken');
+    if (loaded.migrated_from) St.logEvent(S, 'save_migrated', { from: loaded.migrated_from });
     S.content_version = C.content_version;
+    S.current_room = curRoom();
     St.registerVisit(S);
-    St.logEvent(S, 'session_start', { build: BUILD, platform: Platform.name, fresh: loaded.fresh, viewport: innerWidth + 'x' + innerHeight });
+    St.logEvent(S, 'session_start', { build: BUILD, platform: Platform.name, fresh: loaded.fresh, viewport: innerWidth + 'x' + innerHeight, day: St.today() });
     saveNow();
     applySettings();
     Platform.init();
     showScreen('home');
     renderHome();
+    cloudStart();
+    // Новый день мог наступить, пока вкладка открыта.
+    setInterval(function () { if (dayNow !== St.today()) onNewDay(); }, 60000);
   }
 
-  // Для автотестов и наблюдения: только чтение.
+  // Для автотестов и наблюдения.
   window.__hop = {
     state: function () { return JSON.parse(JSON.stringify(S)); },
     build: BUILD,
     screen: function () { return screen; },
-    currentPuzzle: function () { return cur ? cur.pid : null; }
+    currentPuzzle: function () { return cur ? cur.pid : null; },
+    today: function () { return St.today(); },
+    setDay: function (n) { St.setDayOffset(n); onNewDay(); return St.today(); },
+    cloud: function () { return { enabled: HopCloud.enabled, ready: cloud.ready, rev: cloud.rev, pending: !!cloud.pending }; }
   };
 
   boot();

@@ -1,23 +1,41 @@
-/* Состояние игрока «Дома картинок» (P0): локальный сейв с версией и правила
-   комнаты. Чистые функции работают и в Node (тесты), и в браузере.
+/* Состояние игрока «Дома картинок»: локальный сейв с версией, правила комнат,
+   экономика и ежедневные механики. Чистые функции работают и в Node (тесты),
+   и в браузере.
 
-   Правила (ТЗ 01 §6, 02 §2):
+   Правила (ТЗ 01 §6, 02 §2, 03):
    - предмет: locked → available → in_progress → choose_variant → restored;
-   - после последней картинки сразу ставится бесплатный вариант A, выбор B
-     не блокирует прогресс (choose_variant — лишь «ещё не смотрел выбор»);
-   - победа записывается ДО анимации и идемпотентна: повтор не меняет ничего;
-   - черновики хранятся по puzzle_id, до трёх предметов в работе. */
+     доступность — prerequisites (r01) или unlock_after (число восстановленных
+     предметов комнаты, r02 и дальше);
+   - после последней картинки ставится бесплатный вариант A; премиум-варианты
+     (premium: true) выбираются, только если куплены;
+   - победа записывается ДО анимации и идемпотентна. Каждая награда
+     выдаётся по ключу в granted[] — повтор, миграция и заказы не дублируют;
+   - день — календарный по Москве (UTC+3), сдвиг для проверок — setDayOffset;
+   - «Письмо дня»: n-е письмо открывается на n-й день от daily.start
+     (день завершения первой комнаты), нерешённое хранится keep_days дней;
+   - «7 встреч»: штамп за первую решённую картинку дня после первой комнаты,
+     пропуск дня не обнуляет карточку. */
 (function (root) {
   'use strict';
 
-  var SCHEMA_VERSION = 1;
+  var SCHEMA_VERSION = 2;
+  // Ключ остался от первой версии: сейв v1 читается и мигрирует на месте.
   var STORAGE_KEY = 'hop.save.v1';
   var MAX_ACTIVE_DRAFTS = 3;
   var MAX_LOG = 400;
+  var MSK_MS = 3 * 3600 * 1000;
+  var DAY_MS = 24 * 3600 * 1000;
+  var dayOffset = 0;
 
   function nowIso() { return new Date().toISOString(); }
 
-  function dayKey(d) { return (d || new Date()).toISOString().slice(0, 10); }
+  // Календарный день по Москве: в 00:00 МСК начинается новое письмо.
+  function dayKey(d) { return new Date((d || new Date()).getTime() + MSK_MS).toISOString().slice(0, 10); }
+  function setDayOffset(n) { dayOffset = n | 0; }
+  function getDayOffset() { return dayOffset; }
+  function today() { return dayKey(new Date(Date.now() + dayOffset * DAY_MS)); }
+  function daysBetween(a, b) { return Math.round((Date.parse(b + 'T00:00:00Z') - Date.parse(a + 'T00:00:00Z')) / DAY_MS); }
+  function addDays(a, n) { return new Date(Date.parse(a + 'T00:00:00Z') + n * DAY_MS).toISOString().slice(0, 10); }
 
   function emptyState() {
     return {
@@ -34,34 +52,89 @@
       drafts: {},
       story_flags: {},
       visits: [],
+      current_room: 'r01',
+      coins: 0,
+      pencils: 0,
+      owned_variants: [],
+      owned_skus: [],
+      granted: [],
+      orders: [],
+      stamps: { card: 0, days: [] },
+      daily: { start: null, opened: [] },
+      ads: { day: null, n: 0 },
       settings: { sound: true, vibration: true, reduced_motion: false },
       log: []
     };
   }
 
+  function isObj(v) { return v && typeof v === 'object' && !Array.isArray(v); }
+
   // Приводит загруженный объект к текущей схеме. Неизвестные поля сохраняет.
-  function migrate(raw) {
-    if (!raw || typeof raw !== 'object') return null;
+  // C передаётся, чтобы при переходе с v1 выдать награды задним числом.
+  function migrate(raw, C) {
+    if (!isObj(raw)) return null;
+    var from = raw.schema_version | 0;
     var s = emptyState();
     for (var k in raw) if (Object.prototype.hasOwnProperty.call(raw, k)) s[k] = raw[k];
-    if (!s.settings || typeof s.settings !== 'object') s.settings = emptyState().settings;
-    ['completed_puzzles', 'applied_stages', 'completed_rooms', 'seen_variant_choice', 'visits', 'log']
+    var base = emptyState();
+    if (!isObj(s.settings)) s.settings = base.settings;
+    ['completed_puzzles', 'applied_stages', 'completed_rooms', 'seen_variant_choice', 'visits', 'log',
+      'owned_variants', 'owned_skus', 'granted', 'orders']
       .forEach(function (key) { if (!Array.isArray(s[key])) s[key] = []; });
-    ['object_variants', 'drafts', 'story_flags'].forEach(function (key) {
-      if (!s[key] || typeof s[key] !== 'object' || Array.isArray(s[key])) s[key] = {};
-    });
+    ['object_variants', 'drafts', 'story_flags'].forEach(function (key) { if (!isObj(s[key])) s[key] = {}; });
+    ['stamps', 'daily', 'ads'].forEach(function (key) { if (!isObj(s[key])) s[key] = base[key]; });
+    if (!Array.isArray(s.stamps.days)) s.stamps.days = [];
+    s.stamps.card = s.stamps.card | 0;
+    if (!Array.isArray(s.daily.opened)) s.daily.opened = [];
+    if (typeof s.daily.start !== 'string') s.daily.start = null;
+    ['coins', 'pencils'].forEach(function (key) { s[key] = Math.max(0, s[key] | 0); });
+    if (typeof s.current_room !== 'string') s.current_room = 'r01';
     s.schema_version = SCHEMA_VERSION;
+    if (C && from < 2) backfill(C, s);
     return s;
+  }
+
+  // Награды за то, что игрок сделал до появления экономики (v1 → v2).
+  function backfill(C, s) {
+    var E = C.economy, day = today();
+    s.completed_puzzles.forEach(function (pid) {
+      if (C.puzzles[pid]) grant(s, 'p:' + pid, E.coins_per_puzzle, 0);
+      if (C.puzzles[pid] && C.puzzles[pid].difficulty === 'tutorial') grant(s, 't:tutorial', 0, E.tutorial_pencils);
+    });
+    s.completed_rooms.forEach(function (rid) { grant(s, 'r:' + rid, E.room_reward.coins, E.room_reward.pencils); });
+    if (!s.daily.start && isRoomComplete(C, s, C.daily.after_room)) s.daily.start = day;
+    logEvent(s, 'migrate', { from: 1, coins: s.coins, pencils: s.pencils });
   }
 
   function has(arr, v) { return arr.indexOf(v) !== -1; }
   function add(arr, v) { if (!has(arr, v)) arr.push(v); }
 
-  /* ---------- правила комнаты ---------- */
+  /* ---------- комнаты и предметы ---------- */
+
+  function roomOrder(C) { return C.room_order || Object.keys(C.rooms); }
+
+  function isRoomUnlocked(C, s, rid) {
+    var need = C.rooms[rid].requires;
+    return !need || has(s.completed_rooms, need);
+  }
+
+  function openRooms(C, s) { return roomOrder(C).filter(function (rid) { return isRoomUnlocked(C, s, rid); }); }
 
   function isObjectRestored(C, s, oid) {
     var o = C.objects[oid];
     return o.puzzles.every(function (pid) { return has(s.completed_puzzles, pid); });
+  }
+
+  // Сколько картинок предмета уже решено — номер стадии в сцене.
+  function objectStage(C, s, oid) {
+    return C.objects[oid].puzzles.filter(function (pid) { return has(s.completed_puzzles, pid); }).length;
+  }
+
+  function isObjectReady(C, s, oid) {
+    var o = C.objects[oid];
+    if (!isRoomUnlocked(C, s, o.room)) return false;
+    if (o.unlock_after !== undefined) return restoredCount(C, s, o.room) >= o.unlock_after;
+    return (o.prerequisites || []).every(function (p) { return isObjectRestored(C, s, p); });
   }
 
   function objectStatus(C, s, oid) {
@@ -69,8 +142,7 @@
     if (isObjectRestored(C, s, oid)) {
       return has(s.seen_variant_choice, oid) ? 'restored' : 'choose_variant';
     }
-    var ready = o.prerequisites.every(function (p) { return isObjectRestored(C, s, p); });
-    if (!ready) return 'locked';
+    if (!isObjectReady(C, s, oid)) return 'locked';
     var started = o.puzzles.some(function (pid) { return has(s.completed_puzzles, pid) || s.drafts[pid]; });
     return started ? 'in_progress' : 'available';
   }
@@ -101,7 +173,7 @@
     var out = [];
     Object.keys(s.drafts).forEach(function (pid) {
       var p = C.puzzles[pid];
-      if (p && !has(s.completed_puzzles, pid) && !has(out, p.object)) out.push(p.object);
+      if (p && p.object && !has(s.completed_puzzles, pid) && !has(out, p.object)) out.push(p.object);
     });
     return out;
   }
@@ -113,7 +185,23 @@
     return activeDraftObjects(C, s).length < MAX_ACTIVE_DRAFTS;
   }
 
-  /* ---------- изменения состояния ---------- */
+  /* ---------- оформления ---------- */
+
+  function findVariant(C, vid) {
+    for (var oid in C.objects) {
+      var vs = C.objects[oid].variants;
+      for (var i = 0; i < vs.length; i++) if (vs[i].id === vid) return { object: oid, variant: vs[i] };
+    }
+    return null;
+  }
+
+  function isVariantOwned(C, s, vid) {
+    var f = findVariant(C, vid);
+    if (!f) return false;
+    return !f.variant.premium || has(s.owned_variants, vid);
+  }
+
+  /* ---------- журнал и награды ---------- */
 
   function logEvent(s, type, data) {
     s.log.push({ t: nowIso(), type: type, data: data || null });
@@ -122,6 +210,24 @@
 
   function touch(s) { s.revision++; s.updated_at = nowIso(); }
 
+  // Выдача по ключу — ровно один раз. Возвращает список наград для анимации.
+  function grant(s, key, coins, pencils) {
+    if (has(s.granted, key)) return [];
+    s.granted.push(key);
+    var out = [];
+    if (coins) { s.coins += coins; out.push({ type: 'coins', n: coins, key: key }); }
+    if (pencils) { s.pencils += pencils; out.push({ type: 'pencils', n: pencils, key: key }); }
+    return out;
+  }
+
+  function grantVariants(s, list) {
+    var got = [];
+    (list || []).forEach(function (vid) { if (!has(s.owned_variants, vid)) { s.owned_variants.push(vid); got.push(vid); } });
+    return got;
+  }
+
+  /* ---------- черновики и победа ---------- */
+
   function saveDraft(s, pid, board) {
     var empty = board.every(function (row) { return row.every(function (v) { return v === 0; }); });
     if (empty) delete s.drafts[pid];
@@ -129,29 +235,62 @@
     touch(s);
   }
 
-  // Победа: идемпотентно. Возвращает, что изменилось (для анимаций).
-  function completePuzzle(C, s, pid) {
+  function stampsActive(C, s) {
+    return isRoomComplete(C, s, C.daily.after_room) && s.stamps.card < C.stamps.rewards.length;
+  }
+
+  // Штамп за первую решённую картинку дня. Полная карточка — подарок.
+  function addStamp(C, s, day, out) {
+    if (!stampsActive(C, s) || has(s.stamps.days, day)) return;
+    s.stamps.days.push(day);
+    out.push({ type: 'stamp', n: s.stamps.days.length, of: C.stamps.card_size });
+    if (s.stamps.days.length < C.stamps.card_size) return;
+    var gift = C.stamps.rewards[s.stamps.card];
+    var key = 's:' + s.stamps.card;
+    s.stamps.card++;
+    s.stamps.days = [];
+    if (has(s.granted, key)) return;
+    s.granted.push(key);
+    var vids = grantVariants(s, gift.variants);
+    s.pencils += gift.pencils || 0;
+    out.push({ type: 'gift', variants: vids, pencils: gift.pencils || 0, card: s.stamps.card });
+  }
+
+  // Победа: идемпотентно. Возвращает, что изменилось, и награды (rewards).
+  function completePuzzle(C, s, pid, day) {
     var p = C.puzzles[pid];
     if (!p) throw new Error('unknown puzzle ' + pid);
-    if (has(s.completed_puzzles, pid)) return { duplicate: true };
-    var oid = p.object, rid = C.objects[oid].room;
-    var wasRoomComplete = isRoomComplete(C, s, rid);
+    if (has(s.completed_puzzles, pid)) return { duplicate: true, rewards: [] };
+    day = day || today();
+    var E = C.economy, rewards = [];
+    var oid = p.object || null, rid = oid ? C.objects[oid].room : null;
+    var wasRoomComplete = rid ? isRoomComplete(C, s, rid) : true;
     add(s.completed_puzzles, pid);
     add(s.applied_stages, pid);
     delete s.drafts[pid];
-    var objectDone = isObjectRestored(C, s, oid);
+    var objectDone = oid ? isObjectRestored(C, s, oid) : false;
     if (objectDone && !s.object_variants[oid]) s.object_variants[oid] = C.objects[oid].variants[0].id;
-    var roomDone = !wasRoomComplete && isRoomComplete(C, s, rid);
+    var roomDone = !!rid && !wasRoomComplete && isRoomComplete(C, s, rid);
     if (roomDone) add(s.completed_rooms, rid);
-    logEvent(s, 'puzzle_complete', { puzzle_id: pid, object_id: oid, object_done: objectDone, room_done: roomDone });
+
+    rewards = rewards.concat(grant(s, 'p:' + pid, E.coins_per_puzzle, 0));
+    if (p.difficulty === 'tutorial') rewards = rewards.concat(grant(s, 't:tutorial', 0, E.tutorial_pencils));
+    rewards = rewards.concat(grant(s, 'd:' + day, E.coins_daily_first, 0));
+    if (roomDone) rewards = rewards.concat(grant(s, 'r:' + rid, E.room_reward.coins, E.room_reward.pencils));
+    if (roomDone && rid === C.daily.after_room && !s.daily.start) s.daily.start = day;
+    addStamp(C, s, day, rewards);
+
+    logEvent(s, 'puzzle_complete', { puzzle_id: pid, object_id: oid, object_done: objectDone, room_done: roomDone, day: day });
     touch(s);
-    return { duplicate: false, object_done: objectDone, room_done: roomDone, object_id: oid, room_id: rid };
+    return { duplicate: false, object_done: objectDone, room_done: roomDone, object_id: oid, room_id: rid,
+      stage: oid ? objectStage(C, s, oid) : 0, rewards: rewards };
   }
 
   function chooseVariant(C, s, oid, vid) {
     var o = C.objects[oid];
     if (!isObjectRestored(C, s, oid)) return false;
     if (!o.variants.some(function (v) { return v.id === vid; })) return false;
+    if (!isVariantOwned(C, s, vid)) return false;
     s.object_variants[oid] = vid;
     add(s.seen_variant_choice, oid);
     logEvent(s, 'variant_select', { object_id: oid, variant_id: vid });
@@ -164,14 +303,154 @@
     touch(s);
   }
 
+  /* ---------- траты ---------- */
+
+  // Премиум-оформление за монеты: только для восстановленного предмета,
+  // сразу ставится в комнату.
+  function buyVariant(C, s, vid) {
+    var f = findVariant(C, vid);
+    if (!f || !f.variant.premium || !f.variant.price_coins) return { ok: false, reason: 'not_for_coins' };
+    if (has(s.owned_variants, vid)) return { ok: false, reason: 'owned' };
+    if (!isObjectRestored(C, s, f.object)) return { ok: false, reason: 'not_restored' };
+    if (s.coins < f.variant.price_coins) return { ok: false, reason: 'coins', need: f.variant.price_coins - s.coins };
+    s.coins -= f.variant.price_coins;
+    s.owned_variants.push(vid);
+    s.object_variants[f.object] = vid;
+    add(s.seen_variant_choice, f.object);
+    logEvent(s, 'buy_variant', { variant_id: vid, coins: f.variant.price_coins });
+    touch(s);
+    return { ok: true };
+  }
+
+  function buyPencil(C, s) {
+    var price = C.economy.pencil_price;
+    if (s.coins < price) return { ok: false, reason: 'coins', need: price - s.coins };
+    s.coins -= price;
+    s.pencils++;
+    logEvent(s, 'buy_pencil', { coins: price });
+    touch(s);
+    return { ok: true };
+  }
+
+  function usePencil(s, pid, line) {
+    if (s.pencils <= 0) return false;
+    s.pencils--;
+    logEvent(s, 'use_pencil', { puzzle_id: pid, line: line || null });
+    touch(s);
+    return true;
+  }
+
+  /* ---------- покупки за голоса и реклама ---------- */
+
+  function skuOwnedPart(C, s, sku) {
+    var g = C.skus[sku].grants;
+    return (g.variants || []).some(function (vid) { return has(s.owned_variants, vid); });
+  }
+
+  // Можно ли показывать набор: разовые — пока не куплены; стартовый —
+  // пока ни одна его вещь не получена другим путём.
+  function canOfferSku(C, s, sku) {
+    var d = C.skus[sku];
+    if (!d) return false;
+    if (d.one_time && has(s.owned_skus, sku)) return false;
+    if (d.only_if_none_owned && skuOwnedPart(C, s, sku)) return false;
+    return true;
+  }
+
+  // Заказ применяется один раз по order_id (подтверждение могло прийти
+  // дважды: из окна ВК и при синхронизации с сервером).
+  function applyOrder(C, s, orderId, sku) {
+    var d = C.skus[sku];
+    if (!d) return { ok: false, reason: 'unknown_sku' };
+    if (s.orders.some(function (o) { return o.id === orderId; })) return { ok: false, reason: 'duplicate' };
+    s.orders.push({ id: String(orderId), sku: sku, t: nowIso() });
+    add(s.owned_skus, sku);
+    var vids = grantVariants(s, d.grants.variants);
+    var pencils = d.grants.pencils || 0;
+    s.pencils += pencils;
+    // Набор надевает свои вещи на уже восстановленные предметы.
+    vids.forEach(function (vid) {
+      var f = findVariant(C, vid);
+      if (f && isObjectRestored(C, s, f.object)) s.object_variants[f.object] = vid;
+    });
+    logEvent(s, 'order', { order_id: String(orderId), sku: sku });
+    touch(s);
+    return { ok: true, variants: vids, pencils: pencils };
+  }
+
+  function adsLeft(C, s, day) {
+    day = day || today();
+    return C.economy.rewarded.per_day - (s.ads.day === day ? s.ads.n : 0);
+  }
+
+  // Награда за досмотренный ролик: монеты или карандаш, не больше per_day в день.
+  function rewardedGrant(C, s, kind, day) {
+    day = day || today();
+    if (adsLeft(C, s, day) <= 0) return { ok: false, reason: 'limit' };
+    if (s.ads.day !== day) s.ads = { day: day, n: 0 };
+    s.ads.n++;
+    var R = C.economy.rewarded;
+    if (kind === 'pencil') s.pencils += R.pencils; else s.coins += R.coins;
+    logEvent(s, 'rewarded', { kind: kind, day: day });
+    touch(s);
+    return { ok: true, kind: kind, n: kind === 'pencil' ? R.pencils : R.coins };
+  }
+
+  /* ---------- письма дня ---------- */
+
+  // Все письма с их положением для игрока на день day:
+  // future — ещё не пришло, today — сегодняшнее, open — пришло раньше и ждёт,
+  // solved — решено (остаётся в альбоме), expired — не решено и пропало.
+  function dailyLetters(C, s, day) {
+    day = day || today();
+    var start = s.daily.start;
+    var since = start ? daysBetween(start, day) : -1;
+    return C.daily.letters.map(function (L, i) {
+      var st;
+      if (has(s.completed_puzzles, L.id)) st = 'solved';
+      else if (!start || i > since) st = 'future';
+      else if (i === since) st = 'today';
+      else if (since - i < C.daily.keep_days) st = 'open';
+      else st = 'expired';
+      return { id: L.id, index: i, status: st, day: start ? addDays(start, i) : null, opened: has(s.daily.opened, L.id) };
+    });
+  }
+
+  function todayLetter(C, s, day) {
+    var list = dailyLetters(C, s, day);
+    for (var i = 0; i < list.length; i++) if (list[i].status === 'today' || (list[i].status === 'solved' && list[i].day === (day || today()))) return list[i];
+    return null;
+  }
+
+  // Точка на значке «Письма»: есть пришедшее, но ещё не распечатанное письмо.
+  function lettersBadge(C, s, day) {
+    return dailyLetters(C, s, day).some(function (l) { return (l.status === 'today' || l.status === 'open') && !l.opened; });
+  }
+
+  function openLetterEnvelope(s, id) {
+    if (has(s.daily.opened, id)) return false;
+    s.daily.opened.push(id);
+    touch(s);
+    return true;
+  }
+
+  /* ---------- прочее ---------- */
+
   function setFlag(s, name, value) {
     s.story_flags[name] = value === undefined ? true : value;
     touch(s);
   }
 
+  function setRoom(C, s, rid) {
+    if (!C.rooms[rid] || !isRoomUnlocked(C, s, rid) || s.current_room === rid) return false;
+    s.current_room = rid;
+    touch(s);
+    return true;
+  }
+
   // Визит засчитывается раз в календарный день (для «записки следующего визита»).
   function registerVisit(s, d) {
-    var key = dayKey(d);
+    var key = d ? dayKey(d) : today();
     var first = s.visits.length === 0 || s.visits[s.visits.length - 1] !== key;
     if (first) { s.visits.push(key); if (s.visits.length > 60) s.visits.shift(); }
     s.story_flags.session_count = (s.story_flags.session_count || 0) + 1;
@@ -200,15 +479,15 @@
 
   // Нечитаемый сейв не затирается молча: сырой текст копируется под ключ
   // <ключ>.broken.<время>, и только потом игра начинается с чистого профиля.
-  function load(storage) {
+  function load(storage, C) {
     var raw;
     try { raw = storage.getItem(STORAGE_KEY); } catch (e) { return { state: emptyState(), fresh: true, storage_ok: false }; }
     if (raw === null || raw === undefined) return { state: emptyState(), fresh: true, storage_ok: true };
     try {
       var parsed = JSON.parse(raw);
-      var s = migrate(parsed);
+      var s = migrate(parsed, C);
       if (!s) throw new Error('bad save');
-      return { state: s, fresh: false, storage_ok: true };
+      return { state: s, fresh: false, storage_ok: true, migrated_from: parsed.schema_version | 0 };
     } catch (e) {
       try { storage.setItem(STORAGE_KEY + '.broken.' + Date.now(), raw); } catch (e2) { /* место кончилось — оставляем как есть */ }
       return { state: emptyState(), fresh: true, storage_ok: true, recovered_from_broken: true };
@@ -229,15 +508,53 @@
     }
   }
 
+  /* ---------- облако (сервер «Дома картинок», только в ВК) ---------- */
+
+  // Сейв для облака: без журнала событий и черновиков — они у каждого устройства свои.
+  function cloudSave(s) {
+    var o = JSON.parse(JSON.stringify(s));
+    delete o.log;
+    delete o.drafts;
+    return o;
+  }
+
+  // Продолжать ли облачный сейв вместо своего: где больше решённых картинок,
+  // при равенстве — где позже менялся.
+  function preferRemote(local, remote) {
+    if (!isObj(remote) || !Array.isArray(remote.completed_puzzles)) return false;
+    var a = local.completed_puzzles.length, b = remote.completed_puzzles.length;
+    if (a !== b) return b > a;
+    return String(remote.updated_at || '') > String(local.updated_at || '');
+  }
+
+  // Принять облачный сейв. Черновики, журнал и настройки устройства остаются.
+  // Купленное, которого нет в облачном сейве, вернёт сверка журнала покупок.
+  function adoptRemote(C, local, remote) {
+    var s = migrate(JSON.parse(JSON.stringify(remote)), C);
+    if (!s) return null;
+    s.drafts = local.drafts;
+    s.log = local.log;
+    s.settings = local.settings;
+    return s;
+  }
+
   var api = {
     SCHEMA_VERSION: SCHEMA_VERSION, STORAGE_KEY: STORAGE_KEY, MAX_ACTIVE_DRAFTS: MAX_ACTIVE_DRAFTS,
-    emptyState: emptyState, migrate: migrate, dayKey: dayKey,
-    isObjectRestored: isObjectRestored, objectStatus: objectStatus, nextPuzzle: nextPuzzle,
+    emptyState: emptyState, migrate: migrate, dayKey: dayKey, today: today, daysBetween: daysBetween, addDays: addDays,
+    setDayOffset: setDayOffset, getDayOffset: getDayOffset,
+    roomOrder: roomOrder, isRoomUnlocked: isRoomUnlocked, openRooms: openRooms, setRoom: setRoom,
+    isObjectRestored: isObjectRestored, objectStage: objectStage, objectStatus: objectStatus, nextPuzzle: nextPuzzle,
     playableObjects: playableObjects, isRoomComplete: isRoomComplete, restoredCount: restoredCount,
     canStartObject: canStartObject, activeDraftObjects: activeDraftObjects,
+    findVariant: findVariant, isVariantOwned: isVariantOwned,
     saveDraft: saveDraft, completePuzzle: completePuzzle, chooseVariant: chooseVariant,
-    closeVariantChoice: closeVariantChoice, setFlag: setFlag, registerVisit: registerVisit, logEvent: logEvent,
-    encodeBoard: encodeBoard, decodeBoard: decodeBoard, load: load, persist: persist
+    closeVariantChoice: closeVariantChoice, buyVariant: buyVariant, buyPencil: buyPencil, usePencil: usePencil,
+    canOfferSku: canOfferSku, applyOrder: applyOrder, adsLeft: adsLeft, rewardedGrant: rewardedGrant,
+    stampsActive: stampsActive, dailyLetters: dailyLetters, todayLetter: todayLetter, lettersBadge: lettersBadge,
+    openLetterEnvelope: openLetterEnvelope,
+    setFlag: setFlag, registerVisit: registerVisit, logEvent: logEvent,
+    encodeBoard: encodeBoard, decodeBoard: decodeBoard, load: load, persist: persist,
+    cloudSave: cloudSave, preferRemote: preferRemote, adoptRemote: adoptRemote
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.HopState = api;

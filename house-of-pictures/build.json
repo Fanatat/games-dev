@@ -1,18 +1,54 @@
 {
  "game": "house-of-pictures",
- "build_number": "001",
- "app_build": "0.1.0+b001",
+ "build_number": "002",
+ "app_build": "0.1.0+b002",
  "git_branch": "worktree-p0-hallway",
- "git_sha": "dc33519",
+ "git_sha": "ae5cdb6",
  "dirty": false,
- "content_version": 1,
- "built_at": "2026-10-16T03:29:18+00:00",
- "total_bytes": 1052541,
+ "content_version": 2,
+ "api": "",
+ "built_at": "2026-10-16T08:08:23+00:00",
+ "total_bytes": 3122025,
  "files": [
+  {
+   "path": "assets/art/armchair_a.webp",
+   "bytes": 47444,
+   "sha256": "33b6c40fbf282c10f08ba1043bba8c1ee0d74cf4f77b3bb4de6bf55efbd5097c"
+  },
+  {
+   "path": "assets/art/armchair_b.webp",
+   "bytes": 57862,
+   "sha256": "f088ab522ae5a8e4685212317cecc7f991caf3c7c561580ff27ae3fc011ebc83"
+  },
+  {
+   "path": "assets/art/armchair_c.webp",
+   "bytes": 43068,
+   "sha256": "3398e329534f7e25748ad7feb35eb8eff0280568e2c8321101f9a23c0eda090b"
+  },
+  {
+   "path": "assets/art/armchair_s1.webp",
+   "bytes": 18444,
+   "sha256": "1c870931e7da81ae0f659853556d017f16ed156b6b5fe634a57843054b5ec03f"
+  },
+  {
+   "path": "assets/art/armchair_s2.webp",
+   "bytes": 46348,
+   "sha256": "3df399fb577c7c96c93fb2eff5a4bf1d8c42fb25865ec70323160da24dfc0019"
+  },
+  {
+   "path": "assets/art/basket.webp",
+   "bytes": 13358,
+   "sha256": "7d7d84785051fe7ed4d9ac6b2b653393335ebe2a335cc408780598a3f2c8fad0"
+  },
   {
    "path": "assets/art/bg_hallway.webp",
    "bytes": 157234,
    "sha256": "12ace862b39512e8274bcf0d716d62715601bf23b9b75aed1697fa330e481813"
+  },
+  {
+   "path": "assets/art/bg_tearoom.webp",
+   "bytes": 131480,
+   "sha256": "65f3160e259709e928086d5e1e1a5a456989f5779f1dc1541ccb4837dfbcd286"
   },
   {
    "path": "assets/art/bird.webp",
@@ -25,6 +61,41 @@
    "sha256": "19ef5cdf59b3eb9d21c617b020c0b510012a78268b6f2b571ec9da7a4ab19c19"
   },
   {
+   "path": "assets/art/clock_a.webp",
+   "bytes": 21866,
+   "sha256": "0d4de561705102d4769e310378e76519ef7d69a0c49a9ddc00eb0a0cbd0265c3"
+  },
+  {
+   "path": "assets/art/clock_b.webp",
+   "bytes": 21552,
+   "sha256": "df4ecd9defb139d2e3ed42217287c323d4afc71079f1421404a19ab7c8b04c86"
+  },
+  {
+   "path": "assets/art/clock_c.webp",
+   "bytes": 23874,
+   "sha256": "eef1302dac0a7f0c4db2b6be7bc2a9ace9c3ec0a4286b4d422d8637d3c6e448f"
+  },
+  {
+   "path": "assets/art/clock_s1.webp",
+   "bytes": 17106,
+   "sha256": "93bad2ceccbe76485d36fec1f101a88ecfd90b1f656684e90eb5efd64d3594f0"
+  },
+  {
+   "path": "assets/art/clock_s2.webp",
+   "bytes": 18386,
+   "sha256": "4358603f97166be9986ec67f5086833fde9bcc3f723e10bb96be72006fe54603"
+  },
+  {
+   "path": "assets/art/coin.webp",
+   "bytes": 13760,
+   "sha256": "1b39a8d41dd6ad35f5716a157d3fa054abe228f22c27090f5f60dab070b2c281"
+  },
+  {
+   "path": "assets/art/envelope.webp",
+   "bytes": 8498,
+   "sha256": "aad96249e3f4bd1386865d436069132d8e3fdf96456a0151870c8fc2bd6b3b0b"
+  },
+  {
    "path": "assets/art/flower_a.webp",
    "bytes": 41756,
    "sha256": "938917a063746a6430fdf95f0b6c854bf9207e819f28508c7371830edbd6e4e9"
@@ -33,6 +104,16 @@
    "path": "assets/art/flower_b.webp",
    "bytes": 43866,
    "sha256": "c439c962c357ad31dd6ec73c1b56ee85026ddd5ea78d811b98172486b1bd6091"
+  },
+  {
+   "path": "assets/art/flower_c.webp",
+   "bytes": 50322,
+   "sha256": "2842cf8686d15ef7337c5265f8d0cf7ff2748c55120d663287dff1d9bdc3ab1d"
+  },
+  {
+   "path": "assets/art/gift.webp",
+   "bytes": 12714,
+   "sha256": "d994bd00619626c8c315e6e2e7d71d81fdb9a626edd79f0da0fb13a76dcbd784"
   },
   {
    "path": "assets/art/invitation.webp",
@@ -50,9 +131,69 @@
    "sha256": "ce9f49157434846b1985803a62cd830aeed7426b7179946da08699ed4363580b"
   },
   {
+   "path": "assets/art/lamp_c.webp",
+   "bytes": 40992,
+   "sha256": "8e506d26a407a7bb46fabe7722811dae4b789c067e2d984b0eb09d3944169b42"
+  },
+  {
    "path": "assets/art/letter.webp",
    "bytes": 34462,
    "sha256": "14432507e83e8b324d8402c0c95f7ab5a545a65bd1bf5429966f0cf70c13dfe5"
+  },
+  {
+   "path": "assets/art/musicbox_a.webp",
+   "bytes": 62022,
+   "sha256": "3fe32f3db0efd084fde5994a40a48d794372b5b75137b17f1f52cf2f5d7b593b"
+  },
+  {
+   "path": "assets/art/musicbox_b.webp",
+   "bytes": 59230,
+   "sha256": "f530f4e169904a687c41ada318c175ef6026373f002ed5dfa94af57a840b8fd7"
+  },
+  {
+   "path": "assets/art/musicbox_c.webp",
+   "bytes": 62926,
+   "sha256": "8bbdc96207bbccb2be13913e3113d233b7159f3b599d88cb8ced1373e26b4e51"
+  },
+  {
+   "path": "assets/art/musicbox_s1.webp",
+   "bytes": 45456,
+   "sha256": "e3efe31456e1e6659c84d7a39cec4666aa0b8126fa47081e3f35bff9f458be73"
+  },
+  {
+   "path": "assets/art/musicbox_s2.webp",
+   "bytes": 51948,
+   "sha256": "3458c647fc3f2504e3cb0214b98dd6c5146713aa34717c702b550516ba5ec76a"
+  },
+  {
+   "path": "assets/art/pencil.webp",
+   "bytes": 7684,
+   "sha256": "9c5bee756eeb9fbd30a4d0d7e0b057b4fd5131861f9f075684689aab056f786e"
+  },
+  {
+   "path": "assets/art/photo_a.webp",
+   "bytes": 48432,
+   "sha256": "b0be6a9678d78003326319af4bc899aebca5b642237a07de0f069629240d4873"
+  },
+  {
+   "path": "assets/art/photo_b.webp",
+   "bytes": 45548,
+   "sha256": "b4b6ab6664feda8d66a651196039112276957bbd27a9b5d9480792d0c31dc89c"
+  },
+  {
+   "path": "assets/art/photo_c.webp",
+   "bytes": 57866,
+   "sha256": "1601c3d109f562f4f674763d572e620cb2066b119bf14d35962cf13b47948ac2"
+  },
+  {
+   "path": "assets/art/photo_s1.webp",
+   "bytes": 24678,
+   "sha256": "ae478f161c4253720e68e111146ca15829d973133ef663e617fcd269b2bfc043"
+  },
+  {
+   "path": "assets/art/photo_s2.webp",
+   "bytes": 40430,
+   "sha256": "5677b1d0ba26ab769c621ecdeb0fd1e0cf4e5e68f93634a5066df6f08b5d8824"
   },
   {
    "path": "assets/art/rug_a.webp",
@@ -65,6 +206,11 @@
    "sha256": "f8e6aea8d2329efdb43c9aeb4039ef92f358a92a03743a901db42112dbee2b83"
   },
   {
+   "path": "assets/art/rug_c.webp",
+   "bytes": 57318,
+   "sha256": "48755548a490f12f824f31921196ad2a1e5fea63d4b3ef9ec3d9efa779d69bdf"
+  },
+  {
    "path": "assets/art/shelf_a.webp",
    "bytes": 46008,
    "sha256": "5442efb582799f2aa812f81461fd3f9a2b1e6124eaf1147e461c223d48cbcf68"
@@ -73,6 +219,116 @@
    "path": "assets/art/shelf_b.webp",
    "bytes": 46682,
    "sha256": "c6b076b63eb3e3fe683d74eeb7787393e9145736507203cfb15187751d591ac2"
+  },
+  {
+   "path": "assets/art/shelf_c.webp",
+   "bytes": 51010,
+   "sha256": "5226f070b0ed8a653a31e5765087075ce017ac91c960fa7c62cff144e960d34c"
+  },
+  {
+   "path": "assets/art/sideboard_a.webp",
+   "bytes": 39894,
+   "sha256": "fd18ffbbe0b6f86e9c3efdef1acc3f3c1324afe4366f664d14d9c98c2d0887b8"
+  },
+  {
+   "path": "assets/art/sideboard_b.webp",
+   "bytes": 35190,
+   "sha256": "8417e4c1519c37a9dad43e2b2ff18a23d95b8da8beb22145c6d8314b0b79853b"
+  },
+  {
+   "path": "assets/art/sideboard_c.webp",
+   "bytes": 49556,
+   "sha256": "1078a8ccf7c90c8eef67467f92f26633286cf9d98eb77ae4bd4044f81f395486"
+  },
+  {
+   "path": "assets/art/sideboard_s1.webp",
+   "bytes": 33242,
+   "sha256": "27beba7ddbc117d4d73b80511023e34d181df2cc747f24d111f2a84f113280e3"
+  },
+  {
+   "path": "assets/art/sideboard_s2.webp",
+   "bytes": 38644,
+   "sha256": "5d6a3a8f7bc880f470aeef37abbe4ebd3395f246b0dbffa19745ad1f86fe2f40"
+  },
+  {
+   "path": "assets/art/stamp.webp",
+   "bytes": 14258,
+   "sha256": "6fe646899e2b77607b4872f211e4d4bbc2147ea68e62b6833562686de3755fa1"
+  },
+  {
+   "path": "assets/art/table_a.webp",
+   "bytes": 47210,
+   "sha256": "b1dd0ef18570c8ac6c438a0154c8401c5ee8149316a5cb85d091285b08e13bd2"
+  },
+  {
+   "path": "assets/art/table_b.webp",
+   "bytes": 48232,
+   "sha256": "d382e7aa859c30baf2bd11371dcda8923a94880aeac5a503f8df667327121812"
+  },
+  {
+   "path": "assets/art/table_c.webp",
+   "bytes": 47572,
+   "sha256": "4c8680f1c9f2465e6cb65709428a12f182d10c3d89267dcc138aa8314260ccf0"
+  },
+  {
+   "path": "assets/art/table_s1.webp",
+   "bytes": 15866,
+   "sha256": "65f168e418fdd3f20f5c66fae232a803bb7e31c44316328f36a669c5d0fc317a"
+  },
+  {
+   "path": "assets/art/table_s2.webp",
+   "bytes": 28056,
+   "sha256": "ca57d11d8705c241f6066cbd867be721443127bd75c1a14011c76fb31ff786be"
+  },
+  {
+   "path": "assets/art/tea_set_a.webp",
+   "bytes": 39544,
+   "sha256": "ccef9e86363ab576736896c98c03b62f8f3979f41a4ede9fd2f2c065abed287e"
+  },
+  {
+   "path": "assets/art/tea_set_b.webp",
+   "bytes": 35654,
+   "sha256": "e4e672453692611c9a1ba2672f4e24d4a4b8331217f5424a453208378343b9a4"
+  },
+  {
+   "path": "assets/art/tea_set_c.webp",
+   "bytes": 42156,
+   "sha256": "7f44369b6494a4a85aa5ef7c13ed35f9a37809ec17cb1a17489044be26ae7c92"
+  },
+  {
+   "path": "assets/art/tea_set_s1.webp",
+   "bytes": 10392,
+   "sha256": "fc16bf45743a4abfce599f12123783c934929410ad71fb6cb867392469694ccd"
+  },
+  {
+   "path": "assets/art/tea_set_s2.webp",
+   "bytes": 15310,
+   "sha256": "1b4482d16e5990a58b7b84335800aaa379fc3fdb604a97bb6bdcc4041e82cfbd"
+  },
+  {
+   "path": "assets/art/window_a.webp",
+   "bytes": 41446,
+   "sha256": "338596bc8e33dd2ef8086ae48437e2ea71c7bdf5115e9e261918596d149ccc4a"
+  },
+  {
+   "path": "assets/art/window_b.webp",
+   "bytes": 42818,
+   "sha256": "2c5e7494eb4c095ae6d6d6e90800665625a194acb09f3b2ccca31684db715f21"
+  },
+  {
+   "path": "assets/art/window_c.webp",
+   "bytes": 43290,
+   "sha256": "64d7bdc9b9d3f119cd656c360f706dd5a19c89fdf25e700f9e4ba1cf045ef0c6"
+  },
+  {
+   "path": "assets/art/window_s1.webp",
+   "bytes": 44036,
+   "sha256": "5d6103b56010e650de5e155298526e1d199f62f17d7b21e34fe6acdd45d60223"
+  },
+  {
+   "path": "assets/art/window_s2.webp",
+   "bytes": 34560,
+   "sha256": "c8cc9a0c7286d040bc8e9ac012b1e3c8cddee64616c078f18ecefc37d761c239"
   },
   {
    "path": "assets/sfx/CREDITS.md",
@@ -181,28 +437,33 @@
   },
   {
    "path": "data/content.js",
-   "bytes": 6299,
-   "sha256": "4b35345602368dc3a99a4ab19e9a94bd6113a73c8294ae2c052ffabf570803d4"
+   "bytes": 30609,
+   "sha256": "099ac4ecfb500a1d0183f6eaaa7c7594da8accc1b0422f5d02ad0898c3eb4d0d"
   },
   {
    "path": "index.html",
-   "bytes": 6984,
-   "sha256": "d072defe2b0544f2d13fb8711c5a4913aad566b3253d8da323081ab2a468c436"
+   "bytes": 10448,
+   "sha256": "21feb7875470fab38e4cb4f7e5124d941bb85ba1ff31aaf8217e4d660a654390"
   },
   {
    "path": "src/app.js",
-   "bytes": 35451,
-   "sha256": "934e8254750a59797aec15e8ebdbd9db157581fb1bb3ad50fae7d32b2a44e1ba"
+   "bytes": 83799,
+   "sha256": "28370fc01f49ba4aacabd6a3d899dc0e9143ee35cf8e334ca0afde3ad2f6df48"
+  },
+  {
+   "path": "src/cloud.js",
+   "bytes": 3385,
+   "sha256": "2873b6714ccdfa5ad5bb95a19213a948ffa2154f736f09f58bbd1448ee59b6a5"
   },
   {
    "path": "src/platform.js",
-   "bytes": 1735,
-   "sha256": "ca610363729026902a140344c3420e35615caf7bab47c54db308ff18f16aa355"
+   "bytes": 3930,
+   "sha256": "21461545bf7d3bb53a8d21fef0de247df47b3694926cbf05df2ca31a9d1bdd76"
   },
   {
    "path": "src/puzzle/nonogram.js",
-   "bytes": 46084,
-   "sha256": "3f68ee7ab09fcae8565b03c127d43811d8956e53f83e2b6341cab11d868d32ae"
+   "bytes": 47338,
+   "sha256": "ebae036fd53b91eb337feaa40b3bfc44e62954778b91e8e356dddfb53240553c"
   },
   {
    "path": "src/puzzle/nonogram_logic.js",
@@ -211,8 +472,8 @@
   },
   {
    "path": "src/scene.js",
-   "bytes": 8122,
-   "sha256": "f1a3a64c41a81a0e479a56fe69ec48b398ca0951e076bccaba55ab48c22d3105"
+   "bytes": 10322,
+   "sha256": "16e271ba17de8c29b04731a8d5e0719cea4559f46d78f70c7e08156600e900c0"
   },
   {
    "path": "src/sound.js",
@@ -221,13 +482,13 @@
   },
   {
    "path": "src/state.js",
-   "bytes": 10137,
-   "sha256": "0eccac6aa38595650b9b7c1aa85570090b13e86446fe83d69506fa783aea95d7"
+   "bytes": 25198,
+   "sha256": "da776464b87cb9d21845124f3cadc2d1f4ef16d232b09aaa922a1ab666a5af14"
   },
   {
    "path": "src/styles.css",
-   "bytes": 30171,
-   "sha256": "0cd43ae42820b75598784d3f63dc42ffbb8fa923a2977c5ea185221008fe4c15"
+   "bytes": 50890,
+   "sha256": "02bd390955ce06158230aa6aa508953f37bc7f5519c91ba72e6b5f17a34eeac3"
   },
   {
    "path": "src/vendor/vk-bridge.min.js",

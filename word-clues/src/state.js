@@ -14,7 +14,7 @@
   function blank(contentVersion) {
     return {
       schema_version: 1, revision: 0, game_id: GAME_ID, content_version: contentVersion,
-      opened: false,
+      opened: false, traced: false,
       current: null,
       completed_story_ids: [], atlas_item_ids: [], seen_result_ids: [],
       wallet: { stamps: 0, loupes: START_LOUPES }, xp: 0,
@@ -47,6 +47,8 @@
     }
     function normalize(d) {
       var b = blank(content.content_version);
+      // старые сохранения: кто уже нашёл слово, того протяжке заново не учим
+      if (!('traced' in d)) d.traced = !!((d.completed_story_ids && d.completed_story_ids.length) || (d.current && d.current.found && Object.keys(d.current.found).length));
       for (var k in b) if (!(k in d)) d[k] = b[k];
       for (var s in b.settings) if (!(s in d.settings)) d.settings[s] = b.settings[s];
       // недоигранная история, которой нет в контенте, — начинаем заново
@@ -212,6 +214,7 @@
 
     function setSetting(k, v) { data.settings[k] = v; writeNow(); }
     function markOpened() { if (!data.opened) { data.opened = true; writeNow(); } }
+    function markTraced() { if (!data.traced) { data.traced = true; saveSoon(); } }
     function markResultSeen(id) { if (data.seen_result_ids.indexOf(id) < 0) { data.seen_result_ids.push(id); saveSoon(); } }
     function reset() { data = blank(content.content_version); writeNow(); }
 
@@ -224,7 +227,7 @@
       startStory: startStory, isFound: isFound, isOpen: isOpen, openClues: openClues, firstUnfound: firstUnfound,
       foundCount: foundCount, select: select, found: found, complete: complete,
       hintState: hintState, hintPrice: hintPrice, useHint: useHint, explainAfter: explainAfter,
-      activeMs: activeMs, addActive: addActive, setSetting: setSetting, markOpened: markOpened,
+      activeMs: activeMs, addActive: addActive, setSetting: setSetting, markOpened: markOpened, markTraced: markTraced,
       markResultSeen: markResultSeen, reset: reset, flush: flush, save: writeNow, adopt: adopt,
     };
   }

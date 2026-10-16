@@ -117,6 +117,7 @@
     var out = '';
     var idx = clueIndex();
     for (var id in hintPaths) out += poly(hintPaths[id], 'line-hint', '#D59C45', cw * 0.42);
+    if (demoCells && demoEl) out += poly(demoCells.slice(0, demoEl), 'line-demo', '#D59C45', cw * 0.3);
     for (var fid in found) out += poly(found[fid], 'line-found', COLORS[idx[fid] % COLORS.length], cw * 0.36);
     if (path.length) out += poly(path.map(function (p) { return [p.r, p.c]; }), 'line-active', '#2B352F', cw * 0.3);
     svgEl.innerHTML = out;
@@ -154,7 +155,7 @@
   function showPath(id, p) { hintPaths[id] = p; drawLines(); }
   function clearHints() { hintPaths = {}; clearStart(); stopPointer(); drawLines(); }
 
-  var pointerEl = null;
+  var pointerEl = null, demoEl = null, demoTimer = null, demoCells = null;
   // «Палец» обучения: пульс на первой клетке, весь ответ не рисуем (ТЗ §5).
   function pointAt(p) {
     stopPointer();
@@ -164,7 +165,61 @@
     pointerEl.style.left = c[0] + 'px'; pointerEl.style.top = c[1] + 'px';
     wrapEl.appendChild(pointerEl);
   }
-  function stopPointer() { if (pointerEl) { pointerEl.remove(); pointerEl = null; } }
+  /* Показ протяжки без слов: палец ложится на первую клетку, ведёт по cells,
+     за ним тянется пунктир, потом всё гаснет и повторяется. loops — число повторов
+     (0 — пока не остановят). При «меньше движения» — неподвижная картинка. */
+  var STEP_MS = 520, HOLD_MS = 500, PAUSE_MS = 700;
+  function demoTrace(list, loops) {
+    stopPointer();
+    if (!list || list.length < 2 || !story) return;
+    demoCells = list.slice();
+    pointerEl = document.createElement('div');
+    pointerEl.className = 'finger demo';
+    wrapEl.appendChild(pointerEl);
+    var rm = document.body.classList.contains('rm');
+    var n = 0, left = loops || 0;
+    function place(i) { var c = center(demoCells[i]); pointerEl.style.left = c[0] + 'px'; pointerEl.style.top = c[1] + 'px'; }
+    function trail(k) { demoEl = k; drawLines(); }
+    if (rm) { place(0); pointerEl.classList.add('press'); trail(demoCells.length); return; }
+    function cycle() {
+      if (!pointerEl) return;
+      pointerEl.classList.remove('press', 'move', 'gone');
+      trail(0);
+      place(0);
+      void pointerEl.offsetWidth;
+      demoTimer = setTimeout(function () {
+        if (!pointerEl) return;
+        pointerEl.classList.add('press');
+        trail(1);
+        var i = 1;
+        (function step() {
+          demoTimer = setTimeout(function () {
+            if (!pointerEl) return;
+            pointerEl.classList.add('move');
+            place(i); trail(i + 1);
+            i++;
+            if (i < demoCells.length) step();
+            else demoTimer = setTimeout(function () {
+              if (!pointerEl) return;
+              pointerEl.classList.remove('press', 'move');
+              pointerEl.classList.add('gone');
+              trail(0);
+              n++;
+              if (left && n >= left) { demoTimer = setTimeout(stopPointer, 300); return; }
+              demoTimer = setTimeout(cycle, PAUSE_MS);
+            }, HOLD_MS);
+          }, STEP_MS);
+        })();
+      }, 350);
+    }
+    cycle();
+  }
+  function stopPointer() {
+    clearTimeout(demoTimer); demoTimer = null;
+    if (pointerEl) { pointerEl.remove(); pointerEl = null; }
+    if (demoCells) { demoCells = null; demoEl = null; drawLines(); }
+  }
+  function demoing() { return !!pointerEl; }
 
   /* ---------- жест ---------- */
   function cellOf(t) {
@@ -218,6 +273,7 @@
     var els = path.map(function (q) { return q.el; });
     path = [];
     var res = p.length >= 2 && h.onSubmit ? h.onSubmit(p) : 'tap';
+    if (p.length === 1 && h.onTap) h.onTap(p[0]);
     clearActive(els);
     if (res === 'wrong') flashWrong(els);
     drawLines();
@@ -289,6 +345,7 @@
   }
 
   root.Board = { mount: mount, render: render, fit: fit, markFound: markFound, showStart: showStart, clearStart: clearStart,
-    showPath: showPath, clearHints: clearHints, pointAt: pointAt, stopPointer: stopPointer, redraw: drawLines,
+    showPath: showPath, clearHints: clearHints, pointAt: pointAt, demoTrace: demoTrace, stopPointer: stopPointer,
+    get demoing() { return demoing(); }, get demoCells() { return demoCells ? demoCells.slice() : null; }, redraw: drawLines,
     get dragging() { return dragging || kbSelecting; }, COLORS: COLORS };
 })(this);

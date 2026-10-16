@@ -79,6 +79,16 @@
     return t;
   }
 
+  /* Путь для показа протяжки от клетки p: три клетки по прямой (или с поворотом,
+     turn=true), всегда внутри поля. Ответ не подсказывает — это просто жест. */
+  function demoPath(p, rows, cols, turn) {
+    var r = p[0], c = p[1];
+    var dc = c + 2 < cols ? 1 : -1, dr = r + 1 < rows ? 1 : -1;
+    if (turn) return [[r, c], [r, c + dc], [r + dr, c + dc]];
+    if (c + 2 < cols || c - 2 >= 0) return [[r, c], [r, c + dc], [r, c + 2 * dc]];
+    return [[r, c], [r + dr, c], [r + 2 * dr, c]];
+  }
+
   // «4 буквы», «5 букв», «2 буквы» — согласование для подписи длины.
   function lettersLabel(n) {
     var m10 = n % 10, m100 = n % 100;
@@ -87,7 +97,7 @@
   }
 
   var api = { norm: norm, adjacent: adjacent, pathValid: pathValid, pathWord: pathWord, match: match,
-    findPaths: findPaths, turns: turns, lettersLabel: lettersLabel };
+    findPaths: findPaths, turns: turns, demoPath: demoPath, lettersLabel: lettersLabel };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.WordLogic = api;
 })(this);

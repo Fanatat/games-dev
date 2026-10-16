@@ -3,10 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-<meta name="g1f-build" content="0.1.0+b007 · d8b4f0b">
+<meta name="g1f-build" content="0.1.0+b008 · 1dc9073">
+<meta name="g1f-telemetry" content="">
 <meta name="theme-color" content="#F5EEDD">
 <title>Слова по уликам</title>
-<link rel="stylesheet" href="src/styles.css?v=3a627b45ee">
+<link rel="stylesheet" href="src/styles.css?v=809a8f009b">
 </head>
 <body>
 <div id="app">
@@ -42,10 +43,6 @@
       <button class="card tile" id="btn-atlas">
         <span class="tile-icon" id="atlas-icon"></span>
         <span class="tile-text"><b>Мой атлас</b><span class="muted" id="atlas-sub"></span></span>
-      </button>
-      <button class="card tile" id="btn-survey">
-        <span class="tile-icon" id="survey-icon"></span>
-        <span class="tile-text"><b>Отзыв о тесте</b><span class="muted" id="survey-sub">6 коротких вопросов · 1 минута</span></span>
       </button>
       <div class="card soft" id="home-next" hidden>
         <b id="home-next-title"></b>
@@ -132,11 +129,6 @@
           <b id="demo-end-title"></b>
           <span id="demo-end-text"></span>
         </div>
-        <div class="card survey-ask" id="survey-ask" hidden>
-          <b>Помогите игре</b>
-          <span class="muted">Это тестовая версия. Шесть коротких вопросов — минута, а нам очень поможет.</span>
-          <button class="btn-main" id="btn-survey-end">Ответить на вопросы</button>
-        </div>
         <button class="btn-main" id="btn-next">Следующая история</button>
         <div class="link-row">
           <button class="btn-link" id="btn-res-atlas">В атлас</button>
@@ -162,40 +154,21 @@
     </div>
   </section>
 
-  <!-- Анкета для теста на друзьях -->
-  <section class="screen" id="scr-survey" hidden>
-    <header class="field-head">
-      <button class="icon-btn" id="btn-survey-back" aria-label="Назад"></button>
-      <div class="field-title"><b>Отзыв о тесте</b><span class="muted">6 коротких вопросов · 1 минута</span></div>
-    </header>
-    <div class="survey-scroll">
-      <p class="survey-lead">Спасибо, что поиграли! Отвечайте честно: «скучно» и «непонятно» помогают больше, чем похвала. Можно пропускать вопросы.</p>
-      <div id="survey-qs"></div>
-      <div class="card survey-send">
-        <button class="btn-main" id="btn-survey-copy">Скопировать ответы</button>
-        <button class="btn-link" id="btn-survey-tg">Отправить в Telegram</button>
-        <p class="muted small" id="survey-status" aria-live="polite"></p>
-        <textarea class="survey-out" id="survey-out" readonly hidden aria-label="Текст ответов"></textarea>
-      </div>
-      <p class="muted small">Скопированный текст вставьте в сообщение автору игры — в любой мессенджер. Вместе с ответами уходят замеры игры: сколько историй пройдено, время на улики, подсказки, тип устройства и размер экрана. Имени и контактов игра не собирает.</p>
-    </div>
-  </section>
 
   <!-- Шторка: помощь / настройки / подтверждение -->
   <div class="sheet-back" id="sheet-back" hidden></div>
   <div class="sheet" id="sheet" role="dialog" aria-modal="true" hidden></div>
 </div>
 
-<script>window.G1F_ART={"atlas_cover": "bd6fa2f89a", "bg_s001": "938f6a02ed", "bg_s002": "ee15feae63", "bg_s003": "b287794909", "bg_town": "64e40b6e8b", "box_intro": "49c7320f0e", "compass": "455cf6ff49", "envelope": "f4f8c2c5cf", "flower_card": "fda8b44575", "key": "82da45ac66", "lantern": "22de97032d", "logbook": "401750a7ea", "map": "0d35f23029", "pot": "ca160af546", "rails": "8698675a21", "river_letter": "cbb76f3ae7", "seeds": "5854a91516", "signpost": "894b4afbd1", "sprout": "6a2437079d", "stamp": "f9ef8a6caa", "suitcase": "5eec3ff806", "suitcase_garden": "7e2f1bc0c2", "ticket": "05313bdee5", "vera": "f27b3f27ef", "watering_can": "d48ec7f0ee"};</script>
-<script src="data/content.js?v=abbf7d3680"></script>
-<script src="src/logic.js?v=920eff9120"></script>
+<script>window.G1F_ART={"address": "0b0fe89d6c", "album": "ac097aff22", "atlas_cover": "bd6fa2f89a", "bell": "a54ab85968", "berth": "f55866633a", "bg_s001": "938f6a02ed", "bg_s002": "ee15feae63", "bg_s003": "b287794909", "bg_s004": "d2a71f1412", "bg_s005": "7a3cfc770b", "bg_s006": "1c43bd31ac", "bg_s007": "ca275fe270", "bg_s008": "cf14e3da8c", "bg_s009": "7cd94a8457", "bg_s010": "76e4a22597", "bg_town": "64e40b6e8b", "boat": "4c4ed306e5", "bottle": "e34350e333", "bottle_note": "9324704d8e", "box_intro": "49c7320f0e", "clock": "e46186b137", "clock_hand": "fa360cd6de", "clock_token": "abd0bde00e", "club_list": "6b5582abfd", "compartment": "1748f95461", "compass": "455cf6ff49", "conductor": "a4bc5f39c5", "curtain": "ebbcce5ace", "desk": "c0bd5782fa", "envelope": "f4f8c2c5cf", "flower_card": "fda8b44575", "future_letters": "167e1c0fb2", "garden_bed": "cf2f0834a3", "gate": "8f51149364", "glass": "b768e62447", "globe": "4f8ab0cc80", "herbarium": "296c06a467", "herbarium_leaf": "0c6f495f63", "hive": "f536791e6a", "key": "82da45ac66", "lamp": "49ef7c4921", "lantern": "22de97032d", "lantern_parcel": "a6246bde27", "letter": "91a08cd99d", "logbook": "401750a7ea", "map": "0d35f23029", "meeting": "7b198051ed", "oar": "1a25f8d1b7", "parcel": "72e10274b9", "pendulum": "b1745cc54f", "pillar": "e5f911f01b", "pointer": "10b78625c9", "postmark": "3996dc6191", "pot": "ca160af546", "railing": "bea7b0af69", "rails": "8698675a21", "register": "3265015fbe", "river_letter": "cbb76f3ae7", "scales": "0175ccbdce", "scarecrow": "4f528d442d", "school_bell": "229f8a6d6c", "seeds": "5854a91516", "signpost": "894b4afbd1", "sprout": "6a2437079d", "square_lantern": "d4215f8f8a", "stamp": "f9ef8a6caa", "suitcase": "5eec3ff806", "suitcase_garden": "7e2f1bc0c2", "ticket": "05313bdee5", "tower": "1143d7e143", "vera": "f27b3f27ef", "watering_can": "d48ec7f0ee", "weight": "f13b450de2", "window": "bec33ad897"};</script>
+<script src="data/content.js?v=5429b52e07"></script>
+<script src="src/logic.js?v=751efbcdcd"></script>
 <script src="vendor/vk-bridge.min.js?v=827ba6f457"></script>
 <script src="src/platform.js?v=72ba59916e"></script>
-<script src="src/analytics.js?v=7125dcd2e2"></script>
-<script src="src/state.js?v=ea103582d5"></script>
+<script src="src/analytics.js?v=839724c152"></script>
+<script src="src/state.js?v=469cf67332"></script>
 <script src="src/sound.js?v=a77c31e1d3"></script>
-<script src="src/board.js?v=4b0cb85a86"></script>
-<script src="src/survey.js?v=a17501c9b4"></script>
-<script src="src/app.js?v=82f2451ded"></script>
+<script src="src/board.js?v=83a59c9839"></script>
+<script src="src/app.js?v=7c5ecfc4f1"></script>
 </body>
 </html>

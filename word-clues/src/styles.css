@@ -62,7 +62,7 @@ p { margin: 0; }
 /* ---------- главная ---------- */
 .home-scroll, .intro-scroll, .result-scroll, .atlas-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
 .home-scroll { padding: 14px 16px 24px; display: flex; flex-direction: column; gap: 12px; }
-.home-scroll > *, .result-body > *, .survey-scroll > * { flex-shrink: 0; }
+.home-scroll > *, .result-body > * { flex-shrink: 0; }
 .home-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
 .home-head p { font-size: 14px; margin-top: 2px; }
 .place-card { overflow: hidden; }
@@ -156,6 +156,14 @@ p { margin: 0; }
 .finger { position: absolute; z-index: 3; width: 44px; height: 44px; margin: -22px 0 0 -22px; border-radius: 50%; pointer-events: none;
   border: 3px solid var(--amber); background: rgba(213, 156, 69, .2); animation: finger 1.3s ease-in-out infinite; }
 @keyframes finger { 0%, 100% { transform: scale(.75); opacity: .5; } 50% { transform: scale(1.1); opacity: 1; } }
+/* показ протяжки: «кончик пальца» едет по клеткам, за ним пунктир */
+.finger.demo { animation: none; width: 38px; height: 38px; margin: -19px 0 0 -19px; border: 3px solid #fff;
+  background: rgba(213, 156, 69, .85); box-shadow: 0 3px 10px rgba(43, 53, 47, .35); opacity: 0;
+  transform: scale(1.25); transition: opacity .25s, transform .25s; }
+.finger.demo.press { opacity: 1; transform: scale(.9); }
+.finger.demo.move { transition: opacity .25s, transform .25s, left .46s ease-in-out, top .46s ease-in-out; }
+.finger.demo.gone { opacity: 0; transform: scale(1.25); }
+.board-lines .line-demo { opacity: .5; }
 .toast { position: absolute; z-index: 4; left: 50%; top: 4px; transform: translateX(-50%); max-width: calc(100% - 32px);
   padding: 8px 14px; border-radius: 10px; background: var(--text); color: #fff; font-size: 14px; text-align: center; pointer-events: none; }
 .toast.on { animation: fadeUp .2s ease both; }
@@ -187,24 +195,6 @@ p { margin: 0; }
 .link-row { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; }
 .link-row .btn-link { margin: 0; }
 
-/* ---------- анкета для теста ---------- */
-.survey-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 4px 16px 28px;
-  display: flex; flex-direction: column; gap: 18px; }
-.survey-lead { font-family: var(--font); font-size: 17px; line-height: 1.4; }
-#survey-qs { display: flex; flex-direction: column; gap: 26px; }
-.sq { border: 0; margin: 0; padding: 0; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
-.sq legend { padding: 0; margin-bottom: 8px; font-weight: 600; display: flex; gap: 8px; align-items: baseline; }
-.sq-n { flex: none; width: 22px; height: 22px; border-radius: 50%; background: var(--green); color: #fff;
-  font-size: 13px; line-height: 22px; text-align: center; }
-.chips { display: flex; flex-wrap: wrap; gap: 8px; }
-.chip { min-height: 44px; padding: 8px 14px; border-radius: 22px; border: 1px solid var(--line); background: var(--surface); text-align: left; }
-.chip[aria-pressed="true"] { background: var(--green); border-color: var(--green); color: #fff; }
-.sq-text, .survey-out { display: block; width: 100%; font: inherit; font-size: 16px; padding: 10px 12px; border-radius: 12px;
-  border: 1px solid var(--line); background: var(--surface); color: var(--text); resize: vertical; }
-.survey-out { min-height: 180px; font-size: 13px; margin-top: 6px; }
-.survey-send { padding: 14px; display: flex; flex-direction: column; gap: 4px; }
-.survey-ask { padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; border-color: var(--amber); }
-.survey-ask .btn-main { margin-top: 6px; }
 
 /* ---------- атлас ---------- */
 .atlas-scroll { padding: 4px 16px 24px; }
@@ -270,8 +260,8 @@ button.slot.got { background: var(--surface); }
   #scr-field .board-wrap { grid-area: board; width: min(56vw, 100vh); }
   #scr-field .field-foot { grid-area: foot; padding-bottom: 6px; }
   #scr-field .save-warn { position: absolute; left: 0; bottom: 0; }
-  .home-scroll, .result-scroll, .atlas-scroll, .intro-scroll, .survey-scroll,
-  #scr-atlas .field-head, #scr-survey .field-head { max-width: 560px; margin: 0 auto; width: 100%; }
+  .home-scroll, .result-scroll, .atlas-scroll, .intro-scroll,
+  #scr-atlas .field-head { max-width: 560px; margin: 0 auto; width: 100%; }
   .place-art, .intro-art, .result-scene { aspect-ratio: auto; height: 34vh; max-height: none; }
   .atlas-cover { aspect-ratio: auto; height: 30vh; }
   .intro-body { padding: 12px 20px 16px; }

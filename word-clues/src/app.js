@@ -124,7 +124,6 @@
       toggleRow('reduced_motion', 'Меньше движения', 'Без волн и покачиваний') +
       toggleRow('large_text', 'Крупный текст', 'Улики и кнопки крупнее') +
       (P.params.has('journal') ? '<button class="opt" id="opt-journal"><span><b>Журнал событий</b><span class="muted">Скачать JSON для разбора плейтеста</span></span></button>' : '') +
-      '<button class="opt" id="opt-survey"><span><b>Отзыв о тесте</b><span class="muted">6 коротких вопросов автору игры</span></span></button>' +
       '<button class="opt danger" id="opt-reset"><span><b>Начать заново</b><span class="muted">Сотрёт истории, атлас и лупы</span></span></button>' +
       '<p class="muted small">Сборка ' + esc(build) + ' · ' + esc(C.content_version) + '</p>' +
       '<button class="btn-link" data-close>Закрыть</button>';
@@ -141,7 +140,6 @@
       var j = el.querySelector('#opt-journal');
       if (j) j.addEventListener('click', function () { A.exportJson(); });
       el.querySelector('#opt-reset').addEventListener('click', confirmReset);
-      el.querySelector('#opt-survey').addEventListener('click', function () { showSurvey('settings'); });
     });
   }
   function confirmReset() {
@@ -187,7 +185,7 @@
       btn.textContent = 'Начать историю';
       art($('home-art'), t.story.scene, '🏞️');
     } else {
-      $('home-kicker').textContent = 'Пробная глава пройдена';
+      $('home-kicker').textContent = 'Глава 1 пройдена';
       $('home-question').textContent = C.demo_end.question;
       $('home-sub').textContent = C.demo_end.title + '. ' + C.demo_end.text;
       btn.textContent = 'Открыть атлас';
@@ -203,7 +201,6 @@
       $('home-next-title').textContent = 'Дальше: ' + after.place;
       $('home-next-sub').textContent = 'Откроется после истории «' + t.story.title + '»';
     } else nx.hidden = true;
-    surveySub();
     saveLine($('home-save'));
     show('scr-home');
   }
@@ -256,6 +253,7 @@
       onStep: function (n) { window.Sound.play('step', n - 1); },
       onBack: function (n) { window.Sound.play('step', Math.max(0, n - 1)); },
       onTouch: function () { touched(); },
+      onTap: onTap,
       locked: function () { return F.locked || !!sheetKind; },
     });
     if (!S.isFound(selId()) && !S.isOpen(selId())) S.select(S.firstUnfound());
@@ -403,11 +401,12 @@
     if (!m) {
       A.event('word_attempt', { story_id: s.id, clue_id: sel, result: 'wrong', length: path.length, turns: L.turns(path) });
       window.Sound.play('wrong');
+      scheduleGhost();
+      // на третьей улике первой истории поворот показываем жестом, а не словами (ТЗ §5)
       if (!turnTipShown && s.index === 0 && clueIdx(sel) === 2 && L.turns(clue(sel).path) > 0) {
         turnTipShown = true;
-        toast('Слово может свернуть за угол — ведите, не отрывая палец');
+        window.Board.demoTrace(L.demoPath(path[0], s.rows, s.cols, true), 2);
       } else toast('Попробуем другую цепочку');
-      scheduleGhost();
       return 'wrong';
     }
     var id = m.clue.id;
@@ -426,6 +425,7 @@
     if (!r || r.already) return;
     window.Board.markFound(id, path);
     window.Board.stopPointer();
+    if (how === 'trace' && !S.data.traced) S.markTraced();
     clearTimeout(F.ghostTimer);
     window.Sound.play('found');
     A.event('clue_solved', { story_id: s.id, clue_id: id, method: how, active_ms: Math.round(active), attempts: F.attempts,
@@ -463,17 +463,33 @@
     scheduleGhost();
   }
 
-  /* «Палец» обучения: только первая улика первой истории, через 3 с без действий. */
+  /* «Палец» обучения без слов: в первой истории, пока игрок ни разу не провёл слово
+     сам, через 3 с без действий и сразу после одиночного тапа палец проводит первые
+     две буквы ответа выбранной улики и повторяет это, пока игрок не коснётся поля. */
+  function tutorialOn() { return !!F && F.story.index === 0 && !S.data.traced; }
+  function answerDemo() {
+    var c = clue(selId());
+    if (c && !S.isFound(c.id)) window.Board.demoTrace(c.path.slice(0, 2), 0);
+  }
   function scheduleGhost() {
     if (!F) return;
     clearTimeout(F.ghostTimer);
     window.Board.stopPointer();
-    if (F.story.index !== 0 || S.foundCount() > 0) return;
+    if (!tutorialOn()) return;
     F.ghostTimer = setTimeout(function () {
-      if (screen !== 'scr-field' || sheetKind || window.Board.dragging || !S.cur() || S.foundCount() > 0) return;
-      var c = clue(selId());
-      if (c) window.Board.pointAt(c.path[0]);
+      if (screen !== 'scr-field' || sheetKind || window.Board.dragging || !S.cur() || F.locked || F.revealTimer) return;
+      answerDemo();
     }, GHOST_MS);
+  }
+  // Одиночный тап по букве: показать, что слово ведут, а не тыкают.
+  function onTap(p) {
+    if (!F || F.locked || !S.cur()) return;
+    F.taps = (F.taps || 0) + 1;
+    A.event('single_tap', { story_id: F.story.id, clue_id: selId(), taps: F.taps, tutorial: tutorialOn() });
+    clearTimeout(F.ghostTimer);
+    if (tutorialOn()) { answerDemo(); return; }
+    // дальше — общий жест от нажатой клетки (ответ не подсказывает), не чаще трёх раз за историю
+    if (F.taps <= 3) window.Board.demoTrace(L.demoPath(p, F.story.rows, F.story.cols, false), 2);
   }
 
   /* ---------- помощь ---------- */
@@ -574,7 +590,6 @@
     $('result-question').textContent = s.next_question;
     var end = !next;
     $('demo-end').hidden = !end;
-    $('survey-ask').hidden = !end;
     if (end) {
       $('result-question').textContent = C.demo_end.question;
       $('demo-end-title').textContent = C.demo_end.title;
@@ -632,95 +647,6 @@
     show('scr-atlas');
   }
 
-  /* ---------- анкета для теста на друзьях ---------- */
-  // Сервера у прототипа нет: ответы и выжимка журнала уходят автору одним сообщением
-  // в Telegram (ссылка с вписанным текстом), запасной путь — копирование.
-  var SV = window.Survey, SURVEY_KEY = 'g1f1.survey.v1', surveyFrom = 'home';
-  var survey = { answers: {}, sent: 0 };
-  try { var sv0 = JSON.parse(localStorage.getItem(SURVEY_KEY) || 'null'); if (sv0 && sv0.answers) survey = sv0; } catch (e) { /* без черновика */ }
-  function surveySave() { try { localStorage.setItem(SURVEY_KEY, JSON.stringify(survey)); } catch (e) { /* не важнее игры */ } }
-  function surveyText() {
-    return SV.message({ answers: survey.answers, events: A.events, content: C,
-      build: (document.querySelector('meta[name="g1f-build"]') || {}).content || 'dev',
-      code: String(A.playerKey || '').slice(0, 5).toUpperCase(), env: SV.env(navigator, window) });
-  }
-  function surveySub() {
-    $('survey-sub').textContent = survey.sent ? 'Спасибо! Можно дополнить и отправить ещё раз' : '6 коротких вопросов · 1 минута';
-  }
-  function renderSurvey() {
-    var a = survey.answers, box = $('survey-qs');
-    box.innerHTML = '';
-    SV.QUESTIONS.forEach(function (q, i) {
-      var f = document.createElement('fieldset');
-      f.className = 'sq';
-      var h = '<legend><span class="sq-n">' + (i + 1) + '</span><span>' + esc(q.title) +
-        (q.type === 'many' ? ' <span class="muted small">можно несколько</span>' : '') + '</span></legend>';
-      if (q.opts) h += '<div class="chips">' + q.opts.map(function (o, k) {
-        var on = q.type === 'many' ? (a[q.id] || []).indexOf(k) >= 0 : a[q.id] === k;
-        return '<button type="button" class="chip" data-q="' + q.id + '" data-k="' + k + '" aria-pressed="' + on + '">' + esc(o) + '</button>';
-      }).join('') + '</div>';
-      var tk = q.type === 'text' ? q.id : q.text ? q.id + '_text' : null;
-      if (tk) h += '<textarea class="sq-text" data-t="' + tk + '" rows="' + (q.type === 'text' ? 4 : 2) + '" maxlength="500" placeholder="' +
-        esc(q.type === 'text' ? 'Ваш ответ' : q.text) + '">' + esc(a[tk] || '') + '</textarea>';
-      f.innerHTML = h;
-      box.appendChild(f);
-    });
-  }
-  function onSurveyChip(b) {
-    var q = SV.QUESTIONS.filter(function (x) { return x.id === b.dataset.q; })[0], k = +b.dataset.k, a = survey.answers;
-    if (q.type === 'many') {
-      var list = (a[q.id] || []).filter(function (x) { return x !== k; });
-      if (b.getAttribute('aria-pressed') !== 'true') list.push(k);
-      a[q.id] = list.sort();
-      b.setAttribute('aria-pressed', list.indexOf(k) >= 0);
-    } else {
-      a[q.id] = k;
-      b.parentNode.querySelectorAll('.chip').forEach(function (c) { c.setAttribute('aria-pressed', c === b); });
-    }
-    surveySave();
-    window.Sound.play('tap');
-  }
-  function showSurvey(from) {
-    surveyFrom = from || 'home';
-    A.event('survey_open', { from: surveyFrom, sent_before: !!survey.sent });
-    renderSurvey();
-    $('survey-status').textContent = '';
-    $('survey-out').hidden = true;
-    show('scr-survey');
-  }
-  function surveyBack() {
-    if (surveyFrom === 'result' && resultStory) show('scr-result'); else showHome();
-  }
-  function showSurveyText(text, select) {
-    var out = $('survey-out');
-    out.value = text; out.hidden = false;
-    if (select) { out.focus(); out.select(); }
-  }
-  function surveySend(how) {
-    var st = $('survey-status');
-    if (!SV.answered(survey.answers)) { st.textContent = 'Ответьте хотя бы на один вопрос — тогда будет что отправить.'; return; }
-    var text = surveyText(), copied = false;
-    var done = function () {
-      st.textContent = how === 'tg'
-        ? 'Спасибо! Нажмите «Отправить» в Telegram. Если Telegram не открылся или выдал ошибку — ' + (copied ? 'текст уже скопирован, вставьте его в любой чат с автором.' : 'скопируйте текст ниже и пришлите автору.')
-        : copied ? 'Спасибо! Ответы скопированы — вставьте их в сообщение автору игры.' : 'Спасибо! Выделите текст ниже, скопируйте и пришлите автору игры.';
-      showSurveyText(text, !copied);
-    };
-    try {
-      navigator.clipboard.writeText(text).then(function () { copied = true; done(); }, done);
-    } catch (e) { done(); }
-    if (how === 'tg') {
-      var url = SV.tgLink(text), w = null;
-      try { w = window.open(url, '_blank'); } catch (e) { w = null; }
-      if (!w) location.href = url;
-    }
-    survey.sent = Date.now();
-    surveySave();
-    surveySub();
-    A.event('survey_sent', { how: how, chars: text.length, fun: survey.answers.fun == null ? null : survey.answers.fun + 1 });
-    A.flush();
-  }
-
   // Карточка атласа: что это за находка или как её получить.
   function openSlot(s, has) {
     window.Sound.play('tap');
@@ -743,8 +669,6 @@
     $('clue-next').innerHTML = icon('right');
     $('hint-ico').innerHTML = icon('bulb');
     $('atlas-icon').innerHTML = icon('book');
-    $('survey-icon').innerHTML = icon('chat');
-    $('btn-survey-back').innerHTML = icon('back');
     $('btn-accept').innerHTML = icon('check') + '<span>Принять ответ</span>';
 
     $('btn-open').addEventListener('click', function () {
@@ -774,16 +698,6 @@
     $('btn-res-home').addEventListener('click', showHome);
     $('btn-atlas-back').addEventListener('click', showHome);
     $('btn-atlas-home').addEventListener('click', function () { window.Sound.play('tap'); showHome(); });
-    $('btn-survey').addEventListener('click', function () { window.Sound.play('tap'); showSurvey('home'); });
-    $('btn-survey-end').addEventListener('click', function () { window.Sound.play('tap'); showSurvey('result'); });
-    $('btn-survey-back').addEventListener('click', surveyBack);
-    $('survey-qs').addEventListener('click', function (e) { var b = e.target.closest('.chip'); if (b) onSurveyChip(b); });
-    $('survey-qs').addEventListener('input', function (e) {
-      var t = e.target.closest('[data-t]');
-      if (t) { survey.answers[t.dataset.t] = t.value; surveySave(); }
-    });
-    $('btn-survey-tg').addEventListener('click', function () { surveySend('tg'); });
-    $('btn-survey-copy').addEventListener('click', function () { surveySend('copy'); });
     $('sheet-back').addEventListener('click', closeSheet);
     $('sheet').addEventListener('click', function (e) { if (e.target.closest('[data-close]')) closeSheet(); });
     document.addEventListener('keydown', function (e) {
@@ -816,8 +730,7 @@
 
     // Для автотестов: состояние и текущий экран, без обхода правил поля.
     window.__g1f = { state: S, get screen() { return screen; }, get sheet() { return sheetKind; },
-      content: C, board: window.Board, revealNow: endReveal,
-      surveyText: surveyText, get survey() { return survey; }, platform: P.name };
+      content: C, board: window.Board, revealNow: endReveal, platform: P.name };
   }
   // В браузере — сразу; в ВК — после VKWebAppInit и чтения облачной копии (≤ 5,5 с).
   if (P.name === 'vk') P.ready.then(start); else start(null);

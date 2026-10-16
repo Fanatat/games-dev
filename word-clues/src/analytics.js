@@ -25,7 +25,7 @@
 
   function event(name, fields) {
     var e = { event_id: rid(), event_name: name, schema_version: 1, timestamp_utc: new Date().toISOString(),
-      t_ms: Date.now() - t0, session_id: sessionId, player_key: playerKey, build_id: build, platform: 'web',
+      t_ms: Date.now() - t0, session_id: sessionId, player_key: playerKey, build_id: build, platform: root.Platform ? root.Platform.name : 'web',
       content_version: root.G1F_CONTENT ? root.G1F_CONTENT.content_version : null };
     for (var k in fields || {}) e[k] = fields[k];
     buf.push(e);

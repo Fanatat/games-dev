@@ -35,18 +35,32 @@
     var timer = null;
     var listeners = [];
 
+    function parse(raw) {
+      var d = null;
+      if (raw) { try { d = JSON.parse(raw); } catch (e) { d = null; } }
+      return d && d.game_id === GAME_ID && d.schema_version === 1 ? d : null;
+    }
     function load() {
       var raw = null;
       try { raw = storage.get(KEY); } catch (e) { saveOk = false; }
-      var d = null;
-      if (raw) { try { d = JSON.parse(raw); } catch (e) { d = null; } }
-      if (!d || d.game_id !== GAME_ID || d.schema_version !== 1) d = blank(content.content_version);
+      data = normalize(parse(raw) || blank(content.content_version));
+    }
+    function normalize(d) {
       var b = blank(content.content_version);
       for (var k in b) if (!(k in d)) d[k] = b[k];
       for (var s in b.settings) if (!(s in d.settings)) d.settings[s] = b.settings[s];
       // недоигранная история, которой нет в контенте, — начинаем заново
       if (d.current && !byId[d.current.story_id]) d.current = null;
-      data = d;
+      return d;
+    }
+    // Вторая копия (облако ВК): берём её, только если она новее локальной.
+    function adopt(raw) {
+      var d = parse(raw);
+      if (!d || (d.revision || 0) <= (data.revision || 0)) return false;
+      clearTimeout(timer); timer = null;
+      data = normalize(d);
+      writeNow();
+      return true;
     }
 
     function writeNow() {
@@ -211,7 +225,7 @@
       foundCount: foundCount, select: select, found: found, complete: complete,
       hintState: hintState, hintPrice: hintPrice, useHint: useHint, explainAfter: explainAfter,
       activeMs: activeMs, addActive: addActive, setSetting: setSetting, markOpened: markOpened,
-      markResultSeen: markResultSeen, reset: reset, flush: flush, save: writeNow,
+      markResultSeen: markResultSeen, reset: reset, flush: flush, save: writeNow, adopt: adopt,
     };
   }
 

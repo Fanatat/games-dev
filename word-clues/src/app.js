@@ -93,7 +93,7 @@
   }
 
   function saveLine(el) {
-    if (S.saveOk) { el.textContent = P.persistent ? 'Прогресс сохраняется на этом устройстве' : ''; el.classList.remove('warn'); }
+    if (S.saveOk) { el.textContent = !P.persistent ? '' : P.cloud ? 'Прогресс сохраняется в профиле ВК' : 'Прогресс сохраняется на этом устройстве'; el.classList.remove('warn'); }
     else { el.textContent = 'Сейчас прогресс не сохраняется'; el.classList.add('warn'); }
   }
   var saveErrorSent = false;
@@ -789,8 +789,10 @@
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape' && sheetKind) { e.preventDefault(); closeSheet(); }
     });
-    document.addEventListener('visibilitychange', function () { if (document.hidden) { S.flush(); A.flush(); } });
-    window.addEventListener('pagehide', function () { S.flush(); A.flush(); });
+    function stash() { S.flush(); P.flush(); A.flush(); }
+    document.addEventListener('visibilitychange', function () { if (document.hidden) stash(); });
+    window.addEventListener('pagehide', stash);
+    P.onHide(stash); // ВК: приложение свёрнуто
   }
 
   function boot() {
@@ -801,16 +803,22 @@
       in_progress: S.cur() ? S.cur().story_id : null, persistent: P.persistent });
   }
 
-  A.event('launch', { persistent: P.persistent, w: innerWidth, h: innerHeight, dpr: devicePixelRatio || 1 });
-  window.Board.mount();
-  bind();
-  initStaticArt();
-  applySettings();
-  boot();
-  if (!P.persistent) { $('field-save').hidden = false; saveLine($('home-save')); }
+  function start(env) {
+    var restored = !!(env && env.cloud && S.adopt(env.cloud));
+    A.event('launch', { persistent: P.persistent, w: innerWidth, h: innerHeight, dpr: devicePixelRatio || 1,
+      cloud: P.cloud, restored: restored });
+    window.Board.mount();
+    bind();
+    initStaticArt();
+    applySettings();
+    boot();
+    if (!P.persistent) { $('field-save').hidden = false; saveLine($('home-save')); }
 
-  // Для автотестов: состояние и текущий экран, без обхода правил поля.
-  window.__g1f = { state: S, get screen() { return screen; }, get sheet() { return sheetKind; },
-    content: C, board: window.Board, revealNow: endReveal,
-    surveyText: surveyText, get survey() { return survey; } };
+    // Для автотестов: состояние и текущий экран, без обхода правил поля.
+    window.__g1f = { state: S, get screen() { return screen; }, get sheet() { return sheetKind; },
+      content: C, board: window.Board, revealNow: endReveal,
+      surveyText: surveyText, get survey() { return survey; }, platform: P.name };
+  }
+  // В браузере — сразу; в ВК — после VKWebAppInit и чтения облачной копии (≤ 5,5 с).
+  if (P.name === 'vk') P.ready.then(start); else start(null);
 })();

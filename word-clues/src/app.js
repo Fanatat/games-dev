@@ -689,10 +689,10 @@
   function surveyBack() {
     if (surveyFrom === 'result' && resultStory) show('scr-result'); else showHome();
   }
-  function showSurveyText(text) {
+  function showSurveyText(text, select) {
     var out = $('survey-out');
     out.value = text; out.hidden = false;
-    out.focus(); out.select();
+    if (select) { out.focus(); out.select(); }
   }
   function surveySend(how) {
     var st = $('survey-status');
@@ -700,9 +700,9 @@
     var text = surveyText(), copied = false;
     var done = function () {
       st.textContent = how === 'tg'
-        ? 'Спасибо! Нажмите «Отправить» в Telegram.' + (copied ? ' Если поле сообщения пустое — вставьте текст, он уже скопирован.' : ' Если поле сообщения пустое — скопируйте текст ниже.')
-        : copied ? 'Скопировано. Пришлите текст автору в Telegram @' + SV.TG + ' или туда, где вам дали ссылку.' : 'Выделите текст ниже и скопируйте его.';
-      if (!copied) showSurveyText(text);
+        ? 'Спасибо! Нажмите «Отправить» в Telegram. Если Telegram не открылся или выдал ошибку — ' + (copied ? 'текст уже скопирован, вставьте его в любой чат с автором.' : 'скопируйте текст ниже и пришлите автору.')
+        : copied ? 'Спасибо! Ответы скопированы — вставьте их в сообщение автору игры.' : 'Спасибо! Выделите текст ниже, скопируйте и пришлите автору игры.';
+      showSurveyText(text, !copied);
     };
     try {
       navigator.clipboard.writeText(text).then(function () { copied = true; done(); }, done);

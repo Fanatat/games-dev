@@ -12,7 +12,9 @@ window.Scene = (function () {
   var ART = 'assets/art/';
   var SVGNS = 'http://www.w3.org/2000/svg';
   // На каком предмете сидит кот в каждой комнате (кот рисуется сразу за ним).
-  var CAT_ON = { r01: 'r01_rug', r02: 'r02_armchair' };
+  // Место кота в комнате. Кот живёт в последней комнате, где его место готово
+  // (в прихожей — вся комната), и уходит туда сам, когда место появляется.
+  var CAT_ON = { r01: 'r01_rug', r02: 'r02_armchair', r03: 'r03_bench' };
 
   function el(tag, cls, attrs) {
     var e = document.createElement(tag);
@@ -129,9 +131,8 @@ window.Scene = (function () {
       });
     }
 
-    // Кот: в прихожей — когда она готова и пока кресло в чайной не вернулось.
-    var armchair = !opts.before && C.objects.r02_armchair && St.isObjectRestored(C, S, 'r02_armchair') && opts.hide !== 'r02_armchair';
-    var catShown = hall ? complete && !armchair : rid === 'r02' && !!restored.r02_armchair;
+    // Кот: в прихожей — когда она готова, дальше — на своём месте в последней комнате.
+    var catShown = !opts.before && catHome(C, S, opts.hide) === rid;
 
     var order = room.z || room.objects;
     order.forEach(function (oid) {
@@ -166,7 +167,7 @@ window.Scene = (function () {
       host.appendChild(wrap);
 
       if (oid === CAT_ON[rid] && L.cat) {
-        var cat = el('img', 'spr spr-cat' + (catShown ? ' is-shown' : '') + (opts.fresh === (hall ? 'room' : 'r02_armchair') ? ' is-arriving' : ''),
+        var cat = el('img', 'spr spr-cat' + (catShown ? ' is-shown' : '') + (opts.fresh === (hall ? 'room' : CAT_ON[rid]) ? ' is-arriving' : ''),
           { src: ART + 'cat.webp', alt: '', draggable: 'false' });
         place(cat, L.cat);
         host.appendChild(cat);
@@ -188,11 +189,24 @@ window.Scene = (function () {
     }
   }
 
+  // Комната, где сейчас кот (null — ещё не пришёл). hide — предмет, который
+  // пока рисуется на стадию раньше (летит миниатюра).
+  function catHome(C, S, hide) {
+    var St = window.HopState, home = null;
+    St.roomOrder(C).forEach(function (rid) {
+      var seat = CAT_ON[rid];
+      if (!seat || !C.objects[seat] || !C.rooms[rid].layout.cat) return;
+      var ok = rid === 'r01' ? St.isRoomComplete(C, S, rid) : St.isObjectRestored(C, S, seat) && hide !== seat;
+      if (ok) home = rid;
+    });
+    return home;
+  }
+
   // Прямоугольник спрайта предмета на экране (цель полёта миниатюры).
   function objectRect(host, oid) {
     var img = host.querySelector('img.spr-obj[data-obj="' + oid + '"]');
     return img ? img.getBoundingClientRect() : null;
   }
 
-  return { render: render, objectRect: objectRect, spriteOf: spriteOf, stageSprite: stageSprite, variantSprite: variantSprite };
+  return { render: render, objectRect: objectRect, spriteOf: spriteOf, stageSprite: stageSprite, variantSprite: variantSprite, catSeat: function (rid) { return CAT_ON[rid]; } };
 })();

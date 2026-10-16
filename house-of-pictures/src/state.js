@@ -203,9 +203,15 @@
 
   /* ---------- журнал и награды ---------- */
 
+  // Слушатель журнала (src/track.js шлёт события на сервер). Ошибка слушателя
+  // не должна ломать ход игры.
+  var eventHook = null;
+  function setEventHook(fn) { eventHook = fn; }
+
   function logEvent(s, type, data) {
     s.log.push({ t: nowIso(), type: type, data: data || null });
     if (s.log.length > MAX_LOG) s.log.splice(0, s.log.length - MAX_LOG);
+    if (eventHook) { try { eventHook(type, data || null); } catch (e) { /* журнал важнее */ } }
   }
 
   function touch(s) { s.revision++; s.updated_at = nowIso(); }
@@ -448,6 +454,24 @@
     return true;
   }
 
+  // Сколько дней прошло с прошлого визита (0 — сегодня уже были или визитов не было).
+  function daysAway(s, day) {
+    var last = s.visits[s.visits.length - 1];
+    return last ? Math.max(0, daysBetween(last, day || today())) : 0;
+  }
+
+  // Подарок вернувшемуся после долгой паузы — раз в день возвращения.
+  function comebackGift(C, s, away, day) {
+    var R = C.economy.comeback;
+    day = day || today();
+    if (!R || away < R.after_days || s.story_flags.comeback_day === day) return null;
+    s.story_flags.comeback_day = day;
+    s.pencils += R.pencils;
+    logEvent(s, 'comeback_gift', { away: away, pencils: R.pencils });
+    touch(s);
+    return { pencils: R.pencils };
+  }
+
   // Визит засчитывается раз в календарный день (для «записки следующего визита»).
   function registerVisit(s, d) {
     var key = d ? dayKey(d) : today();
@@ -552,7 +576,7 @@
     canOfferSku: canOfferSku, applyOrder: applyOrder, adsLeft: adsLeft, rewardedGrant: rewardedGrant,
     stampsActive: stampsActive, dailyLetters: dailyLetters, todayLetter: todayLetter, lettersBadge: lettersBadge,
     openLetterEnvelope: openLetterEnvelope,
-    setFlag: setFlag, registerVisit: registerVisit, logEvent: logEvent,
+    setFlag: setFlag, registerVisit: registerVisit, daysAway: daysAway, comebackGift: comebackGift, logEvent: logEvent, setEventHook: setEventHook,
     encodeBoard: encodeBoard, decodeBoard: decodeBoard, load: load, persist: persist,
     cloudSave: cloudSave, preferRemote: preferRemote, adoptRemote: adoptRemote
   };

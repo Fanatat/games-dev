@@ -682,7 +682,7 @@
     st.appendChild(icon('lock'));
     soon.appendChild(st);
     var sb = h('span', 'card-body');
-    sb.appendChild(h('b', 'card-title', 'Оранжерея'));
+    sb.appendChild(h('b', 'card-title', C.soon_room || 'Новая комната'));
     sb.appendChild(h('span', 'card-sub', 'Скоро'));
     soon.appendChild(sb);
     list.appendChild(soon);
@@ -1208,7 +1208,7 @@
   function roomFinale(rid, gift) {
     log('room_complete', { room_id: rid });
     saveNow();
-    renderHome({ fresh: rid === 'r01' ? 'room' : 'r02_armchair' });
+    renderHome({ fresh: rid === 'r01' ? 'room' : Scene.catSeat(rid) });
     Sound.play('chord');
     if (rid !== 'r01') {
       toast(C.rooms[rid].final_text, 4200);
@@ -1860,6 +1860,32 @@
     var t = setTimeout(function () { closeSheet(true); done(true); }, reducedMotion() ? 300 : 2000);
   }
 
+  /* ---------------- возвращение после паузы ---------------- */
+
+  function showWelcome(away) {
+    var gift = St.comebackGift(C, S, away);
+    var waiting = St.dailyLetters(C, S).filter(function (l) { return l.status === 'today' || l.status === 'open'; }).length;
+    var node = h('div', 'welcome-sheet');
+    node.appendChild(sheetHead('С возвращением!', 'envelope'));
+    var text = away >= 7 ? 'Дом соскучился! Вера сберегла для тебя всё, что пришло.' : 'Финик ждал у двери и встретил тебя мурчанием.';
+    if (waiting) text += ' Писем ждёт: ' + waiting + '.';
+    node.appendChild(h('p', 'card-text', text));
+    if (gift) {
+      var items = h('div', 'gift-items');
+      var it = h('div', 'gift-item');
+      it.appendChild(pic('pencil'));
+      it.appendChild(h('span', '', '+' + gift.pencils + ' в подарок'));
+      items.appendChild(it);
+      node.appendChild(items);
+      renderHud();
+    }
+    if (waiting) node.appendChild(button('btn-main', 'К письмам', 'letter', function () { closeSheet(true); Sound.play('tap'); showScreen('letters'); }));
+    else node.appendChild(button('btn-main', 'Домой', 'check', function () { Sound.play('tap'); closeSheet(); }));
+    openSheet(node, function () { renderHome(); }, 'sheet-welcome');
+    log('welcome_back', { away: away, letters: waiting, gift: !!gift });
+    saveNow();
+  }
+
   /* ---------------- новый день ---------------- */
 
   var dayNow = St.today();
@@ -1946,6 +1972,7 @@
     if (loaded.migrated_from) St.logEvent(S, 'save_migrated', { from: loaded.migrated_from });
     S.content_version = C.content_version;
     S.current_room = curRoom();
+    var away = St.daysAway(S);
     St.registerVisit(S);
     St.logEvent(S, 'session_start', { build: BUILD, platform: Platform.name, fresh: loaded.fresh, viewport: innerWidth + 'x' + innerHeight, day: St.today() });
     saveNow();
@@ -1953,6 +1980,7 @@
     Platform.init();
     showScreen('home');
     renderHome();
+    if (away >= 2 && hallDone() && $('sheet').hidden) showWelcome(away);
     cloudStart();
     // Новый день мог наступить, пока вкладка открыта.
     setInterval(function () { if (dayNow !== St.today()) onNewDay(); }, 60000);

@@ -64,5 +64,12 @@ window.HopCloud = (function () {
     return req('POST', '/v1/purchases/confirm', { ids: ids.slice(0, 100) });
   }
 
-  return { enabled: enabled, load: load, push: push, purchases: purchases, confirm: confirm };
+  // Пакет событий (src/track.js). → { stored, dup, bad } | null
+  function events(list, build, keepalive) {
+    return req('POST', '/v1/events', { events: list, build: build }, keepalive).then(function (r) {
+      return r && r.status === 200 && r.data ? r.data : null;
+    });
+  }
+
+  return { enabled: enabled, load: load, push: push, purchases: purchases, confirm: confirm, events: events };
 })();

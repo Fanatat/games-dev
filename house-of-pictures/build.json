@@ -1,14 +1,14 @@
 {
  "game": "house-of-pictures",
- "build_number": "003",
- "app_build": "0.1.0+b003",
+ "build_number": "004",
+ "app_build": "0.1.0+b004",
  "git_branch": "worktree-p0-hallway",
- "git_sha": "821a44a",
+ "git_sha": "d319dff",
  "dirty": false,
- "content_version": 2,
+ "content_version": 3,
  "api": "https://api.vanatat.ru/hop",
- "built_at": "2026-10-16T13:18:45+00:00",
- "total_bytes": 3122051,
+ "built_at": "2026-10-16T15:49:04+00:00",
+ "total_bytes": 4681213,
  "files": [
   {
    "path": "assets/art/armchair_a.webp",
@@ -41,9 +41,44 @@
    "sha256": "7d7d84785051fe7ed4d9ac6b2b653393335ebe2a335cc408780598a3f2c8fad0"
   },
   {
+   "path": "assets/art/bench_a.webp",
+   "bytes": 25714,
+   "sha256": "9d9474462b94ff7069bf671db92415767e294e75710c62eecde88e9744bfc6df"
+  },
+  {
+   "path": "assets/art/bench_b.webp",
+   "bytes": 23822,
+   "sha256": "0009a1872d796c1dafc77c43d687a75571e9b2c92d063a91fdcb73883dfecb18"
+  },
+  {
+   "path": "assets/art/bench_c.webp",
+   "bytes": 22744,
+   "sha256": "1096c1942a2aa0b1d934a1ffc1fdc17812c5e5f18cc2d6f2879a8311b6e31e4d"
+  },
+  {
+   "path": "assets/art/bench_s1.webp",
+   "bytes": 11806,
+   "sha256": "d7038938bc3a4693a7a6ff94c44e89ddfed32b397b130e2637441fa5c9a15e20"
+  },
+  {
+   "path": "assets/art/bench_s2.webp",
+   "bytes": 14560,
+   "sha256": "be1c48fcd1dcde76f79883b4eb59f3eb1bca99617eb2a476b9aaf41474a03c20"
+  },
+  {
+   "path": "assets/art/bench_s3.webp",
+   "bytes": 25254,
+   "sha256": "541b6a5f6ab501d2a2945e754da9138ebff2a2cf599a8303a768c3a9ba332a39"
+  },
+  {
    "path": "assets/art/bg_hallway.webp",
    "bytes": 157234,
    "sha256": "12ace862b39512e8274bcf0d716d62715601bf23b9b75aed1697fa330e481813"
+  },
+  {
+   "path": "assets/art/bg_orangery.webp",
+   "bytes": 196578,
+   "sha256": "b08966f2a5725f1628e344e810fcdd1351c3b13b80ed4c47f18a9ddcd770f091"
   },
   {
    "path": "assets/art/bg_tearoom.webp",
@@ -54,6 +89,36 @@
    "path": "assets/art/bird.webp",
    "bytes": 32080,
    "sha256": "565b1751dfd3a7a84a7282944cd37b2b7ce9ec65154addd4390dffadfb4f9a84"
+  },
+  {
+   "path": "assets/art/birdhouse_a.webp",
+   "bytes": 15268,
+   "sha256": "416bf38a734d04c622ce3aa4ca8ede87915d9651982f22880b4ff7dd65546998"
+  },
+  {
+   "path": "assets/art/birdhouse_b.webp",
+   "bytes": 15168,
+   "sha256": "d176f7d91825bf320f2704a7d28013c1169260f09e496bd0e062dabf828b3edd"
+  },
+  {
+   "path": "assets/art/birdhouse_c.webp",
+   "bytes": 16962,
+   "sha256": "ac95a363bd6775d4e600f4fa676124a57fc32e7f2ccc9162896badf5d44546ce"
+  },
+  {
+   "path": "assets/art/birdhouse_s1.webp",
+   "bytes": 9990,
+   "sha256": "68b164d12a0ccfa81ee5bab01d84a79262a29b6291bdb8488bf700484096cc9f"
+  },
+  {
+   "path": "assets/art/birdhouse_s2.webp",
+   "bytes": 13180,
+   "sha256": "beddb4de9c51c6a4d4f9a4af2fe03c7d402200bab71fe98618dadcb5552d7ead"
+  },
+  {
+   "path": "assets/art/birdhouse_s3.webp",
+   "bytes": 13524,
+   "sha256": "d3614cba1cffcd7ac45fad71589059922a735b5f8ba2d80ddeea79acd9fa9b33"
   },
   {
    "path": "assets/art/cat.webp",
@@ -114,6 +179,96 @@
    "path": "assets/art/gift.webp",
    "bytes": 12714,
    "sha256": "d994bd00619626c8c315e6e2e7d71d81fdb9a626edd79f0da0fb13a76dcbd784"
+  },
+  {
+   "path": "assets/art/glass_door_a.webp",
+   "bytes": 41616,
+   "sha256": "ee2262e3a572d08cd0b66ba5a8a6ea97c475d24653ab79fe9ecf123c1055cb94"
+  },
+  {
+   "path": "assets/art/glass_door_b.webp",
+   "bytes": 40170,
+   "sha256": "dfd7d46fbdac48a511aa1e105f44019e7b3dbc4d8e5fe9badfff2ac28056ab89"
+  },
+  {
+   "path": "assets/art/glass_door_c.webp",
+   "bytes": 41068,
+   "sha256": "f30a00858fc94c0bde350ac61c0c28a7bd9d117968a99b328199e57350c7e514"
+  },
+  {
+   "path": "assets/art/glass_door_s1.webp",
+   "bytes": 20778,
+   "sha256": "5def51f73445de76b45f4a69a0bfd4dc8011bc6477899442254e2d2db9cbca83"
+  },
+  {
+   "path": "assets/art/glass_door_s2.webp",
+   "bytes": 21226,
+   "sha256": "3f0cab522279ff397016f2a4c6fdeca77dcb05d8305cc4ab2dcfbe29f19ac28b"
+  },
+  {
+   "path": "assets/art/glass_door_s3.webp",
+   "bytes": 20854,
+   "sha256": "5cb8d9451f08f05ab36e50ea63159e5c919446478a2fd8faf8ed86aaa4b33355"
+  },
+  {
+   "path": "assets/art/hanging_pot_a.webp",
+   "bytes": 43950,
+   "sha256": "a8647d258f17801eedc698f49ac9d8959552c9591699e80f88d038492c9bf520"
+  },
+  {
+   "path": "assets/art/hanging_pot_b.webp",
+   "bytes": 44710,
+   "sha256": "8d1661c4989a0bbcc957053340422d7c59e87c2e34960eb6b9ec314b9f05843b"
+  },
+  {
+   "path": "assets/art/hanging_pot_c.webp",
+   "bytes": 44548,
+   "sha256": "60623a1637ab9c5cc3bcbf4b4a3a5175367a3f36e2e6ba37a2d8aff8f8a48338"
+  },
+  {
+   "path": "assets/art/hanging_pot_s1.webp",
+   "bytes": 4986,
+   "sha256": "953a4ed77464afb63d92a9f09f2898b60f43f7d9b302d89010f4099522e0c8bf"
+  },
+  {
+   "path": "assets/art/hanging_pot_s2.webp",
+   "bytes": 19142,
+   "sha256": "c7f8adf9ceb22bf7c3c070dc7243f972fbce578ba56cfe8f51e84ca7fec786f8"
+  },
+  {
+   "path": "assets/art/hanging_pot_s3.webp",
+   "bytes": 18078,
+   "sha256": "283f1a5dd599bb611229acd4cc9ff689633bf35b017ab2c38282fb7b395cf76a"
+  },
+  {
+   "path": "assets/art/herbarium_a.webp",
+   "bytes": 31730,
+   "sha256": "99e7a7788defeb417c24b5d283ddcc8efdad96411bfc83e647da4fbf92eb0a40"
+  },
+  {
+   "path": "assets/art/herbarium_b.webp",
+   "bytes": 35338,
+   "sha256": "29c162ec49ec2255b5353983a4b92b52dc917259550edc868446ea9d9b850e1e"
+  },
+  {
+   "path": "assets/art/herbarium_c.webp",
+   "bytes": 47070,
+   "sha256": "1e7ee16fa7e91dfcaa25286308699a5a006402b7ed66575f68103cf8ca7a6314"
+  },
+  {
+   "path": "assets/art/herbarium_s1.webp",
+   "bytes": 19724,
+   "sha256": "adde72ff87a3b797fbe5650bd8dd5d968ccb1f6348613c7126400dd51bb8920b"
+  },
+  {
+   "path": "assets/art/herbarium_s2.webp",
+   "bytes": 24712,
+   "sha256": "bf908a0426fc697cdf751a873f0479e658b0ce28a1395093fda8c384e248231e"
+  },
+  {
+   "path": "assets/art/herbarium_s3.webp",
+   "bytes": 30738,
+   "sha256": "14918ff8da2e31c19c96f3b97fc9e902e96cba6763d309e789510e3fe1a36794"
   },
   {
    "path": "assets/art/invitation.webp",
@@ -196,6 +351,36 @@
    "sha256": "5677b1d0ba26ab769c621ecdeb0fd1e0cf4e5e68f93634a5066df6f08b5d8824"
   },
   {
+   "path": "assets/art/pond_a.webp",
+   "bytes": 38746,
+   "sha256": "e11663fd29f01d909d3c097b63a58406a353e7641fafb5d89cefb79189322e10"
+  },
+  {
+   "path": "assets/art/pond_b.webp",
+   "bytes": 39182,
+   "sha256": "6323990fd78c78d904a9d804a61ef88948502a41ca0590a3e4e0a2d75db6c8eb"
+  },
+  {
+   "path": "assets/art/pond_c.webp",
+   "bytes": 38248,
+   "sha256": "9cad1a5bf0cc9d0ec761f22279424837062ecb24a0bb61b046ef74daf9a6c8f6"
+  },
+  {
+   "path": "assets/art/pond_s1.webp",
+   "bytes": 33666,
+   "sha256": "01bcdbc099a1866ff499322b30d2036ec7275d442b3abaad2d3248d9de0aba73"
+  },
+  {
+   "path": "assets/art/pond_s2.webp",
+   "bytes": 34584,
+   "sha256": "bed0b38da3da291f1cf7adee875841f25dfd5d8c4cb953f5f0da19e1f7d64d3a"
+  },
+  {
+   "path": "assets/art/pond_s3.webp",
+   "bytes": 35054,
+   "sha256": "70d1032f3dc89479f5ddae0a6508ce759c66dfe763422344f768ecdbaddf0d2f"
+  },
+  {
    "path": "assets/art/rug_a.webp",
    "bytes": 41766,
    "sha256": "f2b0922659063a8d254dc43347114ded152d7a867cf44efb7e9a6fb769d3f88d"
@@ -209,6 +394,36 @@
    "path": "assets/art/rug_c.webp",
    "bytes": 57318,
    "sha256": "48755548a490f12f824f31921196ad2a1e5fea63d4b3ef9ec3d9efa779d69bdf"
+  },
+  {
+   "path": "assets/art/seed_table_a.webp",
+   "bytes": 38668,
+   "sha256": "2d361a3758f6b567a0b77b45197f4587c213ef88654367dd7683ee96a45701f8"
+  },
+  {
+   "path": "assets/art/seed_table_b.webp",
+   "bytes": 37986,
+   "sha256": "9e7b43c6c5c274e542c11c720653849c9d3f4f5210b82030f74ff6a78fec3383"
+  },
+  {
+   "path": "assets/art/seed_table_c.webp",
+   "bytes": 39988,
+   "sha256": "4ab1ec6bc5feaf689c7e45ae205eb087a41770a0ab9901fbdb9a22a0628fbf91"
+  },
+  {
+   "path": "assets/art/seed_table_s1.webp",
+   "bytes": 25684,
+   "sha256": "71e07f59bee5b02245d1d7e78e4235b924d04348b667f90fe6783671cd8d9741"
+  },
+  {
+   "path": "assets/art/seed_table_s2.webp",
+   "bytes": 30018,
+   "sha256": "3c9a4ca9cb835a1505a3ebc7bf81b0abdb7e23e32dcdb05afbbcc04e884b367d"
+  },
+  {
+   "path": "assets/art/seed_table_s3.webp",
+   "bytes": 30922,
+   "sha256": "5e6cfd90c9947030241d8d0366379ceaeb0f8c70cd169f14341bb5c8901984df"
   },
   {
    "path": "assets/art/shelf_a.webp",
@@ -304,6 +519,36 @@
    "path": "assets/art/tea_set_s2.webp",
    "bytes": 15310,
    "sha256": "1b4482d16e5990a58b7b84335800aaa379fc3fdb604a97bb6bdcc4041e82cfbd"
+  },
+  {
+   "path": "assets/art/watering_can_a.webp",
+   "bytes": 24916,
+   "sha256": "d42b64ced6603c28e1d13ba0e79a6f7b917c1628c47d15ae1375f4514d56ad5e"
+  },
+  {
+   "path": "assets/art/watering_can_b.webp",
+   "bytes": 25532,
+   "sha256": "d5474d4160acd853f31ffb6a749f6f6baa6e52f94494eff6f7833287f92b2fbb"
+  },
+  {
+   "path": "assets/art/watering_can_c.webp",
+   "bytes": 26862,
+   "sha256": "ca7d0839f58dd034e8636d774f6e158cee734571ef3e702f502ad8b6fb8dad8b"
+  },
+  {
+   "path": "assets/art/watering_can_s1.webp",
+   "bytes": 14202,
+   "sha256": "37ea63f9c459007af931f8d73b06f468db78fc6265291a225615c849b4344d44"
+  },
+  {
+   "path": "assets/art/watering_can_s2.webp",
+   "bytes": 18816,
+   "sha256": "8af08889ab183b32bc088db978bbe308ead8d04c76bf724535dc88188fc93169"
+  },
+  {
+   "path": "assets/art/watering_can_s3.webp",
+   "bytes": 24544,
+   "sha256": "247a6639ba3754734cd87df61d689a624caa5ecf9d2c950e01d20e2e0e2dff9f"
   },
   {
    "path": "assets/art/window_a.webp",
@@ -437,23 +682,23 @@
   },
   {
    "path": "data/content.js",
-   "bytes": 30609,
-   "sha256": "099ac4ecfb500a1d0183f6eaaa7c7594da8accc1b0422f5d02ad0898c3eb4d0d"
+   "bytes": 67507,
+   "sha256": "5ac606d4d22371bbc57bfb2b844979daca837fde37ce5383c9a60ab66107e790"
   },
   {
    "path": "index.html",
-   "bytes": 10474,
-   "sha256": "cfce2a21e4b85349af3d9acd8bda2936f89a3137b46db93ed5075c0fad54eea4"
+   "bytes": 10517,
+   "sha256": "017d823adbed75ba61d1c3c06744fbad6dc4887e82e7bb7b9344edf18951d2b2"
   },
   {
    "path": "src/app.js",
-   "bytes": 83799,
-   "sha256": "28370fc01f49ba4aacabd6a3d899dc0e9143ee35cf8e334ca0afde3ad2f6df48"
+   "bytes": 85412,
+   "sha256": "a1fdd08e912c9441e557c4fad85bda08b99da28368d518249b1414bccf51b062"
   },
   {
    "path": "src/cloud.js",
-   "bytes": 3385,
-   "sha256": "2873b6714ccdfa5ad5bb95a19213a948ffa2154f736f09f58bbd1448ee59b6a5"
+   "bytes": 3699,
+   "sha256": "26400a83ee1ea7bc49509f9ce5435ae6d07b4575e3cad9770f076075c1b39202"
   },
   {
    "path": "src/platform.js",
@@ -472,8 +717,8 @@
   },
   {
    "path": "src/scene.js",
-   "bytes": 10322,
-   "sha256": "16e271ba17de8c29b04731a8d5e0719cea4559f46d78f70c7e08156600e900c0"
+   "bytes": 11125,
+   "sha256": "0ad49501795929dd65cc89954e98684608d26beefe1f6f337d05adb663789d81"
   },
   {
    "path": "src/sound.js",
@@ -482,13 +727,18 @@
   },
   {
    "path": "src/state.js",
-   "bytes": 25198,
-   "sha256": "da776464b87cb9d21845124f3cadc2d1f4ef16d232b09aaa922a1ab666a5af14"
+   "bytes": 26443,
+   "sha256": "929e1a7c07156933db6a538f6d521ff1a2ec862a22ccde18ac059770942658f2"
   },
   {
    "path": "src/styles.css",
    "bytes": 50890,
    "sha256": "02bd390955ce06158230aa6aa508953f37bc7f5519c91ba72e6b5f17a34eeac3"
+  },
+  {
+   "path": "src/track.js",
+   "bytes": 5620,
+   "sha256": "e4155cb5d5d8e529684f78977b87b18c5e1159249d9fff9fa1d09d7ca93f0b85"
   },
   {
    "path": "src/vendor/vk-bridge.min.js",

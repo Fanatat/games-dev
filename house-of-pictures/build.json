@@ -1,14 +1,14 @@
 {
  "game": "house-of-pictures",
- "build_number": "002",
- "app_build": "0.1.0+b002",
+ "build_number": "003",
+ "app_build": "0.1.0+b003",
  "git_branch": "worktree-p0-hallway",
- "git_sha": "ae5cdb6",
+ "git_sha": "821a44a",
  "dirty": false,
  "content_version": 2,
- "api": "",
- "built_at": "2026-10-16T08:08:23+00:00",
- "total_bytes": 3122025,
+ "api": "https://api.vanatat.ru/hop",
+ "built_at": "2026-10-16T13:18:45+00:00",
+ "total_bytes": 3122051,
  "files": [
   {
    "path": "assets/art/armchair_a.webp",
@@ -442,8 +442,8 @@
   },
   {
    "path": "index.html",
-   "bytes": 10448,
-   "sha256": "21feb7875470fab38e4cb4f7e5124d941bb85ba1ff31aaf8217e4d660a654390"
+   "bytes": 10474,
+   "sha256": "cfce2a21e4b85349af3d9acd8bda2936f89a3137b46db93ed5075c0fad54eea4"
   },
   {
    "path": "src/app.js",

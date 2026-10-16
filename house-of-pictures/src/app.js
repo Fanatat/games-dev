@@ -110,6 +110,19 @@
 
   function log(type, data) { St.logEvent(S, type, data); scheduleSave(); }
 
+  // Время в игре (для «первые 10 минут без платных окон»): +5 с, если вкладка
+  // видна и последнее касание было не раньше 90 с назад. Пишется только
+  // локально раз в 30 с — облако получит его с ближайшим обычным сохранением.
+  var lastInput = Date.now(), playTicks = 0;
+  ['pointerdown', 'keydown'].forEach(function (ev) { document.addEventListener(ev, function () { lastInput = Date.now(); }, true); });
+  setInterval(function () {
+    if (document.hidden || Date.now() - lastInput > 90000) return;
+    var was = St.paidOpen(C, S);
+    St.addPlayTime(S, 5);
+    if (++playTicks % 6 === 0) St.persist(storage, S);
+    if (!was && St.paidOpen(C, S) && screen === 'shop' && $('sheet').hidden) renderShop();
+  }, 5000);
+
   /* ---------------- облако (только ВК с адресом сервера) ----------------
      Сейв уходит на сервер через несколько секунд после изменения и сразу при
      сворачивании. Если другое устройство ушло дальше, его сейв принимается,
@@ -154,7 +167,7 @@
       St.persist(storage, S);
       applySettings();
       rerender();
-      toast('Прогресс загружен с другого устройства');
+      toast('Прогресс загружен', null, 'check');
     }
     cloud.dirty = true;
     cloudPush(false);
@@ -196,7 +209,7 @@
       Sound.play('chord');
       rerender();
       bump($('hud-pencils'));
-      toast(got > 1 ? 'Покупки получены' : 'Покупка получена');
+      toast(got > 1 ? 'Покупки получены' : 'Покупка получена', null, 'gift');
     });
   }
 
@@ -206,6 +219,7 @@
   function reducedMotion() { return !!S.settings.reduced_motion || !!(rmQuery && rmQuery.matches); }
   function applySettings() {
     Sound.setEnabled(S.settings.sound !== false);
+    Sound.setMusic(S.settings.music !== false);
     Sound.setVibration(S.settings.vibration !== false);
     document.documentElement.classList.toggle('rm', reducedMotion());
   }
@@ -243,6 +257,9 @@
     if (name === 'letters') renderLetters();
     if (name === 'shop') renderShop();
     renderHud();
+    // На поле — без среды комнаты и музыка тише: слышны клетки и линии.
+    Sound.ambient(name === 'puzzle' ? null : curRoom());
+    Sound.musicLevel(name === 'puzzle' ? 0.55 : 1);
     if (name !== 'puzzle') adoptPending();
   }
   // Перерисовать открытый раздел дома (после покупки или смены сейва).
@@ -260,9 +277,12 @@
     $('toast').classList.remove('is-in');
     $('toast').hidden = true;
   }
-  function toast(text, ms) {
+  // Тост — одно-два слова и значок (SVG-значок или картинка), без объяснений.
+  function toast(text, ms, ico) {
     var t = $('toast');
-    t.textContent = text;
+    t.innerHTML = '';
+    if (ico) t.appendChild(document.getElementById('i-' + ico) ? icon(ico) : pic(ico, 'toast-pic'));
+    t.appendChild(h('span', '', text));
     t.hidden = false;
     t.classList.remove('is-in');
     void t.offsetWidth;
@@ -334,11 +354,24 @@
     node.classList.remove('is-bump'); void node.offsetWidth; node.classList.add('is-bump');
   }
 
-  $('hud-coins').addEventListener('click', function () { openShopFromHud(); });
-  $('hud-pencils').addEventListener('click', function () { openShopFromHud(); });
-  function openShopFromHud() {
+  // Отказ без слов: нажатое вздрагивает, а то, чего не хватает, на миг краснеет.
+  function refuse(target, wants) {
+    Sound.play('back');
+    Sound.buzz(30);
+    if (target) shake(target.classList.contains('obj') ? target.querySelector('.spr-obj') : target);
+    (wants || []).forEach(function (w) {
+      if (!w) return;
+      w.classList.remove('is-want'); void w.offsetWidth; w.classList.add('is-want');
+      setTimeout(function () { w.classList.remove('is-want'); }, 1500);
+    });
+  }
+
+  $('hud-coins').addEventListener('click', function () { openShopFromHud(this); });
+  $('hud-pencils').addEventListener('click', function () { openShopFromHud(this); });
+  function openShopFromHud(el) {
+    // Лавка открывается вместе с прихожей — краснеет плашка комнаты.
+    if (!hallDone()) { refuse(el, [$('room-pill')]); log('refuse', { what: 'shop' }); return; }
     Sound.play('tap');
-    if (!hallDone()) { toast('Лавка откроется, когда оживёт прихожая'); return; }
     showScreen('shop');
   }
   $('tabbar').addEventListener('click', function (e) {
@@ -408,6 +441,7 @@
   function objectThumb(oid) {
     var st = St.objectStage(C, S, oid);
     var w = h('span', 'thumb' + (st === 0 ? ' is-ghost' : ''));
+    w.setAttribute('data-thumb', oid); // не data-obj: им ищут карточку предмета в панели
     w.appendChild(pic(Scene.stageSprite(C, S, oid, st)));
     return w;
   }
@@ -485,6 +519,7 @@
       var b = h('button', 'card card-choice');
       b.type = 'button';
       b.setAttribute('data-obj', oid);
+      b.setAttribute('aria-label', o.title + ', ' + puzzleSize(St.nextPuzzle(C, S, oid)));
       b.appendChild(objectThumb(oid));
       b.appendChild(h('b', 'card-title', o.title));
       b.appendChild(h('span', 'card-sub', o.pitch));
@@ -584,9 +619,12 @@
     }
     var n = S.stamps.days.length;
     row.setAttribute('aria-label', 'Штампы: ' + n + ' из ' + size);
+    var steps = C.stamps.steps || {};
     for (var i = 0; i < size; i++) {
       var s = h('i', 'stamp' + (i < n ? ' is-on' : ''));
+      var step = steps[i + 1];
       if (i < n) s.appendChild(pic('stamp'));
+      else if (step) { s.classList.add('is-step'); s.appendChild(pic(step.coins ? 'coin' : 'pencil')); }
       row.appendChild(s);
     }
     row.appendChild(pic('gift', 'stamps-gift'));
@@ -617,8 +655,68 @@
     }
     Scene.render($('scene'), C, S, curRoom(), so);
     renderPill();
+    renderChips();
     renderPanel();
     renderHud();
+  }
+
+  // Значки над сценой: письмо дня (новое «1» / «N ч» до следующего) и фонарики события «зажжено/всего».
+  function renderChips() {
+    var box = $('scene-chips');
+    box.innerHTML = '';
+    var garland = $('scene-garland');
+    var ev = St.eventInfo(C, S);
+    var live = ev && !ev.over && !ev.complete;
+    garland.hidden = !(ev && (live || ev.complete) && !ev.over);
+    if (!garland.hidden) paintGarland(garland, ev);
+    if (!hallDone() || !S.story_flags.letter_opened) return;
+    var T = St.todayLetter(C, S, St.today());
+    var mail = h('button', 'scene-chip chip-mail');
+    mail.type = 'button';
+    mail.setAttribute('data-chip', 'mail');
+    mail.appendChild(pic('envelope'));
+    if (T && T.status === 'today') {
+      mail.classList.add('is-new');
+      mail.appendChild(h('b', 'chip-badge', '1'));
+      mail.setAttribute('aria-label', 'Пришло письмо');
+    } else {
+      mail.appendChild(h('b', 'chip-badge', untilTomorrow().replace('через ', '')));
+      mail.setAttribute('aria-label', 'Новое письмо ' + untilTomorrow());
+    }
+    mail.addEventListener('click', function () { Sound.play('tap'); showScreen('letters'); });
+    box.appendChild(mail);
+    if (live) {
+      var lan = h('button', 'scene-chip chip-lantern' + (ev.waiting ? ' is-new' : ''));
+      lan.type = 'button';
+      lan.setAttribute('data-chip', 'lantern');
+      lan.appendChild(icon('lantern'));
+      lan.appendChild(h('b', 'chip-badge', ev.done + '/' + ev.of));
+      lan.setAttribute('aria-label', ev.title + ': зажжено ' + ev.done + ' из ' + ev.of + ', осталось ' + ev.days_left + ' дн.');
+      lan.addEventListener('click', function () { Sound.play('tap'); showScreen('letters'); });
+      box.appendChild(lan);
+    }
+  }
+
+  // Гирлянда над комнатой: огоньков столько, сколько зажжено фонариков.
+  function paintGarland(node, ev) {
+    var SV = 'http://www.w3.org/2000/svg';
+    node.innerHTML = '';
+    var svg = document.createElementNS(SV, 'svg');
+    svg.setAttribute('viewBox', '0 0 100 14');
+    svg.setAttribute('preserveAspectRatio', 'none');
+    var path = document.createElementNS(SV, 'path');
+    path.setAttribute('d', 'M0 2 Q10 10 20 3 Q30 10 40 3 Q50 10 60 3 Q70 10 80 3 Q90 10 100 2');
+    path.setAttribute('class', 'garland-wire');
+    svg.appendChild(path);
+    node.appendChild(svg);
+    var colors = ['#f2c55a', '#e88a5a', '#9fc28a', '#f2b6c6', '#c9b6f2'];
+    for (var i = 0; i < ev.of; i++) {
+      var b = h('i', 'garland-bulb' + (i < ev.done ? ' is-on' : ''));
+      b.style.left = (10 + i * 20) + '%';
+      b.style.setProperty('--c', colors[i % colors.length]);
+      b.style.setProperty('--d', (i * 0.4) + 's');
+      node.appendChild(b);
+    }
   }
 
   $('scene').addEventListener('click', function (e) {
@@ -639,21 +737,41 @@
       log('object_tap', { object_id: oid });
       if (C.objects[oid].life && C.objects[oid].life.kind === 'waltz') playWaltz(oid);
       openVariantSheet(oid, { secret: true });
-    } else {
-      Sound.play('back');
-      toast(lockedHint(oid));
-    }
+    } else refuseLocked(oid, t);
   });
 
-  function lockedHint(oid) {
+  // Пока вещь прилетает и открывается сундучок, панель, вкладки и плашки ждут: иначе окно
+  // оформления откроется по таймеру поверх следующей картинки. Нажатие — кнопка вздрагивает.
+  document.addEventListener('click', function (e) {
+    if (screen !== 'home' || !$('scene').classList.contains('is-busy')) return;
+    var t = e.target.closest && e.target.closest('button');
+    if (!t || !$('shell').contains(t) || $('scene').contains(t)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    t.classList.remove('is-nudge');
+    void t.offsetWidth;
+    t.classList.add('is-nudge');
+  }, true);
+
+  // Спящая вещь: краснеют вещи, которых она ждёт, или плашка комнаты с замочком и числом.
+  function refuseLocked(oid, btn) {
     var o = C.objects[oid];
-    if (o.unlock_after !== undefined) {
-      var need = o.unlock_after - St.restoredCount(C, S, o.room);
-      if (need > 0) return o.title + ': верни ещё ' + need + ' ' + plural(need, 'вещь', 'вещи', 'вещей');
+    var need = o.unlock_after !== undefined ? o.unlock_after - St.restoredCount(C, S, o.room) : 0;
+    var miss = (o.prerequisites || []).filter(function (p) { return !St.isObjectRestored(C, S, p); });
+    var wants = miss.map(function (p) { return $('scene').querySelector('.obj[data-obj="' + p + '"]'); });
+    if (need > 0) {
+      wants.push($('room-pill'));
+      var r = Scene.objectRect($('scene'), oid) || btn.getBoundingClientRect();
+      var tag = h('span', 'need-bubble');
+      tag.appendChild(icon('lock'));
+      tag.appendChild(h('b', '', '+' + need));
+      tag.style.left = Math.round(r.left + r.width / 2) + 'px';
+      tag.style.top = Math.round(r.top + r.height * 0.4) + 'px';
+      document.body.appendChild(tag);
+      setTimeout(function () { tag.remove(); }, 1700);
     }
-    var miss = (o.prerequisites || []).filter(function (p) { return !St.isObjectRestored(C, S, p); })
-      .map(function (p) { return C.objects[p].title.toLowerCase(); });
-    return miss.length ? o.title + ': сначала ' + miss.join(' и ') : o.title + ' пока спит';
+    refuse(btn, wants);
+    log('refuse', { what: 'object', object_id: oid, need: need, miss: miss });
   }
 
   /* ---------------- комнаты ---------------- */
@@ -668,6 +786,7 @@
       var R = C.rooms[rid];
       var open = St.isRoomUnlocked(C, S, rid);
       var b = h('button', 'room-card' + (open ? '' : ' is-locked') + (rid === curRoom() ? ' is-here' : ''));
+      b.setAttribute('data-room', rid);
       b.type = 'button';
       b.setAttribute('data-room', rid);
       var t = h('span', 'room-thumb');
@@ -677,7 +796,9 @@
       var body = h('span', 'card-body');
       body.appendChild(h('b', 'card-title', R.title));
       var n = St.restoredCount(C, S, rid);
-      body.appendChild(h('span', 'card-sub', open ? n + ' из ' + R.objects.length + (St.isRoomComplete(C, S, rid) ? ' ✓' : '')
+      var sc = St.secretsCount(C, S, rid);
+      body.appendChild(h('span', 'card-sub', open ? n + ' из ' + R.objects.length + (St.isRoomComplete(C, S, rid) ? ' ✓' : '') +
+        (n ? ' · секреты ' + sc.n + '/' + sc.of : '')
         : 'Откроется после: ' + C.rooms[R.requires].title));
       var bar = h('span', 'bar');
       var fill = h('i');
@@ -686,7 +807,7 @@
       body.appendChild(bar);
       b.appendChild(body);
       b.addEventListener('click', function () {
-        if (!open) { Sound.play('back'); toast('Сначала верни все вещи: ' + C.rooms[R.requires].title); return; }
+        if (!open) { refuse(b, [list.querySelector('[data-room="' + R.requires + '"]')]); return; }
         closeSheet(true);
         goRoom(rid);
       });
@@ -710,6 +831,7 @@
     Sound.play('tap');
     var changed = St.setRoom(C, S, rid);
     if (changed) log('room_enter', { room_id: rid });
+    Sound.ambient(rid);
     saveNow();
     if (screen !== 'home') showScreen('home');
     renderHome();
@@ -729,14 +851,20 @@
 
   function startObject(oid) {
     if (!St.canStartObject(C, S, oid)) {
-      toast('Сначала закончи начатые вещи');
+      // Сначала начатые: краснеют их карточки и сами вещи.
+      var wants = [];
+      St.activeDraftObjects(C, S).forEach(function (a) {
+        wants.push($('home-panel').querySelector('.card-choice[data-obj="' + a + '"]'));
+        wants.push($('scene').querySelector('.obj[data-obj="' + a + '"]'));
+      });
+      refuse($('home-panel').querySelector('.card-choice[data-obj="' + oid + '"]') || $('scene').querySelector('.obj[data-obj="' + oid + '"]'), wants);
       return;
     }
     var pid = St.nextPuzzle(C, S, oid);
     if (!pid) return;
     var o = C.objects[oid];
     var n = o.puzzles.length, st = St.objectStage(C, S, oid);
-    startPuzzle(pid, { oid: oid, title: o.title + (n > 1 ? ' · ' + (st + 1) + '/' + n : ''), preview: Scene.stageSprite(C, S, oid, st), ghost: st === 0 });
+    startPuzzle(pid, { oid: oid, title: o.title, stage: n > 1 ? (st + 1) + '/' + n : '', preview: Scene.stageSprite(C, S, oid, st), ghost: st === 0 });
   }
 
   function startLetter(id) {
@@ -747,10 +875,13 @@
   function startPuzzle(pid, ctx) {
     Sound.play('tap');
     pickCancel();
-    cur = { pid: pid, oid: ctx.oid || null, letter: ctx.letter || null, tutorial: pid === 'r01_lamp_01' && !S.story_flags.tutorial_done, step: 0, firstMove: false };
+    cur = { pid: pid, oid: ctx.oid || null, letter: ctx.letter || null, lantern: ctx.lantern || null, tutorial: pid === 'r01_lamp_01' && !S.story_flags.tutorial_done, step: 0, firstMove: false };
     showScreen('puzzle');
     $('puzzle-title').textContent = ctx.title;
     $('puzzle-size').textContent = puzzleSize(pid);
+    $('puzzle-stage').hidden = !ctx.stage;
+    $('puzzle-stage').textContent = ctx.stage || '';
+    $('puzzle-stage').setAttribute('aria-label', ctx.stage ? 'Картинка ' + ctx.stage.replace('/', ' из ') : '');
     var prev = $('puzzle-preview');
     prev.innerHTML = '';
     var t = h('span', 'thumb' + (ctx.ghost ? ' is-ghost' : ''));
@@ -763,6 +894,7 @@
     var sol = solutionOf(pid);
     N.render({ width: sol[0].length, height: sol.length, solution: sol }, $('puzzle-container'), onWin, onMove, onLine);
     markFiveLines(sol[0].length, sol.length);
+    setupLens();
     var d = S.drafts[pid];
     if (d) N.restoreBoard(St.decodeBoard(d.board, sol[0].length, sol.length));
     setMode(1);
@@ -771,13 +903,14 @@
     renderHud();
     renderHintCount();
     renderFieldCoins();
+    fitTitle();
     log('puzzle_start', { puzzle_id: pid, object_id: cur.oid, resumed: !!d });
     coachStart();
     if (!cur.tutorial && !$('btn-pencil').hidden && !S.story_flags.pencil_tip) {
       St.setFlag(S, 'pencil_tip');
       setTimeout(function () {
         if (!cur) return;
-        toast('Карандаш открывает целую строку или столбец', 3800);
+        toast('Открывает линию', 3800, 'pencil');
         bump($('btn-pencil'));
       }, 700);
     }
@@ -868,6 +1001,41 @@
 
   function onLine() { Sound.line(); }
 
+  // Название поля — в одну строку без многоточия: шрифт ужимается с 18 до 11 px
+  // («Музыкальная шкатулка» на 320 px влезает только с 12 px).
+  function fitTitle() {
+    var t = $('puzzle-title');
+    t.style.fontSize = '';
+    for (var fs = 17; fs >= 11 && t.scrollWidth > t.clientWidth + 1; fs--) t.style.fontSize = fs + 'px';
+  }
+
+  // Образец картинки — он же лупа, если клетки мельче 24 px: тогда поле открывается крупно,
+  // а касание образца показывает всё поле и обратно.
+  function setupLens() {
+    var b = $('puzzle-preview'), on = N.isZoomable();
+    var old = b.querySelector(':scope > .ico');
+    if (old) old.remove();
+    b.disabled = !on;
+    b.classList.toggle('is-lens', on);
+    b.setAttribute('aria-label', on ? 'Лупа' : 'Образец');
+    if (!on) { b.removeAttribute('aria-pressed'); return; }
+    b.appendChild(icon('zoom'));
+    b.setAttribute('aria-pressed', String(N.isZoomed()));
+    if (N.isZoomed() && !S.story_flags.zoom_tip) {
+      St.setFlag(S, 'zoom_tip');
+      setTimeout(function () { if (cur && N.isZoomed()) toast('Тяни за числа', 2600); }, 1200);
+    }
+  }
+  $('puzzle-preview').addEventListener('click', function () {
+    if (!cur || this.disabled) return;
+    Sound.play('tap');
+    this.setAttribute('aria-pressed', String(N.toggleZoom()));
+    log('zoom_toggle', { puzzle_id: cur.pid, zoomed: N.isZoomed() });
+  });
+  window.addEventListener('resize', function () {
+    setTimeout(function () { if (cur && screen === 'puzzle') { setupLens(); fitTitle(); } }, 220);
+  });
+
   function goHomeFromPuzzle() {
     if (!cur) return;
     Sound.play('back');
@@ -875,7 +1043,7 @@
     if (!N.isWon()) { St.saveDraft(S, cur.pid, N.getBoardState()); }
     saveNow();
     coachHide();
-    var wasLetter = !!cur.letter;
+    var wasLetter = !!(cur.letter || cur.lantern);
     cur = null;
     showScreen(wasLetter ? 'letters' : 'home');
     if (!wasLetter) renderHome();
@@ -951,7 +1119,11 @@
   function pickConfirm() {
     if (!pick || pick.kind === undefined || !cur) return;
     var kind = pick.kind, idx = pick.idx;
-    if (N.lineClosed(kind, idx)) { toast('Эта линия уже готова — выбери другую'); return; }
+    if (N.lineClosed(kind, idx)) {
+      var clue = $('puzzle-container').querySelector(kind === 'row' ? '.row-clue[data-row="' + idx + '"]' : '.col-clue[data-col="' + idx + '"]');
+      refuse(clue, [clue]);
+      return;
+    }
     if (!St.usePencil(S, cur.pid, kind + ':' + idx)) { pickCancel(); openPencilOffer(); return; }
     saveNow();
     pickCancel();
@@ -1059,13 +1231,13 @@
       N.applyHint({ r: errs[0].r, c: errs[0].c, action: 'clear' });
       // автокрестики, выведенные из этой ошибки, тоже неверны — убираем разом
       if (N.hasWrongCrosses()) N.revealErrors();
-      toast('Эта клетка лишняя — поставила крестик');
+      toast('Лишняя клетка', null, 'cross');
       log('hint', { puzzle_id: cur.pid, kind: 'wrong_fill' });
       return;
     }
     if (N.hasWrongCrosses()) {
       N.revealErrors();
-      toast('Крестик стоял на картинке — убрала его');
+      toast('Крестик убран', null, 'cross');
       log('hint', { puzzle_id: cur.pid, kind: 'wrong_cross' });
       return;
     }
@@ -1081,7 +1253,7 @@
     if (d) {
       flashLine(d.kind, d.idx);
       N.applyHint({ r: d.r, c: d.c, action: 'fill' });
-      toast((d.kind === 'row' ? 'Строка ' : 'Столбец ') + (d.idx + 1) + ': эта клетка закрашена при любом раскладе');
+      toast((d.kind === 'row' ? 'Строка ' : 'Столбец ') + (d.idx + 1), null, 'hint');
       St.useFreeHint(C, S, cur.pid);
       log('hint', { puzzle_id: cur.pid, kind: 'line', line: d.kind + d.idx });
       renderHintCount();
@@ -1090,7 +1262,7 @@
     var any = N.findHint();
     if (any) {
       N.applyHint(any);
-      toast('Вот одна верная клетка');
+      toast('Верная клетка', null, 'hint');
       St.useFreeHint(C, S, cur.pid);
       log('hint', { puzzle_id: cur.pid, kind: 'cell' });
       renderHintCount();
@@ -1162,7 +1334,7 @@
     setToolbarEnabled(false);
     Sound.play('win');
     var rm = reducedMotion();
-    var ctx = { pid: pid, oid: cur.oid, letter: cur.letter, res: res };
+    var ctx = { pid: pid, oid: cur.oid, letter: cur.letter, lantern: cur.lantern, res: res };
     setTimeout(function () { showReveal(ctx); }, rm ? 120 : 620);
   }
 
@@ -1190,7 +1362,7 @@
     var stage = h('div', 'reveal-stage');
     stage.appendChild(pixelCanvas(ctx.pid));
     var title;
-    if (ctx.letter) {
+    if (ctx.letter || ctx.lantern) {
       var col = pixelCanvas(ctx.pid, true);
       col.className = 'reveal-sprite reveal-color';
       stage.appendChild(col);
@@ -1225,6 +1397,7 @@
     $('reveal').classList.remove('is-on', 'to-sprite');
     $('reveal').hidden = true;
     cur = null;
+    if (rs.lantern) { lanternSolved(rs, from); return; }
     if (rs.letter) { letterSolved(rs, from); return; }
     if (curRoom() !== C.objects[rs.oid].room) St.setRoom(C, S, C.objects[rs.oid].room);
     showScreen('home');
@@ -1234,7 +1407,8 @@
     var to = Scene.objectRect($('scene'), rs.oid);
     var rm = reducedMotion();
     var land = function () { arrive(rs); };
-    if (rm || !from || !to || !document.body.animate) { land(); return; }
+    // Поле успело скрыться (нулевой размер) — без полёта, иначе масштаб уходит в бесконечность.
+    if (rm || !from || !to || !from.width || !from.height || !document.body.animate) { land(); return; }
     var fly = h('img', 'fly');
     fly.src = src.src;
     fly.style.left = from.left + 'px';
@@ -1266,12 +1440,11 @@
     var gift = res.rewards.filter(function (r) { return r.type === 'gift'; })[0];
     if (!res.object_done) {
       var left = o.puzzles.length - res.stage;
-      toast(o.title + ': ещё ' + left + ' ' + plural(left, 'картинка', 'картинки', 'картинок'), 3600);
-      $('scene').classList.remove('is-busy');
-      if (gift) setTimeout(function () { showGift(gift); }, 1600);
+      toast('Ещё ' + left, 3600, Scene.stageSprite(C, S, rs.oid, res.stage));
+      if (gift) setTimeout(function () { $('scene').classList.remove('is-busy'); showGift(gift); }, 1600);
+      else $('scene').classList.remove('is-busy');
       return;
     }
-    toast(o.done_text, 4200);
     var newly = St.playableObjects(C, S, o.room).filter(function (oid) { return St.objectStatus(C, S, oid) === 'available'; });
     if (newly.length && !res.room_done) setTimeout(function () { Sound.play('unlock'); }, 600);
     var sheet = function () {
@@ -1281,6 +1454,7 @@
         story: o.done_text,
         onDone: function () {
           if (res.room_done) roomFinale(res.room_id, gift);
+          else if (storyDue()) showStory(gift);
           else if (gift) showGift(gift);
         }
       });
@@ -1315,11 +1489,11 @@
       if (chest.coins) list.push({ type: 'coins', n: chest.coins });
       if (chest.pencils) list.push({ type: 'pencils', n: chest.pencils });
       if (!rm) holdHud(-chest.coins, -chest.pencils);
-      Sound.play(rare ? 'chord' : 'reward');
+      Sound.cue(rare ? 'rare' : 'chest');
       if (rare) {
         renderHome({ fresh: oid });
         hideToast();
-        toast('Сияние! ' + C.objects[oid].title, 2600);
+        toast('Сияние!', 2600, 'star');
       }
       playRewards(list, rect);
       setTimeout(done, rm ? 300 : rare ? 1500 : 1000);
@@ -1350,12 +1524,12 @@
     log('room_complete', { room_id: rid });
     saveNow();
     renderHome({ fresh: rid === 'r01' ? 'room' : Scene.catSeat(rid) });
-    Sound.play('chord');
+    Sound.cue('room');
     var next = function () {
       if (rid !== 'r01') { if (gift) showGift(gift); else showInvitation(rid); }
       else if (gift) showGift(gift);
     };
-    if (rid !== 'r01') toast(C.rooms[rid].final_text, 4200);
+    if (rid !== 'r01') toast(C.rooms[rid].final_text, 4200, 'star');
     // Игрок успел открыть письмо или другую шторку — подарок ждёт, пока она закроется.
     setTimeout(function offer() {
       if (S.room_choice_pending !== rid) { next(); return; }
@@ -1470,13 +1644,27 @@
     opts = opts || {};
     var o = C.objects[oid];
     var node = h('div', 'variant-sheet');
-    node.appendChild(sheetHead(opts.afterReveal ? 'Какой будет ' + o.title.toLowerCase() + '?' : o.title));
-    if (opts.secret) node.appendChild(h('p', 'secret', o.tap_secret));
+    node.appendChild(sheetHead(o.title));
+    if (opts.secret) {
+      var found = St.findSecret(C, S, oid);
+      if (found) {
+        var sx = h('div', 'secret-found');
+        sx.appendChild(h('b', 'secret-n', 'Секрет ' + found.n + '/' + found.of));
+        sx.appendChild(h('p', 'secret', o.tap_secret));
+        node.appendChild(sx);
+        saveNow();
+        Sound.play('reward');
+        playRewards(found.rewards, Scene.objectRect($('scene'), oid));
+        log('secret_view', { object_id: oid, n: found.n });
+        if (found.room_set) setTimeout(function () { toast('Комната сияет!', 3600, 'star'); }, 900);
+      } else node.appendChild(h('p', 'secret', o.tap_secret));
+    }
     // Тост с историей предмета уходит в шторку: поверх неё он закрыл бы заголовок.
     if (opts.story) { hideToast(); node.appendChild(h('p', 'secret', opts.story)); }
     var grid = h('div', 'variant-grid');
     grid.style.setProperty('--n', o.variants.length);
     var action = h('div', 'variant-action');
+    var cap = h('p', 'variant-cap');
     var preview = null;
 
     function rerender() {
@@ -1499,6 +1687,8 @@
         var vv = St.findVariant(C, id).variant;
         cards[i].classList.toggle('is-afford', !owned && !!vv.price_coins && S.coins >= vv.price_coins);
       }
+      var shown = preview || curV;
+      cap.textContent = shown ? St.findVariant(C, shown).variant.title : '';
       action.innerHTML = '';
       if (!preview) return;
       var v = St.findVariant(C, preview).variant;
@@ -1519,9 +1709,11 @@
             if (w) { var img = $('scene').querySelector('img.spr-obj[data-obj="' + oid + '"]'); if (img) { img.classList.remove('is-wiggle'); void img.offsetWidth; img.classList.add('is-wiggle'); } }
             return;
           }
-          if (r.reason === 'coins') { Sound.play('back'); toast('Не хватает ' + r.need + ' ' + plural(r.need, 'монеты', 'монет', 'монет') + '. Монеты — за картинки и письма'); bump($('hud-coins')); }
+          if (r.reason === 'coins') { refuse(buy, [$('hud-coins')]); log('refuse', { what: 'coins', need: r.need }); }
         });
         action.appendChild(buy);
+      } else if (v.sku && !St.paidOpen(C, S)) {
+        action.appendChild(h('p', 'card-sub variant-note', 'Примерка'));
       } else if (v.sku) {
         var d = C.skus[v.sku];
         var sb = h('button', 'btn-buy btn-buy-sku');
@@ -1543,7 +1735,7 @@
       b.type = 'button';
       b.setAttribute('data-v', v.id);
       b.appendChild(pic(v.sprite));
-      b.appendChild(h('span', 'variant-title', v.title));
+      b.setAttribute('aria-label', v.title);
       var mark = h('span', 'variant-check');
       mark.appendChild(icon('check'));
       b.appendChild(mark);
@@ -1566,6 +1758,7 @@
       grid.appendChild(b);
     });
     node.appendChild(grid);
+    node.appendChild(cap);
     node.appendChild(action);
     node.appendChild(button('btn-main', 'Готово', 'check', function () { Sound.play('tap'); closeSheet(); }));
     paint();
@@ -1609,11 +1802,9 @@
     card.appendChild(body);
     node.appendChild(card);
     var next = R.next_room && C.rooms[R.next_room];
-    if (next) {
-      node.appendChild(button('btn-main', inv.button, 'chev', function () { closeSheet(true); goRoom(R.next_room); }));
-    } else {
-      node.appendChild(button('btn-main', inv.button || 'Хорошо', 'check', function () { Sound.play('tap'); closeSheet(); }));
-    }
+    var act = next ? function () { closeSheet(true); goRoom(R.next_room); } : function () { Sound.play('tap'); closeSheet(); };
+    node.appendChild(button('btn-main', next ? inv.button : (inv.button || 'Хорошо'), next ? 'chev' : 'check', act));
+    card.addEventListener('click', act); // открытку нажимают первой — она ведёт туда же, что и кнопка
     openSheet(node, function () { renderHome(); }, 'sheet-invite');
     St.setFlag(S, 'invitation_seen_' + rid);
     log('invitation_view', { room_id: rid });
@@ -1640,6 +1831,17 @@
     setCut();
     node.appendChild(box);
     node.appendChild(range);
+    var share = button('btn-small btn-share', 'Поделиться', 'share', function () {
+      Sound.play('tap');
+      share.disabled = true;
+      shareBeforeAfter(rid, before, after).then(function (how) {
+        share.disabled = false;
+        log('share', { kind: 'before_after', room_id: rid, how: how });
+        if (how === 'download') toast('Сохранено', null, 'share');
+      });
+    });
+    share.setAttribute('data-act', 'share');
+    node.appendChild(share);
     openSheet(node, function () { renderHome(); }, 'sheet-ba');
     Scene.render(after, C, S, rid, { interactive: false });
     Scene.render(before, C, S, rid, { interactive: false, before: true });
@@ -1688,7 +1890,7 @@
           if (!ok) { b.disabled = false; return; }
           S.story_flags[a[4]] = true;
           saveNow();
-          toast(a[0] === 'fav' ? 'Игра в избранном' : 'Напомним о новом письме');
+          toast(a[0] === 'fav' ? 'В избранном' : 'Напомним!', null, a[0] === 'fav' ? 'star' : 'bell');
           if (screen === 'letters') renderLetters();
         });
       });
@@ -1712,6 +1914,9 @@
       page.appendChild(lock);
       return;
     }
+
+    var ev = St.eventInfo(C, S, day);
+    if (ev && !ev.over) page.appendChild(eventCard(ev));
 
     // «7 встреч»
     var sc = h('section', 'card card-stamps');
@@ -1756,7 +1961,8 @@
       tc.appendChild(pic('envelope', 'lock-art'));
       tc.appendChild(h('p', 'card-text', 'Новые письма скоро. Пока можно ответить на прежние.'));
     }
-    page.appendChild(tc);
+    // Письмо дня — сразу под заголовком: на низком экране его видно без прокрутки.
+    page.insertBefore(tc, page.querySelector('.page-title').nextSibling);
 
     // Альбом: решённые — открытки, пришедшие раньше — конверты с остатком дней.
     var older = list.filter(function (l) { return (l.status === 'solved' && (!T || l.id !== T.id)) || l.status === 'open'; }).reverse();
@@ -1783,6 +1989,41 @@
       });
       page.appendChild(grid);
     }
+    page.appendChild(secretsCard());
+  }
+
+  // «Секреты дома»: у каждой вещи свой секрет — открывается первым касанием готовой вещи.
+  function secretsCard() {
+    var all = St.secretsCount(C, S);
+    var c = h('section', 'card card-secrets');
+    var head = h('div', 'card-head');
+    head.appendChild(icon('star'));
+    head.appendChild(h('b', 'card-title', 'Секреты дома'));
+    head.appendChild(h('span', 'event-left secrets-n', all.n + '/' + all.of));
+    c.appendChild(head);
+    var grid = h('div', 'secrets');
+    St.roomOrder(C).forEach(function (rid) {
+      if (!St.isRoomUnlocked(C, S, rid)) return;
+      C.rooms[rid].objects.forEach(function (oid) {
+        var o = C.objects[oid];
+        if (!o.tap_secret) return;
+        var got = (S.secrets || []).indexOf(oid) !== -1;
+        var b = h('button', 'secret-item' + (got ? ' is-found' : ''));
+        b.type = 'button';
+        b.setAttribute('data-secret', oid);
+        b.appendChild(pic(St.findVariant(C, S.object_variants[oid] || o.variants[0].id).variant.sprite));
+        if (!got) b.appendChild(h('span', 'secret-q', '?'));
+        b.setAttribute('aria-label', got ? o.title + ': секрет' : 'Секрет не найден');
+        b.addEventListener('click', function () {
+          Sound.play('tap');
+          if (got) toast(o.tap_secret, 4200);
+          else toast(St.isObjectRestored(C, S, oid) ? 'Коснись: ' + o.title.toLowerCase() : 'Верни: ' + o.title.toLowerCase());
+        });
+        grid.appendChild(b);
+      });
+    });
+    c.appendChild(grid);
+    return c;
   }
 
   function noteBody(L) {
@@ -1813,7 +2054,19 @@
     node.appendChild(sheetHead(L.title));
     node.appendChild(postcard(id, true));
     node.appendChild(noteBody(L));
-    node.appendChild(button('btn-main', 'Готово', 'check', function () { Sound.play('tap'); closeSheet(); }));
+    var row = h('div', 'row-actions');
+    row.appendChild(button('btn-main', 'Готово', 'check', function () { Sound.play('tap'); closeSheet(); }));
+    var sh = button('tile tile-round', '', 'share', function () {
+      Sound.play('tap');
+      sharePicture(L.title, '— ' + L.from, id).then(function (how) {
+        log('share', { kind: 'postcard', id: id, how: how });
+        if (how === 'download') toast('Сохранено', null, 'share');
+      });
+    });
+    sh.setAttribute('aria-label', 'Поделиться открыткой');
+    sh.setAttribute('data-act', 'share');
+    row.appendChild(sh);
+    node.appendChild(row);
     openSheet(node, function () {
       renderLetters(); renderHud();
       if (rewards) {
@@ -1821,6 +2074,187 @@
         if (gift) showGift(gift);
       }
     }, 'sheet-postcard');
+  }
+
+  /* ---------------- «Вечер фонариков» ---------------- */
+
+  function lanternById(id) { return C.event.lanterns.filter(function (L) { return L.id === id; })[0]; }
+
+  function eventCard(ev) {
+    var c = h('section', 'card card-event');
+    var head = h('div', 'card-head');
+    head.appendChild(icon('lantern'));
+    head.appendChild(h('b', 'card-title', ev.title));
+    head.appendChild(h('span', 'event-left', ev.complete ? 'все зажжены' : 'ещё ' + ev.days_left + ' дн.'));
+    c.appendChild(head);
+    if (!ev.complete) c.appendChild(h('p', 'card-sub', C.event.text));
+    var row = h('div', 'lanterns');
+    ev.items.forEach(function (it, i) {
+      var b = h('button', 'lantern is-' + it.status);
+      b.type = 'button';
+      b.setAttribute('data-lantern', it.id);
+      if (it.status === 'solved') {
+        var cv = pixelCanvas(it.id, true);
+        cv.className = 'lantern-pic';
+        b.appendChild(cv);
+        b.setAttribute('aria-label', it.title + ' — зажжён');
+        b.addEventListener('click', function () { Sound.play('tap'); toast(it.title, null, 'lantern'); });
+      } else if (it.status === 'open') {
+        b.appendChild(icon('lantern'));
+        b.appendChild(h('span', 'lantern-go', 'Зажечь'));
+        b.setAttribute('aria-label', 'Зажечь: ' + it.title + ' ' + puzzleSize(it.id));
+        b.addEventListener('click', function () { startLantern(it.id); });
+      } else {
+        b.disabled = true;
+        b.appendChild(icon('lock'));
+        var wait = i - (C.event.open_first - 1) - (C.event.days - ev.days_left);
+        b.appendChild(h('span', 'lantern-go', wait <= 1 ? 'завтра' : 'через ' + wait + ' дн.'));
+        b.setAttribute('aria-label', 'Фонарик откроется ' + (wait <= 1 ? 'завтра' : 'через ' + wait + ' дн.'));
+      }
+      row.appendChild(b);
+    });
+    c.appendChild(row);
+    var R = C.event.reward;
+    var rw = h('p', 'card-sub event-reward');
+    rw.appendChild(h('span', '', ev.complete ? 'Награда получена:' : 'Все пять — '));
+    rw.appendChild(priceTag('coins', R.coins));
+    if (R.pencils) { var pp = h('span', 'price'); pp.appendChild(pic('pencil')); pp.appendChild(h('b', '', '×' + R.pencils)); rw.appendChild(pp); }
+    c.appendChild(rw);
+    return c;
+  }
+
+  function startLantern(id) {
+    if (!St.eventOpen(C, S, id)) { Sound.play('back'); toast('Вечер прошёл', null, 'lantern'); renderLetters(); return; }
+    var L = lanternById(id);
+    log('lantern_start', { id: id });
+    startPuzzle(id, { lantern: id, title: L.title, preview: ART + 'envelope.webp', ghost: false });
+    var t = $('puzzle-preview').querySelector('.thumb');
+    if (t) { t.innerHTML = ''; t.appendChild(icon('lantern')); }
+  }
+
+  function lanternSolved(rs, from) {
+    showScreen('letters');
+    Sound.play('reward');
+    Sound.buzz(20);
+    var L = lanternById(rs.pid), ev = St.eventInfo(C, S);
+    log('lantern_lit', { id: rs.pid, done: ev ? ev.done : 0 });
+    var node = h('div', 'lantern-sheet');
+    node.appendChild(sheetHead(L.title + ' горит!'));
+    var pc = h('div', 'postcard is-big');
+    var cv = pixelCanvas(rs.pid, true);
+    cv.className = 'postcard-pic';
+    pc.appendChild(cv);
+    node.appendChild(pc);
+    var text = rs.res.event_done ? 'Вечер вернулся! Над комнатой — гирлянда.'
+      : 'Горит ' + (ev ? ev.done : 1) + '/' + C.event.lanterns.length + '. ' + (ev && ev.waiting ? 'Ещё один ждёт.' : 'Новый — завтра.');
+    node.appendChild(h('p', 'card-text', text));
+    node.appendChild(button('btn-main', 'Хорошо', 'check', function () { Sound.play('tap'); closeSheet(); }));
+    openSheet(node, function () {
+      renderLetters(); renderHud();
+      var gift = rs.res.rewards.filter(function (r) { return r.type === 'gift'; })[0];
+      if (gift) showGift(gift);
+    }, 'sheet-postcard');
+    playRewards(rs.res.rewards, from);
+  }
+
+  /* ---------------- «Тайна птицы» ---------------- */
+
+  function storyDue() {
+    return !S.story_flags.story_answer && St.restoredCount(C, S, 'r02') >= 3;
+  }
+
+  function showStory(gift) {
+    St.setFlag(S, 'story_answer');
+    log('story_answer');
+    saveNow();
+    Sound.play('reward');
+    var node = h('div', 'story-sheet');
+    node.appendChild(sheetHead('Тайна птицы', 'letter'));
+    var card = h('div', 'card card-letter');
+    card.appendChild(h('p', 'card-text', 'Птица — знак дома. Тут зажигали фонари.'));
+    card.appendChild(h('p', 'card-text story-q', 'Кто же прислал письмо?'));
+    node.appendChild(card);
+    node.appendChild(button('btn-main', 'Узнаю дальше', 'chev', function () { Sound.play('tap'); closeSheet(); }));
+    openSheet(node, function () { renderHome(); if (gift) showGift(gift); }, 'sheet-story');
+  }
+
+  /* ---------------- поделиться ---------------- */
+
+  // Картинка для истории 1080×1920: заголовок, «до» и «после» квадратами.
+  // Рисуется из уже показанных сцен: фон и спрайты с их фильтрами и прозрачностью.
+  function drawScene(g, host, x, y, size) {
+    var box = host.getBoundingClientRect();
+    if (!box.width) return;
+    var k = size / box.width;
+    g.save();
+    g.beginPath(); g.rect(x, y, size, size); g.clip();
+    g.fillStyle = '#ebdfc4'; g.fillRect(x, y, size, size);
+    var imgs = host.querySelectorAll('img');
+    for (var i = 0; i < imgs.length; i++) {
+      var im = imgs[i], r = im.getBoundingClientRect();
+      if (!im.complete || !im.naturalWidth || !r.width) continue;
+      var cs = getComputedStyle(im), wrap = getComputedStyle(im.parentNode);
+      var a = (+cs.opacity) * (im.parentNode === host ? 1 : +wrap.opacity);
+      if (a <= 0.01 || cs.visibility === 'hidden') continue;
+      g.globalAlpha = a;
+      g.filter = cs.filter && cs.filter !== 'none' ? cs.filter : 'none';
+      try { g.drawImage(im, x + (r.left - box.left) * k, y + (r.top - box.top) * k, r.width * k, r.height * k); } catch (e) { /* картинка не готова */ }
+    }
+    g.restore();
+  }
+
+  function roundRect(g, x, y, w, hh, r) {
+    g.beginPath();
+    g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + hh, r); g.arcTo(x + w, y + hh, x, y + hh, r);
+    g.arcTo(x, y + hh, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath();
+  }
+
+  function storyCanvas(title) {
+    var cv = document.createElement('canvas');
+    cv.width = 1080; cv.height = 1920;
+    var g = cv.getContext('2d');
+    g.fillStyle = '#f4ead6'; g.fillRect(0, 0, 1080, 1920);
+    g.fillStyle = '#3b2c22'; g.textAlign = 'center';
+    g.font = '900 64px Nunito, system-ui, sans-serif';
+    g.fillText(title, 540, 130);
+    g.font = '700 36px Nunito, system-ui, sans-serif';
+    g.fillStyle = '#6e5a48';
+    g.fillText('Дом картинок · ВКонтакте', 540, 1880);
+    return { cv: cv, g: g };
+  }
+
+  function label(g, text, x, y) {
+    g.font = '900 40px Nunito, system-ui, sans-serif';
+    var w = g.measureText(text).width + 48;
+    g.fillStyle = 'rgba(255,250,240,.92)'; roundRect(g, x, y, w, 64, 32); g.fill();
+    g.fillStyle = '#3b2c22'; g.textAlign = 'left'; g.fillText(text, x + 24, y + 46);
+  }
+
+  function shareBeforeAfter(rid, before, after) {
+    var t = storyCanvas(C.rooms[rid].title + ': было и стало');
+    var g = t.g, S0 = 820, X = 130;
+    [[before, 200, 'До'], [after, 1040, 'После']].forEach(function (p) {
+      g.save(); roundRect(g, X, p[1], S0, S0, 36); g.clip();
+      drawScene(g, p[0], X, p[1], S0);
+      g.restore();
+      label(g, p[2], X + 24, p[1] + 24);
+    });
+    return Platform.shareImage(t.cv.toDataURL('image/png'), 'dom-kartinok.png');
+  }
+
+  function sharePicture(title, sub, pid) {
+    var t = storyCanvas(title);
+    var g = t.g, p = C.puzzles[pid], H = p.rows.length, W = p.rows[0].length;
+    var k = Math.floor(Math.min(760 / W, 1200 / H)), w = W * k, hh = H * k, x = (1080 - w) / 2, y = 260 + (1300 - hh) / 2;
+    g.fillStyle = '#fff'; roundRect(g, x - 36, y - 36, w + 72, hh + 72, 18); g.fill();
+    for (var r = 0; r < H; r++) for (var c = 0; c < W; c++) {
+      var ch = p.pic[r][c];
+      if (ch === '.') continue;
+      g.fillStyle = p.palette[ch]; g.fillRect(x + c * k, y + r * k, k, k);
+    }
+    g.fillStyle = '#6e5a48'; g.textAlign = 'center'; g.font = 'italic 700 44px Nunito, system-ui, sans-serif';
+    g.fillText(sub, 540, 1700);
+    return Platform.shareImage(t.cv.toDataURL('image/png'), 'otkrytka.png');
   }
 
   function letterSolved(rs, from) {
@@ -1848,14 +2282,14 @@
     var grid = h('div', 'offers');
     var one = offer('pencil', '×1', priceTag('coins', C.economy.pencil_price), function () {
       var r = St.buyPencil(C, S);
-      if (!r.ok) { Sound.play('back'); toast('Не хватает ' + r.need + ' ' + plural(r.need, 'монеты', 'монет', 'монет')); bump($('hud-coins')); return; }
+      if (!r.ok) { refuse(one, [$('hud-coins')]); log('refuse', { what: 'coins', need: r.need }); return; }
       Sound.play('reward'); saveNow(); renderHud(); bump($('hud-pencils'));
       if (after) after();
       else if (screen === 'shop') renderShop();
     });
     one.setAttribute('data-offer', 'pencil_coins');
     grid.appendChild(one);
-    if (C.skus.pencils_10) {
+    if (C.skus.pencils_10 && St.paidOpen(C, S)) {
       var ten = offer('pencil', '×10', priceTag('votes', C.skus.pencils_10.votes), function () { buySku('pencils_10', after); });
       ten.setAttribute('data-offer', 'pencils_10');
       ten.classList.add('is-pack');
@@ -1911,7 +2345,7 @@
     s1.appendChild(pencilOffers(null));
     page.appendChild(s1);
 
-    var skus = Object.keys(C.skus).filter(function (k) { return C.skus[k].grants.variants && St.canOfferSku(C, S, k); });
+    var skus = St.paidOpen(C, S) ? Object.keys(C.skus).filter(function (k) { return C.skus[k].grants.variants && St.canOfferSku(C, S, k); }) : [];
     if (skus.length) {
       var s2 = section('Наборы', 'gift');
       skus.forEach(function (k) { s2.appendChild(bundleCard(k)); });
@@ -1967,7 +2401,7 @@
     else if (!restored) { var l = h('span', 'price price-lock'); l.appendChild(icon('lock')); b.appendChild(l); }
     else b.appendChild(priceTag('coins', v.price_coins));
     b.addEventListener('click', function () {
-      if (!restored) { Sound.play('back'); toast('Сначала верни: ' + C.objects[oid].title.toLowerCase()); return; }
+      if (!restored) { refuse(b, [b.querySelector('.price-lock')]); return; }
       // Примерка в комнате: открываем предмет со шторкой оформлений.
       goRoom(C.objects[oid].room);
       openVariantSheet(oid, {});
@@ -1980,12 +2414,12 @@
      покупка без денег (чтобы проверить выдачу и интерфейс). */
   function buySku(sku, after) {
     var d = C.skus[sku];
-    if (!St.canOfferSku(C, S, sku)) { toast('Уже куплено'); return; }
+    if (!St.canOfferSku(C, S, sku)) { toast('Уже куплено', null, 'check'); return; }
     log('buy_start', { sku: sku });
     if (Platform.canPay) {
       Platform.buy(sku).then(function (r) {
         if (r.ok) grantOrder('vk-' + r.order_id, sku, after);
-        else if (r.reason !== 'cancel') toast('Покупка не прошла. Голоса не списаны');
+        else if (r.reason !== 'cancel') toast('Голоса не списаны', null, 'close');
         log('buy_result', { sku: sku, ok: r.ok, reason: r.reason || null });
         // Сдвинуть курсор журнала; если ответ окна потерялся — выдать по журналу.
         setTimeout(syncPurchases, 1500);
@@ -1995,7 +2429,7 @@
     var node = h('div', 'test-buy');
     node.appendChild(sheetHead(d.title, d.icon === 'pencil' ? 'pencil' : 'gift'));
     node.appendChild(h('p', 'secret', d.text));
-    node.appendChild(h('p', 'test-note', 'Тестовая покупка: на стенде голоса не списываются. В ВК здесь откроется окно оплаты.'));
+    node.appendChild(h('p', 'test-note', 'Стенд: голоса не списываются.'));
     var b = h('button', 'btn-buy btn-buy-sku');
     b.type = 'button';
     b.appendChild(h('span', '', 'Купить'));
@@ -2007,7 +2441,7 @@
 
   function grantOrder(orderId, sku, after) {
     var r = St.applyOrder(C, S, orderId, sku);
-    if (!r.ok) { if (r.reason === 'duplicate') toast('Эта покупка уже получена'); return; }
+    if (!r.ok) { if (r.reason === 'duplicate') toast('Уже получено', null, 'check'); return; }
     saveNow();
     Sound.play('chord');
     renderHud();
@@ -2032,7 +2466,7 @@
       items.appendChild(p);
     }
     node.appendChild(items);
-    if (r.variants.length) node.appendChild(h('p', 'secret', 'Вещи уже стоят в комнатах. Ещё не возвращённые появятся в своём оформлении.'));
+    if (r.variants.length) node.appendChild(h('p', 'secret', 'Вещи уже в комнатах.'));
     node.appendChild(button('btn-main', 'Готово', 'check', function () { Sound.play('tap'); closeSheet(); }));
     openSheet(node, function () { if (after) after(); }, 'sheet-gift');
     log('order_applied', { sku: sku, order_id: String(orderId), title: d.title });
@@ -2040,9 +2474,9 @@
 
   /* Ролик за награду — только по нажатию игрока, не больше 3 в день. */
   function watchAd(kind, after) {
-    if (St.adsLeft(C, S, St.today()) <= 0) { toast('На сегодня ролики закончились'); return; }
+    if (St.adsLeft(C, S, St.today()) <= 0) { toast('До завтра', null, 'video'); return; }
     var done = function (ok) {
-      if (!ok) { toast('Ролик не досмотрен — награды нет'); return; }
+      if (!ok) { toast('Без награды', null, 'video'); return; }
       var r = St.rewardedGrant(C, S, kind);
       if (!r.ok) return;
       saveNow();
@@ -2060,7 +2494,7 @@
     var bar = h('div', 'ad-bar');
     bar.appendChild(h('i'));
     node.appendChild(bar);
-    node.appendChild(h('p', 'test-note', 'На стенде вместо рекламы — пауза в 2 секунды.'));
+    node.appendChild(h('p', 'test-note', 'Стенд: пауза 2 секунды.'));
     openSheet(node, function () { clearTimeout(t); }, 'sheet-ad');
     var t = setTimeout(function () { closeSheet(true); done(true); }, reducedMotion() ? 300 : 2000);
   }
@@ -2069,25 +2503,49 @@
 
   function showWelcome(away) {
     var gift = St.comebackGift(C, S, away);
-    var waiting = St.dailyLetters(C, S).filter(function (l) { return l.status === 'today' || l.status === 'open'; }).length;
+    var cards = St.deliverLetters(C, S);
+    var T = St.todayLetter(C, S, St.today());
+    var fresh = T && T.status === 'today';
+    var ev = St.eventInfo(C, S);
     var node = h('div', 'welcome-sheet');
     node.appendChild(sheetHead('С возвращением!', 'envelope'));
-    var text = away >= 7 ? 'Дом соскучился! Вера сберегла для тебя всё, что пришло.' : 'Финик ждал у двери и встретил тебя мурчанием.';
-    if (waiting) text += ' Писем ждёт: ' + waiting + '.';
-    node.appendChild(h('p', 'card-text', text));
+    node.appendChild(h('p', 'card-text', away >= 7 ? 'Дом соскучился!' : away >= 3 ? 'Финик ждал у двери.' : 'Финик проснулся!'));
+    // Что пришло, пока тебя не было, — значками с числом, подпись только для чтеца.
+    var news = h('div', 'news-row');
+    [[cards.length, 'letter', '+' + cards.length, cards.length + ' ' + plural(cards.length, 'открытка', 'открытки', 'открыток') + ' в альбоме'],
+     [fresh ? 1 : 0, 'envelope', '1', 'Новое письмо'],
+     [ev && !ev.over ? ev.waiting : 0, 'lantern', String(ev ? ev.waiting : 0), 'Фонариков ждёт: ' + (ev ? ev.waiting : 0)]].forEach(function (a) {
+      if (!a[0]) return;
+      var c = h('span', 'news-chip');
+      c.setAttribute('aria-label', a[3]);
+      c.appendChild(document.getElementById('i-' + a[1]) ? icon(a[1]) : pic(a[1]));
+      c.appendChild(h('b', '', a[2]));
+      news.appendChild(c);
+    });
+    if (news.childNodes.length) node.appendChild(news);
     if (gift) {
       var items = h('div', 'gift-items');
-      var it = h('div', 'gift-item');
-      it.appendChild(pic('pencil'));
-      it.appendChild(h('span', '', '+' + gift.pencils + ' в подарок'));
-      items.appendChild(it);
+      gift.variants.forEach(function (vid) {
+        var f = St.findVariant(C, vid);
+        var iv = h('div', 'gift-item');
+        iv.appendChild(pic(f.variant.sprite));
+        iv.appendChild(h('span', '', f.variant.title));
+        items.appendChild(iv);
+      });
+      [['coin', gift.coins], ['pencil', gift.pencils]].forEach(function (a) {
+        if (!a[1]) return;
+        var it = h('div', 'gift-item');
+        it.appendChild(pic(a[0]));
+        it.appendChild(h('span', '', '+' + a[1]));
+        items.appendChild(it);
+      });
       node.appendChild(items);
       renderHud();
     }
-    if (waiting) node.appendChild(button('btn-main', 'К письмам', 'letter', function () { closeSheet(true); Sound.play('tap'); showScreen('letters'); }));
+    if (fresh || cards.length || (ev && !ev.over && ev.waiting)) node.appendChild(button('btn-main', fresh ? 'Письмо дня' : 'К письмам', 'letter', function () { closeSheet(true); Sound.play('tap'); showScreen('letters'); }));
     else node.appendChild(button('btn-main', 'Домой', 'check', function () { Sound.play('tap'); closeSheet(); }));
     openSheet(node, function () { renderHome(); }, 'sheet-welcome');
-    log('welcome_back', { away: away, letters: waiting, gift: !!gift });
+    log('welcome_back', { away: away, letters: fresh ? 1 : 0, postcards: cards.length, gift: gift });
     saveNow();
   }
 
@@ -2110,7 +2568,7 @@
     var node = h('div', 'settings');
     node.appendChild(sheetHead('Настройки'));
     var row = h('div', 'toggles');
-    [['sound', 'Звук', 'sound'], ['vibration', 'Вибрация', 'vibro'], ['reduced_motion', 'Меньше движения', 'motion']].forEach(function (t) {
+    [['music', 'Музыка', 'music'], ['sound', 'Звуки', 'sound'], ['vibration', 'Вибрация', 'vibro'], ['reduced_motion', 'Меньше движения', 'motion']].forEach(function (t) {
       var key = t[0];
       var wrap = h('label', 'toggle');
       var b = h('button', 'tile tile-round toggle-btn');
@@ -2177,6 +2635,8 @@
     if (loaded.migrated_from) St.logEvent(S, 'save_migrated', { from: loaded.migrated_from });
     S.content_version = C.content_version;
     S.current_room = curRoom();
+    // Прихожую прошли до выхода события — «Вечер фонариков» начинается с этого запуска.
+    St.startEvent(C, S);
     var away = St.daysAway(S);
     St.registerVisit(S);
     St.logEvent(S, 'session_start', { build: BUILD, platform: Platform.name, fresh: loaded.fresh, viewport: innerWidth + 'x' + innerHeight, day: St.today() });
@@ -2187,7 +2647,7 @@
     renderHome();
     var pend = S.room_choice_pending;
     if (pend && C.rooms[pend] && St.isRoomComplete(C, S, pend)) showRoomChoice(pend, function () {});
-    else if (away >= 2 && hallDone() && $('sheet').hidden) showWelcome(away);
+    else if (away >= 1 && hallDone() && $('sheet').hidden) showWelcome(away);
     cloudStart();
     // Новый день мог наступить, пока вкладка открыта.
     setInterval(function () { if (dayNow !== St.today()) onNewDay(); }, 60000);
@@ -2201,6 +2661,7 @@
     currentPuzzle: function () { return cur ? cur.pid : null; },
     today: function () { return St.today(); },
     setDay: function (n) { St.setDayOffset(n); onNewDay(); return St.today(); },
+    playLetter: function (id) { startLetter(id); }, // для проверок: открыть поле письма дня
     cloud: function () { return { enabled: HopCloud.enabled, ready: cloud.ready, rev: cloud.rev, pending: !!cloud.pending }; }
   };
 

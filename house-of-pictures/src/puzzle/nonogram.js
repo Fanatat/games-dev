@@ -56,6 +56,13 @@ window.Nonogram = (function () {
   var _viewport   = null;    // div-обёртка с transform
   var _container  = null;    // puzzle-container (родитель)
   var _puzzleEl   = null;    // .puzzle — на нём выставляется --cell
+  // Лупа: если «вписанная» клетка меньше MIN_CELL, поле само открывается крупно
+  // (ZOOM_CELL), числа прилипают к краям, двигать — за числа или двумя пальцами.
+  var MIN_CELL = 24, ZOOM_CELL = 26;
+  var _fitAll   = false;      // игрок нажал лупу «показать всё поле» — держим до следующей картинки
+  var _colArea  = null, _rowArea = null, _cornerEl = null;
+  var _cluePan  = null;       // { id, x, y, tx, ty, moved } — протяжка за числа
+  var _eatClick = false;      // клик после протяжки за числа не выбирает линию
 
   // Состояние pinch
   var _pinch        = null;   // { dist, cx, cy, tx, ty, scale }
@@ -141,6 +148,91 @@ window.Nonogram = (function () {
       _ty = Math.max(-maxTy, Math.min(maxTy, _ty));
     }
     _viewport.style.transform = 'translate(' + _tx + 'px,' + _ty + 'px)';
+    pinClues();
+  }
+
+  // Числа прилипают к краям видимой части: столбцы — к верху, строки — к левому краю.
+  // Числа строк и столбцов, ушедших за край, прячем — их всё равно не видно.
+  function pinClues() {
+    if (!_colArea || !_container) return;
+    _colArea.style.transform = _rowArea.style.transform = _cornerEl.style.transform = '';
+    var cr = _container.getBoundingClientRect();
+    var dy = Math.max(0, Math.round(cr.top - _colArea.getBoundingClientRect().top));
+    var dx = Math.max(0, Math.round(cr.left - _rowArea.getBoundingClientRect().left));
+    if (dy) _colArea.style.transform = 'translateY(' + dy + 'px)';
+    if (dx) _rowArea.style.transform = 'translateX(' + dx + 'px)';
+    if (dx || dy) _cornerEl.style.transform = 'translate(' + dx + 'px,' + dy + 'px)';
+    _puzzleEl.classList.toggle('is-pinned-top', dy > 0);
+    _puzzleEl.classList.toggle('is-pinned-left', dx > 0);
+    var zoomed = isZoomed();
+    _puzzleEl.classList.toggle('is-zoomed', zoomed);
+    for (var c = 0; c < _colClueEls.length; c++) {
+      var r1 = zoomed && _colClueEls[c].getBoundingClientRect();
+      _colClueEls[c].style.visibility = zoomed && (r1.right <= cr.left + 1 || r1.left >= cr.right - 1) ? 'hidden' : '';
+    }
+    for (var r = 0; r < _rowClueEls.length; r++) {
+      var r2 = zoomed && _rowClueEls[r].getBoundingClientRect();
+      _rowClueEls[r].style.visibility = zoomed && (r2.bottom <= cr.top + 1 || r2.top >= cr.bottom - 1) ? 'hidden' : '';
+    }
+  }
+
+  // Поле не помещается целиком — его можно двигать.
+  function isZoomed() {
+    if (!_viewport || !_container) return false;
+    return _viewport.scrollWidth > _container.clientWidth + 1 || _viewport.scrollHeight > _container.clientHeight + 1;
+  }
+  // Лупа нужна, если вписанная клетка мельче MIN_CELL.
+  function isZoomable() { return !!_level && _baseCell < MIN_CELL; }
+
+  // Вписать поле или открыть крупно с левого верхнего угла (там числа).
+  function fitOrZoom() {
+    _tx = 0; _ty = 0;
+    if (isZoomable() && !_fitAll) {
+      _scale = Math.min(SCALE_MAX, ZOOM_CELL / _baseCell);
+      _tx = 1e6; _ty = 1e6; // applyTransform прижмёт к краю
+    } else {
+      _scale = 1;
+    }
+    applyTransform();
+  }
+
+  // Кнопка-лупа: всё поле ↔ крупно. → true, если теперь крупно.
+  function toggleZoom() {
+    if (!_level) return false;
+    _fitAll = isZoomed();
+    if (_fitAll) { _scale = 1; _tx = 0; _ty = 0; applyTransform(); return false; }
+    _scale = Math.min(SCALE_MAX, ZOOM_CELL / _baseCell);
+    _tx = 1e6; _ty = 1e6;
+    applyTransform();
+    return true;
+  }
+
+  // Протяжка за числа двигает крупное поле одним пальцем или мышью.
+  function onCluePointerDown(e) {
+    if (_pinchActive || !isZoomed()) return;
+    _cluePan = { id: e.pointerId, x: e.clientX, y: e.clientY, tx: _tx, ty: _ty, moved: false };
+    window.addEventListener('pointermove', onCluePointerMove);
+    window.addEventListener('pointerup', onCluePointerUp);
+    window.addEventListener('pointercancel', onCluePointerUp);
+  }
+  function onCluePointerMove(e) {
+    if (!_cluePan || e.pointerId !== _cluePan.id || _pinchActive) return;
+    var dx = e.clientX - _cluePan.x, dy = e.clientY - _cluePan.y;
+    if (!_cluePan.moved && Math.abs(dx) + Math.abs(dy) < 8) return;
+    _cluePan.moved = true;
+    _tx = _cluePan.tx + dx; _ty = _cluePan.ty + dy;
+    applyTransform();
+  }
+  function onCluePointerUp(e) {
+    if (!_cluePan || e.pointerId !== _cluePan.id) return;
+    if (_cluePan.moved) { _eatClick = true; setTimeout(function () { _eatClick = false; }, 0); }
+    _cluePan = null;
+    window.removeEventListener('pointermove', onCluePointerMove);
+    window.removeEventListener('pointerup', onCluePointerUp);
+    window.removeEventListener('pointercancel', onCluePointerUp);
+  }
+  function onClickCapture(e) {
+    if (_eatClick) { _eatClick = false; e.stopPropagation(); e.preventDefault(); }
   }
 
   /* ----------------------------------------------------------
@@ -278,14 +370,21 @@ window.Nonogram = (function () {
     var W = _level.width, H = _level.height;
     var maxRowLen = _clues.rows.reduce(function (m, r) { return Math.max(m, r.length); }, 0);
     var maxColLen = _clues.cols.reduce(function (m, c) { return Math.max(m, c.length); }, 0);
-    var NUM_W = 16, NUM_H = 20, PAD = 12;
-    _rowClueW = maxRowLen * NUM_W + 8;
-    var colClueH = maxColLen * NUM_H + 6;
-
+    // Ширина числа зависит от шрифта (--clue-fs = clamp(13px, cell×0,4, 19px)), а шрифт —
+    // от клетки: считаем дважды. Поля и рамка .puzzle — 8 + 4 px, запас у края — PAD.
+    var PAD = 8, FRAME = 12;
     var contRect = _container.getBoundingClientRect();
-    var availW = contRect.width  - PAD * 2 - _rowClueW;
-    var availH = contRect.height - PAD * 2 - colClueH;
-    _baseCell = Math.max(8, Math.min(72, Math.floor(Math.min(availW / W, availH / H))));
+    var cell = 32;
+    for (var pass = 0; pass < 2; pass++) {
+      var fs = Math.max(13, Math.min(19, cell * 0.4));
+      var NUM_W = Math.ceil(fs * 0.62) + 5, NUM_H = Math.ceil(fs * 1.08) + 1;
+      _rowClueW = maxRowLen * NUM_W + 8;
+      var colClueH = maxColLen * NUM_H + 6;
+      var availW = contRect.width  - PAD * 2 - FRAME - _rowClueW;
+      var availH = contRect.height - PAD * 2 - FRAME - colClueH;
+      cell = Math.max(8, Math.min(72, Math.floor(Math.min(availW / W, availH / H))));
+    }
+    _baseCell = cell;
   }
 
   /* ----------------------------------------------------------
@@ -306,8 +405,8 @@ window.Nonogram = (function () {
       if (!_level || !_container || !_puzzleEl) return;
       if (!_container.offsetParent) return; // поле не видно — нечего пересчитывать
       computeBaseCell();
-      _scale = 1; _tx = 0; _ty = 0;
-      applyTransform();
+      _puzzleEl.style.setProperty('--clue-col-w', _rowClueW + 'px');
+      fitOrZoom();
     }, 150);
   }
   window.addEventListener('resize', onWindowResize);
@@ -321,6 +420,7 @@ window.Nonogram = (function () {
     container.addEventListener('touchend',   onTouchEnd);
     container.addEventListener('wheel',      onWheel,      { passive: false });
     container.addEventListener('mousedown',  onMouseDown);
+    container.addEventListener('click',      onClickCapture, true);
     document.addEventListener('keydown',     onKeyDown);
     document.addEventListener('keyup',       onKeyUp);
   }
@@ -332,6 +432,7 @@ window.Nonogram = (function () {
     container.removeEventListener('touchend',   onTouchEnd);
     container.removeEventListener('wheel',      onWheel);
     container.removeEventListener('mousedown',  onMouseDown);
+    container.removeEventListener('click',      onClickCapture, true);
     document.removeEventListener('keydown',     onKeyDown);
     document.removeEventListener('keyup',       onKeyUp);
   }
@@ -735,6 +836,7 @@ window.Nonogram = (function () {
     _undoStack = [];
     _scale = 1; _tx = 0; _ty = 0; _pinch = null; _pinchActive = false;
     _dragPointerId = null; _panning = false;
+    _fitAll = false; _cluePan = null;
 
     _boardState = [];
     for (var ri = 0; ri < level.height; ri++) {
@@ -761,6 +863,7 @@ window.Nonogram = (function () {
     var corner = document.createElement('div');
     corner.className = 'puzzle-tl';
     puzzle.appendChild(corner);
+    _cornerEl = corner;
 
     _cellEls = []; _rowClueEls = []; _colClueEls = [];
 
@@ -779,6 +882,7 @@ window.Nonogram = (function () {
       colArea.appendChild(ccDiv);
     }
     puzzle.appendChild(colArea);
+    _colArea = colArea;
 
     var rowArea = document.createElement('div');
     rowArea.className = 'puzzle-row-clues';
@@ -795,6 +899,8 @@ window.Nonogram = (function () {
       rowArea.appendChild(rcDiv);
     }
     puzzle.appendChild(rowArea);
+    _rowArea = rowArea;
+    [corner, colArea, rowArea].forEach(function (n) { n.addEventListener('pointerdown', onCluePointerDown); });
 
     var gridEl = document.createElement('div');
     gridEl.className = 'puzzle-grid';
@@ -830,6 +936,7 @@ window.Nonogram = (function () {
     container.appendChild(_viewport);
 
     attachZoomHandlers(container);
+    fitOrZoom();
   }
 
   /* ----------------------------------------------------------
@@ -1075,6 +1182,9 @@ window.Nonogram = (function () {
     getBoardState: getBoardState,
     restoreBoard:  restoreBoard,
     resetZoom:     resetZoom,
+    isZoomable:    isZoomable,
+    isZoomed:      isZoomed,
+    toggleZoom:    toggleZoom,
     findErrors:      findErrors,
     hasErrors:       hasErrors,
     findWrongCrosses: findWrongCrosses,

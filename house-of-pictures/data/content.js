@@ -15,10 +15,10 @@ window.HOP_CONTENT = {
       next_room: 'r02',
       intro: 'В этом доме картинки помнят вещи. Разгадай картинку — и вещь вернётся.',
       intro_sign: 'Вера',
-      final_text: 'Финик вернулся домой и устроился на коврике. Письмо на полке приподнялось — его можно открыть.',
+      final_text: 'Финик дома. На полке ждёт письмо.',
       invitation: {
         title: 'Приглашение к чаю',
-        text: 'Дорогой хранитель! Спасибо, что вернул свет в прихожую. Приходи к чаю — чайная за зелёной дверью.',
+        text: 'Спасибо за свет! Чайная — за зелёной дверью.',
         sign: 'Вера',
         button: 'Пойти к чаю'
       },
@@ -45,11 +45,11 @@ window.HOP_CONTENT = {
       background: 'assets/art/bg_tearoom.webp',
       intro: 'Здесь пили чай всей семьёй. Начнём с чашки — остальное подскажет дом.',
       intro_sign: 'Вера',
-      final_text: 'Музыкальная коробочка заиграла старый вальс. Финик дремлет в кресле, а за окном кто-то зажёг фонарик.',
+      final_text: 'Чайная ожила!',
       next_room: 'r03',
       invitation: {
         title: 'Записка из оранжереи',
-        text: 'Спасибо за чай! Финик нашёл ключ от оранжереи за садом. Там тепло, только всё заросло. Поможешь?',
+        text: 'Финик нашёл ключ от оранжереи. Поможешь?',
         sign: 'Вера',
         button: 'В оранжерею'
       },
@@ -71,26 +71,27 @@ window.HOP_CONTENT = {
       requires: 'r02',
       objects: ['r03_seed_table', 'r03_watering_can', 'r03_hanging_pot', 'r03_birdhouse', 'r03_herbarium', 'r03_bench', 'r03_pond', 'r03_glass_door'],
       background: 'assets/art/bg_orangery.webp',
-      intro: 'Здесь бабушка растила лимоны и розы. Начнём со стола для рассады — семена ещё живы.',
+      intro: 'Здесь бабушка растила лимоны. Начнём со стола для рассады.',
       intro_sign: 'Вера',
-      final_text: 'Двери оранжереи распахнулись в сад. Финик греется на скамейке, а в пруду отражаются первые фонарики.',
+      final_text: 'Сад открыт!',
       invitation: {
         title: 'Вечер фонариков',
-        text: 'Оранжерея ожила! Здесь и устроим Вечер фонариков. Новые комнаты дома скоро откроются, а письма приходят каждый день.',
+        text: 'Оранжерея ожила! Новые комнаты скоро откроются.',
         sign: 'Вера',
         button: 'Хорошо'
       },
       next_visit_note: 'Новые комнаты скоро откроются. А пока каждый день приходит новое письмо.',
       layout: {
         r03_herbarium: { x: 0.215, y: 0.43, w: 0.115 },
-        r03_glass_door: { x: 0.79, y: 0.605, w: 0.28 },
+        r03_glass_door: { x: 0.82, y: 0.59, w: 0.28 },
         r03_hanging_pot: { x: 0.36, y: 0.33, w: 0.15 },
         r03_seed_table: { x: 0.33, y: 0.68, w: 0.30 },
         r03_birdhouse: { x: 0.93, y: 0.76, w: 0.11 },
         r03_bench: { x: 0.64, y: 0.73, w: 0.30 },
         r03_watering_can: { x: 0.13, y: 0.88, w: 0.17 },
-        r03_pond: { x: 0.52, y: 0.97, w: 0.42 },
-        cat: { x: 0.62, y: 0.635, w: 0.15 }
+        r03_pond: { x: 0.52, y: 0.99, w: 0.38 },
+        cat: { x: 0.62, y: 0.635, w: 0.15 },
+        bird: { x: 0.785, y: 0.925, w: 0.075 }
       },
       z: ['r03_herbarium', 'r03_glass_door', 'r03_hanging_pot', 'r03_seed_table', 'r03_birdhouse', 'r03_bench', 'r03_watering_can', 'r03_pond']
     }
@@ -109,37 +110,37 @@ window.HOP_CONTENT = {
         { id: 'r01_lamp_b', title: 'Сливочный абажур', sprite: 'lamp_b' },
         { id: 'r01_lamp_c', title: 'Мозаичный абажур', sprite: 'lamp_c', premium: true, price_coins: 300 }
       ],
-      tap_secret: 'Лампа щёлкает выключателем — и снова светит.'
+      tap_secret: 'Щёлк — и лампа снова светит.'
     },
     r01_shelf: {
       room: 'r01', title: 'Почтовая полка', verb: 'Починить',
       puzzles: ['r01_shelf_01'], prerequisites: ['r01_lamp'],
-      pitch: 'Полка для писем — с ней в доме появится почта',
-      done_text: 'На полку легло письмо с птичьей печатью. Пока оно запечатано.',
+      pitch: 'Полка — и придёт почта',
+      done_text: 'На полке — письмо с птичьей печатью.',
       variants: [
         { id: 'r01_shelf_a', title: 'Светлая берёза', sprite: 'shelf_a' },
         { id: 'r01_shelf_b', title: 'Тёмный орех', sprite: 'shelf_b' },
         { id: 'r01_shelf_c', title: 'Полка с открытками', sprite: 'shelf_c', premium: true, price_coins: 800 }
       ],
-      tap_secret: 'Письмо запечатано: на сургуче птица. Где-то она уже встречалась…'
+      tap_secret: 'На сургуче птица. Где-то она встречалась…'
     },
     r01_rug: {
       room: 'r01', title: 'Коврик', verb: 'Соткать',
       puzzles: ['r01_rug_01'], prerequisites: ['r01_lamp'],
-      pitch: 'Мягкий коврик у двери — кто-то его очень ждёт',
-      done_text: 'Коврик снова мягкий. У двери — свежие кошачьи следы.',
+      pitch: 'Коврик, которого кто-то ждёт',
+      done_text: 'У двери — свежие кошачьи следы.',
       variants: [
         { id: 'r01_rug_a', title: 'Терракотовый', sprite: 'rug_a' },
         { id: 'r01_rug_b', title: 'Шалфейный', sprite: 'rug_b' },
         { id: 'r01_rug_c', title: 'Звёздный индиго', sprite: 'rug_c', premium: true, price_coins: 120 }
       ],
-      tap_secret: 'Следы ведут к зелёной двери. Чей-то хвост мелькнул за ней.'
+      tap_secret: 'Следы ведут к зелёной двери.'
     },
     r01_flower: {
       room: 'r01', title: 'Оконный цветок', verb: 'Посадить',
       puzzles: ['r01_flower_01'], prerequisites: ['r01_shelf', 'r01_rug'],
-      pitch: 'Цветок на подоконник — и к окну кто-то прилетит',
-      done_text: 'Цветок раскрылся. За окном села птица — точь-в-точь как на печати письма!',
+      pitch: 'Цветок — и кто-то прилетит',
+      done_text: 'За окном села птица — как на печати!',
       variants: [
         { id: 'r01_flower_a', title: 'Белый цветок', sprite: 'flower_a' },
         { id: 'r01_flower_b', title: 'Жёлтый цветок', sprite: 'flower_b' },
@@ -151,9 +152,9 @@ window.HOP_CONTENT = {
     r02_tea_set: {
       room: 'r02', title: 'Чайный сервиз', verb: 'Собрать',
       life: { kind: 'steam', x: 0.06, y: 0.16 },
-      puzzles: ['r02_tea_set_02', 'r02_tea_set_01', 'r02_tea_set_03'], unlock_after: 0,
-      stage_sprites: ['tea_set_s1', 'tea_set_s2'],
-      pitch: 'Чашка, блюдце, чайник — и можно звать гостей',
+      puzzles: ['r02_tea_set_02', 'r02_tea_set_01'], unlock_after: 0,
+      stage_sprites: ['tea_set_s2'],
+      pitch: 'Чайник — и можно звать гостей',
       done_text: 'Чайник запыхтел паром. Пахнет мятой и малиной.',
       variants: [
         { id: 'r02_tea_set_a', title: 'Белый с кобальтом', sprite: 'tea_set_a' },
@@ -164,8 +165,8 @@ window.HOP_CONTENT = {
     },
     r02_table: {
       room: 'r02', title: 'Чайный столик', verb: 'Накрыть',
-      puzzles: ['r02_table_03', 'r02_table_01', 'r02_table_02'], unlock_after: 0,
-      stage_sprites: ['table_s1', 'table_s2'],
+      puzzles: ['r02_table_03', 'r02_table_02'], unlock_after: 0,
+      stage_sprites: ['table_s2'],
       pitch: 'Круглый столик для чая на двоих',
       done_text: 'Столик снова крепко стоит. Салфетка пахнет лавандой.',
       variants: [
@@ -173,54 +174,54 @@ window.HOP_CONTENT = {
         { id: 'r02_table_b', title: 'Терракотовая клетка', sprite: 'table_b' },
         { id: 'r02_table_c', title: 'Вечерняя скатерть', sprite: 'table_c', premium: true, sku: 'theme_tea_evening' }
       ],
-      tap_secret: 'Под салфеткой нашлась крошка печенья. Финик её уже заметил.'
+      tap_secret: 'Под салфеткой — крошка печенья.'
     },
     r02_armchair: {
       room: 'r02', title: 'Кресло', verb: 'Обить',
-      puzzles: ['r02_armchair_01', 'r02_armchair_03', 'r02_armchair_02'], unlock_after: 0,
-      stage_sprites: ['armchair_s1', 'armchair_s2'],
-      pitch: 'Мягкое кресло у окна — на нём кто-то любит спать',
-      done_text: 'Кресло снова мягкое. Финик тут же занял его.',
+      puzzles: ['r02_armchair_01', 'r02_armchair_03'], unlock_after: 0,
+      stage_sprites: ['armchair_s2'],
+      pitch: 'Кресло, где кто-то спит',
+      done_text: 'Финик тут же занял кресло.',
       variants: [
         { id: 'r02_armchair_a', title: 'Шалфейный бархат', sprite: 'armchair_a' },
         { id: 'r02_armchair_b', title: 'Горчичный в цветах', sprite: 'armchair_b' },
         { id: 'r02_armchair_c', title: 'Полночный бархат', sprite: 'armchair_c', premium: true, sku: 'theme_tea_evening' }
       ],
-      tap_secret: 'Финик приоткрыл один глаз и снова уснул.'
+      tap_secret: 'Финик приоткрыл глаз и уснул.'
     },
     r02_clock: {
       room: 'r02', title: 'Часы', verb: 'Завести',
       life: { kind: 'glint', x: 0.59, y: 0.55 },
-      puzzles: ['r02_clock_01', 'r02_clock_03', 'r02_clock_02'], unlock_after: 2,
-      stage_sprites: ['clock_s1', 'clock_s2'],
-      pitch: 'Настенные часы стоят с прошлой зимы',
-      done_text: 'Тик-так. Часы пошли и пробили пять — время чая.',
+      puzzles: ['r02_clock_01', 'r02_clock_03'], unlock_after: 2,
+      stage_sprites: ['clock_s2'],
+      pitch: 'Часы стоят с прошлой зимы',
+      done_text: 'Часы пробили пять — время чая.',
       variants: [
         { id: 'r02_clock_a', title: 'Ореховые', sprite: 'clock_a' },
         { id: 'r02_clock_b', title: 'Шалфейные', sprite: 'clock_b' },
         { id: 'r02_clock_c', title: 'Звёздные', sprite: 'clock_c', premium: true, sku: 'theme_tea_evening' }
       ],
-      tap_secret: 'Маятник качнулся, и где-то в доме откликнулось эхо.'
+      tap_secret: 'Маятник качнулся — в доме эхо.'
     },
     r02_window: {
       room: 'r02', title: 'Окно в сад', verb: 'Украсить',
-      puzzles: ['r02_window_01', 'r02_window_02', 'r02_window_03'], unlock_after: 2,
-      stage_sprites: ['window_s1', 'window_s2'],
-      pitch: 'Шторы и витраж — чтобы свет был мягче',
-      done_text: 'На витраже — та самая птица с печати. Она смотрит в сад.',
+      puzzles: ['r02_window_01', 'r02_window_02'], unlock_after: 2,
+      stage_sprites: ['window_s2'],
+      pitch: 'Витраж, чтобы свет был мягче',
+      done_text: 'На витраже — птица с печати.',
       variants: [
         { id: 'r02_window_a', title: 'Кремовые шторы', sprite: 'window_a' },
         { id: 'r02_window_b', title: 'Пыльная роза', sprite: 'window_b' },
         { id: 'r02_window_c', title: 'Полночные шторы', sprite: 'window_c', premium: true, sku: 'theme_tea_evening' }
       ],
-      tap_secret: 'В саду качнулась ветка. Кажется, там кто-то ходил с фонариком.'
+      tap_secret: 'В саду мелькнул чей-то фонарик.'
     },
     r02_sideboard: {
       room: 'r02', title: 'Буфет', verb: 'Расставить',
-      puzzles: ['r02_sideboard_02', 'r02_sideboard_01', 'r02_sideboard_03'], unlock_after: 4,
-      stage_sprites: ['sideboard_s1', 'sideboard_s2'],
-      pitch: 'Буфет для чашек и баночек с вареньем',
-      done_text: 'На полке — банка вишнёвого варенья с подписью «Для гостей».',
+      puzzles: ['r02_sideboard_02', 'r02_sideboard_03'], unlock_after: 4,
+      stage_sprites: ['sideboard_s2'],
+      pitch: 'Буфет для чашек и варенья',
+      done_text: 'На полке — варенье «Для гостей».',
       variants: [
         { id: 'r02_sideboard_a', title: 'Медовый', sprite: 'sideboard_a' },
         { id: 'r02_sideboard_b', title: 'Голубой', sprite: 'sideboard_b' },
@@ -230,65 +231,65 @@ window.HOP_CONTENT = {
     },
     r02_photo: {
       room: 'r02', title: 'Фотография', verb: 'Повесить',
-      puzzles: ['r02_photo_01', 'r02_photo_02', 'r02_photo_03'], unlock_after: 4,
-      stage_sprites: ['photo_s1', 'photo_s2'],
-      pitch: 'Старая фотография дома — каким он был',
-      done_text: 'На снимке — этот дом, полный гостей, и сад в фонариках.',
+      puzzles: ['r02_photo_01', 'r02_photo_02'], unlock_after: 4,
+      stage_sprites: ['photo_s2'],
+      pitch: 'Каким был этот дом?',
+      done_text: 'На снимке — дом, полный гостей.',
       variants: [
         { id: 'r02_photo_a', title: 'Золочёная рамка', sprite: 'photo_a' },
         { id: 'r02_photo_b', title: 'Ореховая рамка', sprite: 'photo_b' },
         { id: 'r02_photo_c', title: 'Вечерняя рамка', sprite: 'photo_c', premium: true, price_coins: 120 }
       ],
-      tap_secret: 'На обороте подпись: «Вечер фонариков. Все в сборе».'
+      tap_secret: 'Подпись: «Вечер фонариков. Все в сборе».'
     },
     r02_musicbox: {
       room: 'r02', title: 'Музыкальная шкатулка', verb: 'Починить',
       life: { kind: 'waltz', x: 0.62, y: 0.42 },
-      puzzles: ['r02_musicbox_02', 'r02_musicbox_01', 'r02_musicbox_03'], unlock_after: 7,
-      stage_sprites: ['musicbox_s1', 'musicbox_s2'],
-      pitch: 'Шкатулка молчит давно. Какую песню она помнит?',
+      puzzles: ['r02_musicbox_02', 'r02_musicbox_03'], unlock_after: 7,
+      stage_sprites: ['musicbox_s2'],
+      pitch: 'Какую песню помнит шкатулка?',
       done_text: 'Шкатулка заиграла вальс. Птичка на крышке закружилась.',
       variants: [
         { id: 'r02_musicbox_a', title: 'Палисандр', sprite: 'musicbox_a' },
         { id: 'r02_musicbox_b', title: 'Кремовая с золотом', sprite: 'musicbox_b' },
         { id: 'r02_musicbox_c', title: 'Полночная', sprite: 'musicbox_c', premium: true, price_coins: 300 }
       ],
-      tap_secret: 'Шкатулка играет три ноты и ждёт продолжения.'
+      tap_secret: 'Шкатулка играет три ноты и ждёт.'
     },
     r03_seed_table: {
       room: 'r03', title: 'Стол для рассады', verb: 'Расставить',
       life: { kind: 'bloom' },
       puzzles: ['r03_seed_table_01', 'r03_seed_table_02', 'r03_seed_table_04'], unlock_after: 0,
       stage_sprites: ['seed_table_s1', 'seed_table_s2'],
-      pitch: 'Стол, ящик с землёй, росток — и семена проснутся',
-      done_text: 'В ящике проклюнулись первые ростки. Пахнет мокрой землёй.',
+      pitch: 'Разбудить спящие семена',
+      done_text: 'Проклюнулись первые ростки. Пахнет землёй.',
       variants: [
         { id: 'r03_seed_table_a', title: 'Медовый', sprite: 'seed_table_a' },
         { id: 'r03_seed_table_b', title: 'Шалфейный', sprite: 'seed_table_b' },
         { id: 'r03_seed_table_c', title: 'Вечерний с огоньками', sprite: 'seed_table_c', premium: true, price_coins: 150 }
       ],
-      tap_secret: 'Под столом шуршит — Финик проверяет мешок с семенами.'
+      tap_secret: 'Финик шуршит в мешке с семенами.'
     },
     r03_watering_can: {
       room: 'r03', title: 'Лейка', verb: 'Начистить',
       life: { kind: 'bloom' },
       puzzles: ['r03_watering_can_01', 'r03_watering_can_02', 'r03_watering_can_04'], unlock_after: 0,
       stage_sprites: ['watering_can_s1', 'watering_can_s2'],
-      pitch: 'Ведёрко, ручка, капля — будет чем поливать',
-      done_text: 'Лейка звякнула и пустила тонкую струйку. Ростки повеселели.',
+      pitch: 'Будет чем поливать ростки',
+      done_text: 'Лейка пустила струйку. Ростки повеселели.',
       variants: [
         { id: 'r03_watering_can_a', title: 'Медная', sprite: 'watering_can_a' },
         { id: 'r03_watering_can_b', title: 'С ромашками', sprite: 'watering_can_b' },
         { id: 'r03_watering_can_c', title: 'Звёздная', sprite: 'watering_can_c', premium: true, price_coins: 120 }
       ],
-      tap_secret: 'Из носика выкатилась капля и упала Финику на нос.'
+      tap_secret: 'Капля упала Финику на нос.'
     },
     r03_hanging_pot: {
       room: 'r03', title: 'Подвесное кашпо', verb: 'Повесить',
       life: { kind: 'bloom' },
       puzzles: ['r03_hanging_pot_01', 'r03_hanging_pot_03', 'r03_hanging_pot_04'], unlock_after: 0,
       stage_sprites: ['hanging_pot_s1', 'hanging_pot_s2'],
-      pitch: 'Крючок, горшок, лист плюща — и плющ повиснет',
+      pitch: 'Подвесить зелёный плющ',
       done_text: 'Плющ свесился зелёной косой. Кашпо тихо покачивается.',
       variants: [
         { id: 'r03_hanging_pot_a', title: 'Терракотовое', sprite: 'hanging_pot_a' },
@@ -302,7 +303,7 @@ window.HOP_CONTENT = {
       life: { kind: 'bloom' },
       puzzles: ['r03_birdhouse_01', 'r03_birdhouse_02', 'r03_birdhouse_03'], unlock_after: 2,
       stage_sprites: ['birdhouse_s1', 'birdhouse_s2'],
-      pitch: 'Столбик, крыша, леток — и прилетит жилец',
+      pitch: 'Домик — и прилетит жилец',
       done_text: 'В скворечник заглянула малиновка и решила остаться.',
       variants: [
         { id: 'r03_birdhouse_a', title: 'Рыжая крыша', sprite: 'birdhouse_a' },
@@ -316,56 +317,56 @@ window.HOP_CONTENT = {
       life: { kind: 'bloom' },
       puzzles: ['r03_herbarium_01', 'r03_herbarium_02', 'r03_herbarium_03'], unlock_after: 2,
       stage_sprites: ['herbarium_s1', 'herbarium_s2'],
-      pitch: 'Рамка, кленовый лист, папоротник — память о лете',
-      done_text: 'Под стеклом — клён и папоротник. На ярлыке бабушкин почерк.',
+      pitch: 'Память о лете под стеклом',
+      done_text: 'Под стеклом — клён. Ярлык бабушкиной рукой.',
       variants: [
         { id: 'r03_herbarium_a', title: 'Дубовая рамка', sprite: 'herbarium_a' },
         { id: 'r03_herbarium_b', title: 'Шалфейная рамка', sprite: 'herbarium_b' },
         { id: 'r03_herbarium_c', title: 'Золочёная', sprite: 'herbarium_c', premium: true, price_coins: 150 }
       ],
-      tap_secret: 'На ярлыке едва видно: «Собрано к первому Вечеру фонариков».'
+      tap_secret: 'Ярлык: «К первому Вечеру фонариков».'
     },
     r03_bench: {
       room: 'r03', title: 'Скамейка', verb: 'Починить',
       life: { kind: 'bloom' },
       puzzles: ['r03_bench_01', 'r03_bench_02', 'r03_bench_03'], unlock_after: 4,
       stage_sprites: ['bench_s1', 'bench_s2'],
-      pitch: 'Чугунные бока, сиденье, спинка — и можно присесть',
-      done_text: 'Скамейка снова стоит крепко. Финик уже занял подушку.',
+      pitch: 'Скамейка, чтобы присесть',
+      done_text: 'Скамейка крепка. Финик уже на подушке.',
       variants: [
         { id: 'r03_bench_a', title: 'Терракотовая', sprite: 'bench_a' },
         { id: 'r03_bench_b', title: 'В полоску', sprite: 'bench_b' },
         { id: 'r03_bench_c', title: 'Полночная', sprite: 'bench_c', premium: true, price_coins: 200 }
       ],
-      tap_secret: 'Финик потянулся и перевернулся на другой бок.'
+      tap_secret: 'Финик перевернулся на другой бок.'
     },
     r03_pond: {
       room: 'r03', title: 'Пруд', verb: 'Расчистить',
       life: { kind: 'bloom' },
       puzzles: ['r03_pond_01', 'r03_pond_02', 'r03_pond_03'], unlock_after: 4,
       stage_sprites: ['pond_s1', 'pond_s2'],
-      pitch: 'Камни, кувшинка, лягушка — пруд оживает',
+      pitch: 'Пруд с кувшинкой оживёт',
       done_text: 'Вода стала прозрачной. На кувшинке сидит лягушка.',
       variants: [
         { id: 'r03_pond_a', title: 'Летний', sprite: 'pond_a' },
         { id: 'r03_pond_b', title: 'Солнечный', sprite: 'pond_b' },
         { id: 'r03_pond_c', title: 'С фонариками', sprite: 'pond_c', premium: true, price_coins: 250 }
       ],
-      tap_secret: 'Лягушка квакнула и спряталась под лист кувшинки.'
+      tap_secret: 'Лягушка квакнула и спряталась.'
     },
     r03_glass_door: {
       room: 'r03', title: 'Дверь в сад', verb: 'Открыть',
       life: { kind: 'bloom' },
       puzzles: ['r03_glass_door_01', 'r03_glass_door_02', 'r03_glass_door_03'], unlock_after: 6,
       stage_sprites: ['glass_door_s1', 'glass_door_s2'],
-      pitch: 'Рама, ручка, старый ключ — и дверь откроется в сад',
-      done_text: 'Дверь распахнулась, и в оранжерею вошёл тёплый ветер из сада.',
+      pitch: 'Дверь в сад откроется',
+      done_text: 'Дверь распахнулась — из сада тёплый ветер.',
       variants: [
         { id: 'r03_glass_door_a', title: 'Кремовая с розами', sprite: 'glass_door_a' },
         { id: 'r03_glass_door_b', title: 'Шалфейная с вьюнком', sprite: 'glass_door_b' },
         { id: 'r03_glass_door_c', title: 'Полночная с цветами', sprite: 'glass_door_c', premium: true, price_coins: 300 }
       ],
-      tap_secret: 'За стеклом мелькнула птица с печатью — и исчезла в листве.'
+      tap_secret: 'За стеклом мелькнула птица с печати.'
     }
   },
 
@@ -389,8 +390,17 @@ window.HOP_CONTENT = {
     tutorial_pencils: 3,
     pencil_price: 100,
     rewarded: { coins: 40, pencils: 1, per_day: 3, after_room: 'r01' },
-    // Вернулся после паузы в after_days и больше — карандаш в подарок.
-    comeback: { after_days: 3, pencils: 1 }
+    // Подарок вернувшемуся растёт с паузой: день — монеты, три — монеты и
+    // карандаши, неделя — вещь для дома (нет такой — монеты).
+    comeback: { tiers: [
+      { after_days: 1, coins: 30 },
+      { after_days: 3, coins: 60, pencils: 2 },
+      { after_days: 7, variant: true, coins: 150, pencils: 3 }
+    ] },
+    // Наборы за голоса — не раньше 10 минут игры и готовой прихожей.
+    paid_after_s: 600,
+    // Секрет готовой вещи (первое касание) и все секреты комнаты.
+    secrets: { coins: 5, room_coins: 50 }
   },
 
   /* Наборы за голоса ВК. Цены — тестовые, подтверждает основатель. */
@@ -415,7 +425,29 @@ window.HOP_CONTENT = {
   /* «7 встреч»: штамп за первую картинку дня, полная карточка — подарок. */
   stamps: {
     card_size: 7,
+    // Подарки по дороге к полной карточке.
+    steps: { 2: { coins: 50 }, 4: { pencils: 2 } },
     rewards: [{ variants: ['r01_flower_c'], pencils: 3 }]
+  },
+
+  /* «Вечер фонариков»: событие на days дней с готовой прихожей. В первый день
+     открыто open_first фонариков, дальше по одному в день; все зажжённые — награда. */
+  event: {
+    id: 'lanterns', title: 'Вечер фонариков', after_room: 'r01', days: 7, open_first: 2,
+    text: 'Зажгите пять фонарей — и вечер вернётся.',
+    reward: { coins: 200, pencils: 2 },
+    lanterns: [
+      { id: "e_l1", title: "Медный фонарь", palette: { a: "#3b2c22", b: "#c8643c", c: "#f2c55a" },
+        pic: ['...a...', '..aaa..', '.bbbbb.', 'bbcccbb', 'bbcccbb', 'bbbcbbb', '.bbbbb.', '..aaa..', '...a...'] },
+      { id: "e_l2", title: "Свеча в банке", palette: { a: "#3b2c22", c: "#f2c55a" },
+        pic: ['...a...', '..aaa..', '.aaaaa.', '.a.c.a.', '.acc.a.', '.accca.', '.a.c.a.', '.aaaaa.', '..a.a..'] },
+      { id: "e_l3", title: "Фонарь-звезда", palette: { a: "#3b2c22", b: "#d9a441", c: "#fbe7a6" },
+        pic: ['....a....', '....b....', '...bbb...', 'bbbbcbbbb', '.bbcccbb.', '..bbcbb..', '.bbb.bbb.', '.bb...bb.'] },
+      { id: "e_l4", title: "Тыквенный фонарь", palette: { b: "#d07a3e", c: "#f7d36b", d: "#7d9466" },
+        pic: ['....d....', '...dd....', '.bbbbbbb.', 'bbcbbbcbb', 'bbbbbbbbb', 'bbcbcbcbb', '.bbcccbb.', '..bbbbb..'] },
+      { id: "e_l5", title: "Фонарик из ткани", palette: { a: "#3b2c22", b: "#7b4b5a", c: "#f2c55a" },
+        pic: ['....a....', '...aaa...', '..bbbbb..', '.bbcbcbb.', 'bbbcccbbb', '.bbcbcbb.', '..bbbbb..', '...aaa...', '..a.a.a..'] }
+    ]
   },
 
   /* «Письмо дня»: по письму в день от daily.start, нерешённое ждёт keep_days.
@@ -426,25 +458,25 @@ window.HOP_CONTENT = {
     letters: [
       {
         id: "d001", title: "Кленовый лист", from: "Вера",
-        text: "Доброе утро! В доме снова ходят письма, как в прежние годы. Первое — с клёна у калитки. Его посадили те, кто жил здесь до меня.",
+        text: "Письма снова ходят. Первое — с клёна, что посадили до меня.",
         palette: { a: "#c8643c", b: "#d9a441", c: "#3b2c22" },
         pic: ['...a....', '.a.aa.a.', '.aaaaaa.', 'aaabaaaa', '.aabbaa.', '..abba..', '...c....', '..c.....']
       },
       {
         id: "d002", title: "Рыбка", from: "Финик",
-        text: "Мрр. Рыбку не ел. Почти. Под крыльцом нашёл коробку, пахнет свечками. Лапой не открыть. Финик.",
+        text: "Мрр. Рыбку не ел. Почти. Под крыльцом коробка, пахнет свечками.",
         palette: { a: "#5f7d8c", b: "#d9a441", c: "#3b2c22" },
         pic: ['........', '...bb...', '.aaaaa.b', 'aacaaaab', 'aaaaaaab', '.aaaaa.b', '...bb...', '........']
       },
       {
         id: "d003", title: "Жёлудь", from: "Нина",
-        text: "Вера, дуб у сарая сыплет жёлуди! Говорят, прежние хозяева пекли тут ореховое печенье. Найду рецепт — принесу к чаю.",
+        text: "Дуб сыплет жёлуди! Тут пекли ореховое печенье. Найду рецепт.",
         palette: { a: "#8a5a3b", b: "#c79a3a", c: "#3b2c22" },
         pic: ['...c....', '..aaaa..', '.aaaaaa.', 'aaaaaaaa', '.bbbbbb.', '.bbbbbb.', '..bbbb..', '...bb...']
       },
       {
-        id: "d004", title: "Гриб у старого пня", from: "Почтальон Тимофей",
-        text: "Доброго дня! Нашёл у грибного пня письмо без обратного адреса. Марка старая, с фонариком. Передаю как есть.",
+        id: "d004", title: "Гриб у пня", from: "Почтальон Тимофей",
+        text: "У пня нашёл письмо без адреса. Марка с фонариком.",
         palette: { a: "#c8643c", b: "#d9a441", c: "#b89870", d: "#7d9466" },
         pic: ['...aaaa...', '..abaaaa..', '.aaaabaaa.', 'aabaaaaaba', 'aaaaaaaaaa', '...cccc...', '...cccc...', '...cccc...', '..dccccd..', 'dddddddddd']
       },
@@ -456,235 +488,235 @@ window.HOP_CONTENT = {
       },
       {
         id: "d006", title: "Тыква", from: "Нина",
-        text: "Пирог с тыквой удался! Соседка вспомнила: из тыкв тут резали фонари к одному вечеру. Каждый год, в первые холода.",
+        text: "Пирог с тыквой удался! Из тыкв тут резали фонари.",
         palette: { a: "#d07a3e", b: "#a8452e", c: "#3b2c22", d: "#7d9466" },
         pic: ['....cd....', '....c.dd..', '.aabaabaa.', 'aaabaabaaa', 'aaabaabaaa', 'aaabaabaaa', 'aaabaabaaa', '.aabaabaa.', '..aaaaaa..']
       },
       {
         id: "d007", title: "Клубок ниток", from: "Вера",
-        text: "В шкафу нашёлся клубок и недовязанная варежка. Чья — не знаю. Довяжу: вдруг её хозяйка однажды заглянет на чай.",
+        text: "В шкафу — недовязанная варежка. Довяжу: вдруг хозяйка заглянет.",
         palette: { a: "#c27a6e", b: "#7b4b5a", c: "#3b2c22" },
         pic: ['...aaaa...', '.aabbaaaa.', '.abaabbaa.', 'aabaaaabba', 'abaabbaaab', 'aabbaaabaa', '.aaabbbaa.', '.abaaaaaa.', '...aaaa..c', '.........c']
       },
       {
         id: "d008", title: "Зонтик", from: "Почтальон Тимофей",
-        text: "Дождь, а письма сухие — спасибо зонтику. На почте старики помнят: раз в год в этом доме светились все окна до утра.",
+        text: "На почте помнят: раз в год тут светились все окна.",
         palette: { a: "#c8643c", b: "#d9a441", c: "#3b2c22" },
         pic: ['....cc....', '..aabbaa..', '.aaabbaaa.', 'aaaabbaaaa', 'aaaabbaaaa', 'a.a.cc.a.a', '....c.....', '....c.....', '....c..c..', '.....cc...']
       },
       {
         id: "d009", title: "Ягоды рябины", from: "Нина",
-        text: "Рябина после заморозка сладкая, сварю варенье. Бабушка говорила, гроздья вешали у фонарей, чтобы свет был теплее.",
+        text: "Сварю рябиновое варенье. Гроздья вешали у фонарей — для тепла.",
         palette: { a: "#a8452e", b: "#7d9466", c: "#3b2c22" },
         pic: ['..bb..bb..', '.bbbccbbb.', '...c..c...', '..c....c..', '.aa.aa.aa.', 'aaaaaaaaaa', '.aa.aa.aa.', '..aa..aa..', '.aaaaaaaa.', '..aa..aa..']
       },
       {
         id: "d010", title: "Финик спит", from: "Финик",
-        text: "Сплю. Не будить. Снились огоньки в саду и люди с пирогами. Нюхал сарай: там тоже пахнет свечками. Финик.",
+        text: "Сплю. Не будить. Снились огоньки в саду. Сарай пахнет свечками.",
         palette: { a: "#c98a4b", b: "#a8452e", c: "#3b2c22", d: "#7d9466" },
         pic: ['............', '.a.a........', '.aaa...aaa..', '.cac.aaaaaa.', '.aaaaabaabaa', '.aaaaabaabaa', '..aaaaaaaaa.', 'babaaaaa....', 'dddddddddddd']
       },
       {
         id: "d011", title: "Сова", from: "Птица с печатью",
-        text: "Сова видела их всех. Ей до сих пор снится тот вечер. Спросите у сарая.",
+        text: "Сова видела их всех. Спросите у сарая.",
         palette: { a: "#8a5a3b", b: "#d9a441", c: "#3b2c22", d: "#c8643c", e: "#c79a6a" },
         pic: ['a........a', 'aa......aa', '.aaaaaaaa.', 'abbaaaabba', 'abcbaabcba', 'abbaddabba', 'aaaaddaaaa', 'aaeeeeeeaa', '.aeeeeeea.', '..aaaaaa..', '...d..d...']
       },
       {
         id: "d012", title: "Свеча", from: "Вера",
-        text: "Ключ из сада подошёл к сараю! Внутри фонари, десятки, в пыли, коробка свечей и список гостей. Есть в нём и мой дедушка.",
+        text: "Ключ подошёл к сараю! Там фонари и список гостей.",
         palette: { a: "#d9a441", b: "#c8643c", c: "#3b2c22", d: "#9aa77c", e: "#8a5a3b" },
         pic: ['...a....', '..aba...', '..aba...', '...c....', '.dddddd.', '.dddddd.', '.dddddd.', '.dddddd.', '.dddddd.', 'eeeeeeee', '.eeeeee.']
       },
       {
         id: "d013", title: "Птичий домик", from: "Почтальон Тимофей",
-        text: "Вешал вам птичий домик и заметил на крыше сургуч с птицей. Кто-то давно присматривает за домом. По-доброму, думаю.",
+        text: "На крыше — сургуч с птицей. Кто-то бережёт этот дом.",
         palette: { a: "#c8643c", b: "#7d9466", c: "#3b2c22", d: "#8a5a3b" },
         pic: ['....aa....', '...aaaa...', '..aaaaaa..', '.aaaaaaaa.', 'aaaaaaaaaa', '.bbbbbbbb.', '.bbbccbbb.', '.bbbccbbb.', '.ddbbbbbb.', '.bbbbbbbb.', '....dd....', '....dd....']
       },
       {
         id: "d014", title: "Фонарик", from: "Вера",
-        text: "Зажгла первый фонарь — и сад стал как в рассказах. Может, устроим вечер снова? В списке гостей ещё много имён…",
+        text: "Зажгла первый фонарь — сад как в рассказах. Устроим вечер снова?",
         palette: { a: "#3b2c22", b: "#d9a441", c: "#c8643c" },
         pic: ['....aa....', '...a..a...', '..aaaaaa..', '.acbbbbca.', '.abbbbbba.', '.abbbbbba.', '.abbbbbba.', '.acbbbbca.', '..aaaaaa..', '....aa....']
       },
       {
         id: "d015", title: "Тыквенный пирог", from: "Нина",
-        text: "Испекла тыквенный пирог по старому рецепту, с мёдом и корицей. Прочла ваш список гостей: половину фамилий знаю! Начнём с аптеки?",
+        text: "Пирог по старому рецепту готов. Половину гостей из списка знаю!",
         palette: { a: "#c98a4b", b: "#c8643c", c: "#8a5a3b", d: "#e8d9b0" },
         pic: ['...d..d...', '....d..d..', '...d..d...', '.aaaaaaaa.', 'abbabbabba', 'aaaaaaaaaa', 'bbbbbbbbbb', '.aaaaaaaa.', 'cccccccccc', '.cccccccc.']
       },
       {
         id: "d016", title: "Корзинка", from: "Финик",
-        text: "Мрр. Нашёл корзинку с фонарями. Лёг сверху. Фонари теперь тёплые и в шерсти. Это помощь. Финик.",
+        text: "Мрр. Нашёл корзинку с фонарями. Лёг сверху. Это помощь.",
         palette: { a: "#8a5a3b", b: "#c79a3a", c: "#c98a4b", d: "#3b2c22" },
         pic: ['...aaaa...', '..a....a..', '.a.c..c.a.', '.a.cccc.a.', '.acdccdca.', 'aaaaaaaaaa', 'bababababa', 'ababababab', '.babababa.', '..aaaaaa..']
       },
       {
         id: "d017", title: "Почтовая сумка", from: "Почтальон Тимофей",
-        text: "Доброго дня! Сверил ваш список с почтовой книгой. Первый адрес — аптека на Липовой. Аптекарь Лев там до сих пор и всё помнит.",
+        text: "Первый адрес — аптека на Липовой. Аптекарь Лев всё помнит.",
         palette: { a: "#3b2c22", b: "#a8452e", c: "#d9a441", d: "#8a5a3b", e: "#e8d9b0" },
         pic: ['..aaaaaa..', '.a......a.', '.a.eeee.a.', 'bbbbbbbbbb', 'bbbbbbbbbb', '.bbbccbbb.', 'dddddddddd', 'dddddddddd', 'dddddddddd', '.dddddddd.']
       },
       {
         id: "d018", title: "Ступка", from: "Аптекарь Лев",
-        text: "Здравствуйте, Вера. Мальчишкой я толок в этой ступке лаванду для свечей к вашему вечеру. Ступка цела, руки тоже. Сделаю свечи снова.",
+        text: "Мальчишкой я толок тут лаванду для свечей. Сделаю снова.",
         palette: { a: "#8a5a3b", b: "#5f7d8c", c: "#3b2c22", d: "#7d9466" },
         pic: ['.......aa.', '......aa..', '.....aa...', 'dd..aa.dd.', 'bbbbbbbbbb', 'bbbbbbbbbb', '.bbbbbbbb.', '..bbbbbb..', '...bbbb...', '..cccccc..']
       },
       {
         id: "d019", title: "Перо", from: "Птица с печатью",
-        text: "Перо моё. Рука, что писала первое письмо, — не моя. Она сажала клён.",
+        text: "Перо моё. Но первое письмо писала рука, сажавшая клён.",
         palette: { a: "#5f7d8c", b: "#e8d9b0" },
         pic: ['.......aaa', '.....aaaab', '....aaaaba', '...aaaabaa', '..aa.aba..', '..aaaba...', '.aaaba....', '.aaba.....', '.bb.......', 'b.........']
       },
       {
         id: "d020", title: "Лейка", from: "Вера",
-        text: "В оранжерее посеяла астры и бархатцы — к вечеру фонарей они должны зацвести. Финик проверяет каждую лунку. Лапами.",
+        text: "Посеяла астры к вечеру фонарей. Финик проверяет каждую лунку.",
         palette: { a: "#7d9466", b: "#5f7d8c" },
         pic: ['...aaa....', '..a...a...', '..a...a..b', 'aaaaaaa.b.', 'aaaaaaabb.', 'aaaaaaab..', 'aaaaaaa..b', 'aaaaaaa...', '.aaaaa...b']
       },
       {
         id: "d021", title: "Варежка", from: "Внучка Соня",
-        text: "Я Соня, внучка Анны из вашего списка. Бабушка узнала по рисунку свою варежку из шкафа. Плакала и смеялась. Говорит: довяжем вместе.",
+        text: "Я Соня, внучка Анны. Бабушка узнала свою варежку из шкафа!",
         palette: { a: "#c27a6e", b: "#e8d9b0", c: "#a8452e" },
         pic: ['..aaaa....', '.aaaaaa...', '.abbabba..', '.aaaaaa.aa', '.aaaaaaaaa', '.abbabbaa.', '.aaaaaaa..', '..cccccc..', '..cbcbcb..', '..cccccc..']
       },
       {
         id: "d022", title: "Ёжик", from: "Финик",
-        text: "Мрр. В листьях под яблоней живёт ёжик. Фыркает. Я тоже фыркнул. Теперь друзья. Яблоки он не отдаёт. Финик.",
+        text: "Мрр. Под яблоней живёт ёжик. Фыркает. Теперь друзья.",
         palette: { a: "#8a5a3b", b: "#c98a4b", c: "#3b2c22", d: "#a8452e" },
         pic: ['..a.a.a.a..', '..aaaaaaa..', '.aaaddaaa..', 'aaaaddaaab.', 'aaaaaaaabcb', 'aaaaaaabbbb', 'aaaaaaabbbc', '.aaaaaabbb.', '..bb...bb..']
       },
       {
         id: "d023", title: "Почтовый ящик", from: "Почтальон Тимофей",
-        text: "Разнёс семь писем по адресам из списка. Три ответа уже в ящике. Дядя Коля с мельницы пишет, что отец часто вспоминал ваш вечер.",
+        text: "Разнёс письма по списку. Мельник Коля помнит ваш вечер.",
         palette: { a: "#5f7d8c", b: "#8a5a3b", c: "#d9a441", d: "#e8d9b0" },
         pic: ['..aaaaaa..', '.aaaaaaaa.', 'aaaaaaaaaa', 'a.dddddd.a', 'aaaaaaaaaa', 'aaaacaaaaa', 'aaaaaaaaaa', '....bb....', '....bb....', '..bbbbbb..']
       },
       {
-        id: "d024", title: "Колосок", from: "Дядя Коля с мельницы",
-        text: "Здорово, хозяйка! Отец мой каждый год вёз на ваш вечер мешок муки — на всех пироги. Мельница крутится. Привезу и я, как он.",
+        id: "d024", title: "Колосок", from: "Дядя Коля",
+        text: "Отец возил на ваш вечер муку. Привезу и я.",
         palette: { a: "#c79a3a", b: "#9aa77c" },
         pic: ['....a....', '..a.a.a..', '.aa.a.aa.', '..aaaaa..', '.aa.a.aa.', '..aaaaa..', '.aa.a.aa.', '..aaaaa..', '....b....', '....b.bb.', '....bbb..', '....b....']
       },
       {
         id: "d025", title: "Кружка какао", from: "Нина",
-        text: "Рецепт к холодам: какао, ложка мёда, щепотка корицы, сверху зефир. Пила такое на вечере фонарей девчонкой. Грело лучше шарфа.",
+        text: "Какао, мёд, корица, зефир — так грелись на вечере фонарей.",
         palette: { a: "#c8643c", b: "#8a5a3b", c: "#e8d9b0", d: "#d9a441" },
         pic: ['...c...c....', '....c...c...', '...c...c....', '.aaaaaaaa...', '.abbcbbba...', '.aaaaaaaaaa.', '.aaaaaaaa..a', '.aadadaaa..a', '.aaaaaaaa.a.', '.aaaaaaaaa..', '..aaaaaa....', 'bbbbbbbbbbbb']
       },
       {
         id: "d026", title: "Песочные часы", from: "Птица с печатью",
-        text: "Кто написал первым, тот ждал дольше всех. Песок почти пересыпался.",
+        text: "Кто написал первым, ждал дольше всех. Песок почти пересыпался.",
         palette: { a: "#8a5a3b", b: "#5f7d8c", c: "#d9a441" },
         pic: ['aaaaaaaaaa', '.b......b.', '.bccccccb.', '..bccccb..', '...bccb...', '....bb....', '...bccb...', '..b.cc.b..', '.b.cccc.b.', '.bccccccb.', 'aaaaaaaaaa']
       },
       {
         id: "d027", title: "Росток", from: "Вера",
-        text: "Взошли астры! Ряды крошечных ростков под стеклом. Соня принесла семена бархатцев от бабушки — у неё они росли с того самого вечера.",
+        text: "Взошли астры! Соня принесла бабушкины семена бархатцев.",
         palette: { a: "#7d9466", b: "#a8452e", c: "#c8643c" },
         pic: ['.aaa...aa.', 'aaaaa.aaaa', '.aaaa.aaa.', '....aa....', '....a.....', 'bbbbbbbbbb', 'bbbbbbbbbb', '.cccccccc.', '.cccccccc.', '..cccccc..', '..cccccc..']
       },
       {
         id: "d028", title: "Фонарь с ручкой", from: "Почтальон Тимофей",
-        text: "Разбирал фонари из сарая и нашёл один с буквами «М.Т.» на ручке. Это мамин. Она была в вашем списке, а я и не знал. Спасибо, Вера.",
+        text: "Нашёл в сарае фонарь с буквами «М.Т.». Это мамин.",
         palette: { a: "#3b2c22", b: "#d9a441", c: "#c8643c", d: "#e8d9b0" },
         pic: ['....aaa....', '...a...a...', '...a...a...', '..aaaaaaa..', '.aaaaaaaaa.', '.a.bbbbb.a.', '.a.bbcbb.a.', '.a.bcccb.a.', '.a.bbdbb.a.', '.a.bbdbb.a.', '.aaaaaaaaa.', '..aaaaaaa..']
       },
       {
         id: "d029", title: "Мышка", from: "Финик",
-        text: "Поймал мышку. Тряпичную, из сарая. Носил по дому, пока не отобрали. Теперь она на шкафу. Шкаф я тоже поймаю. Мрр. Финик.",
+        text: "Поймал тряпичную мышку. Отобрали. Она на шкафу. Поймаю шкаф.",
         palette: { a: "#9a8f86", b: "#c27a6e", c: "#3b2c22", e: "#c27a6e" },
         pic: ['..bb........', '.bbbb.......', '.bbbbaaaa...', '..aaaaaaaa..', '.acaaaaaaaa.', 'baaaaaaaaaa.', '.aaaaaaaaaaa', '..aaaaaaaa.e', '..........e.', '......eeee..']
       },
       {
         id: "d030", title: "Свеча в банке", from: "Аптекарь Лев",
-        text: "Вера, свечи с лавандой готовы. Ставьте их в банки, как в старину: ветер не задует, дети не обожгутся. Сорок банок хватит?",
+        text: "Свечи готовы. В банках их ветер не задует.",
         palette: { a: "#c8643c", b: "#d9a441", c: "#8a5a3b", d: "#5f7d8c", e: "#e8d9b0", f: "#3b2c22" },
         pic: ['.cccccccc.', 'd........d', 'd...aa...d', 'd..abba..d', 'd...ba...d', 'd...f....d', 'd..eeee..d', 'd..eeee..d', 'd..eeee..d', 'd..eeee..d', 'dddddddddd', '.dddddddd.']
       },
       {
         id: "d031", title: "Яблоко", from: "Нина",
-        text: "Пеку яблоки с орехами. А по секрету: Лев и Коля сорок лет спорили, чей фонарь светил ярче. Вчера встретились в аптеке — и смеялись.",
+        text: "Лев и Коля сорок лет спорили. Вчера смеялись вместе.",
         palette: { a: "#a8452e", b: "#7d9466", c: "#3b2c22", d: "#c27a6e" },
         pic: ['......c....', '.....c.bb..', '.....cbbb..', '..aaa.aaa..', '.aaaaaaaaa.', 'aadaaaaaaaa', 'adaaaaaaaaa', 'aaaaaaaaaaa', 'aaaaaaaaaaa', '.aaaaaaaaa.', '..aaa.aaa..']
       },
       {
         id: "d032", title: "Месяц", from: "Птица с печатью",
-        text: "При молодом месяце сургуч мягче. Спросите клён у калитки, чью руку он помнит.",
+        text: "Спросите клён у калитки, чью руку он помнит.",
         palette: { a: "#d9a441", b: "#e8d9b0" },
         pic: ['...aaaa....', '.aaaa......', '.aaa.......', 'aaa......b.', 'aaa.....bbb', 'aaa......b.', 'aaa........', '.aaa.......', '.aaaaa.....', '..aaaaaaaa.', '....aaaaa..']
       },
       {
         id: "d033", title: "Шарф", from: "Внучка Соня",
-        text: "Бабушка учит меня вязать. Варежку довязали! Теперь вяжем шарф для Финика — он сам выбрал нитку и утащил клубок под кровать.",
+        text: "Варежку довязали! Вяжем шарф Финику — он утащил клубок.",
         palette: { a: "#a8452e", b: "#d9a441", c: "#e8d9b0" },
         pic: ['..aaaaaaaa..', '.aa......aa.', '.aa......aa.', '..aaaaaaaa..', '...bbb.bbb..', '...aaa.aaa..', '...bbb..bbb.', '...aaa..aaa.', '...bbb...bbb', '...aaa...aaa', '...c.c...c.c', '...c.c...c.c']
       },
       {
         id: "d034", title: "Марка с фонариком", from: "Почтальон Тимофей",
-        text: "Объехал всю округу: почти все из списка нашлись — кто сам, кто во внуках. А в конторе отыскал марки с фонариком, как на том письме.",
+        text: "Почти все гости нашлись — сами или во внуках.",
         palette: { a: "#5f7d8c", c: "#3b2c22", d: "#d9a441", e: "#c8643c" },
         pic: ['a.a.a.a.a.a', '.aaaaaaaaa.', 'aa.......aa', '.a...c...a.', 'aa..ccc..aa', '.a.cdddc.a.', 'aa.cdedc.aa', '.a.cdddc.a.', 'aa..ccc..aa', '.a.......a.', 'aaaaaaaaaaa', 'a.a.a.a.a.a']
       },
       {
         id: "d035", title: "Астра", from: "Вера",
-        text: "Ночью ударил первый мороз, а в оранжерее зацвели астры. На полях списка нашла дедушкин почерк: «Оставить место тому, кто вернёт свет».",
+        text: "В списке приписка дедушки: «Место тому, кто вернёт свет».",
         palette: { a: "#c27a6e", b: "#d9a441", c: "#7d9466", d: "#9aa77c" },
         pic: ['.....a......', '..a..aa..a..', '...aaaaaaa..', '.aaaabbbaaa.', '..aabbbbbaa.', 'aaaabbbbbaaa', '..aabbbbbaa.', '.aaaabbbaaa.', '...aaaaaa...', '..a..cc.a...', '...dd.c.....', '.....dc.....']
       },
       {
-        id: "d036", title: "Тачка", from: "Дядя Коля с мельницы",
-        text: "Везу тачку тыкв с огорода — для фонарей. Вырезать научу, отец показывал. Главное: глаза пошире, а улыбку подобрее.",
+        id: "d036", title: "Тачка", from: "Дядя Коля",
+        text: "Везу тыквы для фонарей. Научу вырезать — глаза пошире!",
         palette: { a: "#8a5a3b", b: "#c8643c", c: "#7d9466", d: "#3b2c22", e: "#c79a3a" },
         pic: ['...c.....c...', '..bbb...bbb..', '.bbbbbbbbbbb.', 'aaaaaaaaaaaaa', '.aaaaaaaaaaa.', '..aaaaaaaaaaa', '..ddd....a...', '.dd.dd...a...', '.d.e.d...a...', '.dd.dd.......', '..ddd........']
       },
       {
         id: "d037", title: "Полосатый носок", from: "Финик",
-        text: "Мрр. Носок Сони теперь мой. Тёплый, полосатый, пахнет печеньем. Сплю в нём у печки. Вернуть не могу, я занят. Финик.",
+        text: "Мрр. Носок Сони теперь мой. Сплю в нём. Я занят.",
         palette: { a: "#a8452e", b: "#e8d9b0", c: "#5f7d8c" },
         pic: ['.aaaaa....', '.bbbbb....', '.aaaaa....', '.bbbbb....', '.aaaaa....', '.bbbbb....', '.aaaaaa...', '.bbbbbbbb.', 'caaaaaaaaa', 'ccbbbbbbbc', '.cccccccc.']
       },
       {
         id: "d038", title: "Пряничный человечек", from: "Нина",
-        text: "Пеку пряничных человечков — пробую рецепт, чтобы к вечеру хватило на всех. Глазурь легла ровно. Финик уже унёс одного. За ногу.",
+        text: "Пеку пряничных человечков на всех. Финик уже унёс одного.",
         palette: { a: "#c98a4b", b: "#e8d9b0", c: "#a8452e" },
         pic: ['....aaa....', '...aaaaa...', '...a.a.a...', '...abbba...', '....aaa....', '.aaaaaaaaa.', 'aaaaacaaaaa', '...aaaaa...', '...aacaa...', '...aa.aa...', '..aaa.aaa..', '..aa...aa..']
       },
       {
         id: "d039", title: "Колокольчик", from: "Птица с печатью",
-        text: "Когда в сарае звякнет колокольчик, откройте третий ящик. Я подожду.",
+        text: "Когда в сарае звякнет колокольчик, откройте третий ящик.",
         palette: { a: "#c79a3a", b: "#a8452e", c: "#3b2c22", d: "#8a5a3b" },
         pic: ['..bbb.bbb..', '....bbb....', '....aaa....', '...aaaaa...', '...aaaaa...', '..aaaaaaa..', '..aacaaaa..', '..aaaaaaa..', '.aaaaaaaaa.', 'aaaaaaaaaaa', '.....d.....', '....ddd....']
       },
       {
         id: "d040", title: "Горшочек мёда", from: "Аптекарь Лев",
-        text: "Для гостей заварю чай с липой и мёдом — от простуды и для доброго разговора. Рецепт моего учителя, он тоже был в вашем списке.",
+        text: "Для гостей заварю чай с липой и мёдом.",
         palette: { a: "#c98a4b", b: "#d9a441", c: "#e8d9b0", d: "#a8452e" },
         pic: ['...cc..cc...', '..cccccccc..', '...dddddd...', '...aaaaaa...', '..aaaaaaaa..', '.aaaaaaaaaa.', 'aaabbbbbbaaa', 'aaab.bb.baaa', 'aaabbbbbbaaa', '.aaaaaaaaaa.', '..aaaaaaaa..', '...aaaaaa...']
       },
       {
         id: "d041", title: "Валенок", from: "Внучка Соня",
-        text: "Бабушка достала валенки и сказала: «Поеду». Двадцать лет никуда не ездила! Шьём ей фонарик из ткани, чтобы нести самой.",
+        text: "Бабушка сказала: «Поеду»! Двадцать лет никуда не ездила.",
         palette: { a: "#5f6b73", b: "#a8452e", c: "#e8d9b0" },
         pic: ['.aaaaaa....', '.aaaaaa....', '.abcbca....', '.aaaaaa....', '.aaaaaa....', '.aaaaaa....', '.aaaaaa....', '.aaaaaaa...', '.aaaaaaaaa.', 'aaaaaaaaaaa', 'aaaaaaaaaaa', '.aaaaaaaaa.']
       },
       {
         id: "d042", title: "Письмо с сургучом", from: "Почтальон Тимофей",
-        text: "В архиве почты нашёлся конверт с той же птицей на сургуче. Адрес — ваш дом. А на обороте: «Открыть в вечер фонарей».",
+        text: "В архиве — конверт с птицей: «Открыть в вечер фонарей».",
         palette: { a: "#e8d9b0", b: "#c8a878", c: "#a8452e", d: "#3b2c22" },
         pic: ['aaaaaaaaaaaaaa', '.aaaaaaaaaaaa.', 'a.aaaaaaaaaa.a', 'aa.aaaaaaaa.aa', 'aaa.aaaaaa.aaa', 'aaaa.cccc.aaaa', 'aaaaccdcccaaaa', 'aaaaccccccaaaa', 'aaaaaccccaaaaa', 'bbbbbbbbbbbbbb']
       },
       {
         id: "d043", title: "Лапка", from: "Финик",
-        text: "Мрр. На крыльце иней. Я прошёлся. Теперь там мои следы, красиво. Птица на крыше смотрела. Я тоже смотрел. Финик.",
+        text: "Мрр. На крыльце иней и мои следы. Птица смотрела.",
         palette: { a: "#c98a4b", b: "#c27a6e" },
         pic: ['...aa..aa...', '..aaa..aaa..', '..aaa..aaa..', 'aa........aa', 'aaa......aaa', 'aaa..aa..aaa', '.a..bbbb..a.', '...bbbbbb...', '..bbbbbbbb..', '.bbbbbbbbbb.', '.bbbbbbbbbb.', '..bbb..bbb..']
       },
       {
         id: "d044", title: "Гирлянда фонариков", from: "Вера",
-        text: "Решили всем домом: вечер фонарей будет в первую субботу заморозков. Гирлянды развешаны, конверт ждёт на полке. Приходите и вы.",
+        text: "Вечер фонарей — в первую субботу заморозков. Приходите и вы!",
         palette: { a: "#3b2c22", b: "#8a5a3b", c: "#c8643c", d: "#d9a441" },
         pic: ['aaa........aaa', '..aaa....aaa..', '..b.aaaaaa.b..', '.bbb..b...bbb.', '.cdc.bbb..cdc.', '.cdc.cdc..cdc.', '.bbb.cdc..bbb.', '..b..cdc...b..', '.....bbb......', '......b.......']
       }
@@ -717,16 +749,8 @@ window.HOP_CONTENT = {
       object: 'r02_tea_set', stage: 1, title: "Блюдце", difficulty: 'normal',
       rows: ['.###.', '##.##', '#.#.#', '##.##', '.###.']
     },
-    r02_tea_set_03: {
-      object: 'r02_tea_set', stage: 3, title: "Чайник", difficulty: 'normal',
-      rows: ['...##...', '..####..', '..######', '#.####.#', '.#####.#', '..######', '..####..', '.######.']
-    },
-    r02_table_01: {
-      object: 'r02_table', stage: 2, title: "Ножка с завитком", difficulty: 'normal',
-      rows: ['#####', '.##..', '..#..', '..#.#', '...##']
-    },
     r02_table_02: {
-      object: 'r02_table', stage: 3, title: "Столешница", difficulty: 'normal',
+      object: 'r02_table', stage: 2, title: "Столешница", difficulty: 'normal',
       rows: ['.#####.', '#######', '.#...#.', '.#...#.', '.#...#.', '.#...#.', '##...##']
     },
     r02_table_03: {
@@ -737,10 +761,6 @@ window.HOP_CONTENT = {
       object: 'r02_armchair', stage: 1, title: "Ножки", difficulty: 'normal',
       rows: ['#####', '#####', '.#.#.', '#...#', '#...#']
     },
-    r02_armchair_02: {
-      object: 'r02_armchair', stage: 3, title: "Спинка", difficulty: 'normal',
-      rows: ['..###..', '.#...#.', '#.#.#.#', '#.....#', '#.#.#.#', '#.....#', '#######']
-    },
     r02_armchair_03: {
       object: 'r02_armchair', stage: 2, title: "Подушка", difficulty: 'normal',
       rows: ['#.....#', '#######', '.##.##.', '#######', '#.....#']
@@ -748,10 +768,6 @@ window.HOP_CONTENT = {
     r02_clock_01: {
       object: 'r02_clock', stage: 1, title: "Маятник", difficulty: 'normal',
       rows: ['#######', '#..#..#', '#..#..#', '#..#..#', '#.###.#', '#.###.#', '#######']
-    },
-    r02_clock_02: {
-      object: 'r02_clock', stage: 3, title: "Циферблат", difficulty: 'normal',
-      rows: ['..######..', '.##.##.##.', '##...#..##', '#....#...#', '##...#..##', '##.####.##', '#..#.....#', '##.......#', '###.##.###', '#.######.#']
     },
     r02_clock_03: {
       object: 'r02_clock', stage: 2, title: "Ключик", difficulty: 'normal',
@@ -765,20 +781,12 @@ window.HOP_CONTENT = {
       object: 'r02_window', stage: 2, title: "Подвязка", difficulty: 'easy',
       rows: ['.######.', '..####..', '##.##.##', '#.####.#', '##.##.##', '..#..#..', '.##..##.', '########']
     },
-    r02_window_03: {
-      object: 'r02_window', stage: 3, title: "Витражная птица", difficulty: 'normal',
-      rows: ['..#######.', '.##....##.', '#..###...#', '#.##.##.##', '...######.', '#..######.', '#.#.####.#', '#....#.#.#', '.#####.##.', '..######..']
-    },
-    r02_sideboard_01: {
-      object: 'r02_sideboard', stage: 2, title: "Дверца", difficulty: 'normal',
-      rows: ['##########', '#........#', '#.######.#', '#.#.##.#.#', '#.#.##.#.#', '#.######.#', '#.#.##.#.#', '#.#.##.#.#', '#.######.#', '##########']
-    },
     r02_sideboard_02: {
       object: 'r02_sideboard', stage: 1, title: "Ручка", difficulty: 'normal',
       rows: ['...##...', '..####..', '...##...', '.######.', '##....##', '#......#', '##....##', '.######.']
     },
     r02_sideboard_03: {
-      object: 'r02_sideboard', stage: 3, title: "Банка варенья", difficulty: 'normal',
+      object: 'r02_sideboard', stage: 2, title: "Банка варенья", difficulty: 'normal',
       rows: ['..######..', '.########.', '###.##.###', '..######..', '.########.', '##......##', '##.####.##', '##..##..##', '##......##', '.########.']
     },
     r02_photo_01: {
@@ -789,20 +797,12 @@ window.HOP_CONTENT = {
       object: 'r02_photo', stage: 2, title: "Домик", difficulty: 'easy',
       rows: ['....##.##.', '...######.', '..######..', '.########.', '##########', '.#......#.', '.#.##.#.#.', '.#.##.#.#.', '.#....#.#.', '##########']
     },
-    r02_photo_03: {
-      object: 'r02_photo', stage: 3, title: "Цветок", difficulty: 'normal',
-      rows: ['...####...', '..##..##..', '.##.##.##.', '.##.##.##.', '..##..##..', '...####...', '....##....', '###.##.###', '.##.##.##.', '..######..']
-    },
-    r02_musicbox_01: {
-      object: 'r02_musicbox', stage: 2, title: "Корпус", difficulty: 'normal',
-      rows: ['.########.', '##########', '##########', '#........#', '#.######.#', '#.#.##.#.#', '#.######.#', '#........#', '##########', '.##....##.']
-    },
     r02_musicbox_02: {
       object: 'r02_musicbox', stage: 1, title: "Гребёнка", difficulty: 'normal',
       rows: ['##########', '#.######.#', '##########', '#.#.#.#.#.', '#.#.#.#.#.', '#.#.#.#...', '#.#.#.#...', '#.#.#.....', '#.#.......', '#.........']
     },
     r02_musicbox_03: {
-      object: 'r02_musicbox', stage: 3, title: "Птичка", difficulty: 'normal',
+      object: 'r02_musicbox', stage: 2, title: "Птичка", difficulty: 'normal',
       rows: ['.....###..', '.....####.', '.....##.##', '#.#.####..', '#.######..', '.#######..', '.######...', '..####....', '..#.#.....', '##########']
     },
     r03_seed_table_01: {
@@ -909,6 +909,12 @@ window.HOP_CONTENT = {
   C.daily.letters.forEach(function (L) {
     C.puzzles[L.id] = {
       kind: 'daily', title: L.title, difficulty: 'daily', pic: L.pic, palette: L.palette,
+      rows: L.pic.map(function (r) { return r.replace(/[^.]/g, '#'); })
+    };
+  });
+  C.event.lanterns.forEach(function (L) {
+    C.puzzles[L.id] = {
+      kind: 'event', title: L.title, difficulty: 'daily', pic: L.pic, palette: L.palette,
       rows: L.pic.map(function (r) { return r.replace(/[^.]/g, '#'); })
     };
   });

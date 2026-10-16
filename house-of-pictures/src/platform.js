@@ -58,6 +58,32 @@ window.Platform = (function () {
     }).catch(function () { return false; });
   }
 
+  // Поделиться картинкой: в ВК — редактор истории; вне ВК — системное «Поделиться»
+  // с файлом, а где его нет — скачивание. → 'vk' | 'share' | 'download' | 'cancel'.
+  function download(dataUrl, name) {
+    var a = document.createElement('a');
+    a.href = dataUrl; a.download = name || 'picture.png';
+    document.body.appendChild(a); a.click(); a.remove();
+    return 'download';
+  }
+  function shareImage(dataUrl, name) {
+    if (inVk) {
+      return send('VKWebAppShowStoryBox', { background_type: 'image', blob: dataUrl }).then(function () { return 'vk'; }, function (e) {
+        var code = e && e.error_data && e.error_data.error_code;
+        return code === 4 ? 'cancel' : download(dataUrl, name);
+      });
+    }
+    try {
+      var bin = atob(dataUrl.split(',')[1]), arr = new Uint8Array(bin.length);
+      for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+      var file = new File([arr], name || 'picture.png', { type: 'image/png' });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        return navigator.share({ files: [file] }).then(function () { return 'share'; }, function () { return 'cancel'; });
+      }
+    } catch (e) { /* нет File или share — скачаем */ }
+    return Promise.resolve(download(dataUrl, name));
+  }
+
   // Закладка ВК и согласие на уведомления — только по нажатию игрока. → true при согласии.
   function ask(method) {
     return send(method).then(function (d) { return !!(d && d.result); }).catch(function () { return false; });
@@ -70,6 +96,7 @@ window.Platform = (function () {
     canAds: inVk,
     buy: buy,
     showRewarded: showRewarded,
+    shareImage: shareImage,
     addFavorite: function () { return ask('VKWebAppAddToFavorites'); },
     allowNotify: function () { return ask('VKWebAppAllowNotifications'); },
     // уже в избранном / уведомления уже разрешены (параметры запуска ВК)

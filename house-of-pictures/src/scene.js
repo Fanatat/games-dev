@@ -56,7 +56,8 @@ window.Scene = (function () {
     svg.setAttribute('class', 'sign');
     var c = document.createElementNS(SVGNS, 'circle');
     c.setAttribute('cx', '20'); c.setAttribute('cy', '20'); c.setAttribute('r', '18');
-    c.setAttribute('fill', 'none'); c.setAttribute('stroke', 'currentColor'); c.setAttribute('stroke-width', '2');
+    c.setAttribute('fill', '#fbefd9'); c.setAttribute('fill-opacity', '.7');
+    c.setAttribute('stroke', 'currentColor'); c.setAttribute('stroke-width', '3.4');
     var p = document.createElementNS(SVGNS, 'path');
     p.setAttribute('d', 'M9 23c3-1 5-4 7-7 1.5-2.3 4-3.5 6.4-2.6l3.8-1.6-1.6 3.4c1 2.6.4 5.7-1.7 7.6 2.5.3 5 1.4 7.1 3.2-4.8.4-8.6 0-11.6-1.3-2.9 1.3-6.2 1-9.4-.7z');
     p.setAttribute('fill', 'currentColor');
@@ -109,6 +110,8 @@ window.Scene = (function () {
     host.setAttribute('data-warm', String(warm));
     host.style.setProperty('--life', (solved / total).toFixed(3));
     host.style.setProperty('--warm', (warm / 3).toFixed(3));
+    // Прихожая начинает выцветшей (её «вау» — тепло), следующие комнаты — уже живые.
+    host.style.setProperty('--sat0', opts.before || rid === 'r01' ? '.3' : '.6');
     host.classList.toggle('is-warming', !!host._warmAt && Date.now() - host._warmAt < 2200);
     host.classList.toggle('is-complete', complete);
     host.classList.toggle('is-lit', !!restored.r01_lamp);
@@ -116,6 +119,8 @@ window.Scene = (function () {
 
     host.appendChild(el('img', 'scene-bg', { src: room.background, alt: '', draggable: 'false' }));
     host.appendChild(el('div', 'scene-warm'));
+    // Оранжерея: свет из сада сквозь стеклянную крышу — с первой минуты.
+    if (rid === 'r03' && !opts.before) host.appendChild(el('div', 'scene-sun'));
 
     var hall = rid === 'r01';
     if (hall) {
@@ -181,6 +186,11 @@ window.Scene = (function () {
         wrap.appendChild(coin);
         wrap.setAttribute('aria-label', o.title + ' — хватает на оформление');
       }
+      // Не найденный секрет готовой вещи — искорка: коснись, и он откроется.
+      if (inter && st === 'restored' && o.tap_secret && (S.secrets || []).indexOf(oid) === -1) {
+        wrap.appendChild(el('span', 'hs-secret'));
+        wrap.setAttribute('aria-label', o.title + ' — здесь секрет');
+      }
       if (pv) {
         wrap.classList.add('is-preview');
         wrap.appendChild(el('span', 'pv-label')).textContent = 'Пример';
@@ -207,6 +217,11 @@ window.Scene = (function () {
       var bird = el('img', 'spr spr-bird' + (restored.r01_flower ? ' is-shown' : '') + (opts.fresh === 'r01_flower' ? ' is-fresh' : ''), { src: ART + 'bird.webp', alt: '', draggable: 'false' });
       place(bird, L.bird);
       host.appendChild(bird);
+    } else if (L.bird && !opts.before) {
+      // Малиновка залетела из сада первой и ждёт у двери — тёплое пятно в пустой комнате.
+      var guest = el('img', 'spr spr-bird spr-guest is-shown', { src: ART + 'bird.webp', alt: '', draggable: 'false' });
+      place(guest, L.bird);
+      host.appendChild(guest);
     }
   }
 

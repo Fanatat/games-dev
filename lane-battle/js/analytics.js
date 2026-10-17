@@ -14,8 +14,8 @@
 //  (b) Яндекс Метрика (счётчик 113661732, 17.10.2026) — цели reachGoal
 //      по таблице METRIKA_GOALS ниже: общий набор студии (game_loaded,
 //      first_move, level_start, level_win, level_restart, level_quit,
-//      rewarded_click, rewarded_result, interstitial_shown, return_day) и
-//      свои цели игры (mission_lose, era_up, chapter_complete,
+//      rewarded_click, rewarded_result, interstitial_shown, return_day,
+//      level_lose) и свои цели игры (era_up, chapter_complete,
 //      tutorial_step, shop_open). Событие вне таблицы (crash_*, perf_*,
 //      boot-события) в Метрику не уходит — только в (a).
 //      Отправка включена ТОЛЬКО в собранной игре для ВК/Яндекса:
@@ -30,6 +30,10 @@
 //      лишние отбрасываются). Не загрузился (адблок, нет сети) — очередь
 //      молча пропадает, игра не замечает. Вебвизор и карта кликов выключены.
 //      Адрес хита — без query: в ВК там vk_user_id и подпись запуска.
+//      Прежнее правило «никаких запросов к сторонним доменам (автопроверка
+//      Яндекса)» Метрику не запрещает: mc.yandex.ru — сервис самого Яндекса,
+//      на Яндекс-сборке Метрика остаётся (решение 17.10.2026). Чужих
+//      счётчиков и сторонних трекеров по-прежнему нет.
 //  (c) CrazyGames — метрики воронки площадка собирает сама (gameplayStart/
 //      Stop уже вызываются, см. PLATFORM.setGameplayActive). Отсюда только
 //      штатные вызовы SDK.game: setGameContext/clearGameContext (контекст к
@@ -65,8 +69,8 @@ const METRIKA_GOALS = {
   ad_reward_fail: { goal: 'rewarded_result', map: (p) => ({ ok: false, screen: p && p.screen }) },
   interstitial_shown: { goal: 'interstitial_shown' },
   return_day: { goal: 'return_day' },
+  mission_lose: { goal: 'level_lose' },       // поражение в миссии
   // Свои цели «Двух крепостей»:
-  mission_lose: { goal: 'mission_lose' },     // поражение в миссии (у общего набора нет)
   era_up: { goal: 'era_up' },                 // игрок перешёл в новую эпоху в бою
   chapter_complete: { goal: 'chapter_complete' }, // победа в последней миссии главы
   tutorial_step: { goal: 'tutorial_step' },   // шаг обучения миссии 1 (воронка обучения)

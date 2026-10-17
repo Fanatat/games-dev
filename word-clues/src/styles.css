@@ -81,6 +81,7 @@ p { margin: 0; }
 .intro-art { aspect-ratio: 4 / 3; background: linear-gradient(160deg, #E7DDC5, #CFDCC9); }
 .intro-body { padding: 18px 20px 24px; display: flex; flex-direction: column; gap: 10px; }
 .intro-text { font-family: var(--font); font-size: var(--clue-fs); line-height: 1.45; margin-bottom: 8px; }
+.intro-foot { flex: none; padding: 8px 18px 10px; border-top: 1px solid var(--line); background: var(--bg); }
 
 /* ---------- поле ---------- */
 #scr-field { gap: 0; }
@@ -175,6 +176,14 @@ p { margin: 0; }
 .btn-hint .ico { color: var(--amber); display: inline-flex; }
 .badge { position: absolute; top: -4px; right: -4px; width: 14px; height: 14px; border-radius: 50%; background: var(--amber); border: 2px solid var(--surface); }
 .loupes { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); }
+/* капля лупы: 5 бонусных слов = лупа */
+.loupes .drop { display: inline-flex; gap: 2px; margin-left: 2px; }
+.loupes .drop i { width: 5px; height: 5px; border-radius: 50%; background: var(--line); }
+.loupes .drop i.on { background: var(--amber); }
+/* подталкивание: игра сама зовёт к подсказке */
+.btn-hint.nudge { border-color: var(--amber); animation: nudge 1.6s ease-in-out 4; }
+@keyframes nudge { 50% { box-shadow: 0 0 0 7px rgba(213, 156, 69, .35); transform: scale(1.05); } }
+body.rm .btn-hint.nudge { animation: none; box-shadow: 0 0 0 4px rgba(213, 156, 69, .45); }
 .btn-accept { margin-left: auto; min-height: var(--btn-h); display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px;
   border: 0; border-radius: 12px; background: var(--green); color: #fff; font-weight: 600; }
 .save-warn { flex: none; text-align: center; font-size: 13px; padding: 0 12px 6px; }
@@ -243,6 +252,13 @@ button.slot.got { background: var(--surface); }
 .hint-opt .sub { grid-column: 1 / -1; font-size: 13px; }
 .hint-opt:disabled { opacity: .6; }
 .hint-opt.explain:not(:disabled) { border-color: var(--green); background: #EEF3EC; }
+.sheet-x { position: absolute; top: 4px; right: 6px; width: 44px; height: 44px; border: 0; border-radius: 50%; background: none;
+  color: var(--muted); font-size: 26px; line-height: 1; }
+/* низкий экран (320×568): лист подсказки целиком в экране, подписи — только ярлыками (оценка №4, п. 5) */
+@media (max-height: 600px) {
+  .hint-opt, .hint-grid .hint-opt { min-height: 48px; }
+  .hint-opt .sub, .sheet .hint-note { display: none; }
+}
 .tag { font-size: 13px; font-weight: 600; color: var(--green-d); background: var(--surface); border-radius: 8px; padding: 3px 8px; white-space: nowrap; }
 .sw { flex: none; width: 46px; height: 28px; border-radius: 14px; background: var(--line); position: relative; transition: background .15s; }
 .sw::after { content: ""; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; transition: transform .15s; }
@@ -262,7 +278,8 @@ button.slot.got { background: var(--surface); }
   #scr-field .field-foot { grid-area: foot; padding-bottom: 6px; }
   #scr-field .save-warn { position: absolute; left: 0; bottom: 0; }
   .home-scroll, .result-scroll, .atlas-scroll, .intro-scroll,
-  #scr-atlas .field-head, .result-foot { max-width: 560px; margin: 0 auto; width: 100%; }
+  #scr-atlas .field-head, .result-foot, .intro-foot { max-width: 560px; margin: 0 auto; width: 100%; }
+  .intro-foot { padding: 6px 18px; }
   .result-foot { display: flex; align-items: center; gap: 8px; padding: 6px 18px; }
   .result-foot .btn-main { flex: 1; }
   .result-foot .link-row { flex-wrap: nowrap; }
@@ -487,7 +504,8 @@ body.rm .cell.hint-start { animation: none; }
 .intro-guess { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; padding: 10px 14px; margin-bottom: 8px; }
 .intro-guess.good { background: #E4EFE7; }
 .guess-opts { display: flex; gap: 8px; flex-wrap: wrap; }
-.guess-opts .btn-small { min-height: 44px; min-width: 96px; font-weight: 700; letter-spacing: .04em; }
+.guess-opts .btn-small { min-height: 44px; min-width: 96px; font-weight: 700; letter-spacing: .04em;
+  background: var(--surface); color: var(--green-d); border: 2px solid var(--green); box-shadow: none; }
 
 /* Вечернее поле (пометка evening): сумерки и тёплый свет фонарей */
 #scr-field.evening { background: linear-gradient(180deg, #3B3F5C 0%, #5A4A5E 38%, #7A5844 100%); --muted: #E6D9C2; }

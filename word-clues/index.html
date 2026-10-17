@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-<meta name="g1f-build" content="0.1.0+b013 · 99e3f47">
+<meta name="g1f-build" content="0.1.0+b014 · d689979">
 <meta name="g1f-telemetry" content="">
 <meta name="theme-color" content="#F5EEDD">
 <title>Слова по уликам</title>
-<link rel="stylesheet" href="src/styles.css?v=c5c913230f">
+<link rel="stylesheet" href="src/styles.css?v=f6c0d0d000">
 </head>
 <body>
 <div id="app">
@@ -68,10 +68,11 @@
         <p class="intro-text" id="intro-text"></p>
         <p class="intro-new" id="intro-new" hidden></p>
         <div class="intro-guess card soft" id="intro-guess" hidden></div>
-        <button class="btn-main" id="btn-intro-go">Искать улики</button>
         <button class="btn-link" id="btn-intro-home">На главную</button>
       </div>
     </div>
+    <!-- главная кнопка всегда у нижнего края, как на итоге (оценка №4, п. 5: на 1366×768 она уходила под край) -->
+    <div class="intro-foot"><button class="btn-main" id="btn-intro-go">Искать улики</button></div>
   </section>
 
   <!-- Поле -->
@@ -248,9 +249,9 @@
 <script src="vendor/vk-bridge.min.js?v=827ba6f457"></script>
 <script src="src/platform.js?v=367d30015c"></script>
 <script src="src/analytics.js?v=839724c152"></script>
-<script src="src/state.js?v=ae967f025d"></script>
+<script src="src/state.js?v=38b059f574"></script>
 <script src="src/sound.js?v=a77c31e1d3"></script>
 <script src="src/board.js?v=6de0a67091"></script>
-<script src="src/app.js?v=5dee154a0e"></script>
+<script src="src/app.js?v=6b6af6e291"></script>
 </body>
 </html>

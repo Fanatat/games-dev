@@ -20,7 +20,11 @@
   var PARCELS = { 4: { loupes: 1, stamps: 40 }, 12: { loupes: 1, stamps: 40 } }; // посылка хранителей: 5-я и 13-я истории
   var FINALE = { loupes: 2, stamps: 100 };         // финал главы (ТЗ §6.2)
   var CACHE_REWARD = { loupes: 1, stamps: 15 };
-  var LANTERN_COST = 30;
+  /* Фонарь дорожает ступенькой (план эксперта №4, круг 1): 30, 35, 40… — марки всегда есть куда деть,
+     а 8 фонарей за первые полчаса остаются по силам. */
+  var LANTERN_COST = 30, LANTERN_STEP = 5;
+  var BONUS_DROP = 5;                              // каждые 5 бонусных слов — лупа (капля у значка лупы)
+  var EXPLAIN_BROKE_MS = 45000;                    // без луп «Разобрать вместе» открывается раньше
   var TRIO = 3;                                    // каждые 3 истории — общий секрет маршрута (ТЗ §6.2)
   // Звания каждые ~40–100 опыта, 12 штук (ТЗ §8.3); за звание — марки, не лупы.
   var RANKS = [
@@ -30,13 +34,14 @@
     { xp: 410, name: 'Почётный следопыт' }, { xp: 500, name: 'Голос Тихоречья' }, { xp: 600, name: 'Легенда маршрута' },
   ];
   var RANK_STAMPS = 10;
-  // Оформление атласа: бумага по умолчанию; после 3-й истории — одна из двух обложек бесплатно,
-  // вторая за 50; рамки — за 150 / 300 / 600 марок (ТЗ §8.2).
+  // Оформление атласа: бумага по умолчанию; после 3-й истории — одна из двух обложек бесплатно
+  // (не выбрал — на 4-й истории «Река» надевается сама), вторая за 50 марок.
+  // Рамки выдаются сами за горящие фонари: 3 / 6 / 10 (план эксперта №4, круг 1: марки → фонари → рамка).
   var COVERS = [
     { id: 'paper', cost: 0 }, { id: 'river', cost: 0, pick: true }, { id: 'garden', cost: 0, pick: true },
-    { id: 'copper', cost: 150 }, { id: 'silver', cost: 300 }, { id: 'gold', cost: 600 },
+    { id: 'copper', cost: 0, lamps: 3 }, { id: 'silver', cost: 0, lamps: 6 }, { id: 'gold', cost: 0, lamps: 10 },
   ];
-  var PICK_AFTER = 3, SECOND_PICK_COST = 50;
+  var PICK_AFTER = 3, SECOND_PICK_COST = 50, AUTO_COVER = 'river';
   /* Дневник маршрута (план эксперта b009, круг 2): первая разгаданная история дня ставит штамп,
      пять штампов — страница. Пропуск дня ничего не отнимает: штампы не сгорают. */
   var DIARY = [{ stamps: 20 }, { loupes: 1 }, { stamps: 30 }, { loupes: 1 }, { cover: 'copper', stamps: 50 }];
@@ -65,7 +70,7 @@
       current: null,
       completed_story_ids: [], atlas_item_ids: [], seen_result_ids: [],
       wallet: { stamps: 0, loupes: START_LOUPES }, xp: 0,
-      seed: seedOf(), bonus_total: 0, golden: 0, lanterns: [], secret: {}, guesses: {}, caches: [], parcels: [],
+      seed: seedOf(), bonus_total: 0, bonus_drop: 0, golden: 0, lanterns: [], secret: {}, guesses: {}, caches: [], parcels: [],
       cover: 'paper', covers: ['paper'], seen_new: [], finale: false, finales: [],
       diary: [], diary_pages: 0, last_day: null, visits: 0,
       free_demo: { start: true, path: true },
@@ -114,6 +119,8 @@
       if (d.current && d.current.content_version !== content.content_version) d.current = null;
       if (d.current && !d.current.bonus) d.current.bonus = [];
       if (d.finale && d.finales.indexOf(1) < 0) d.finales.push(1);
+      // рамки теперь за фонари: старым сохранениям выдаём заработанные
+      COVERS.forEach(function (c) { if (c.lamps && d.lanterns.length >= c.lamps && d.covers.indexOf(c.id) < 0) d.covers.push(c.id); });
       return d;
     }
     // Вторая копия (облако ВК): берём её, только если она новее локальной.
@@ -258,8 +265,11 @@
       data.bonus_total++;
       var got = c.bonus.length > BONUS_FULL ? 1 : BONUS_STAMPS;
       data.wallet.stamps += got;
+      data.bonus_drop = (data.bonus_drop || 0) + 1;
+      var loupe = data.bonus_drop >= BONUS_DROP;
+      if (loupe) { data.bonus_drop = 0; data.wallet.loupes++; }
       writeNow();
-      return { ok: true, repeat: false, count: c.bonus.length, stamps: got };
+      return { ok: true, repeat: false, count: c.bonus.length, stamps: got, loupe: loupe, drop: data.bonus_drop };
     }
     // Тайник: слово без улики. Награда один раз на историю.
     function cacheFound() {
@@ -274,15 +284,28 @@
     function cacheDone(id) { return data.caches.indexOf(id) >= 0; }
 
     // Фонари Тихоречья: за марки зажигается фонарь у пройденного места (видно на картинке городка).
+    function lanternCost() { return LANTERN_COST + LANTERN_STEP * data.lanterns.length; }
     function canLight(id) {
-      return data.completed_story_ids.indexOf(id) >= 0 && data.lanterns.indexOf(id) < 0 && data.wallet.stamps >= LANTERN_COST;
+      return data.completed_story_ids.indexOf(id) >= 0 && data.lanterns.indexOf(id) < 0 && data.wallet.stamps >= lanternCost();
     }
+    // Зажечь фонарь. Возвращает {cost, frame}: frame — рамка атласа, которую фонарь только что принёс (и сразу надел).
     function light(id) {
       if (!canLight(id)) return null;
-      data.wallet.stamps -= LANTERN_COST;
+      var cost = lanternCost();
+      data.wallet.stamps -= cost;
       data.lanterns.push(id);
+      var frame = null;
+      COVERS.forEach(function (c) {
+        if (c.lamps && data.lanterns.length >= c.lamps && data.covers.indexOf(c.id) < 0) { data.covers.push(c.id); frame = c.id; }
+      });
+      if (frame) data.cover = frame;
       writeNow();
-      return { cost: LANTERN_COST };
+      return { cost: cost, frame: frame };
+    }
+    // Ближайшая рамка за фонари: {id, lamps, have} или null, если все получены.
+    function nextFrame() {
+      var c = COVERS.filter(function (x) { return x.lamps && data.covers.indexOf(x.id) < 0; })[0];
+      return c ? { id: c.id, lamps: c.lamps, have: data.lanterns.length } : null;
     }
     function rank() {
       var k = rankOf(data.xp), nx = RANKS[k + 1] || null;
@@ -301,6 +324,7 @@
       var open = data.completed_story_ids.length >= PICK_AFTER;
       return COVERS.map(function (c) {
         var own = data.covers.indexOf(c.id) >= 0, price = coverPrice(c.id);
+        if (c.lamps) return { id: c.id, own: own, on: data.cover === c.id, price: 0, lamps: c.lamps, locked: !own, can: own };
         return { id: c.id, own: own, on: data.cover === c.id, price: own ? 0 : price, locked: !own && !open,
           can: own || (open && data.wallet.stamps >= price) };
       });
@@ -328,7 +352,7 @@
       if (!s || foundCount() !== s.clues.length) return null;
       var first = data.completed_story_ids.indexOf(s.id) < 0;
       var reward = { stamps: 0, xp: 0, item: null, first: first, loupes: 0, no_hints: false, golden: false,
-        parcel: null, rank: null, trio: 0, finale: null, diary: null, bonus: data.current.bonus.length };
+        parcel: null, rank: null, trio: 0, cover: null, finale: null, diary: null, bonus: data.current.bonus.length };
       if (first) {
         data.completed_story_ids.push(s.id);
         var h = data.current.hints, used = false;
@@ -351,6 +375,12 @@
           if (s.chapter === 1) data.finale = true;
           reward.finale = { loupes: FINALE.loupes, stamps: FINALE.stamps };
           reward.loupes += FINALE.loupes; reward.stamps += FINALE.stamps;
+        }
+        // обложку так и не выбрали — после 4-й истории она надевается сама
+        if (data.completed_story_ids.length > PICK_AFTER && !pickedFree()) {
+          data.covers.push(AUTO_COVER);
+          if (data.cover === 'paper') data.cover = AUTO_COVER;
+          reward.cover = AUTO_COVER;
         }
         if (data.completed_story_ids.length % TRIO === 0) reward.trio = data.completed_story_ids.length / TRIO;
         var dy = diaryStamp();
@@ -429,7 +459,8 @@
     function explainAfter(clueId) {
       var s = curStory();
       var c = s && s.clues.filter(function (x) { return x.id === clueId; })[0];
-      return (c && c.explain_ms) || 90000;
+      var ms = (c && c.explain_ms) || 90000;
+      return data.wallet.loupes > 0 ? ms : Math.min(ms, EXPLAIN_BROKE_MS);
     }
 
     function activeMs(clueId) { return (data.current && data.current.active_ms_by_clue[clueId]) || 0; }
@@ -450,7 +481,7 @@
 
     load();
     return {
-      KEY: KEY, COST: COST, RANKS: RANKS, LANTERN_COST: LANTERN_COST, BONUS_STAMPS: BONUS_STAMPS, BONUS_FULL: BONUS_FULL, FINALE: FINALE, DIARY: DIARY,
+      KEY: KEY, COST: COST, RANKS: RANKS, LANTERN_COST: LANTERN_COST, LANTERN_STEP: LANTERN_STEP, BONUS_DROP: BONUS_DROP, BONUS_STAMPS: BONUS_STAMPS, BONUS_FULL: BONUS_FULL, FINALE: FINALE, DIARY: DIARY,
       chapters: chapters, chapter: chapter, chapterStories: chapterStories, isChapterEnd: isChapterEnd, chapterFull: chapterFull,
       chapterGot: chapterGot, diary: diary, visit: visit, dayKey: function () { return dayKey(now()); },
       get data() { return data; }, get saveOk() { return saveOk; },
@@ -462,7 +493,7 @@
       activeMs: activeMs, addActive: addActive, setSetting: setSetting, markOpened: markOpened, markTraced: markTraced,
       markResultSeen: markResultSeen, reset: reset, flush: flush, save: writeNow, adopt: adopt,
       bonusWord: bonusWord, cacheFound: cacheFound, cacheDone: cacheDone,
-      canLight: canLight, light: light, rank: rank, secretOf: secretOf, canGuess: canGuess, guess: guess, GUESS: GUESS,
+      canLight: canLight, light: light, lanternCost: lanternCost, nextFrame: nextFrame, rank: rank, secretOf: secretOf, canGuess: canGuess, guess: guess, GUESS: GUESS,
       covers: covers, canPickCover: canPickCover, setCover: setCover, markNew: markNew, seenNew: seenNew, trioCount: trioCount,
     };
   }

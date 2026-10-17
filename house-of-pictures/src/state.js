@@ -65,7 +65,7 @@
       rng: seedRng(),
       hints: {},
       glows: [],
-      room_choice_pending: null,
+      room_gifts: [],
       play_s: 0,
       secrets: [],
       event_start: null,
@@ -86,7 +86,7 @@
     var base = emptyState();
     if (!isObj(s.settings)) s.settings = base.settings;
     ['completed_puzzles', 'applied_stages', 'completed_rooms', 'seen_variant_choice', 'visits', 'log',
-      'owned_variants', 'owned_skus', 'granted', 'orders', 'glows', 'secrets']
+      'owned_variants', 'owned_skus', 'granted', 'orders', 'glows', 'secrets', 'room_gifts']
       .forEach(function (key) { if (!Array.isArray(s[key])) s[key] = []; });
     ['object_variants', 'drafts', 'story_flags', 'hints'].forEach(function (key) { if (!isObj(s[key])) s[key] = {}; });
     ['stamps', 'daily', 'ads'].forEach(function (key) { if (!isObj(s[key])) s[key] = base[key]; });
@@ -98,7 +98,10 @@
     if (typeof s.current_room !== 'string') s.current_room = 'r01';
     if (typeof s.rng !== 'number' || !isFinite(s.rng)) s.rng = seedRng();
     s.rng = s.rng >>> 0;
-    if (typeof s.room_choice_pending !== 'string') s.room_choice_pending = null;
+    // Невзятый подарок за комнату был один и затирался следующей комнатой — теперь очередь.
+    if (typeof s.room_choice_pending === 'string') add(s.room_gifts, s.room_choice_pending);
+    delete s.room_choice_pending;
+    s.room_gifts = s.room_gifts.filter(function (rid) { return typeof rid === 'string'; });
     s.play_s = Math.max(0, Math.round(+s.play_s || 0));
     if (typeof s.event_start !== 'string') s.event_start = null;
     s.schema_version = SCHEMA_VERSION;
@@ -118,11 +121,16 @@
       if (has(s.completed_rooms, rid) || !isRoomUnlocked(C, s, rid) || !isRoomComplete(C, s, rid)) return;
       add(s.completed_rooms, rid);
       grant(s, 'r:' + rid, E.room_reward.coins, E.room_reward.pencils);
-      if (E.room_choice && !has(s.granted, 'rc:' + rid)) s.room_choice_pending = rid;
+      if (E.room_choice && !has(s.granted, 'rc:' + rid)) add(s.room_gifts, rid);
       if (rid === C.daily.after_room && !s.daily.start) s.daily.start = day;
       if (C.event && rid === C.event.after_room) startEvent(C, s, day);
       logEvent(s, 'room_healed', { room_id: rid });
     });
+    // Подарок готовой комнаты, затёртый следующей комнатой (до 007), снова ждёт.
+    if (E.room_choice) s.completed_rooms.forEach(function (rid) {
+      if (C.rooms[rid] && !has(s.granted, 'rc:' + rid)) add(s.room_gifts, rid);
+    });
+    s.room_gifts = s.room_gifts.filter(function (rid) { return C.rooms[rid] && !has(s.granted, 'rc:' + rid); });
   }
 
   // Награды за то, что игрок сделал до появления экономики (v1 → v2).
@@ -387,11 +395,20 @@
     return [{ coins: R.coins }, { pencils: R.pencils }, third];
   }
 
+  // Первая невзятая награда за комнату (комнаты — в порядке готовности).
+  function pendingGift(C, s) {
+    for (var i = 0; i < s.room_gifts.length; i++) {
+      var rid = s.room_gifts[i];
+      if (C.rooms[rid] && isRoomComplete(C, s, rid) && !has(s.granted, 'rc:' + rid)) return rid;
+    }
+    return null;
+  }
+
   function pickRoomReward(C, s, rid, i) {
-    if (s.room_choice_pending !== rid) return null;
+    if (!has(s.room_gifts, rid)) return null;
     var opt = roomChoices(C, s, rid)[i];
     if (!opt) return null;
-    s.room_choice_pending = null;
+    s.room_gifts = s.room_gifts.filter(function (r) { return r !== rid; });
     var key = 'rc:' + rid;
     if (has(s.granted, key)) { touch(s); return null; }
     s.granted.push(key);
@@ -488,7 +505,7 @@
       chest = openChest(C, s, oid);
     }
     if (roomDone) rewards = rewards.concat(grant(s, 'r:' + rid, E.room_reward.coins, E.room_reward.pencils));
-    if (roomDone && E.room_choice && !has(s.granted, 'rc:' + rid)) s.room_choice_pending = rid;
+    if (roomDone && E.room_choice && !has(s.granted, 'rc:' + rid)) add(s.room_gifts, rid);
     if (roomDone && rid === C.daily.after_room && !s.daily.start) s.daily.start = day;
     if (roomDone && C.event && rid === C.event.after_room) startEvent(C, s, day);
     addStamp(C, s, day, rewards);
@@ -504,7 +521,7 @@
     touch(s);
     return { duplicate: false, object_done: objectDone, room_done: roomDone, object_id: oid, room_id: rid,
       stage: oid ? objectStage(C, s, oid) : 0, rewards: rewards, chest: chest,
-      room_choice: s.room_choice_pending === rid && roomDone, event_done: eventDone };
+      room_choice: roomDone && has(s.room_gifts, rid), event_done: eventDone };
   }
 
   function chooseVariant(C, s, oid, vid) {
@@ -902,7 +919,7 @@
     findVariant: findVariant, isVariantOwned: isVariantOwned,
     rand: rand, puzzleCoins: puzzleCoins, fieldCoins: fieldCoins, collectFieldCoins: collectFieldCoins,
     freeHintsLeft: freeHintsLeft, useFreeHint: useFreeHint, openChest: openChest,
-    roomChoices: roomChoices, pickRoomReward: pickRoomReward, affordableVariant: affordableVariant,
+    roomChoices: roomChoices, pickRoomReward: pickRoomReward, pendingGift: pendingGift, affordableVariant: affordableVariant,
     saveDraft: saveDraft, completePuzzle: completePuzzle, chooseVariant: chooseVariant,
     closeVariantChoice: closeVariantChoice, buyVariant: buyVariant, buyPencil: buyPencil, usePencil: usePencil,
     canOfferSku: canOfferSku, applyOrder: applyOrder, adsLeft: adsLeft, rewardedGrant: rewardedGrant,

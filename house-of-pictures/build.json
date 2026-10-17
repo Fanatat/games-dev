@@ -1,14 +1,14 @@
 {
  "game": "house-of-pictures",
- "build_number": "006",
- "app_build": "0.1.0+b006",
+ "build_number": "007",
+ "app_build": "0.1.0+b007",
  "git_branch": "worktree-release-polish",
- "git_sha": "bc2581a",
+ "git_sha": "5dc9f28",
  "dirty": false,
  "content_version": 3,
  "api": "https://api.vanatat.ru/hop",
- "built_at": "2026-10-16T21:35:19+00:00",
- "total_bytes": 4806325,
+ "built_at": "2026-10-17T02:06:58+00:00",
+ "total_bytes": 4823000,
  "files": [
   {
    "path": "assets/art/armchair_a.webp",
@@ -692,18 +692,18 @@
   },
   {
    "path": "data/content.js",
-   "bytes": 58128,
-   "sha256": "0adf3b3c506e6e313bbff9f97ae75f183c66f47781108957f7821e5201b33cc8"
+   "bytes": 58258,
+   "sha256": "09ece87551fd737c845a93920120c25ffe37dd2fa69c9cc5f0a57076caeb7d17"
   },
   {
    "path": "index.html",
    "bytes": 12356,
-   "sha256": "f776745ea64f85ac359960466e9c97e47c09af10c146b627e2e010ba5cdbbe03"
+   "sha256": "833c37104e65e8512fa57385792381449b858c69d64cafccf48bcde63fd4c7f1"
   },
   {
    "path": "src/app.js",
-   "bytes": 118805,
-   "sha256": "35ef4002aea6c5ebca0eb39dd68d738ca8eeae65598edf1b2eeb8474022ec69d"
+   "bytes": 128926,
+   "sha256": "86058086b28a85468e1ae754588b732f030c841e8db60abb5f1f5477c82d546a"
   },
   {
    "path": "src/cloud.js",
@@ -727,8 +727,8 @@
   },
   {
    "path": "src/scene.js",
-   "bytes": 15616,
-   "sha256": "9b3202d4ede15c8532db9a96f9cad5bde306d1a9e12308717ce7a36469f7500e"
+   "bytes": 16299,
+   "sha256": "10d36f5b6f5e6652d7441d1c62a2b1da55a865c1b59427ecce58ea10de633764"
   },
   {
    "path": "src/sound.js",
@@ -737,13 +737,13 @@
   },
   {
    "path": "src/state.js",
-   "bytes": 43346,
-   "sha256": "35c682da8e8d4c344ea7d653fb175f80717c0f5bdd25d85547c113e8f058003d"
+   "bytes": 44476,
+   "sha256": "b98b4532313a79413bcfad91860ec7ac8ff711a6f299b56b323f3abbad4e5428"
   },
   {
    "path": "src/styles.css",
-   "bytes": 72417,
-   "sha256": "3ab1cb449b9fa58ed5841acd4ad33f08357a88ed525cd7f9296f69a58dedaba4"
+   "bytes": 77028,
+   "sha256": "f03cc67954d4591c79c6ac907698820069d7fca9d70446012800df8ea6e08e44"
   },
   {
    "path": "src/track.js",

@@ -390,11 +390,12 @@ window.HOP_CONTENT = {
     tutorial_pencils: 3,
     pencil_price: 100,
     rewarded: { coins: 40, pencils: 1, per_day: 3, after_room: 'r01' },
-    // Подарок вернувшемуся растёт с паузой: день — монеты, три — монеты и
-    // карандаши, неделя — вещь для дома (нет такой — монеты).
+    // Подарок вернувшемуся растёт с паузой и не монетами (их и так тысячи):
+    // день — карандаши, три дня — вещь для дома и карандаши, неделя — вещь и
+    // больше карандашей. Монеты — только если вещи для дома нет.
     comeback: { tiers: [
-      { after_days: 1, coins: 30 },
-      { after_days: 3, coins: 60, pencils: 2 },
+      { after_days: 1, pencils: 2 },
+      { after_days: 3, variant: true, coins: 60, pencils: 2 },
       { after_days: 7, variant: true, coins: 150, pencils: 3 }
     ] },
     // Наборы за голоса — не раньше 10 минут игры и готовой прихожей.
@@ -434,7 +435,7 @@ window.HOP_CONTENT = {
      открыто open_first фонариков, дальше по одному в день; все зажжённые — награда. */
   event: {
     id: 'lanterns', title: 'Вечер фонариков', after_room: 'r01', days: 7, open_first: 2,
-    text: 'Зажгите пять фонарей — и вечер вернётся.',
+    text: 'Зажги пять фонарей — и вечер вернётся.',
     reward: { coins: 200, pencils: 2 },
     lanterns: [
       { id: "e_l1", title: "Медный фонарь", palette: { a: "#3b2c22", b: "#c8643c", c: "#f2c55a" },
@@ -518,7 +519,7 @@ window.HOP_CONTENT = {
       },
       {
         id: "d011", title: "Сова", from: "Птица с печатью",
-        text: "Сова видела их всех. Спросите у сарая.",
+        text: "Сова видела их всех. Спроси у сарая.",
         palette: { a: "#8a5a3b", b: "#d9a441", c: "#3b2c22", d: "#c8643c", e: "#c79a6a" },
         pic: ['a........a', 'aa......aa', '.aaaaaaaa.', 'abbaaaabba', 'abcbaabcba', 'abbaddabba', 'aaaaddaaaa', 'aaeeeeeeaa', '.aeeeeeea.', '..aaaaaa..', '...d..d...']
       },
@@ -590,13 +591,13 @@ window.HOP_CONTENT = {
       },
       {
         id: "d023", title: "Почтовый ящик", from: "Почтальон Тимофей",
-        text: "Разнёс письма по списку. Мельник Коля помнит ваш вечер.",
+        text: "Разнёс письма по списку. Мельник Коля помнит тот вечер.",
         palette: { a: "#5f7d8c", b: "#8a5a3b", c: "#d9a441", d: "#e8d9b0" },
         pic: ['..aaaaaa..', '.aaaaaaaa.', 'aaaaaaaaaa', 'a.dddddd.a', 'aaaaaaaaaa', 'aaaacaaaaa', 'aaaaaaaaaa', '....bb....', '....bb....', '..bbbbbb..']
       },
       {
         id: "d024", title: "Колосок", from: "Дядя Коля",
-        text: "Отец возил на ваш вечер муку. Привезу и я.",
+        text: "Отец возил на вечер фонарей муку. Привезу и я.",
         palette: { a: "#c79a3a", b: "#9aa77c" },
         pic: ['....a....', '..a.a.a..', '.aa.a.aa.', '..aaaaa..', '.aa.a.aa.', '..aaaaa..', '.aa.a.aa.', '..aaaaa..', '....b....', '....b.bb.', '....bbb..', '....b....']
       },
@@ -644,7 +645,7 @@ window.HOP_CONTENT = {
       },
       {
         id: "d032", title: "Месяц", from: "Птица с печатью",
-        text: "Спросите клён у калитки, чью руку он помнит.",
+        text: "Спроси клён у калитки, чью руку он помнит.",
         palette: { a: "#d9a441", b: "#e8d9b0" },
         pic: ['...aaaa....', '.aaaa......', '.aaa.......', 'aaa......b.', 'aaa.....bbb', 'aaa......b.', 'aaa........', '.aaa.......', '.aaaaa.....', '..aaaaaaaa.', '....aaaaa..']
       },
@@ -686,7 +687,7 @@ window.HOP_CONTENT = {
       },
       {
         id: "d039", title: "Колокольчик", from: "Птица с печатью",
-        text: "Когда в сарае звякнет колокольчик, откройте третий ящик.",
+        text: "Когда в сарае звякнет колокольчик, открой третий ящик.",
         palette: { a: "#c79a3a", b: "#a8452e", c: "#3b2c22", d: "#8a5a3b" },
         pic: ['..bbb.bbb..', '....bbb....', '....aaa....', '...aaaaa...', '...aaaaa...', '..aaaaaaa..', '..aacaaaa..', '..aaaaaaa..', '.aaaaaaaaa.', 'aaaaaaaaaaa', '.....d.....', '....ddd....']
       },
@@ -716,7 +717,7 @@ window.HOP_CONTENT = {
       },
       {
         id: "d044", title: "Гирлянда фонариков", from: "Вера",
-        text: "Вечер фонарей — в первую субботу заморозков. Приходите и вы!",
+        text: "Вечер фонарей — в первую субботу заморозков. Приходи и ты!",
         palette: { a: "#3b2c22", b: "#8a5a3b", c: "#c8643c", d: "#d9a441" },
         pic: ['aaa........aaa', '..aaa....aaa..', '..b.aaaaaa.b..', '.bbb..b...bbb.', '.cdc.bbb..cdc.', '.cdc.cdc..cdc.', '.bbb.cdc..bbb.', '..b..cdc...b..', '.....bbb......', '......b.......']
       }
@@ -735,7 +736,7 @@ window.HOP_CONTENT = {
     },
     r01_rug_01: {
       object: 'r01_rug', stage: 1, title: 'Коврик с ромбом', difficulty: 'easy',
-      rows: ['#######', '#..#..#', '#.###.#', '###.###', '#.###.#', '#..#..#', '#######']
+      rows: ['######', '##..##', '#.##.#', '#.##.#', '##..##', '######']
     },
     r01_flower_01: {
       object: 'r01_flower', stage: 1, title: 'Цветок в горшке', difficulty: 'normal',

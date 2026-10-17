@@ -817,6 +817,14 @@ button.obj::after, button.spr-letter::after {
 .scene-chip.is-new { background: var(--accent); }
 .scene-chip.is-new .chip-badge { background: var(--terra); color: #fff; }
 .scene-chip.is-new img, .scene-chip.is-new .ico { animation: letter-hop 1.6s ease-in-out infinite; }
+/* 320 px: рядом два значка — домик в плашке убираем, чтобы название комнаты читалось целиком. */
+@media (max-width: 360px) {
+  .room-pill { gap: 4px; padding: 0 9px 0 11px; font-size: 14px; }
+  .room-pill > .ico { display: none; }
+  .scene-chips { gap: 7px; }
+  /* сундучок подарка вытесняет значок письма, пока подарок не взят: третьему значку места нет */
+  .scene-chips .chip-gift ~ .chip-mail { display: none; }
+}
 
 .scene-garland { position: absolute; left: 0; right: 0; top: 0; height: 9%; z-index: 2; pointer-events: none; }
 .scene-garland svg { position: absolute; inset: 0; width: 100%; height: 100%; }
@@ -828,13 +836,18 @@ button.obj::after, button.spr-letter::after {
 .garland-bulb.is-on { background: var(--c); box-shadow: 0 0 10px 3px var(--c); animation: bulb 2.4s ease-in-out var(--d) infinite; }
 @keyframes bulb { 0%, 100% { opacity: 1; } 50% { opacity: .6; } }
 
-/* не найденный секрет готовой вещи */
-.hs-secret {
-  position: absolute; left: -2px; top: -2px; width: 20px; height: 20px; border-radius: 50%;
-  background: radial-gradient(circle, #fffbe8 0 28%, var(--accent) 30% 100%);
-  box-shadow: 0 0 0 2px rgba(255, 255, 255, .7), 0 0 10px rgba(233, 185, 73, .9);
-  animation: badge 2.2s ease-in-out infinite; pointer-events: none;
+/* секрет не подписан: вставшая вещь один раз блестит (≈1,8 с) */
+.hint-spark {
+  position: absolute; width: 9px; height: 9px; pointer-events: none;
+  background: #fffbe8; border-radius: 2px; transform: rotate(45deg) scale(0); opacity: 0;
+  box-shadow: 0 0 8px 2px rgba(255, 220, 130, .95);
+  animation: hint-spark .7s ease-out .7s 1 both;
 }
+.hint-spark:nth-of-type(1) { left: 18%; top: 14%; }
+.hint-spark:nth-of-type(2) { right: 14%; top: 40%; animation-delay: .95s; }
+.hint-spark:nth-of-type(3) { left: 50%; top: 0; animation-delay: 1.2s; }
+@keyframes hint-spark { 0% { transform: rotate(45deg) scale(0); opacity: 0; } 45% { transform: rotate(45deg) scale(1.15); opacity: 1; } 100% { transform: rotate(45deg) scale(0); opacity: 0; } }
+html.rm .hint-spark { display: none; }
 .secret-found { display: flex; flex-direction: column; gap: 6px; }
 .secret-n {
   align-self: flex-start; padding: 2px 10px; border-radius: 10px;
@@ -884,6 +897,33 @@ button.obj::after, button.spr-letter::after {
 }
 
 .card-daily { display: flex; align-items: center; gap: 12px; }
+.card-daily .daily-env { position: relative; }
+.daily-env .tm-gift { position: absolute; right: -6px; bottom: -4px; width: 30px; height: 30px; object-fit: contain; filter: drop-shadow(0 2px 3px rgba(59, 44, 34, .3)); }
+.tm-title { display: flex; align-items: center; gap: 10px; }
+
+/* «Завтра» на доме: письмо, подарок штампа и часы до него */
+.panel-head { display: flex; align-items: center; justify-content: center; gap: 8px; min-width: 0; }
+.panel-head.has-tomorrow { justify-content: space-between; }
+.panel-head.has-tomorrow .panel-title { text-align: left; min-width: 0; }
+.tomorrow {
+  flex: none; display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 4px 12px 4px 8px;
+  border: 0; border-radius: 22px; cursor: pointer; font: inherit; color: var(--ink);
+  background: #fff3d6; box-shadow: 0 0 0 2px var(--accent) inset, var(--shadow);
+}
+.tomorrow .tm-pic { width: 32px; height: 32px; object-fit: contain; display: block; }
+.tomorrow .tm-gift { width: 26px; height: 26px; margin-left: -12px; margin-top: 12px; }
+.tm-word { font-size: 16px; font-weight: 900; }
+.tm-hrs { display: inline-flex; align-items: center; gap: 3px; font-size: 15px; font-weight: 900; color: var(--terra-d, var(--terra)); white-space: nowrap; }
+.tm-hrs .ico { width: 16px; height: 16px; }
+.row-actions .tomorrow { min-height: 52px; }
+@media (max-width: 380px) {
+  .tomorrow { padding: 4px 10px 4px 6px; gap: 4px; }
+  .tomorrow .tm-word { display: none; }
+}
+.card-lantern { background: linear-gradient(180deg, #fff3d6, var(--card)); }
+.thumb-lantern { display: flex; align-items: center; justify-content: center; }
+.thumb-lantern .ico { width: 34px; height: 34px; color: var(--terra); animation: letter-hop 1.6s ease-in-out infinite; }
+html.rm .thumb-lantern .ico { animation: none; }
 .daily-env { flex: none; width: 58px; height: 58px; display: flex; align-items: center; justify-content: center; }
 .daily-env img { width: 100%; display: block; }
 .daily-env.is-new img { animation: letter-hop 1.6s ease-in-out infinite; }
@@ -935,7 +975,12 @@ button.obj::after, button.spr-letter::after {
 .card-today .note { align-self: stretch; text-align: left; }
 .envelope-today { width: min(56%, 200px); }
 .note .card-sign { margin-top: 8px; }
-.next-letter { display: flex; align-items: center; gap: 6px; margin: 0; font-weight: 700; }
+.next-letter { display: flex; align-items: center; gap: 6px; margin: 0; font-weight: 900; font-size: 18px; }
+.next-letter .next-pic { width: 34px; height: 34px; object-fit: contain; }
+.sr-only { position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.card-stamps[role="button"] { cursor: pointer; }
+.event-left .ico { width: 14px; height: 14px; vertical-align: -2px; margin-right: 3px; }
+.event-reward > .ico { width: 16px; height: 16px; }
 .next-letter .ico { width: 18px; height: 18px; }
 .remind-row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 4px; }
 .btn-remind { display: inline-flex; align-items: center; justify-content: center; gap: 8px; flex: 1 1 140px; max-width: 220px; font-weight: 700; color: var(--ink); }
@@ -1239,6 +1284,23 @@ html.rm .glow-spark { display: none; }
 .reward-card.is-glow img { filter: drop-shadow(0 0 6px rgba(255, 214, 120, .95)); }
 .reward-card:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 @media (hover: hover) and (pointer: fine) { .reward-card:hover { border-color: var(--accent); } }
+/* выбранная карточка: рамка и галочка в уголке; «Забрать» — под карточками */
+.reward-card { position: relative; transition: transform .12s ease-out, border-color .12s; }
+.reward-card.is-picked { border-color: var(--terra); background: #fff3e2; transform: translateY(-2px); }
+.reward-card.is-picked::after {
+  content: ''; position: absolute; top: 6px; right: 6px; width: 20px; height: 20px; border-radius: 50%;
+  background: var(--terra) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M5 10.5l3.2 3L15 6.5' fill='none' stroke='%23fff' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 100% no-repeat;
+}
+.choice-sheet .btn-main { margin-top: 14px; }
+html.rm .reward-card.is-picked { transform: none; }
+
+/* Невзятый подарок за комнату: карточка с сундучком и главная кнопка «Подарок» */
+.card-gift { cursor: pointer; }
+.thumb-gift { width: 60px; height: 60px; background: #fff3cf; }
+.thumb-gift img { animation: letter-hop 1.6s ease-in-out infinite; }
+.btn-main .btn-pic { width: 34px; height: 34px; margin: -6px 0; display: block; flex: none; }
+.welcome-event { margin: 2px 0 0; }
+html.rm .thumb-gift img { animation: none; }
 
 /* Счётчик бесплатных подсказок и отказ, когда они кончились */
 .tool-hint .count {

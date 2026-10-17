@@ -99,17 +99,24 @@ window.Scene = (function () {
       total += n; solved += st;
     });
     var complete = room.objects.every(function (oid) { return restored[oid]; });
-    // Тепло ступенями: на 1/3 и 2/3 картинок комната теплеет, готовая — полностью.
-    var warm = opts.before ? 0 : complete ? 3 : Math.floor(3 * solved / total);
+    var hall = rid === 'r01';
+    // Тепло ступенями: прихожая — с каждой вещью (лампа — четверть), дальше — на 1/3 и 2/3 картинок.
+    var steps = hall ? total : 3;
+    var warm = opts.before ? 0 : complete ? steps : Math.floor(steps * solved / total);
+    var same = host.getAttribute('data-room') === rid;
     var was = host.getAttribute('data-warm');
-    if (!opts.before && host.getAttribute('data-room') === rid && was !== null && +was < warm) host._warmAt = Date.now();
-    if (host.getAttribute('data-room') !== rid) host._warmAt = 0;
+    if (!opts.before && same && was !== null && +was < warm) host._warmAt = Date.now();
+    if (!same) host._warmAt = 0;
+    // Кот: в прихожей — после третьей вещи, дальше — на своём месте в последней комнате.
+    var catShown = !opts.before && catHome(C, S, opts.hide) === rid;
+    var catWas = same ? host.getAttribute('data-cat') : null;
 
     host.innerHTML = '';
     host.setAttribute('data-room', rid);
     host.setAttribute('data-warm', String(warm));
+    host.setAttribute('data-cat', catShown ? '1' : '0');
     host.style.setProperty('--life', (solved / total).toFixed(3));
-    host.style.setProperty('--warm', (warm / 3).toFixed(3));
+    host.style.setProperty('--warm', (warm / steps).toFixed(3));
     // Прихожая начинает выцветшей (её «вау» — тепло), следующие комнаты — уже живые.
     host.style.setProperty('--sat0', opts.before || rid === 'r01' ? '.3' : '.6');
     host.classList.toggle('is-warming', !!host._warmAt && Date.now() - host._warmAt < 2200);
@@ -122,7 +129,6 @@ window.Scene = (function () {
     // Оранжерея: свет из сада сквозь стеклянную крышу — с первой минуты.
     if (rid === 'r03' && !opts.before) host.appendChild(el('div', 'scene-sun'));
 
-    var hall = rid === 'r01';
     if (hall) {
       var light = el('div', 'scene-light');
       light.style.setProperty('--lx', (L.light.x * 100) + '%');
@@ -136,7 +142,7 @@ window.Scene = (function () {
       host.appendChild(signWrap);
 
       // Следы видны после коврика и до прихода кота.
-      var pawsOn = restored.r01_rug && !complete;
+      var pawsOn = restored.r01_rug && !catShown;
       L.paws.forEach(function (pt, i) {
         var w = el('div', 'spr-paw' + (pawsOn ? ' is-shown' : '') + (opts.fresh === 'r01_rug' ? ' is-fresh' : ''));
         place(w, { x: pt[0], y: pt[1], w: 0.034 });
@@ -146,9 +152,6 @@ window.Scene = (function () {
         host.appendChild(w);
       });
     }
-
-    // Кот: в прихожей — когда она готова, дальше — на своём месте в последней комнате.
-    var catShown = !opts.before && catHome(C, S, opts.hide) === rid;
 
     var order = room.z || room.objects;
     order.forEach(function (oid) {
@@ -186,10 +189,10 @@ window.Scene = (function () {
         wrap.appendChild(coin);
         wrap.setAttribute('aria-label', o.title + ' — хватает на оформление');
       }
-      // Не найденный секрет готовой вещи — искорка: коснись, и он откроется.
-      if (inter && st === 'restored' && o.tap_secret && (S.secrets || []).indexOf(oid) === -1) {
-        wrap.appendChild(el('span', 'hs-secret'));
-        wrap.setAttribute('aria-label', o.title + ' — здесь секрет');
+      // Секрет не подписан: только что вставшая готовая вещь один раз блестит, когда
+      // игрок снова видит сцену (после окна оформления), — и всё.
+      if (inter && opts.spark === oid && restored[oid] && o.tap_secret && (S.secrets || []).indexOf(oid) === -1) {
+        for (var q = 0; q < 3; q++) wrap.appendChild(el('i', 'hint-spark'));
       }
       if (pv) {
         wrap.classList.add('is-preview');
@@ -198,7 +201,8 @@ window.Scene = (function () {
       host.appendChild(wrap);
 
       if (oid === CAT_ON[rid] && L.cat) {
-        var cat = el('img', 'spr spr-cat' + (catShown ? ' is-shown' : '') + (opts.fresh === (hall ? 'room' : CAT_ON[rid]) ? ' is-arriving' : ''),
+        var arriving = catShown && (hall ? catWas === '0' : opts.fresh === CAT_ON[rid]);
+        var cat = el('img', 'spr spr-cat' + (catShown ? ' is-shown' : '') + (arriving ? ' is-arriving' : ''),
           { src: ART + 'cat.webp', alt: '', draggable: 'false' });
         place(cat, L.cat);
         host.appendChild(cat);
@@ -254,6 +258,13 @@ window.Scene = (function () {
     return box;
   }
 
+  // В прихожую кот приходит после третьей вещи — «вау» до третьей минуты.
+  var HALL_CAT = 3;
+  function hallRestored(C, S, hide) {
+    var St = window.HopState;
+    return C.rooms.r01.objects.filter(function (oid) { return oid !== hide && St.isObjectRestored(C, S, oid); }).length;
+  }
+
   // Комната, где сейчас кот (null — ещё не пришёл). hide — предмет, который
   // пока рисуется на стадию раньше (летит миниатюра).
   function catHome(C, S, hide) {
@@ -261,7 +272,7 @@ window.Scene = (function () {
     St.roomOrder(C).forEach(function (rid) {
       var seat = CAT_ON[rid];
       if (!seat || !C.objects[seat] || !C.rooms[rid].layout.cat) return;
-      var ok = rid === 'r01' ? St.isRoomComplete(C, S, rid) : St.isObjectRestored(C, S, seat) && hide !== seat;
+      var ok = rid === 'r01' ? hallRestored(C, S, hide) >= HALL_CAT : St.isObjectRestored(C, S, seat) && hide !== seat;
       if (ok) home = rid;
     });
     return home;

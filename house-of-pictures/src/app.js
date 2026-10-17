@@ -314,7 +314,12 @@
     sheetOnClose = null;
     if (cb && !silent) cb();
   }
-  $('sheet-backdrop').addEventListener('click', function () { Sound.play('back'); closeSheet(); });
+  $('sheet-backdrop').addEventListener('click', function () {
+    // Подарок за комнату касанием мимо не закрывается: «Забрать» или крестик.
+    if ($('sheet').classList.contains('sheet-choice')) return;
+    Sound.play('back');
+    closeSheet();
+  });
   function sheetHead(title, art) {
     var head = h('div', 'sheet-head');
     if (art) head.appendChild(pic(art, 'sheet-art'));
@@ -469,6 +474,10 @@
     var rid = curRoom(), R = C.rooms[rid];
     var f = S.story_flags;
 
+    // Невзятый подарок за комнату — главная кнопка, пока его не заберут.
+    var gr = St.pendingGift(C, S);
+    if (gr) { renderGiftPanel(panel, gr); return; }
+
     if (!f[introFlag(rid)]) {
       var card = h('div', 'card card-letter');
       card.appendChild(h('p', 'card-text', R.intro));
@@ -494,7 +503,8 @@
       panel.appendChild(h('p', 'card card-text', 'Загляни в письма — там ждёт картинка.'));
       return;
     }
-    if (playable.length === 1) {
+    var lan = waitingLantern();
+    if (playable.length === 1 && !lan) {
       var oid = playable[0], o = C.objects[oid];
       var c1 = h('div', 'card card-goal');
       c1.appendChild(objectThumb(oid));
@@ -508,13 +518,25 @@
       c1.appendChild(side);
       panel.appendChild(c1);
       var cont = St.objectStatus(C, S, oid) === 'in_progress';
-      panel.appendChild(button('btn-main', cont ? 'Продолжить' : o.verb, 'play', function () { startObject(oid); }));
+      var go = button('btn-main', cont ? 'Продолжить' : o.verb, 'play', function () { startObject(oid); });
+      var tm1 = tomorrowPill();
+      if (tm1) {
+        var r1 = h('div', 'row-actions');
+        r1.appendChild(go);
+        r1.appendChild(tm1);
+        panel.appendChild(r1);
+      } else panel.appendChild(go);
       return;
     }
-    panel.appendChild(h('h3', 'panel-title', 'Что вернём дальше?'));
-    var grid = h('div', 'choice-grid' + (playable.length > 2 ? ' is-compact' : ''));
-    grid.style.setProperty('--n', Math.min(playable.length, 4));
-    playable.slice(0, 4).forEach(function (oid) {
+    var ph = h('div', 'panel-head');
+    ph.appendChild(h('h3', 'panel-title', 'Что вернём дальше?'));
+    var tm = tomorrowPill();
+    if (tm) { ph.classList.add('has-tomorrow'); ph.appendChild(tm); }
+    panel.appendChild(ph);
+    var picks = playable.slice(0, lan ? 3 : 4), cards = picks.length + (lan ? 1 : 0);
+    var grid = h('div', 'choice-grid' + (cards > 2 ? ' is-compact' : ''));
+    grid.style.setProperty('--n', cards);
+    picks.forEach(function (oid) {
       var o = C.objects[oid];
       var b = h('button', 'card card-choice');
       b.type = 'button';
@@ -531,7 +553,89 @@
       b.addEventListener('click', function () { startObject(oid); });
       grid.appendChild(b);
     });
+    if (lan) grid.appendChild(lanternChoice(lan));
     panel.appendChild(grid);
+  }
+
+  // Ждущий фонарик «Вечера фонариков» — его поле видно на доме, без захода в «Письма».
+  function waitingLantern() {
+    if (!hallDone() || !S.story_flags.letter_opened) return null;
+    var ev = St.eventInfo(C, S);
+    if (!ev || ev.over || ev.complete || !ev.waiting) return null;
+    return ev.items.filter(function (x) { return x.status === 'open'; })[0] || null;
+  }
+
+  function lanternChoice(it) {
+    var b = h('button', 'card card-choice card-lantern');
+    b.type = 'button';
+    b.setAttribute('data-lantern', it.id);
+    b.setAttribute('aria-label', 'Фонарик: ' + it.title + ', ' + puzzleSize(it.id));
+    var t = h('span', 'thumb thumb-lantern');
+    t.appendChild(icon('lantern'));
+    b.appendChild(t);
+    b.appendChild(h('b', 'card-title', 'Фонарик'));
+    b.appendChild(h('span', 'card-sub', C.event.title));
+    var meta = h('span', 'choice-meta');
+    meta.appendChild(h('span', 'size-chip', puzzleSize(it.id)));
+    b.appendChild(meta);
+    b.addEventListener('click', function () { startLantern(it.id, true); });
+    return b;
+  }
+
+  // «Завтра»: письмо дня разгадано — что придёт и через сколько часов (видно без захода в разделы).
+  function tomorrowPill() {
+    if (!hallDone() || !S.story_flags.letter_opened) return null;
+    var T = St.todayLetter(C, S, St.today());
+    if (!T || T.status !== 'solved') return null;
+    var b = h('button', 'tomorrow');
+    b.type = 'button';
+    b.setAttribute('data-tomorrow', '1');
+    b.appendChild(pic('envelope', 'tm-pic'));
+    var g = tomorrowGift();
+    if (g) b.appendChild(pic(g, 'tm-pic tm-gift'));
+    b.appendChild(h('b', 'tm-word', 'Завтра'));
+    var hrs = h('span', 'tm-hrs');
+    hrs.appendChild(icon('clock'));
+    hrs.appendChild(document.createTextNode(untilTomorrow().replace('через ', '')));
+    b.appendChild(hrs);
+    b.setAttribute('aria-label', 'Завтра: новое письмо' + (g ? ' и подарок' : '') + ', ' + untilTomorrow());
+    b.addEventListener('click', function () { Sound.play('tap'); showScreen('letters'); });
+    return b;
+  }
+
+  // Что даст завтрашний штамп «7 встреч»: монеты, карандаши или подарок карточки.
+  function tomorrowGift() {
+    if (!St.stampsActive(C, S)) return null;
+    var k = S.stamps.days.length + 1, step = (C.stamps.steps || {})[k];
+    if (step) return step.coins ? 'coin' : 'pencil';
+    return k === C.stamps.card_size ? 'gift' : null;
+  }
+
+  // Подарок за готовую комнату ждёт на панели: сундучок и главная кнопка «Подарок».
+  function renderGiftPanel(panel, gr) {
+    var c = h('div', 'card card-goal card-gift');
+    var t = h('span', 'thumb thumb-gift');
+    t.appendChild(pic('chest_b'));
+    c.appendChild(t);
+    var body = h('div', 'card-body');
+    body.appendChild(h('b', 'card-title', C.rooms[gr].title));
+    body.appendChild(h('span', 'card-sub', 'Выбери подарок'));
+    c.appendChild(body);
+    c.addEventListener('click', function () { Sound.play('tap'); openRoomGift(gr); });
+    panel.appendChild(c);
+    var b = button('btn-main btn-gift', 'Подарок', null, function () { Sound.play('tap'); openRoomGift(gr); });
+    b.insertBefore(pic('chest_b', 'btn-pic'), b.firstChild);
+    panel.appendChild(b);
+  }
+
+  function openRoomGift(rid) {
+    showRoomChoice(rid, function () { afterRoomGift(rid); });
+  }
+
+  // Подарок взят — следом приглашение в следующую комнату (если других подарков нет).
+  function afterRoomGift(rid) {
+    if (!$('sheet').hidden || St.pendingGift(C, S)) return;
+    if (rid !== 'r01' && !S.story_flags['invitation_seen_' + rid]) showInvitation(rid);
   }
 
   // Готовая комната: письмо прихожей → дорога дальше → письмо дня.
@@ -591,11 +695,22 @@
     var c = h('div', 'card card-daily');
     var L = St.todayLetter(C, S, St.today());
     var env = h('span', 'daily-env' + (L && L.status === 'today' && !L.opened ? ' is-new' : ''));
-    env.appendChild(pic(L && L.status === 'solved' ? 'stamp' : 'envelope'));
+    env.appendChild(pic('envelope'));
     c.appendChild(env);
     var body = h('div', 'card-body');
     if (L && L.status === 'today') body.appendChild(h('b', 'card-title', L.opened ? 'Письмо ждёт ответа' : 'Пришло письмо'));
-    else if (L) body.appendChild(h('b', 'card-title', 'Новое письмо ' + untilTomorrow()));
+    else if (L) {
+      c.classList.add('is-tomorrow');
+      var g = tomorrowGift();
+      if (g) env.appendChild(pic(g, 'tm-gift'));
+      var tt = h('b', 'card-title tm-title', 'Завтра');
+      var hrs = h('span', 'tm-hrs');
+      hrs.appendChild(icon('clock'));
+      hrs.appendChild(document.createTextNode(untilTomorrow().replace('через ', '')));
+      tt.appendChild(hrs);
+      tt.setAttribute('aria-label', 'Новое письмо ' + untilTomorrow());
+      body.appendChild(tt);
+    }
     else body.appendChild(h('b', 'card-title', 'Новые письма скоро'));
     body.appendChild(stampsRow(true));
     c.appendChild(body);
@@ -669,6 +784,17 @@
     var live = ev && !ev.over && !ev.complete;
     garland.hidden = !(ev && (live || ev.complete) && !ev.over);
     if (!garland.hidden) paintGarland(garland, ev);
+    // Невзятый подарок за комнату — сундучок, пока его не заберут.
+    var gr = St.pendingGift(C, S);
+    if (gr) {
+      var ch = h('button', 'scene-chip chip-gift is-new');
+      ch.type = 'button';
+      ch.setAttribute('data-chip', 'gift');
+      ch.appendChild(pic('chest_b'));
+      ch.setAttribute('aria-label', 'Подарок за комнату');
+      ch.addEventListener('click', function () { Sound.play('tap'); showScreen('home'); openRoomGift(gr); });
+      box.appendChild(ch);
+    }
     if (!hallDone() || !S.story_flags.letter_opened) return;
     var T = St.todayLetter(C, S, St.today());
     var mail = h('button', 'scene-chip chip-mail');
@@ -683,7 +809,12 @@
       mail.appendChild(h('b', 'chip-badge', untilTomorrow().replace('через ', '')));
       mail.setAttribute('aria-label', 'Новое письмо ' + untilTomorrow());
     }
-    mail.addEventListener('click', function () { Sound.play('tap'); showScreen('letters'); });
+    // Пришло письмо — сразу само письмо, а не список писем (одно касание до картинки).
+    mail.addEventListener('click', function () {
+      Sound.play('tap');
+      showScreen('letters');
+      if (T && T.status === 'today') openDailyLetter(T.id);
+    });
     box.appendChild(mail);
     if (live) {
       var lan = h('button', 'scene-chip chip-lantern' + (ev.waiting ? ' is-new' : ''));
@@ -692,7 +823,7 @@
       lan.appendChild(icon('lantern'));
       lan.appendChild(h('b', 'chip-badge', ev.done + '/' + ev.of));
       lan.setAttribute('aria-label', ev.title + ': зажжено ' + ev.done + ' из ' + ev.of + ', осталось ' + ev.days_left + ' дн.');
-      lan.addEventListener('click', function () { Sound.play('tap'); showScreen('letters'); });
+      lan.addEventListener('click', function () { Sound.play('tap'); showScreen('letters'); openEventSheet(); });
       box.appendChild(lan);
     }
   }
@@ -797,8 +928,9 @@
       body.appendChild(h('b', 'card-title', R.title));
       var n = St.restoredCount(C, S, rid);
       var sc = St.secretsCount(C, S, rid);
+      // Счётчик секретов — только после первой находки: до неё это тайна, а не список дел.
       body.appendChild(h('span', 'card-sub', open ? n + ' из ' + R.objects.length + (St.isRoomComplete(C, S, rid) ? ' ✓' : '') +
-        (n ? ' · секреты ' + sc.n + '/' + sc.of : '')
+        (n && (S.secrets || []).length ? ' · секреты ' + sc.n + '/' + sc.of : '')
         : 'Откроется после: ' + C.rooms[R.requires].title));
       var bar = h('span', 'bar');
       var fill = h('i');
@@ -875,7 +1007,7 @@
   function startPuzzle(pid, ctx) {
     Sound.play('tap');
     pickCancel();
-    cur = { pid: pid, oid: ctx.oid || null, letter: ctx.letter || null, lantern: ctx.lantern || null, tutorial: pid === 'r01_lamp_01' && !S.story_flags.tutorial_done, step: 0, firstMove: false };
+    cur = { pid: pid, oid: ctx.oid || null, letter: ctx.letter || null, lantern: ctx.lantern || null, home: !!ctx.home, tutorial: pid === 'r01_lamp_01' && !S.story_flags.tutorial_done, step: 0, firstMove: false };
     showScreen('puzzle');
     $('puzzle-title').textContent = ctx.title;
     $('puzzle-size').textContent = puzzleSize(pid);
@@ -1043,7 +1175,7 @@
     if (!N.isWon()) { St.saveDraft(S, cur.pid, N.getBoardState()); }
     saveNow();
     coachHide();
-    var wasLetter = !!(cur.letter || cur.lantern);
+    var wasLetter = !!(cur.letter || cur.lantern) && !cur.home;
     cur = null;
     showScreen(wasLetter ? 'letters' : 'home');
     if (!wasLetter) renderHome();
@@ -1334,7 +1466,7 @@
     setToolbarEnabled(false);
     Sound.play('win');
     var rm = reducedMotion();
-    var ctx = { pid: pid, oid: cur.oid, letter: cur.letter, lantern: cur.lantern, res: res };
+    var ctx = { pid: pid, oid: cur.oid, letter: cur.letter, lantern: cur.lantern, home: cur.home, res: res };
     setTimeout(function () { showReveal(ctx); }, rm ? 120 : 620);
   }
 
@@ -1525,29 +1657,34 @@
     saveNow();
     renderHome({ fresh: rid === 'r01' ? 'room' : Scene.catSeat(rid) });
     Sound.cue('room');
-    var next = function () {
-      if (rid !== 'r01') { if (gift) showGift(gift); else showInvitation(rid); }
-      else if (gift) showGift(gift);
-    };
     if (rid !== 'r01') toast(C.rooms[rid].final_text, 4200, 'star');
-    // Игрок успел открыть письмо или другую шторку — подарок ждёт, пока она закроется.
+    // Подарок за комнату не всплывает под палец: он ждёт на панели («Подарок») и сундучком
+    // над сценой, приглашение дальше — после него. Подарок «7 встреч» — сразу.
+    var waits = S.room_gifts.indexOf(rid) !== -1;
+    if (!gift && (waits || rid === 'r01')) return;
     setTimeout(function offer() {
-      if (S.room_choice_pending !== rid) { next(); return; }
       if (!$('sheet').hidden) { setTimeout(offer, 700); return; }
-      showRoomChoice(rid, next);
+      if (gift) showGift(gift); else showInvitation(rid);
     }, reducedMotion() ? 300 : rid === 'r01' ? 900 : 1600);
   }
 
-  // Награда за комнату на выбор из трёх: монеты, карандаши или вещь.
+  // Награда за комнату на выбор из трёх: монеты, карандаши или вещь. Касание карточки —
+  // выбор (вещь выбрана сразу: она встанет в комнату), «Забрать» — получить.
   function showRoomChoice(rid, after) {
     var opts = St.roomChoices(C, S, rid);
     var node = h('div', 'choice-sheet');
     node.appendChild(sheetHead('Выбери подарок', 'chest_b'));
     var grid = h('div', 'reward-grid');
-    var picked = false;
+    grid.setAttribute('role', 'radiogroup');
+    var picked = false, sel = opts.length - 1, cards = [];
+    var mark = function (i) {
+      sel = i;
+      cards.forEach(function (c, j) { c.classList.toggle('is-picked', j === i); c.setAttribute('aria-checked', String(j === i)); });
+    };
     opts.forEach(function (o, i) {
       var b = h('button', 'card reward-card');
       b.type = 'button';
+      b.setAttribute('role', 'radio');
       b.setAttribute('data-pick', String(i));
       var label;
       if (o.coins) { b.appendChild(pic('coin')); label = '+' + o.coins; }
@@ -1564,31 +1701,37 @@
       }
       b.appendChild(h('b', '', label));
       b.setAttribute('aria-label', o.coins ? o.coins + ' монет' : o.pencils ? o.pencils + ' карандаша' : label);
-      b.addEventListener('click', function () {
-        if (picked) return;
-        picked = true;
-        var from = b.getBoundingClientRect();
-        var got = St.pickRoomReward(C, S, rid, i);
-        saveNow();
-        closeSheet(true);
-        if (got && got.variant) {
-          var fv = St.findVariant(C, got.variant);
-          renderHome({ fresh: fv.object });
-          Sound.play('chord');
-        } else if (got && got.glow) {
-          renderHome({ fresh: got.glow });
-          Sound.play('chord');
-        } else {
-          renderHome();
-          if (got) playRewards([{ type: got.coins ? 'coins' : 'pencils', n: got.coins || got.pencils }], from);
-        }
-        setTimeout(after, reducedMotion() ? 200 : 1200);
-      });
+      b.addEventListener('click', function () { if (!picked && sel !== i) { Sound.play('tap'); mark(i); } });
+      cards.push(b);
       grid.appendChild(b);
     });
+    mark(sel);
     node.appendChild(grid);
-    // Закрыли не выбрав — выбор подождёт до следующего входа.
-    openSheet(node, function () { if (!picked) after(); }, 'sheet-choice');
+    node.appendChild(button('btn-main', 'Забрать', 'check', function () {
+      if (picked) return;
+      picked = true;
+      var i = sel;
+      var from = cards[i].getBoundingClientRect();
+      var got = St.pickRoomReward(C, S, rid, i);
+      // Вещь или сияние — в своей комнате, чтобы их было видно.
+      if (got && (got.variant || got.glow) && curRoom() !== rid) St.setRoom(C, S, rid);
+      saveNow();
+      closeSheet(true);
+      if (got && got.variant) {
+        var fv = St.findVariant(C, got.variant);
+        renderHome({ fresh: fv.object });
+        Sound.play('chord');
+      } else if (got && got.glow) {
+        renderHome({ fresh: got.glow });
+        Sound.play('chord');
+      } else {
+        renderHome();
+        if (got) playRewards([{ type: got.coins ? 'coins' : 'pencils', n: got.coins || got.pencils }], from);
+      }
+      setTimeout(after, reducedMotion() ? 200 : 1200);
+    }));
+    // Закрыли крестиком — подарок ждёт на панели и сундучком над сценой.
+    openSheet(node, function () { if (!picked) renderHome(); }, 'sheet-choice');
     log('room_choice_show', { room_id: rid });
   }
 
@@ -1765,7 +1908,7 @@
     openSheet(node, function () {
       if (St.objectStatus(C, S, oid) === 'choose_variant') St.closeVariantChoice(S, oid);
       saveNow();
-      renderHome();
+      renderHome(opts.afterReveal ? { spark: oid } : undefined);
       if (opts.onDone) opts.onDone();
     }, 'sheet-variants');
   }
@@ -1903,7 +2046,7 @@
   function renderLetters() {
     var page = $('letters-page');
     page.innerHTML = '';
-    page.appendChild(h('h1', 'page-title', 'Письма'));
+    page.appendChild(h('h1', 'page-title sr-only', 'Письма'));
     var day = St.today();
 
     if (!S.daily.start) {
@@ -1925,7 +2068,12 @@
     head.appendChild(h('b', 'card-title', '7 встреч'));
     sc.appendChild(head);
     sc.appendChild(stampsRow(false));
-    if (St.stampsActive(C, S)) sc.appendChild(h('p', 'card-sub', 'Штамп — за первую картинку дня. Пропуск не сбрасывает.'));
+    if (St.stampsActive(C, S)) {
+      sc.setAttribute('role', 'button');
+      sc.setAttribute('tabindex', '0');
+      sc.setAttribute('aria-label', '7 встреч: штамп за первую картинку дня');
+      sc.addEventListener('click', function () { Sound.play('tap'); toast('Штамп — картинка дня', 3600, 'stamp'); });
+    }
     page.appendChild(sc);
 
     // Письмо дня
@@ -1952,8 +2100,10 @@
       tc.appendChild(postcard(T.id, true));
       tc.appendChild(h('b', 'card-title', L2.title));
       var nx = h('p', 'card-sub next-letter');
+      nx.setAttribute('aria-label', 'Новое письмо ' + untilTomorrow());
+      nx.appendChild(pic('envelope', 'next-pic'));
       nx.appendChild(icon('clock'));
-      nx.appendChild(h('span', '', 'Новое письмо ' + untilTomorrow()));
+      nx.appendChild(h('span', '', untilTomorrow().replace('через ', '')));
       tc.appendChild(nx);
       var rm = remindRow();
       if (rm) tc.appendChild(rm);
@@ -1989,7 +2139,7 @@
       });
       page.appendChild(grid);
     }
-    page.appendChild(secretsCard());
+    if ((S.secrets || []).length) page.appendChild(secretsCard());
   }
 
   // «Секреты дома»: у каждой вещи свой секрет — открывается первым касанием готовой вещи.
@@ -2080,14 +2230,19 @@
 
   function lanternById(id) { return C.event.lanterns.filter(function (L) { return L.id === id; })[0]; }
 
-  function eventCard(ev) {
+  function eventCard(ev, inSheet) {
     var c = h('section', 'card card-event');
     var head = h('div', 'card-head');
-    head.appendChild(icon('lantern'));
-    head.appendChild(h('b', 'card-title', ev.title));
-    head.appendChild(h('span', 'event-left', ev.complete ? 'все зажжены' : 'ещё ' + ev.days_left + ' дн.'));
+    if (!inSheet) {
+      head.appendChild(icon('lantern'));
+      head.appendChild(h('b', 'card-title', ev.title));
+    }
+    var left = h('span', 'event-left');
+    if (ev.complete) left.appendChild(icon('check'));
+    else { left.appendChild(icon('clock')); left.appendChild(document.createTextNode(ev.days_left + ' дн.')); }
+    left.setAttribute('aria-label', ev.complete ? 'Все зажжены' : 'Осталось ' + ev.days_left + ' дн.');
+    head.appendChild(left);
     c.appendChild(head);
-    if (!ev.complete) c.appendChild(h('p', 'card-sub', C.event.text));
     var row = h('div', 'lanterns');
     ev.items.forEach(function (it, i) {
       var b = h('button', 'lantern is-' + it.status);
@@ -2103,12 +2258,12 @@
         b.appendChild(icon('lantern'));
         b.appendChild(h('span', 'lantern-go', 'Зажечь'));
         b.setAttribute('aria-label', 'Зажечь: ' + it.title + ' ' + puzzleSize(it.id));
-        b.addEventListener('click', function () { startLantern(it.id); });
+        b.addEventListener('click', function () { closeSheet(true); startLantern(it.id); });
       } else {
         b.disabled = true;
         b.appendChild(icon('lock'));
         var wait = i - (C.event.open_first - 1) - (C.event.days - ev.days_left);
-        b.appendChild(h('span', 'lantern-go', wait <= 1 ? 'завтра' : 'через ' + wait + ' дн.'));
+        if (wait <= 1) b.appendChild(h('span', 'lantern-go', 'завтра'));
         b.setAttribute('aria-label', 'Фонарик откроется ' + (wait <= 1 ? 'завтра' : 'через ' + wait + ' дн.'));
       }
       row.appendChild(b);
@@ -2116,24 +2271,42 @@
     c.appendChild(row);
     var R = C.event.reward;
     var rw = h('p', 'card-sub event-reward');
-    rw.appendChild(h('span', '', ev.complete ? 'Награда получена:' : 'Все пять — '));
+    rw.setAttribute('aria-label', (ev.complete ? 'Награда получена: ' : 'За все пять: ') + R.coins + ' монет' + (R.pencils ? ', карандашей ' + R.pencils : ''));
+    var five = h('span', 'price');
+    five.appendChild(icon('lantern'));
+    five.appendChild(h('b', '', '×' + ev.of));
+    rw.appendChild(five);
+    rw.appendChild(icon(ev.complete ? 'check' : 'chev'));
     rw.appendChild(priceTag('coins', R.coins));
     if (R.pencils) { var pp = h('span', 'price'); pp.appendChild(pic('pencil')); pp.appendChild(h('b', '', '×' + R.pencils)); rw.appendChild(pp); }
     c.appendChild(rw);
     return c;
   }
 
-  function startLantern(id) {
+  // Значок фонариков над комнатой: окно события сразу, ждущий фонарик — главной кнопкой.
+  function openEventSheet() {
+    var ev = St.eventInfo(C, S);
+    if (!ev || ev.over) return;
+    var node = h('div', 'event-sheet');
+    node.appendChild(sheetHead(ev.title));
+    node.appendChild(eventCard(ev, true));
+    var next = ev.items.filter(function (x) { return x.status === 'open'; })[0];
+    if (next) node.appendChild(button('btn-main', 'Зажечь ' + puzzleSize(next.id), 'play', function () { closeSheet(true); startLantern(next.id); }));
+    openSheet(node, null, 'sheet-event');
+  }
+
+  function startLantern(id, home) {
     if (!St.eventOpen(C, S, id)) { Sound.play('back'); toast('Вечер прошёл', null, 'lantern'); renderLetters(); return; }
     var L = lanternById(id);
-    log('lantern_start', { id: id });
-    startPuzzle(id, { lantern: id, title: L.title, preview: ART + 'envelope.webp', ghost: false });
+    log('lantern_start', { id: id, from: home ? 'home' : 'letters' });
+    startPuzzle(id, { lantern: id, home: home, title: L.title, preview: ART + 'envelope.webp', ghost: false });
     var t = $('puzzle-preview').querySelector('.thumb');
     if (t) { t.innerHTML = ''; t.appendChild(icon('lantern')); }
   }
 
   function lanternSolved(rs, from) {
-    showScreen('letters');
+    showScreen(rs.home ? 'home' : 'letters');
+    if (rs.home) renderHome();
     Sound.play('reward');
     Sound.buzz(20);
     var L = lanternById(rs.pid), ev = St.eventInfo(C, S);
@@ -2150,7 +2323,8 @@
     node.appendChild(h('p', 'card-text', text));
     node.appendChild(button('btn-main', 'Хорошо', 'check', function () { Sound.play('tap'); closeSheet(); }));
     openSheet(node, function () {
-      renderLetters(); renderHud();
+      if (rs.home) renderHome(); else renderLetters();
+      renderHud();
       var gift = rs.res.rewards.filter(function (r) { return r.type === 'gift'; })[0];
       if (gift) showGift(gift);
     }, 'sheet-postcard');
@@ -2502,17 +2676,24 @@
   /* ---------------- возвращение после паузы ---------------- */
 
   function showWelcome(away) {
+    delete S.story_flags.welcome_away;
     var gift = St.comebackGift(C, S, away);
     var cards = St.deliverLetters(C, S);
     var T = St.todayLetter(C, S, St.today());
     var fresh = T && T.status === 'today';
     var ev = St.eventInfo(C, S);
+    var gr = St.pendingGift(C, S);
+    // «Вечер фонариков» кончился, пока тебя не было, — итог один раз.
+    var evEnd = ev && ev.over && !ev.complete && !S.story_flags['event_end_' + ev.id];
+    if (evEnd) S.story_flags['event_end_' + ev.id] = true;
     var node = h('div', 'welcome-sheet');
     node.appendChild(sheetHead('С возвращением!', 'envelope'));
     node.appendChild(h('p', 'card-text', away >= 7 ? 'Дом соскучился!' : away >= 3 ? 'Финик ждал у двери.' : 'Финик проснулся!'));
+    if (evEnd) node.appendChild(h('p', 'card-sub welcome-event', ev.title + ' прошёл: ' + ev.done + ' из ' + ev.of));
     // Что пришло, пока тебя не было, — значками с числом, подпись только для чтеца.
     var news = h('div', 'news-row');
-    [[cards.length, 'letter', '+' + cards.length, cards.length + ' ' + plural(cards.length, 'открытка', 'открытки', 'открыток') + ' в альбоме'],
+    [[gr ? 1 : 0, 'chest_b', '1', 'Подарок за комнату'],
+     [cards.length, 'letter', '+' + cards.length, cards.length + ' ' + plural(cards.length, 'открытка', 'открытки', 'открыток') + ' в альбоме'],
      [fresh ? 1 : 0, 'envelope', '1', 'Новое письмо'],
      [ev && !ev.over ? ev.waiting : 0, 'lantern', String(ev ? ev.waiting : 0), 'Фонариков ждёт: ' + (ev ? ev.waiting : 0)]].forEach(function (a) {
       if (!a[0]) return;
@@ -2542,10 +2723,14 @@
       node.appendChild(items);
       renderHud();
     }
-    if (fresh || cards.length || (ev && !ev.over && ev.waiting)) node.appendChild(button('btn-main', fresh ? 'Письмо дня' : 'К письмам', 'letter', function () { closeSheet(true); Sound.play('tap'); showScreen('letters'); }));
+    if (gr) {
+      var gb = button('btn-main btn-gift', 'Подарок', null, function () { closeSheet(true); Sound.play('tap'); renderHome(); openRoomGift(gr); });
+      gb.insertBefore(pic('chest_b', 'btn-pic'), gb.firstChild);
+      node.appendChild(gb);
+    } else if (fresh || cards.length || (ev && !ev.over && ev.waiting)) node.appendChild(button('btn-main', fresh ? 'Письмо дня' : 'К письмам', 'letter', function () { closeSheet(true); Sound.play('tap'); showScreen('letters'); }));
     else node.appendChild(button('btn-main', 'Домой', 'check', function () { Sound.play('tap'); closeSheet(); }));
     openSheet(node, function () { renderHome(); }, 'sheet-welcome');
-    log('welcome_back', { away: away, letters: fresh ? 1 : 0, postcards: cards.length, gift: gift });
+    log('welcome_back', { away: away, letters: fresh ? 1 : 0, postcards: cards.length, gift: gift, room_gift: gr, event_end: evEnd ? ev.done : null });
     saveNow();
   }
 
@@ -2637,17 +2822,19 @@
     S.current_room = curRoom();
     // Прихожую прошли до выхода события — «Вечер фонариков» начинается с этого запуска.
     St.startEvent(C, S);
-    var away = St.daysAway(S);
+    // Пауза помнится, пока «С возвращением» не показано: день засчитан, а окно могли не увидеть.
+    var away = Math.max(St.daysAway(S), S.story_flags.welcome_away | 0);
     St.registerVisit(S);
+    if (away >= 1 && hallDone()) S.story_flags.welcome_away = away;
     St.logEvent(S, 'session_start', { build: BUILD, platform: Platform.name, fresh: loaded.fresh, viewport: innerWidth + 'x' + innerHeight, day: St.today() });
     saveNow();
     applySettings();
     Platform.init();
     showScreen('home');
     renderHome();
-    var pend = S.room_choice_pending;
-    if (pend && C.rooms[pend] && St.isRoomComplete(C, S, pend)) showRoomChoice(pend, function () {});
-    else if (away >= 1 && hallDone() && $('sheet').hidden) showWelcome(away);
+    // Первым — «С возвращением» с подарком за паузу; невзятый подарок за комнату ждёт
+    // в нём сундучком и главной кнопкой, потом — на панели.
+    if (away >= 1 && hallDone() && $('sheet').hidden) showWelcome(away);
     cloudStart();
     // Новый день мог наступить, пока вкладка открыта.
     setInterval(function () { if (dayNow !== St.today()) onNewDay(); }, 60000);

@@ -1271,7 +1271,7 @@ window.G1F_CONTENT = {
    "cache": null,
    "secret": null,
    "new": "bonus",
-   "new_text": "Новое: любое другое слово на поле — бонус, +2 марки.",
+   "new_text": "Слова-бонусы",
    "letter_label": null,
    "evening": false
   },
@@ -1582,7 +1582,7 @@ window.G1F_CONTENT = {
     ]
    },
    "new": "secret",
-   "new_text": "Новое: золотая буква на поле — часть тайного слова главы.",
+   "new_text": "Золотая буква",
    "letter_label": null,
    "evening": false
   },
@@ -1898,7 +1898,7 @@ window.G1F_CONTENT = {
     ]
    },
    "new": "picture",
-   "new_text": "Новое: одна улика — картинка.",
+   "new_text": "Улика-картинка",
    "letter_label": null,
    "evening": false
   },
@@ -2190,7 +2190,7 @@ window.G1F_CONTENT = {
     ]
    },
    "new": "double",
-   "new_text": "Новое: двойная улика — две подсказки к одному слову.",
+   "new_text": "Двойная улика",
    "letter_label": null,
    "evening": false
   },
@@ -2513,7 +2513,7 @@ window.G1F_CONTENT = {
     ]
    },
    "new": "cache",
-   "new_text": "Новое: тайник. На поле спрятано слово без улики.",
+   "new_text": "Тайник",
    "letter_label": null,
    "evening": false
   },
@@ -2835,7 +2835,7 @@ window.G1F_CONTENT = {
     ]
    },
    "new": "letter",
-   "new_text": "Новое: среди улик — письмо, подписанное «П.»",
+   "new_text": "Письмо от «П.»",
    "letter_label": null,
    "evening": false
   },
@@ -3098,7 +3098,7 @@ window.G1F_CONTENT = {
     ]
    },
    "new": "guess",
-   "new_text": "Новое: угадайте тайное слово раньше последней буквы — награда лупой.",
+   "new_text": "Угадай имя!",
    "letter_label": null,
    "evening": false
   },
@@ -3356,7 +3356,7 @@ window.G1F_CONTENT = {
     ]
    },
    "new": "secret2",
-   "new_text": "Новое: у сада своё тайное слово — пять золотых букв.",
+   "new_text": "Тайна сада",
    "letter_label": null,
    "evening": false
   },
@@ -3949,7 +3949,7 @@ window.G1F_CONTENT = {
     ]
    },
    "new": "silhouette",
-   "new_text": "Новое: улика-силуэт. Узнайте вещь по тени.",
+   "new_text": "Улика-силуэт",
    "letter_label": null,
    "evening": false
   },
@@ -4521,7 +4521,7 @@ window.G1F_CONTENT = {
     ]
    },
    "new": "letter2",
-   "new_text": "Новое: Полина отвечает сама — её письмо среди улик.",
+   "new_text": "Письмо Полины",
    "letter_label": null,
    "evening": false
   },
@@ -5068,7 +5068,7 @@ window.G1F_CONTENT = {
    "cache": null,
    "secret": null,
    "new": "note",
-   "new_text": "Новое: среди улик — записка, подписанная «Т.»",
+   "new_text": "Записка от «Т.»",
    "letter_label": "Записка «Т.»",
    "evening": false
   },
@@ -5655,7 +5655,7 @@ window.G1F_CONTENT = {
    "cache": null,
    "secret": null,
    "new": "evening",
-   "new_text": "Новое: вечер — поле в свете фонарей.",
+   "new_text": "Вечер",
    "letter_label": null,
    "evening": true
   },
@@ -5917,5 +5917,5 @@ window.G1F_CONTENT = {
    "evening": false
   }
  ],
- "checksum": "d14a0168450c"
+ "checksum": "4a449c94052f"
 };

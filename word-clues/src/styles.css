@@ -201,7 +201,7 @@ body.rm .btn-hint.nudge { animation: none; box-shadow: 0 0 0 4px rgba(213, 156, 
 .card.question { padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; background: #F0E7D2; border-color: transparent; }
 .card.question b { font-family: var(--font); font-size: 18px; }
 .result-foot { flex: none; padding: 8px 18px 6px; border-top: 1px solid var(--line); background: var(--bg); }
-.result-foot .btn-link { min-height: 40px; }
+.result-foot .btn-link { min-height: 44px; }
 .link-row { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; }
 .link-row .btn-link { margin: 0; }
 
@@ -308,7 +308,7 @@ button.slot.got { background: var(--surface); }
 .chip .i { width: 18px; height: 18px; color: var(--green); }
 #chip-cache { color: #8A5A12; border-color: #E2C68E; background: #FFF6E2; }
 #chip-cache .i { color: var(--amber); }
-.field-foot .chip { min-height: 40px; }
+.field-foot .chip { min-height: 44px; }
 .pulse { animation: chipPulse .5s ease; }
 @keyframes chipPulse { 40% { transform: scale(1.18); background: #FBE9C6; } }
 .cell.gold { background: #FBEBC4; border-color: #C9962B; box-shadow: inset 0 0 0 2px rgba(201, 150, 43, .55); }
@@ -534,3 +534,53 @@ body.rm .cell.hint-start { animation: none; }
 /* цена с значком марки не разрывается на 320 (круг 8) */
 .nw { white-space: nowrap; }
 @media (max-width: 359px) { #btn-next { font-size: 15px; padding-left: 10px; padding-right: 10px; } }
+
+/* ---------- круг 9 (план эксперта №5, круг 3): интерфейс ---------- */
+/* 3.1 «Принять ответ» не уходит за край: пока она видна, чипы и лупы прячутся, кнопка занимает остаток строки */
+.field-foot.accepting .chip, .field-foot.accepting .loupes { display: none; }
+.field-foot.accepting .btn-accept { flex: 1 1 auto; min-width: 0; justify-content: center; margin-left: 0; }
+.chip { min-height: 44px; }
+/* 3.2 итог: развязка свёрнута */
+.ending-toggle { margin: 4px 0 0; padding-left: 0; text-align: left; }
+.ending-toggle::after { content: ' ›'; }
+.ending-toggle[aria-expanded="true"]::after { content: ' ⌄'; }
+.keepsake #keepsake-note { display: none; }
+/* 3.3 новинка — значок и 1–2 слова */
+.new-badge { display: inline-block; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: #FFF6E2;
+  background: #B7791F; border-radius: 6px; padding: 1px 6px; margin-right: 4px; vertical-align: 1px; }
+.daily-gain .i { width: 15px; height: 15px; vertical-align: -2px; color: var(--amber); }
+/* 3.6 звук — круглая кнопка в углу главной и плитка в настройках */
+.head-btns { display: flex; gap: 4px; flex: none; }
+#btn-sound { border-radius: 50%; }
+#btn-sound[aria-checked="false"] { color: var(--muted); }
+.tile-row { display: flex; gap: 12px; justify-content: center; margin: 4px 0 10px; }
+.tile-btn { width: 76px; height: 76px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-size: 13px; font-weight: 600; }
+.tile-btn .i { width: 26px; height: 26px; color: var(--green); }
+.tile-btn[aria-checked="false"] { background: var(--soft); color: var(--muted); }
+.tile-btn[aria-checked="false"] .i { color: var(--muted); }
+/* 3.7 на телефоне: заголовок поля целиком — точки улик во второй строке вместо места; на 320 звание без обрезки */
+@media (max-width: 419px) {
+  .field-head { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "back title atlas" "back dots atlas"; column-gap: 6px; row-gap: 3px; }
+  .field-head #btn-back { grid-area: back; }
+  .field-head .field-title { grid-area: title; }
+  .field-head #field-sub { display: none; }
+  .field-head #chip-atlas { grid-area: atlas; }
+  .field-head .dots { grid-area: dots; gap: 5px; }
+  .field-head .dot { width: 10px; height: 10px; }
+  .rank-bar .rank-name { max-width: none; flex: 0 1 auto; white-space: normal; text-overflow: clip; line-height: 1.15; text-align: right; }
+  .rank-bar .bar { min-width: 24px; }
+}
+@media (max-width: 359px) {
+  .field-head { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "back title atlas" "back dots atlas"; column-gap: 6px; row-gap: 3px; }
+  .field-head #btn-back { grid-area: back; }
+  .field-head .field-title { grid-area: title; }
+  .field-head #field-sub { display: none; }
+  .field-head #chip-atlas { grid-area: atlas; }
+  .field-head .dots { grid-area: dots; gap: 5px; }
+  .field-head .dot { width: 10px; height: 10px; }
+  .field-title b { font-size: 16px; }
+  .rank-bar { font-size: 13px; }
+  .rank-bar .bar { min-width: 24px; }
+  .rank-bar .rank-name { max-width: none; flex: 0 1 auto; white-space: normal; text-overflow: clip; line-height: 1.15; text-align: right; }
+}

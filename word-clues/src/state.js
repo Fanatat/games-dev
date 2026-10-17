@@ -12,9 +12,11 @@
   var IDLE_CAP_MS = 120000;    // активное время: не больше 120 с без действий (ТЗ §14.1)
   /* Экономика круга 3 (план эксперта b009, круг 1): лупы редкие — их тратят на подсказки,
      а не копят; марки приходят чаще и тратятся на фонари и оформление атласа (ТЗ §8.2). */
-  var BONUS_STAMPS = 2;                            // бонусное слово — только марки
+  var BONUS_STAMPS = 2, BONUS_FULL = 25;           // бонусное слово — только марки; после 25-го в истории — по 1
   var NO_HINT_XP = 5;                              // история без «Начала», «Пути» и «Разбора»
-  var GOLDEN_CHANCE = 0.35, GOLDEN = { loupes: 1, stamps: 10 }; // золотая марка: изредка за историю без подсказок
+  var GOLDEN_CHANCE = 0.2, GOLDEN = { loupes: 1, stamps: 10 }; // золотая марка: изредка за историю без подсказок
+  var GOLDEN_AT = [4, 8];                          // …и всегда на 5-й и 9-й истории главы (круг 5: награда растёт к концу главы)
+  var GUESS = { loupes: 1, stamps: 15 };           // тайное слово угадано до последней буквы
   var PARCELS = { 4: { loupes: 1, stamps: 40 }, 12: { loupes: 1, stamps: 40 } }; // посылка хранителей: 5-я и 13-я истории
   var FINALE = { loupes: 2, stamps: 100 };         // финал главы (ТЗ §6.2)
   var CACHE_REWARD = { loupes: 1, stamps: 15 };
@@ -63,7 +65,7 @@
       current: null,
       completed_story_ids: [], atlas_item_ids: [], seen_result_ids: [],
       wallet: { stamps: 0, loupes: START_LOUPES }, xp: 0,
-      seed: seedOf(), bonus_total: 0, golden: 0, lanterns: [], secret: {}, caches: [], parcels: [],
+      seed: seedOf(), bonus_total: 0, golden: 0, lanterns: [], secret: {}, guesses: {}, caches: [], parcels: [],
       cover: 'paper', covers: ['paper'], seen_new: [], finale: false, finales: [],
       diary: [], diary_pages: 0, last_day: null, visits: 0,
       free_demo: { start: true, path: true },
@@ -240,23 +242,24 @@
       var complete = foundCount() === curStory().clues.length;
       if (!complete && (c.selected_clue_id === clueId || isFound(c.selected_clue_id))) c.selected_clue_id = firstUnfound();
       // золотая буква тайного слова главы лежит в этом ответе
-      var sec = curStory().secret, letter = null;
-      if (sec && sec.clue_id === clueId && !data.secret[sec.pos]) { data.secret[sec.pos] = sec.letter; letter = sec.letter; }
+      var sec = curStory().secret, letter = null, sk = sec && secretKey(curStory().chapter, sec.pos);
+      if (sec && sec.clue_id === clueId && !data.secret[sk]) { data.secret[sk] = sec.letter; letter = sec.letter; }
       writeNow(); // каждое найденное слово — сразу на диск (A06)
       return { already: false, complete: complete, secret: letter };
     }
 
-    /* Бонусное слово: настоящее слово поля, не ответ. +2 марки.
-       Возвращает {ok, repeat, count, stamps} или null, если слова нет в списке истории. */
+    /* Бонусное слово: настоящее слово поля, не ответ. +2 марки, после 25-го в истории +1
+       (круг 5: награды за истории растут, а рамкам атласа нужно остаться целью). Возвращает {ok, repeat, count, stamps} или null, если слова нет в списке истории. */
     function bonusWord(word) {
       var c = data.current, s = curStory();
       if (!c || !s || !s.bonus || s.bonus.indexOf(word) < 0) return null;
       if (c.bonus.indexOf(word) >= 0) return { ok: false, repeat: true, count: c.bonus.length };
       c.bonus.push(word);
       data.bonus_total++;
-      data.wallet.stamps += BONUS_STAMPS;
+      var got = c.bonus.length > BONUS_FULL ? 1 : BONUS_STAMPS;
+      data.wallet.stamps += got;
       writeNow();
-      return { ok: true, repeat: false, count: c.bonus.length, stamps: BONUS_STAMPS };
+      return { ok: true, repeat: false, count: c.bonus.length, stamps: got };
     }
     // Тайник: слово без улики. Награда один раз на историю.
     function cacheFound() {
@@ -333,12 +336,9 @@
         var rankBefore = rankOf(data.xp);
         reward.stamps = s.reward.first_completion_stamps;
         reward.xp = s.reward.first_completion_xp;
-        if (!used) {
-          reward.no_hints = true;
-          reward.xp += NO_HINT_XP;
-          if (chance(data.seed, s.id) < GOLDEN_CHANCE) {
-            reward.golden = true; reward.loupes += GOLDEN.loupes; reward.stamps += GOLDEN.stamps; data.golden++;
-          }
+        if (!used) { reward.no_hints = true; reward.xp += NO_HINT_XP; }
+        if (GOLDEN_AT.indexOf(s.pos) >= 0 || (!used && chance(data.seed, s.id) < GOLDEN_CHANCE)) {
+          reward.golden = true; reward.loupes += GOLDEN.loupes; reward.stamps += GOLDEN.stamps; data.golden++;
         }
         var pc = PARCELS[s.index];
         if (pc && data.parcels.indexOf(s.id) < 0) {
@@ -372,6 +372,30 @@
       data.current = null;
       writeNow();
       return reward;
+    }
+
+    /* Тайное слово главы: у главы 1 буквы лежат под номерами 0…5 (старые сохранения), у следующих — «2:0»… */
+    function secretKey(ch, pos) { return ch === 1 ? String(pos) : ch + ':' + pos; }
+    function secretOf(ch) {
+      var c = chapter(ch), w = c.secret_word || (ch === 1 ? content.secret_word : null);
+      if (!w) return null;
+      var got = {}, n = 0;
+      for (var i = 0; i < w.length; i++) { var l = data.secret[secretKey(ch, i)]; if (l) { got[i] = l; n++; } }
+      return { word: w, title: c.secret_title || content.secret_title || 'Тайное слово', got: got, count: n, full: n === w.length, guess: data.guesses[ch] || null };
+    }
+    /* Угадать тайное слово раньше последней буквы: одна попытка, верно — лупа и марки. */
+    function canGuess(ch) {
+      var sw = secretOf(ch);
+      return !!sw && sw.count === sw.word.length - 1 && !data.guesses[ch];
+    }
+    function guess(ch, word) {
+      if (!canGuess(ch)) return null;
+      var sw = secretOf(ch), ok = word === sw.word;
+      data.guesses[ch] = ok ? 'ok' : 'no';
+      var r = { ok: ok, loupes: 0, stamps: 0 };
+      if (ok) { r.loupes = GUESS.loupes; r.stamps = GUESS.stamps; data.wallet.loupes += r.loupes; data.wallet.stamps += r.stamps; }
+      writeNow();
+      return r;
     }
 
     function hintState(clueId) {
@@ -426,7 +450,7 @@
 
     load();
     return {
-      KEY: KEY, COST: COST, RANKS: RANKS, LANTERN_COST: LANTERN_COST, BONUS_STAMPS: BONUS_STAMPS, FINALE: FINALE, DIARY: DIARY,
+      KEY: KEY, COST: COST, RANKS: RANKS, LANTERN_COST: LANTERN_COST, BONUS_STAMPS: BONUS_STAMPS, BONUS_FULL: BONUS_FULL, FINALE: FINALE, DIARY: DIARY,
       chapters: chapters, chapter: chapter, chapterStories: chapterStories, isChapterEnd: isChapterEnd, chapterFull: chapterFull,
       chapterGot: chapterGot, diary: diary, visit: visit, dayKey: function () { return dayKey(now()); },
       get data() { return data; }, get saveOk() { return saveOk; },
@@ -438,7 +462,7 @@
       activeMs: activeMs, addActive: addActive, setSetting: setSetting, markOpened: markOpened, markTraced: markTraced,
       markResultSeen: markResultSeen, reset: reset, flush: flush, save: writeNow, adopt: adopt,
       bonusWord: bonusWord, cacheFound: cacheFound, cacheDone: cacheDone,
-      canLight: canLight, light: light, rank: rank,
+      canLight: canLight, light: light, rank: rank, secretOf: secretOf, canGuess: canGuess, guess: guess, GUESS: GUESS,
       covers: covers, canPickCover: canPickCover, setCover: setCover, markNew: markNew, seenNew: seenNew, trioCount: trioCount,
     };
   }

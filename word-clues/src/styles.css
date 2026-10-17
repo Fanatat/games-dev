@@ -453,3 +453,38 @@ body.rm .cell.hint-start { animation: none; }
 #wallet .gold { color: #A86F12; }
 #wallet .gold svg { color: #C9962B; }
 .town-lamps.many .town-lamp { width: 8%; }
+/* круг 5: фонарь прямо на итоге — карточка с картинкой, вспышка на сцене */
+.btn-lantern.card { justify-content: flex-start; gap: 12px; text-align: left; width: 100%; font: inherit; }
+.btn-lantern > span:last-child { display: flex; flex-direction: column; }
+.btn-lantern .muted { font-weight: 400; }
+.lan-img { width: 52px; height: 52px; flex: none; border-radius: 10px; filter: grayscale(.7) brightness(.85); }
+.lan-img > img { object-fit: contain; }
+.lan-img > .art-icon { font-size: 32px; }
+.btn-lantern.lit .lan-img { filter: drop-shadow(0 0 8px rgba(255, 196, 80, .9)); }
+.scene-lamp { position: absolute; right: 8%; bottom: 10%; width: 22%; height: 46%; pointer-events: none;
+  filter: drop-shadow(0 0 14px rgba(255, 200, 90, .95)); animation: lampPop .7s cubic-bezier(.3, 1.6, .5, 1) both; }
+.scene-lamp > img { object-fit: contain; }
+.scene-lamp > .art-icon { font-size: 40px; }
+.lamp-flash::after { content: ''; position: absolute; inset: 0; pointer-events: none; border-radius: inherit;
+  background: radial-gradient(circle at 80% 60%, rgba(255, 214, 120, .85), rgba(255, 214, 120, 0) 60%); animation: lampFlash 1.4s ease both; }
+@keyframes lampPop { from { opacity: 0; transform: scale(.3) translateY(20px); } }
+@keyframes lampFlash { 0% { opacity: 0; } 25% { opacity: 1; } 100% { opacity: .35; } }
+/* круг 5: шкала «Нити маршрута» на поле */
+.scene-thread { position: absolute; left: 6px; bottom: 6px; display: flex; align-items: center; gap: 5px; padding: 3px 8px; border-radius: 10px;
+  background: rgba(255, 253, 246, .9); font-size: 12px; color: var(--green-d); pointer-events: none; }
+.scene-thread .i { width: 14px; height: 14px; color: var(--amber); }
+.th-dots { display: flex; gap: 3px; }
+.th-dots i { width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid var(--amber); }
+.th-dots i.on { background: var(--amber); }
+.th-dots i.cur { box-shadow: 0 0 0 2px rgba(213, 156, 69, .35); }
+/* круг 5: письмо Полины и улика-силуэт */
+.clue-card.letter { background: #FFFBF0; border-left-color: #8A5A12; }
+.clue-card.letter .clue-text { font-style: italic; }
+.clue-card.letter::before { content: '✉ ' attr(data-letter); position: absolute; top: -9px; left: 14px; padding: 0 6px; font-size: 11px; font-weight: 700;
+  color: #8A5A12; background: #FFF6E2; border: 1px solid #E2C68E; border-radius: 6px; }
+.clue-pic.sil > img { filter: brightness(0) opacity(.8); }
+/* круг 5: угадать тайное слово на вступлении */
+.intro-guess { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; padding: 10px 14px; margin-bottom: 8px; }
+.intro-guess.good { background: #E4EFE7; }
+.guess-opts { display: flex; gap: 8px; flex-wrap: wrap; }
+.guess-opts .btn-small { min-height: 44px; min-width: 96px; font-weight: 700; letter-spacing: .04em; }

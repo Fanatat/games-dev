@@ -38,7 +38,11 @@ window.G1F_CONTENT = {
     "text": "Это все десять историй первой главы. Глава 2 «Старый сад» уже открыта — там начинаются поиски автора маршрута.",
     "question": "Почему Полина спрятала своё имя?"
    },
-   "stories": 10
+   "secret_decoys": [
+    "ПОЛЯНА"
+   ],
+   "stories": 10,
+   "secret_word": "ПОЛИНА"
   },
   {
    "num": 2,
@@ -49,7 +53,12 @@ window.G1F_CONTENT = {
     "text": "Это все опубликованные истории главы 2. Следующие пять пишутся — в них Полина ответит сама.",
     "question": "Сколько фонарей нужно зажечь, чтобы Полина вернулась?"
    },
-   "stories": 5
+   "secret_title": "Тайное слово сада",
+   "secret_decoys": [
+    "ДОМОВ"
+   ],
+   "stories": 5,
+   "secret_word": "ДОМОЙ"
   }
  ],
  "share": {
@@ -574,7 +583,6 @@ window.G1F_CONTENT = {
     "ЛЕТ",
     "МЕЛ",
     "МЕЧ",
-    "МОЕ",
     "ОАЗ",
     "ОДА",
     "РАЗ",
@@ -871,7 +879,7 @@ window.G1F_CONTENT = {
    "keepsake_icon": "📦",
    "keepsake_note": "Тридцать лет ожидания",
    "reward": {
-    "first_completion_stamps": 20,
+    "first_completion_stamps": 25,
     "first_completion_xp": 10,
     "atlas_item_id": "lantern_parcel"
    },
@@ -1153,7 +1161,7 @@ window.G1F_CONTENT = {
    "keepsake_icon": "🪙",
    "keepsake_note": "Время — подсказка",
    "reward": {
-    "first_completion_stamps": 20,
+    "first_completion_stamps": 25,
     "first_completion_xp": 10,
     "atlas_item_id": "clock_token"
    },
@@ -1462,7 +1470,7 @@ window.G1F_CONTENT = {
    "keepsake_icon": "✉️",
    "keepsake_note": "Дети тоже искали",
    "reward": {
-    "first_completion_stamps": 20,
+    "first_completion_stamps": 25,
     "first_completion_xp": 10,
     "atlas_item_id": "future_letters"
    },
@@ -1776,7 +1784,7 @@ window.G1F_CONTENT = {
    "keepsake_icon": "📜",
    "keepsake_note": "Тот же почерк",
    "reward": {
-    "first_completion_stamps": 20,
+    "first_completion_stamps": 30,
     "first_completion_xp": 10,
     "atlas_item_id": "bottle_note"
    },
@@ -2066,7 +2074,7 @@ window.G1F_CONTENT = {
    "keepsake_icon": "🍂",
    "keepsake_note": "Уговор хранителей",
    "reward": {
-    "first_completion_stamps": 20,
+    "first_completion_stamps": 30,
     "first_completion_xp": 10,
     "atlas_item_id": "herbarium_leaf"
    },
@@ -2387,7 +2395,7 @@ window.G1F_CONTENT = {
    "keepsake_icon": "📋",
    "keepsake_note": "Двенадцать имён",
    "reward": {
-    "first_completion_stamps": 20,
+    "first_completion_stamps": 30,
     "first_completion_xp": 10,
     "atlas_item_id": "club_list"
    },
@@ -2545,7 +2553,7 @@ window.G1F_CONTENT = {
     {
      "id": "s009_c5",
      "answer": "ЖУРНАЛ",
-     "clue": "Учитель ставил в нём оценки, а кружок — отметки о найденных местах.",
+     "clue": "Ребята, в него я записывала каждое найденное место. Найдёте — допишите своё. П.",
      "extra": "Толстая тетрадь класса для оценок и посещений.",
      "reveal": "Последняя запись: «Маршрут готов. Хранители: Вера, Михаил, Нина».",
      "path": [
@@ -2576,7 +2584,8 @@ window.G1F_CONTENT = {
      ],
      "explain_ms": 90000,
      "img": "register",
-     "icon": "📒"
+     "icon": "📒",
+     "letter": true
     },
     {
      "id": "s009_c6",
@@ -2686,8 +2695,8 @@ window.G1F_CONTENT = {
      1
     ]
    },
-   "new": null,
-   "new_text": ""
+   "new": "letter",
+   "new_text": "Новое: среди улик — письмо, подписанное «П.»"
   },
   {
    "id": "s010",
@@ -2706,7 +2715,7 @@ window.G1F_CONTENT = {
    "keepsake_icon": "🏮",
    "keepsake_note": "Город снова в гостях",
    "reward": {
-    "first_completion_stamps": 20,
+    "first_completion_stamps": 35,
     "first_completion_xp": 10,
     "atlas_item_id": "square_lantern"
    },
@@ -2930,10 +2939,8 @@ window.G1F_CONTENT = {
     "ПАНИ",
     "ФОРА",
     "ЕРА",
-    "ОНА",
     "ПАН",
     "ПАР",
-    "САМ",
     "СИП",
     "ФОН",
     "ЧАС",
@@ -2949,8 +2956,8 @@ window.G1F_CONTENT = {
      4
     ]
    },
-   "new": null,
-   "new_text": ""
+   "new": "guess",
+   "new_text": "Новое: угадайте тайное слово раньше последней буквы — награда лупой."
   },
   {
    "id": "s011",
@@ -2969,7 +2976,7 @@ window.G1F_CONTENT = {
    "keepsake_icon": "🟦",
    "keepsake_note": "Дом, где жила Полина",
    "reward": {
-    "first_completion_stamps": 20,
+    "first_completion_stamps": 35,
     "first_completion_xp": 10,
     "atlas_item_id": "blue_shutter"
    },
@@ -3196,9 +3203,17 @@ window.G1F_CONTENT = {
     "РОГ"
    ],
    "cache": null,
-   "secret": null,
-   "new": null,
-   "new_text": ""
+   "secret": {
+    "letter": "М",
+    "pos": 2,
+    "clue_id": "s011_c4",
+    "cell": [
+     0,
+     2
+    ]
+   },
+   "new": "secret2",
+   "new_text": "Новое: у сада своё тайное слово — пять золотых букв."
   },
   {
    "id": "s012",
@@ -3217,7 +3232,7 @@ window.G1F_CONTENT = {
    "keepsake_icon": "🏷️",
    "keepsake_note": "«Тем, кто дошёл до сада»",
    "reward": {
-    "first_completion_stamps": 20,
+    "first_completion_stamps": 35,
     "first_completion_xp": 10,
     "atlas_item_id": "well_tag"
    },
@@ -3463,7 +3478,15 @@ window.G1F_CONTENT = {
     "ЦЕЖ"
    ],
    "cache": null,
-   "secret": null,
+   "secret": {
+    "letter": "Д",
+    "pos": 0,
+    "clue_id": "s012_c3",
+    "cell": [
+     3,
+     0
+    ]
+   },
    "new": null,
    "new_text": ""
   },
@@ -3484,7 +3507,7 @@ window.G1F_CONTENT = {
    "keepsake_icon": "🎖️",
    "keepsake_note": "Одиннадцать из двенадцати",
    "reward": {
-    "first_completion_stamps": 20,
+    "first_completion_stamps": 40,
     "first_completion_xp": 10,
     "atlas_item_id": "pathfinder_badge"
    },
@@ -3601,7 +3624,9 @@ window.G1F_CONTENT = {
      ],
      "explain_ms": 90000,
      "img": "wheelbarrow",
-     "icon": "🛒"
+     "icon": "🛒",
+     "picture": true,
+     "silhouette": true
     },
     {
      "id": "s013_c4",
@@ -3706,7 +3731,6 @@ window.G1F_CONTENT = {
    ],
    "bonus": [
     "ТАПОЧКА",
-    "ТЕЛОЧКА",
     "ЕЛОЧКА",
     "КЛОЧКА",
     "КЛЕТЬ",
@@ -3716,14 +3740,11 @@ window.G1F_CONTENT = {
     "ПОЛЕТ",
     "ПОЛКА",
     "ПОЧКА",
-    "ТЕЛКА",
     "ТЕСЛО",
     "ЧАЛКА",
     "АРГО",
-    "АТАС",
     "ГРАБ",
     "ЕЛКА",
-    "ИГИЛ",
     "ИГРА",
     "КЕТА",
     "КЛОП",
@@ -3771,9 +3792,17 @@ window.G1F_CONTENT = {
     "ШОК"
    ],
    "cache": null,
-   "secret": null,
-   "new": null,
-   "new_text": ""
+   "secret": {
+    "letter": "О",
+    "pos": 1,
+    "clue_id": "s013_c2",
+    "cell": [
+     5,
+     3
+    ]
+   },
+   "new": "silhouette",
+   "new_text": "Новое: улика-силуэт. Узнайте вещь по тени."
   },
   {
    "id": "s014",
@@ -3792,7 +3821,7 @@ window.G1F_CONTENT = {
    "keepsake_icon": "📦",
    "keepsake_note": "Письмо Полины",
    "reward": {
-    "first_completion_stamps": 20,
+    "first_completion_stamps": 40,
     "first_completion_xp": 10,
     "atlas_item_id": "linden_box"
    },
@@ -4041,7 +4070,15 @@ window.G1F_CONTENT = {
     "УДА"
    ],
    "cache": null,
-   "secret": null,
+   "secret": {
+    "letter": "О",
+    "pos": 3,
+    "clue_id": "s014_c3",
+    "cell": [
+     4,
+     5
+    ]
+   },
    "new": null,
    "new_text": ""
   },
@@ -4062,7 +4099,7 @@ window.G1F_CONTENT = {
    "keepsake_icon": "🎖️",
    "keepsake_note": "Значок вернулся в атлас",
    "reward": {
-    "first_completion_stamps": 20,
+    "first_completion_stamps": 40,
     "first_completion_xp": 10,
     "atlas_item_id": "twelfth_badge"
    },
@@ -4172,7 +4209,7 @@ window.G1F_CONTENT = {
     {
      "id": "s015_c4",
      "answer": "МОСТИК",
-     "clue": "Пять досок через воду, и под ногами пружинит.",
+     "clue": "Пять досок через воду — по ним я каждое утро ходила к острову. Они и сейчас пружинят? П.",
      "extra": "Небольшой мост через ручей или пруд.",
      "reveal": "Мостик новый: доски ещё светлые.",
      "path": [
@@ -4203,7 +4240,8 @@ window.G1F_CONTENT = {
      ],
      "explain_ms": 90000,
      "img": "footbridge",
-     "icon": "🌉"
+     "icon": "🌉",
+     "letter": true
     },
     {
      "id": "s015_c5",
@@ -4308,7 +4346,6 @@ window.G1F_CONTENT = {
     "КИТ",
     "КУР",
     "МАК",
-    "МОЕ",
     "МОР",
     "ОРТ",
     "ОСА",
@@ -4323,10 +4360,18 @@ window.G1F_CONTENT = {
     "ЧУР"
    ],
    "cache": null,
-   "secret": null,
-   "new": null,
-   "new_text": ""
+   "secret": {
+    "letter": "Й",
+    "pos": 4,
+    "clue_id": "s015_c1",
+    "cell": [
+     1,
+     3
+    ]
+   },
+   "new": "letter2",
+   "new_text": "Новое: Полина отвечает сама — её письмо среди улик."
   }
  ],
- "checksum": "7fa3cca940b6"
+ "checksum": "06152dd6b3b5"
 };

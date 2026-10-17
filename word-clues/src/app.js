@@ -180,7 +180,10 @@
   /* ---------- главы (план эксперта b009, круг 2): атлас и счёт историй — внутри главы ---------- */
   function chTitle(num) { return 'Глава ' + num + ' · ' + S.chapter(num).title; }
   function chCount(num) { return S.chapterGot(num) + '/' + S.chapter(num).slots; }
-  function storyKicker(s) { return 'История ' + (s.pos + 1) + ' из ' + S.chapter(s.chapter).slots + ' · ' + s.place; }
+  function storyKicker(s) {
+    var n = S.chapterFull(s.chapter) ? S.chapter(s.chapter).slots : S.chapterStories(s.chapter).length;
+    return 'История ' + (s.pos + 1) + ' из ' + n + ' · ' + s.place;
+  }
   function lastChapter() { return S.stories[S.stories.length - 1].chapter; }
   function curChapter() { var t = homeTarget(); return t.story ? t.story.chapter : lastChapter(); }
   function atlasChip(el, num, got) {
@@ -246,7 +249,7 @@
     var ch = t.story ? t.story.chapter : lastChapter();
     $('atlas-sub').textContent = 'Глава ' + ch + ': ' + S.chapterGot(ch) + ' из ' + S.chapter(ch).slots + ' · ' + S.rank().name;
     $('town-tile-sub').textContent = 'Фонарей: ' + S.data.lanterns.length + ' из ' + S.stories.length + ' · марок ' + S.data.wallet.stamps;
-    renderSecret($('home-secret'), ch !== 1);
+    renderSecret($('home-secret'), ch);
     if (S.data.completed_story_ids.length) renderDiary($('home-diary'), { back: visitInfo.back });
     else $('home-diary').hidden = true;
     var nx = $('home-next');
@@ -279,6 +282,8 @@
     $('intro-new').hidden = !fresh;
     $('intro-new').textContent = fresh ? s.new_text : '';
     if (s.new) S.markNew(s.new);
+    $('intro-guess').classList.remove('good');
+    renderGuess(s);
     show('scr-intro');
   }
   function beginStory(s) {
@@ -299,6 +304,16 @@
     return n;
   }
   function clue(id) { return F.story.clues.filter(function (c) { return c.id === id; })[0]; }
+  // «Нить 2/5 ●●○»: сколько историй до следующего общего секрета маршрута.
+  function renderThread() {
+    var el = $('scene-thread'), all = C.route_secrets.length, k = S.trioCount();
+    if (!all || k >= all) { el.hidden = true; return; }
+    var inTrio = S.data.completed_story_ids.length % 3, dots = '';
+    for (var i = 0; i < 3; i++) dots += '<i class="' + (i < inTrio ? 'on' : i === inTrio ? 'cur' : '') + '"></i>';
+    el.hidden = false;
+    el.innerHTML = icon('book') + '<b>Нить ' + (k + 1) + '/' + all + '</b><span class="th-dots">' + dots + '</span>';
+    el.setAttribute('aria-label', 'Нить маршрута ' + (k + 1) + ' из ' + all + ': историй до неё ' + (3 - inTrio));
+  }
   function selId() { return S.cur() ? S.cur().selected_clue_id : null; }
   function clueIdx(id) { var i = -1; F.story.clues.forEach(function (c, k) { if (c.id === id) i = k; }); return i; }
 
@@ -310,6 +325,7 @@
     $('field-sub').textContent = s.place;
     art($('scene-bg'), s.scene, '');
     $('scene').dataset.story = s.id;    renderSceneItems($('scene-items'), s, function (c) { return S.isFound(c.id); }, false);
+    renderThread();
     show('scr-field');
     sizeClueCard();
     window.Board.render(s, S.cur().found, {
@@ -466,13 +482,17 @@
     $('clue-text').classList.toggle('pic', !!pic);
     if (pic) {
       var im = document.createElement('span');
-      im.className = 'clue-pic art';
+      im.className = 'clue-pic art' + (c.silhouette ? ' sil' : '');
       $('clue-text').appendChild(im);
       art(im, c.img, c.icon);
       var cap = document.createElement('span');
-      cap.textContent = 'Что на картинке?';
+      cap.textContent = c.silhouette ? 'Чей это силуэт?' : 'Что на картинке?';
       $('clue-text').appendChild(cap);
     }
+    // Письмо Полины: улика её словами, с подписью (новинка 9-й и 15-й историй)
+    var letter = c.letter && !found;
+    $('clue-card').classList.toggle('letter', !!letter);
+    $('clue-card').dataset.letter = letter ? (F.story.chapter === 1 ? 'Письмо от «П.»' : 'Письмо Полины') : '';
     var meta = (c.double ? 'Двойная улика · ' : '') + L.lettersLabel(c.answer.length) + ' · ' + (i + 1) + ' из ' + F.story.clues.length;
     var ans = found || h.path || h.explain;
     if (ans) meta = (found ? 'Найдено: ' : 'Ответ: ') + c.answer + ' · ' + meta;
@@ -754,6 +774,8 @@
     art($('result-bg'), s.scene, '');
     $('result-scene').dataset.story = s.id;
     renderSceneItems($('result-items'), s, function () { return true; }, true);
+    $('result-scene').querySelectorAll('.scene-lamp').forEach(function (x) { x.remove(); });
+    $('result-scene').classList.remove('lamp-flash');
     $('result-title').textContent = s.title;
     $('result-ending').textContent = s.ending;
     art($('keepsake-img'), s.keepsake_img, s.keepsake_icon);
@@ -774,7 +796,7 @@
     $('btn-res-atlas').hidden = end;
     S.markResultSeen(s.id);
     F = null;
-    renderSecret($('result-secret'));
+    renderSecret($('result-secret'), s.chapter);
     renderLantern(s);
     atlasChip($('res-atlas-chip'), s.chapter, S.chapterGot(s.chapter) - (reward && reward.item ? 1 : 0));
     show('scr-result');
@@ -878,31 +900,93 @@
       }, 800);
     }, 1200);
   }
-  // Тайное слово главы: «_ _ _ _ Н _».
-  function renderSecret(el, off) {
-    var w = C.secret_word, got = S.data.secret;
-    if (off || !w || !Object.keys(got).length) { el.hidden = true; return; }
+  // Тайное слово главы: «_ _ _ _ Н _». У каждой главы своё (круг 5).
+  function secretCells(sw) {
+    return sw.word.split('').map(function (ch, i) { return '<span class="sl' + (sw.got[i] ? ' on' : '') + '">' + (sw.got[i] || '') + '</span>'; }).join('');
+  }
+  function renderSecret(el, ch) {
+    var sw = ch && S.secretOf(ch);
+    if (!sw || !sw.count) { el.hidden = true; return; }
     el.hidden = false;
-    var cells = w.split('').map(function (ch, i) { return '<span class="sl' + (got[i] ? ' on' : '') + '">' + (got[i] || '') + '</span>'; }).join('');
-    el.innerHTML = '<span class="muted">' + esc(C.secret_title || 'Тайное слово') + '</span><span class="secret-cells">' + cells + '</span>';
+    el.innerHTML = '<span class="muted">' + esc(sw.title) + '</span><span class="secret-cells">' + secretCells(sw) + '</span>';
   }
-  // Фонарь у пройденного места: тратим марки сразу с итога.
+  // Угадать тайное слово до последней буквы: на вступлении, одна попытка.
+  function renderGuess(s) {
+    var box = $('intro-guess'), ch = s.chapter;
+    if (!S.canGuess(ch)) { box.hidden = true; return; }
+    var sw = S.secretOf(ch), opts = [sw.word].concat(S.chapter(ch).secret_decoys || []);
+    if (opts.length < 2) { box.hidden = true; return; }
+    if ((String(S.data.seed).charCodeAt(0) + ch) % 2) opts.reverse(); // верное слово не всегда слева
+    box.hidden = false;
+    box.innerHTML = '<b>' + esc(sw.title) + ': угадаете до последней буквы?</b><span class="secret-cells">' + secretCells(sw) + '</span>' +
+      '<span class="guess-opts">' + opts.map(function (w) { return '<button class="btn-small" data-guess="' + esc(w) + '">' + esc(w) + '</button>'; }).join('') + '</span>' +
+      '<span class="muted">Одна попытка · верно — +' + nLoupes(S.GUESS.loupes) + ' и +' + nStamps(S.GUESS.stamps) + '</span>';
+    box.querySelectorAll('[data-guess]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var r = S.guess(ch, b.dataset.guess);
+        if (!r) return;
+        A.event('secret_guess', { story_id: s.id, chapter: ch, ok: r.ok });
+        window.Sound.play(r.ok ? 'reward' : 'wrong');
+        box.innerHTML = r.ok ? '<b>' + icon('check') + ' Верно: ' + esc(sw.word) + '!</b><span class="muted">+' + nLoupes(r.loupes) + ' · +' + nStamps(r.stamps) + '. Последняя буква — в этой истории.</span>'
+          : '<b>Не угадали.</b><span class="muted">Последняя буква — в этой истории, на золотой клетке.</span>';
+        box.classList.toggle('good', r.ok);
+        pulse(box);
+      });
+    });
+  }
+  // Фонарь у пройденного места: тратим марки сразу с итога (план эксперта №3, круг 1).
+  // Самый первый фонарь зажигает главная кнопка — так игрок один раз видит, зачем марки.
+  var firstLamp = false;
   function renderLantern(s) {
-    var b = $('btn-lantern');
+    var b = $('btn-lantern'), nx = $('btn-next');
     var lit = S.data.lanterns.indexOf(s.id) >= 0;
+    firstLamp = false;
+    if (nx.dataset.text) { nx.textContent = nx.dataset.text; nx.dataset.text = ''; }
+    renderGoal();
     if (lit || S.data.completed_story_ids.indexOf(s.id) < 0) { b.hidden = true; return; }
+    var can = S.canLight(s.id);
     b.hidden = false;
-    b.disabled = !S.canLight(s.id);
-    b.innerHTML = icon('lamp') + '<span>Зажечь фонарь · ' + S.LANTERN_COST + ' марок</span>' +
-      (S.canLight(s.id) ? '' : '<span class="muted"> · у вас ' + S.data.wallet.stamps + '</span>');
+    b.disabled = !can;
+    b.classList.remove('lit');
+    b.innerHTML = '<span class="lan-img art"></span><span><b>Зажечь фонарь: ' + esc(s.place) + '</b><span class="muted">' +
+      S.LANTERN_COST + ' марок · ' + (can ? 'фонарей ' + S.data.lanterns.length + ' из ' + S.stories.length : 'у вас ' + S.data.wallet.stamps) + '</span></span>';
+    art(b.querySelector('.lan-img'), 'street_lamp', '🏮');
     b.onclick = function () { lightLantern(s, b); };
+    if (can && !S.data.lanterns.length) {
+      firstLamp = true;
+      nx.dataset.text = nx.textContent;
+      nx.textContent = 'Зажечь первый фонарь · ' + S.LANTERN_COST + ' марок';
+    }
   }
-  function lightLantern(s, b) {
+  // Шкала «марки → ближайшая рамка атласа»: копить есть на что.
+  function renderGoal() {
+    var g = $('result-goal');
+    var next = S.covers().filter(function (c) { return !c.own && c.price > 0; }).sort(function (a, b) { return a.price - b.price; })[0];
+    if (!next) { g.hidden = true; return; }
+    var have = S.data.wallet.stamps, pct = Math.min(100, Math.round(100 * have / next.price));
+    g.hidden = false;
+    g.innerHTML = icon('stamp') + '<b>' + have + ' / ' + next.price + '</b><span class="bar"><i style="width:' + pct + '%"></i></span><span class="rank-name">' + esc(C.covers[next.id] || next.id) + '</span>';
+    g.setAttribute('aria-label', 'Марки: ' + have + ' из ' + next.price + ' до обложки «' + (C.covers[next.id] || next.id) + '»');
+  }
+  function lightLantern(s, b, from) {
     var r = S.light(s.id);
     if (!r) return;
-    A.event('lantern_lit', { story_id: s.id, count: S.data.lanterns.length, stamps: S.data.wallet.stamps });
+    A.event('lantern_lit', { story_id: s.id, count: S.data.lanterns.length, stamps: S.data.wallet.stamps, from: from || (screen === 'scr-result' ? 'result' : 'town') });
     window.Sound.play('reward');
-    if (b) { b.innerHTML = icon('lamp') + '<span>Фонарь горит</span>'; b.disabled = true; b.classList.add('lit'); }
+    if (b) {
+      b.innerHTML = '<span class="lan-img art"></span><span><b>Фонарь горит: ' + esc(s.place) + '</b><span class="muted">фонарей ' + S.data.lanterns.length + ' из ' + S.stories.length + '</span></span>';
+      art(b.querySelector('.lan-img'), 'street_lamp', '🏮');
+      b.disabled = true; b.classList.add('lit');
+    }
+    if (screen === 'scr-result') {
+      var sc = $('result-scene'), lamp = document.createElement('span');
+      lamp.className = 'scene-lamp art';
+      art(lamp, 'street_lamp', '🏮');
+      sc.appendChild(lamp);
+      sc.classList.remove('lamp-flash'); void sc.offsetWidth; sc.classList.add('lamp-flash');
+      if (firstLamp) { firstLamp = false; var nx = $('btn-next'); nx.textContent = nx.dataset.text; nx.dataset.text = ''; }
+      renderGoal();
+    }
     if (screen === 'scr-town') renderTown();
   }
 
@@ -945,6 +1029,7 @@
 
   function onNext() {
     var s = resultStory;
+    if (firstLamp && s && screen === 'scr-result') { lightLantern(s, $('btn-lantern'), 'result_main'); return; }
     var end = !s || S.isChapterEnd(s), next = s && !end ? S.stories[s.index + 1] : null;
     A.event('story_next_clicked', { story_id: s ? s.id : null, next_story_id: next ? next.id : null });
     window.Sound.play('tap');
@@ -1018,7 +1103,7 @@
       if (S.data.atlas_item_ids.indexOf(st.reward.atlas_item_id) >= 0) art(el, st.keepsake_img, st.keepsake_icon);
       g.appendChild(el);
     });
-    renderSecret($('finale-secret'));
+    renderSecret($('finale-secret'), num);
     show('scr-finale');
     window.Sound.play('chapter');
   }

@@ -1,5 +1,5 @@
 {
- "build": "0.1.0+b009 · 743d1e1",
+ "build": "0.1.0+b010 · 6a10695",
  "art": [
   "address",
   "album",
@@ -178,16 +178,16 @@
   "assets/sfx/tap.mp3": "8cb413ca2f49b945861fdd7b69e452ff0c222882011be7bfeae92baaec2614cc",
   "assets/sfx/win.mp3": "468d5f3b8bf8c8ea8bcef52906b0da44ab35547d763035470621e2c9309cde0d",
   "assets/sfx/wrong.mp3": "cd172cec43bb120ad724e809a543e2e1608579441897b249ad916fc68b18f924",
-  "data/content.js": "e0d0b71f2247891ad085dbff1c6a0ffa3b4d9cd0ed280fcc3387ec765c211cfd",
-  "index.html": "b2851b04b77274a4d739f4a10e475e774304ca2b10bb8544ea48a1603b245216",
+  "data/content.js": "d3a9c6fc878ba75c84303e4177c9c2646e1d63f6b1c67c186bcf5fdedbd72f7f",
+  "index.html": "c533b20ab1f21617b6c3897fcf0810983018bab42abded480cf93d776455674c",
   "src/analytics.js": "839724c1521a0e1f94657ae92203788baf104657657d36f51f35fee11c532b28",
-  "src/app.js": "69336b00b6689a7b7a9038427b9d37a02e135e0d61531cf5de7c2c8591761ccc",
+  "src/app.js": "cf15b4e6d041c3a7a89e69337869939de4530533da7508c1608e13798d2af0cb",
   "src/board.js": "6de0a67091b9fd6e8f988fdf474db8b2f2fddc6ccb287f06357e32550500483f",
   "src/logic.js": "751efbcdcdc906b6ce093387588e905aaece51c0a05653cc99c501c715af8d4b",
   "src/platform.js": "72ba59916e42e80702bd0a34ef42e856f7b8ddf193f17c6c93a96be4725b4489",
   "src/sound.js": "a77c31e1d39cdba7eb2ca8b89464816a80198fd2258b9c61c8432ab1187ac70b",
-  "src/state.js": "f92352c3223816f16142f0fe3f234c9f6877987cdae9bf603a83b2d78a4a08bb",
-  "src/styles.css": "ac4a30f7ae57f19b6b784d29cacab196b507ea2216093b6e69cfa535df63a0ac",
+  "src/state.js": "1813e3111f6b3c53fcfaf57b79befcadf184274189c197f3bccbbb754e4e4c8a",
+  "src/styles.css": "722bd68204d0357e09a85310b79d1f2c4fa05e1950109c8b4c55f23adc0afa1d",
   "vendor/VK_BRIDGE.md": "954dbcac21cccc2676d7cd91c1c8241e0bc8695ff6cb75f40d547520df8dc8ba",
   "vendor/vk-bridge.min.js": "827ba6f457cd9e73519b58b2c66564caf138645202f1bba37dca0b567f601bb4"
  }

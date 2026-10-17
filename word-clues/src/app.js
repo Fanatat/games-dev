@@ -6,7 +6,6 @@
   var C = window.G1F_CONTENT, L = window.WordLogic, A = window.Analytics, P = window.Platform;
   var S = window.GameState.create(C, P.storage);
   var $ = function (id) { return document.getElementById(id); };
-  var TOTAL_SLOTS = 10; // разворот атласа: по находке на каждую из 10 историй главы
   var IDLE_MS = 120000, GHOST_MS = 3000, REVEAL_MS = 2600, RESULT_DELAY = 1500;
   var NEW_BONUS_AT = 8; // после 8-го найденного слова главы — знакомство с бонусными словами
 
@@ -178,6 +177,39 @@
     show('scr-box');
   }
 
+  /* ---------- главы (план эксперта b009, круг 2): атлас и счёт историй — внутри главы ---------- */
+  function chTitle(num) { return 'Глава ' + num + ' · ' + S.chapter(num).title; }
+  function chCount(num) { return S.chapterGot(num) + '/' + S.chapter(num).slots; }
+  function storyKicker(s) { return 'История ' + (s.pos + 1) + ' из ' + S.chapter(s.chapter).slots + ' · ' + s.place; }
+  function lastChapter() { return S.stories[S.stories.length - 1].chapter; }
+  function curChapter() { var t = homeTarget(); return t.story ? t.story.chapter : lastChapter(); }
+  function atlasChip(el, num, got) {
+    el.innerHTML = icon('book') + '<b>' + (got === undefined ? S.chapterGot(num) : got) + '/' + S.chapter(num).slots + '</b>';
+    el.setAttribute('aria-label', 'Атлас главы ' + num + ': ' + (got === undefined ? S.chapterGot(num) : got) + ' из ' + S.chapter(num).slots);
+  }
+
+  /* ---------- дневник маршрута: зачем вернуться завтра ---------- */
+  var visitInfo = { first: true, back: false, away: 0 };
+  function giftText(g) {
+    if (g.cover) return (C.covers[g.cover] || 'Рамка') + ' для атласа';
+    var out = [];
+    if (g.stamps) out.push('+' + nStamps(g.stamps));
+    if (g.loupes) out.push('+' + nLoupes(g.loupes));
+    return out.join(' · ');
+  }
+  function renderDiary(el, opts) {
+    var d = S.diary();
+    var dots = '';
+    for (var i = 0; i < d.of; i++) {
+      var on = d.days >= d.of ? true : i < d.days;
+      dots += '<span class="dd' + (on ? ' on' : '') + '">' + (on ? icon('check') : (i + 1)) + '</span>';
+    }
+    var line = d.today ? 'Сегодня штамп стоит. Завтра: ' + giftText(d.gift) : 'Первая история сегодня: ' + giftText(d.gift);
+    el.innerHTML = '<b>' + (opts && opts.back ? 'С возвращением! ' : '') + 'Дневник маршрута</b>' +
+      '<span class="diary-days">' + dots + '</span><span class="muted">' + esc(line) + '</span>';
+    el.hidden = false;
+  }
+
   /* ---------- главная ---------- */
   function homeTarget() {
     var cur = S.curStory();
@@ -188,7 +220,7 @@
   function showHome() {
     var t = homeTarget();
     $('home-town').textContent = C.town;
-    $('home-chapter').textContent = C.chapter_title;
+    $('home-chapter').textContent = chTitle(t.story ? t.story.chapter : lastChapter());
     var btn = $('btn-continue');
     if (t.mode === 'continue') {
       $('home-kicker').textContent = 'Продолжить · ' + t.story.place;
@@ -197,23 +229,26 @@
       btn.textContent = 'Продолжить историю';
       art($('home-art'), t.story.scene, '🏞️');
     } else if (t.mode === 'start') {
-      $('home-kicker').textContent = 'История ' + (t.story.index + 1) + ' из ' + S.stories.length + ' · ' + t.story.place;
+      $('home-kicker').textContent = storyKicker(t.story);
       $('home-question').textContent = t.story.teaser;
       $('home-sub').textContent = t.story.title;
       btn.textContent = 'Начать историю';
       art($('home-art'), t.story.scene, '🏞️');
     } else {
-      $('home-kicker').textContent = 'Глава 1 пройдена';
-      $('home-question').textContent = C.demo_end.question;
-      $('home-sub').textContent = C.demo_end.title + '. ' + C.demo_end.text;
+      var end = S.chapter(lastChapter()).end;
+      $('home-kicker').textContent = end.title;
+      $('home-question').textContent = end.question;
+      $('home-sub').textContent = end.text;
       btn.textContent = 'Открыть атлас';
       art($('home-art'), 'bg_town', '🏞️');
     }
     btn.dataset.mode = t.mode;
-    var got = S.data.atlas_item_ids.length;
-    $('atlas-sub').textContent = 'Находок: ' + got + ' из ' + TOTAL_SLOTS + ' · ' + S.rank().name;
+    var ch = t.story ? t.story.chapter : lastChapter();
+    $('atlas-sub').textContent = 'Глава ' + ch + ': ' + S.chapterGot(ch) + ' из ' + S.chapter(ch).slots + ' · ' + S.rank().name;
     $('town-tile-sub').textContent = 'Фонарей: ' + S.data.lanterns.length + ' из ' + S.stories.length + ' · марок ' + S.data.wallet.stamps;
-    renderSecret($('home-secret'));
+    renderSecret($('home-secret'), ch !== 1);
+    if (S.data.completed_story_ids.length) renderDiary($('home-diary'), { back: visitInfo.back });
+    else $('home-diary').hidden = true;
     var nx = $('home-next');
     var after = t.story && S.stories[t.story.index + 1];
     if (t.mode !== 'done' && after) {
@@ -237,7 +272,7 @@
   function showIntro(s) {
     introStory = s;
     art($('intro-art'), s.scene, '🏞️');
-    $('intro-kicker').textContent = 'История ' + (s.index + 1) + ' из ' + S.stories.length + ' · ' + s.place;
+    $('intro-kicker').textContent = (s.pos === 0 && s.chapter > 1 ? chTitle(s.chapter) + ' · ' : '') + storyKicker(s);
     $('intro-title').textContent = s.title;
     $('intro-text').textContent = s.intro;
     var fresh = s.new_text && (S.data.completed_story_ids.indexOf(s.id) >= 0 || !S.seenNew(s.new));
@@ -297,9 +332,7 @@
 
   /* Счётчики на поле: находки атласа, бонусные слова, тайник. */
   function renderChips() {
-    var got = S.data.atlas_item_ids.length;
-    $('chip-atlas').innerHTML = icon('book') + '<b>' + got + '/' + TOTAL_SLOTS + '</b>';
-    $('chip-atlas').setAttribute('aria-label', 'Атлас: ' + got + ' из ' + TOTAL_SLOTS);
+    atlasChip($('chip-atlas'), F ? F.story.chapter : curChapter());
     if (!F || !S.cur()) return;
     var n = S.cur().bonus.length;
     var showBonus = n > 0 || F.story.index >= 3 || S.seenNew('bonus');
@@ -718,7 +751,6 @@
   var resultStory = null;
   function showResult(s, reward) {
     resultStory = s;
-    var next = S.stories[s.index + 1];
     art($('result-bg'), s.scene, '');
     $('result-scene').dataset.story = s.id;
     renderSceneItems($('result-items'), s, function () { return true; }, true);
@@ -729,20 +761,24 @@
     $('keepsake-note').textContent = s.keepsake_note;
     renderReward(s, reward);
     $('result-question').textContent = s.next_question;
-    var end = !next;
-    $('demo-end').hidden = true;
-    if (end) $('result-question').textContent = C.demo_end.question;
-    $('btn-next').textContent = end ? 'Финал главы' : 'Следующая история';
+    // Конец главы: полная глава — финал; опубликованная часть кончилась — карточка «продолжение пишется».
+    var end = S.isChapterEnd(s), full = end && S.chapterFull(s.chapter), che = S.chapter(s.chapter).end;
+    $('demo-end').hidden = !end || full;
+    if (end) {
+      $('result-question').textContent = che.question;
+      $('demo-end-title').textContent = che.title;
+      $('demo-end-text').textContent = che.text;
+    }
+    $('btn-next').textContent = full ? 'Финал главы' : end ? 'Открыть атлас' : 'Следующая история';
     $('btn-next').dataset.end = end ? '1' : '';
     $('btn-res-atlas').hidden = end;
     S.markResultSeen(s.id);
     F = null;
     renderSecret($('result-secret'));
     renderLantern(s);
-    var had = S.data.atlas_item_ids.length - (reward && reward.item ? 1 : 0);
-    $('res-atlas-chip').innerHTML = icon('book') + '<b>' + had + '/' + TOTAL_SLOTS + '</b>';
+    atlasChip($('res-atlas-chip'), s.chapter, S.chapterGot(s.chapter) - (reward && reward.item ? 1 : 0));
     show('scr-result');
-    if (reward && reward.item) flyKeepsake();
+    if (reward && reward.item) flyKeepsake(s.chapter);
     window.Sound.play(end ? 'chapter' : 'win');
     setTimeout(function () { window.Sound.play('reward'); }, 900);
     $('btn-next').focus({ preventScroll: true });
@@ -762,7 +798,8 @@
     if (r.golden) cards.push(['golden_stamp', '🏅', 'Золотая марка!', '+1 лупа · +10 марок · всего ' + S.data.golden]);
     if (r.parcel) cards.push(['reward_parcel', '🎁', 'Посылка хранителей', '+' + nLoupes(r.parcel.loupes) + ' · +' + nStamps(r.parcel.stamps)]);
     if (r.rank) cards.push(['', '⭐', r.rank.name, 'Новое звание · +' + nStamps(r.rank.stamps)]);
-    if (r.trio && C.route_secrets[r.trio - 1]) cards.push(['map', '🧵', 'Нить маршрута ' + r.trio + '/3', C.route_secrets[r.trio - 1]]);
+    if (r.trio && C.route_secrets[r.trio - 1]) cards.push(['map', '🧵', 'Нить маршрута ' + r.trio + '/' + C.route_secrets.length, C.route_secrets[r.trio - 1]]);
+    if (r.diary) cards.push(['logbook', '📅', 'Дневник маршрута · день ' + r.diary.day + ' из ' + r.diary.of, giftText(r.diary)]);
     cards.forEach(function (c, i) {
       var el = document.createElement('div');
       el.className = 'card reward-card';
@@ -772,6 +809,7 @@
       big.appendChild(el);
       if (c[0] === 'golden_stamp') A.event('golden_stamp', { story_id: s.id, count: S.data.golden });
       if (c[0] === 'reward_parcel') A.event('parcel_open', { story_id: s.id, value: r.parcel.loupes, stamps: r.parcel.stamps });
+      if (c[0] === 'logbook') A.event('diary_stamp', { story_id: s.id, count: r.diary.day, page: S.data.diary_pages });
     });
     if (r.rank) A.event('rank_up', { story_id: s.id, rank: r.rank.name, value: r.rank.stamps });
     if (r.trio) A.event('route_secret', { story_id: s.id, count: r.trio });
@@ -812,19 +850,18 @@
           window.Sound.play(r.bought ? 'reward' : 'tap');
           closeSheet();
           if (from === 'result') { var p = $('btn-cover-pick'); if (p) p.remove(); renderLantern(resultStory); }
-          if (screen === 'scr-atlas') showAtlas(atlasFrom);
+          if (screen === 'scr-atlas') showAtlas(atlasFrom, atlasCh);
         });
       });
     });
   }
   // Находка сама влетает в значок атласа (план эксперта: коллекция на виду).
-  function flyKeepsake() {
+  function flyKeepsake(ch) {
     var from = $('keepsake-img'), to = $('res-atlas-chip');
-    var got = S.data.atlas_item_ids.length;
-    if (document.body.classList.contains('rm')) { to.innerHTML = icon('book') + '<b>' + got + '/' + TOTAL_SLOTS + '</b>'; return; }
+    if (document.body.classList.contains('rm')) { atlasChip(to, ch); return; }
     setTimeout(function () {
       var a = from.getBoundingClientRect(), b = to.getBoundingClientRect();
-      if (!a.width || !b.width) { to.innerHTML = icon('book') + '<b>' + got + '/' + TOTAL_SLOTS + '</b>'; return; }
+      if (!a.width || !b.width) { atlasChip(to, ch); return; }
       var ghost = from.cloneNode(true);
       ghost.removeAttribute('id');
       ghost.className += ' fly-keep';
@@ -836,15 +873,15 @@
       });
       setTimeout(function () {
         ghost.remove();
-        to.innerHTML = icon('book') + '<b>' + got + '/' + TOTAL_SLOTS + '</b>';
+        atlasChip(to, ch);
         pulse(to);
       }, 800);
     }, 1200);
   }
   // Тайное слово главы: «_ _ _ _ Н _».
-  function renderSecret(el) {
+  function renderSecret(el, off) {
     var w = C.secret_word, got = S.data.secret;
-    if (!w || !Object.keys(got).length) { el.hidden = true; return; }
+    if (off || !w || !Object.keys(got).length) { el.hidden = true; return; }
     el.hidden = false;
     var cells = w.split('').map(function (ch, i) { return '<span class="sl' + (got[i] ? ' on' : '') + '">' + (got[i] || '') + '</span>'; }).join('');
     el.innerHTML = '<span class="muted">' + esc(C.secret_title || 'Тайное слово') + '</span><span class="secret-cells">' + cells + '</span>';
@@ -870,7 +907,8 @@
   }
 
   /* ---------- фонари Тихоречья: трата марок ---------- */
-  var LAMP_SPOTS = [[18, 52], [30, 66], [44, 58], [24, 78], [56, 72], [66, 54], [78, 64], [40, 84], [86, 78], [60, 88]];
+  var LAMP_SPOTS = [[18, 52], [30, 66], [44, 58], [24, 78], [56, 72], [66, 54], [78, 64], [40, 84], [86, 78], [60, 88],
+    [10, 68], [34, 48], [52, 44], [72, 84], [92, 58]];
   function showTown() {
     A.event('town_open', { count: S.data.lanterns.length });
     renderTown();
@@ -880,6 +918,7 @@
     $('town-sub').textContent = S.data.lanterns.length + ' / ' + S.stories.length + ' фонарей · ' + S.data.wallet.stamps + ' марок';
     var map = $('town-lamps');
     map.innerHTML = '';
+    map.classList.toggle('many', S.stories.length > 10);
     S.stories.forEach(function (st, i) {
       var on = S.data.lanterns.indexOf(st.id) >= 0;
       var el = document.createElement('span');
@@ -906,23 +945,73 @@
 
   function onNext() {
     var s = resultStory;
-    var next = s && S.stories[s.index + 1];
+    var end = !s || S.isChapterEnd(s), next = s && !end ? S.stories[s.index + 1] : null;
     A.event('story_next_clicked', { story_id: s ? s.id : null, next_story_id: next ? next.id : null });
     window.Sound.play('tap');
-    if (next) showIntro(next); else showFinale();
+    if (next) showIntro(next);
+    else if (s && S.chapterFull(s.chapter)) showFinale(s.chapter);
+    else showAtlas('result', s ? s.chapter : null);
+  }
+
+  /* ---------- «На сегодня всё»: дневник, завтрашний подарок, вопрос и открытка ---------- */
+  function showRest() {
+    var s = resultStory, d = S.diary();
+    var t = homeTarget();
+    A.event('session_rest', { story_id: s ? s.id : null, completed: S.data.completed_story_ids.length, diary: d.days, today: d.today });
+    $('rest-sub').textContent = 'Разгадано историй: ' + S.data.completed_story_ids.length + ' · ' + S.rank().name;
+    renderDiary($('rest-diary'));
+    $('rest-question').textContent = s && !S.isChapterEnd(s) ? s.next_question : t.story ? t.story.teaser : S.chapter(lastChapter()).end.question;
+    renderPostcard($('rest-postcard'));
+    show('scr-rest');
+    window.Sound.play('tap');
+  }
+
+  /* Открытка-загадка: улика из разгаданной истории, ответ не раскрываем (план эксперта b009, круг 2). */
+  function riddle() {
+    var ids = S.data.completed_story_ids;
+    if (!ids.length || !C.share) return null;
+    var st = S.story(ids[ids.length - 1]);
+    var c = st.clues[0];
+    return { story: st, clue: c, text: C.share.text.replace('{clue}', c.clue.replace(/\n/g, ' ')).replace('{n}', String(c.answer.length)) };
+  }
+  function renderPostcard(el) {
+    var r = riddle();
+    el.hidden = !r;
+    if (!r) return;
+    el.innerHTML = '<span class="pc-img art"></span><span><b>Открытка-загадка</b><span class="muted">«' + esc(r.clue.clue.replace(/\n/g, ' ')) +
+      '» — ' + r.clue.answer.length + ' букв</span></span>';
+    art(el.querySelector('.pc-img'), 'postcard', '💌');
+  }
+  function shareRiddle(from) {
+    var r = riddle();
+    if (!r) return;
+    window.Sound.play('tap');
+    A.event('share_open', { from: from, story_id: r.story.id });
+    P.share(r.text).then(function (how) {
+      A.event('share_done', { from: from, method: how || 'cancel' });
+      if (how === 'copy') toast('Текст открытки скопирован — отправьте его другу');
+    });
   }
 
   /* ---------- финал главы (ТЗ §6.2): отдельный экран, заполненная страница атласа ---------- */
-  function showFinale() {
-    A.event('chapter_finale', { items: S.data.atlas_item_ids.length, stamps: S.data.wallet.stamps, loupes: S.data.wallet.loupes });
-    $('finale-title').textContent = C.demo_end.title;
-    $('finale-text').textContent = C.demo_end.text;
-    $('finale-question').textContent = C.demo_end.question;
+  var finaleNext = null, finaleCh = 1;
+  function showFinale(num) {
+    num = num || 1;
+    finaleCh = num;
+    var list = S.chapterStories(num), last = list[list.length - 1], end = S.chapter(num).end;
+    finaleNext = S.stories[last.index + 1] || null;
+    A.event('chapter_finale', { chapter: num, items: S.chapterGot(num), stamps: S.data.wallet.stamps, loupes: S.data.wallet.loupes });
+    $('finale-kicker').textContent = chTitle(num);
+    $('finale-title').textContent = end.title;
+    $('finale-text').textContent = end.text;
+    $('finale-question').textContent = end.question;
+    $('finale-q-label').textContent = finaleNext ? chTitle(finaleNext.chapter) : 'Следующий вопрос';
+    $('btn-finale-next').textContent = finaleNext ? 'Глава ' + finaleNext.chapter + ': ' + S.chapter(finaleNext.chapter).title : 'Открыть атлас';
     $('finale-reward').innerHTML = chip('stamp', '+' + S.FINALE.stamps) + chip('loupe', '+' + S.FINALE.loupes) + chip('star', String(S.data.xp));
     var g = $('finale-grid');
     g.innerHTML = '';
     g.dataset.cover = S.data.cover;
-    S.stories.forEach(function (st, i) {
+    list.forEach(function (st, i) {
       var el = document.createElement('span');
       el.className = 'finale-item art';
       el.style.animationDelay = (i * 90) + 'ms';
@@ -935,12 +1024,22 @@
   }
 
   /* ---------- атлас ---------- */
-  var atlasFrom = 'home';
-  function showAtlas(from) {
+  var atlasFrom = 'home', atlasCh = 1;
+  function showAtlas(from, num) {
     atlasFrom = from || 'home';
-    A.event('atlas_open', { from: atlasFrom, items: S.data.atlas_item_ids.length });
+    atlasCh = num || (from === 'field' && F ? F.story.chapter : from === 'result' && resultStory ? resultStory.chapter : curChapter());
+    A.event('atlas_open', { from: atlasFrom, items: S.data.atlas_item_ids.length, chapter: atlasCh });
     var got = S.data.atlas_item_ids;
-    $('atlas-page-sub').textContent = got.length + ' / ' + TOTAL_SLOTS;
+    $('atlas-page-sub').textContent = S.chapterGot(atlasCh) + ' / ' + S.chapter(atlasCh).slots;
+    var tabs = $('atlas-tabs');
+    tabs.innerHTML = S.chapters.map(function (c) {
+      return '<button class="chip atlas-tab" data-ch="' + c.num + '" aria-pressed="' + (c.num === atlasCh) + '">Глава ' + c.num +
+        ' <b>' + chCount(c.num) + '</b></button>';
+    }).join('');
+    tabs.querySelectorAll('[data-ch]').forEach(function (b) {
+      b.addEventListener('click', function () { window.Sound.play('tap'); showAtlas(atlasFrom, +b.dataset.ch); });
+    });
+    $('atlas-h').textContent = chTitle(atlasCh);
     var w = S.data.wallet;
     $('wallet').innerHTML =
       '<span aria-label="Марки">' + icon('stamp') + '<b>' + w.stamps + '</b></span>' +
@@ -951,21 +1050,21 @@
     $('scr-atlas').dataset.cover = S.data.cover;
     var trio = S.trioCount(), rs = $('atlas-route');
     rs.hidden = !trio;
-    rs.innerHTML = '<b>' + icon('book') + ' Нить маршрута ' + Math.min(trio, 3) + '/3</b>' +
+    rs.innerHTML = '<b>' + icon('book') + ' Нить маршрута ' + Math.min(trio, C.route_secrets.length) + '/' + C.route_secrets.length + '</b>' +
       C.route_secrets.slice(0, trio).map(function (t) { return '<p>' + esc(t) + '</p>'; }).join('');
     var grid = $('atlas-grid');
     grid.innerHTML = '';
-    S.stories.forEach(function (s, i) {
+    S.chapterStories(atlasCh).forEach(function (s) {
       var has = got.indexOf(s.reward.atlas_item_id) >= 0;
       var el = document.createElement('button');
-      el.className = 'slot' + (has ? ' got' : '') + (i < trio * 3 ? ' linked' : '');
+      el.className = 'slot' + (has ? ' got' : '') + (s.index < trio * 3 ? ' linked' : '');
       el.addEventListener('click', function () { openSlot(s, has); });
       el.innerHTML = '<span class="slot-img art"></span><b>' + esc(has ? s.item_title : '?') + '</b><span class="muted">' + esc(s.place) + '</span>';
       if (has) art(el.querySelector('.slot-img'), s.keepsake_img, s.keepsake_icon);
       else el.querySelector('.slot-img').innerHTML = icon('lock');
       grid.appendChild(el);
     });
-    for (var i = S.stories.length; i < TOTAL_SLOTS; i++) {
+    for (var i = S.chapterStories(atlasCh).length; i < S.chapter(atlasCh).slots; i++) {
       var sl = document.createElement('button');
       sl.className = 'slot soon';
       sl.addEventListener('click', function () { openSlot(null, false); });
@@ -982,7 +1081,7 @@
     if (s && has) html = '<div class="slot-big art" id="slot-big"></div><h3>' + esc(s.item_title) + '</h3>' +
       '<p class="muted">' + esc(s.keepsake_note) + ' · ' + esc(s.place) + '</p><p>Находка из истории «' + esc(s.title) + '».</p>';
     else if (s) html = '<h3>Пока закрыто</h3><p>Находка появится здесь, когда вы разгадаете историю «' + esc(s.title) + '» (' + esc(s.place) + ').</p>';
-    else html = '<h3>Скоро</h3><p>Новые места Тихоречья и их находки появятся в следующих главах.</p>';
+    else html = '<h3>Скоро</h3><p>Эта история главы ещё пишется. Её место и находка появятся в атласе с обновлением.</p>';
     openSheet('slot', html + '<button class="btn-link" data-close>Закрыть</button>', function (el) {
       if (s && has) art(el.querySelector('#slot-big'), s.keepsake_img, s.keepsake_icon);
     });
@@ -1031,11 +1130,18 @@
     $('btn-accept').addEventListener('click', acceptShown);
     $('btn-next').addEventListener('click', onNext);
     $('btn-res-atlas').addEventListener('click', function () { showAtlas('result'); });
-    $('btn-res-home').addEventListener('click', showHome);
+    $('btn-res-home').addEventListener('click', showRest);
+    $('btn-rest-home').addEventListener('click', function () { window.Sound.play('tap'); showHome(); });
+    $('btn-rest-share').addEventListener('click', function () { shareRiddle('rest'); });
+    $('btn-finale-share').addEventListener('click', function () { shareRiddle('finale'); });
+    $('btn-finale-next').addEventListener('click', function () {
+      window.Sound.play('tap');
+      if (finaleNext) showIntro(finaleNext); else showAtlas('result', finaleCh);
+    });
     $('btn-atlas-back').addEventListener('click', function () { if (atlasFrom === 'field' && S.cur()) openField(); else showHome(); });
     $('btn-atlas-home').addEventListener('click', function () { window.Sound.play('tap'); showHome(); });
     $('btn-covers').addEventListener('click', function () { openCovers('atlas'); });
-    $('btn-finale-atlas').addEventListener('click', function () { window.Sound.play('tap'); showAtlas('result'); });
+    $('btn-finale-atlas').addEventListener('click', function () { window.Sound.play('tap'); showAtlas('result', finaleCh); });
     $('btn-finale-home').addEventListener('click', showHome);
     $('sheet-back').addEventListener('click', closeSheet);
     $('sheet').addEventListener('click', function (e) { if (e.target.closest('[data-close]')) closeSheet(); });
@@ -1050,6 +1156,8 @@
 
   function boot() {
     F = null;
+    visitInfo = S.visit();
+    if (visitInfo.back) A.event('visit_back', { away_days: visitInfo.away, completed: S.data.completed_story_ids.length, diary: S.diary().days });
     if (!S.data.opened) showBox();
     else showHome();
     A.event('game_ready', { screen: screen, opened: S.data.opened, completed: S.data.completed_story_ids.length,

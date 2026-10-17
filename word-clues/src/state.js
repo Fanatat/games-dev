@@ -15,7 +15,7 @@
   var BONUS_STAMPS = 2;                            // бонусное слово — только марки
   var NO_HINT_XP = 5;                              // история без «Начала», «Пути» и «Разбора»
   var GOLDEN_CHANCE = 0.35, GOLDEN = { loupes: 1, stamps: 10 }; // золотая марка: изредка за историю без подсказок
-  var PARCELS = { 4: { loupes: 1, stamps: 40 } };  // посылка хранителей после 5-й истории
+  var PARCELS = { 4: { loupes: 1, stamps: 40 }, 12: { loupes: 1, stamps: 40 } }; // посылка хранителей: 5-я и 13-я истории
   var FINALE = { loupes: 2, stamps: 100 };         // финал главы (ТЗ §6.2)
   var CACHE_REWARD = { loupes: 1, stamps: 15 };
   var LANTERN_COST = 30;
@@ -35,6 +35,17 @@
     { id: 'copper', cost: 150 }, { id: 'silver', cost: 300 }, { id: 'gold', cost: 600 },
   ];
   var PICK_AFTER = 3, SECOND_PICK_COST = 50;
+  /* Дневник маршрута (план эксперта b009, круг 2): первая разгаданная история дня ставит штамп,
+     пять штампов — страница. Пропуск дня ничего не отнимает: штампы не сгорают. */
+  var DIARY = [{ stamps: 20 }, { loupes: 1 }, { stamps: 30 }, { loupes: 1 }, { cover: 'copper', stamps: 50 }];
+  function dayKey(t) {
+    var d = new Date(t);
+    return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+  }
+  function daysBetween(a, b) {
+    var p = function (k) { var x = k.split('-'); return Date.UTC(+x[0], x[1] - 1, +x[2]); };
+    return Math.round((p(b) - p(a)) / 86400000);
+  }
   function rankOf(xp) { var k = 0; RANKS.forEach(function (r, i) { if (xp >= r.xp) k = i; }); return k; }
   function seedOf() { return Math.random().toString(36).slice(2, 10); }
   // Стабильная «случайность»: один и тот же игрок и история — тот же исход, перезагрузка не перебрасывает.
@@ -53,7 +64,8 @@
       completed_story_ids: [], atlas_item_ids: [], seen_result_ids: [],
       wallet: { stamps: 0, loupes: START_LOUPES }, xp: 0,
       seed: seedOf(), bonus_total: 0, golden: 0, lanterns: [], secret: {}, caches: [], parcels: [],
-      cover: 'paper', covers: ['paper'], seen_new: [], finale: false,
+      cover: 'paper', covers: ['paper'], seen_new: [], finale: false, finales: [],
+      diary: [], diary_pages: 0, last_day: null, visits: 0,
       free_demo: { start: true, path: true },
       settings: { sound: true, reduced_motion: false, large_text: false },
       updated_at: null,
@@ -65,7 +77,14 @@
     var now = opts.now || function () { return Date.now(); };
     var stories = content.stories;
     var byId = {};
-    stories.forEach(function (s, i) { s.index = i; byId[s.id] = s; });
+    // Главы: номер истории внутри главы (s.pos) и сколько мест у главы в атласе.
+    var chapters = content.chapters || [{ num: 1, slots: stories.length }];
+    var perCh = {};
+    stories.forEach(function (s, i) {
+      s.index = i; byId[s.id] = s;
+      s.chapter = s.chapter || 1;
+      s.pos = perCh[s.chapter] = (perCh[s.chapter] === undefined ? 0 : perCh[s.chapter] + 1);
+    });
     var data = null;
     var saveOk = true;
     var timer = null;
@@ -92,6 +111,7 @@
       // глава пересобрана (новые сетки) — недоигранную историю начинаем заново, награды остаются
       if (d.current && d.current.content_version !== content.content_version) d.current = null;
       if (d.current && !d.current.bonus) d.current.bonus = [];
+      if (d.finale && d.finales.indexOf(1) < 0) d.finales.push(1);
       return d;
     }
     // Вторая копия (облако ВК): берём её, только если она новее локальной.
@@ -120,6 +140,45 @@
     function story(id) { return byId[id]; }
     function cur() { return data.current; }
     function curStory() { return data.current ? byId[data.current.story_id] : null; }
+
+    function chapter(num) { return chapters.filter(function (c) { return c.num === num; })[0] || { num: num, slots: perCh[num] + 1 }; }
+    function chapterStories(num) { return stories.filter(function (s) { return s.chapter === num; }); }
+    // Последняя опубликованная история главы; глава «полная», если опубликованы все её места.
+    function isChapterEnd(s) { var nx = stories[s.index + 1]; return !nx || nx.chapter !== s.chapter; }
+    function chapterFull(num) { return chapterStories(num).length >= chapter(num).slots; }
+    function chapterGot(num) {
+      return chapterStories(num).filter(function (s) { return data.atlas_item_ids.indexOf(s.reward.atlas_item_id) >= 0; }).length;
+    }
+
+    /* Дневник: что даст следующий штамп и стоит ли уже сегодняшний. */
+    function diary() {
+      var today = dayKey(now()), d = data.diary;
+      var done = d.length > 0 && d[d.length - 1] === today;
+      var k = d.length; // следующий штамп: сегодня, если ещё не стоит, иначе завтра
+      if (k >= DIARY.length) k = 0;
+      return { days: d.length, of: DIARY.length, today: done, next: k, gift: diaryGift(k), page: data.diary_pages };
+    }
+    function diaryGift(k) {
+      var g = DIARY[k];
+      if (g.cover && data.covers.indexOf(g.cover) >= 0) return { stamps: g.stamps };
+      return g.cover ? { cover: g.cover } : { stamps: g.stamps || 0, loupes: g.loupes || 0 };
+    }
+    function diaryStamp() {
+      var today = dayKey(now()), d = data.diary;
+      if (d.length && d[d.length - 1] === today) return null;
+      if (d.length >= DIARY.length) { data.diary = d = []; data.diary_pages++; }
+      var g = diaryGift(d.length);
+      d.push(today);
+      if (g.cover) data.covers.push(g.cover);
+      return { day: d.length, of: DIARY.length, stamps: g.stamps || 0, loupes: g.loupes || 0, cover: g.cover || null };
+    }
+    // Заход в игру: «с возвращением», если был другой день. Вызывается один раз при запуске.
+    function visit() {
+      var today = dayKey(now()), prev = data.last_day;
+      var r = { first: !prev, back: !!prev && prev !== today, away: prev ? daysBetween(prev, today) : 0 };
+      if (prev !== today) { data.last_day = today; data.visits++; writeNow(); }
+      return r;
+    }
 
     function nextStoryId() {
       for (var i = 0; i < stories.length; i++) if (data.completed_story_ids.indexOf(stories[i].id) < 0) return stories[i].id;
@@ -266,7 +325,7 @@
       if (!s || foundCount() !== s.clues.length) return null;
       var first = data.completed_story_ids.indexOf(s.id) < 0;
       var reward = { stamps: 0, xp: 0, item: null, first: first, loupes: 0, no_hints: false, golden: false,
-        parcel: null, rank: null, trio: 0, finale: null, bonus: data.current.bonus.length };
+        parcel: null, rank: null, trio: 0, finale: null, diary: null, bonus: data.current.bonus.length };
       if (first) {
         data.completed_story_ids.push(s.id);
         var h = data.current.hints, used = false;
@@ -287,12 +346,15 @@
           reward.parcel = { loupes: pc.loupes, stamps: pc.stamps };
           reward.loupes += pc.loupes; reward.stamps += pc.stamps;
         }
-        if (s.index === stories.length - 1 && !data.finale) {
-          data.finale = true;
+        if (isChapterEnd(s) && chapterFull(s.chapter) && data.finales.indexOf(s.chapter) < 0) {
+          data.finales.push(s.chapter);
+          if (s.chapter === 1) data.finale = true;
           reward.finale = { loupes: FINALE.loupes, stamps: FINALE.stamps };
           reward.loupes += FINALE.loupes; reward.stamps += FINALE.stamps;
         }
         if (data.completed_story_ids.length % TRIO === 0) reward.trio = data.completed_story_ids.length / TRIO;
+        var dy = diaryStamp();
+        if (dy) { reward.diary = dy; reward.stamps += dy.stamps; reward.loupes += dy.loupes; }
         data.xp += reward.xp;
         var rankAfter = rankOf(data.xp);
         if (rankAfter > rankBefore) {
@@ -364,7 +426,9 @@
 
     load();
     return {
-      KEY: KEY, COST: COST, RANKS: RANKS, LANTERN_COST: LANTERN_COST, BONUS_STAMPS: BONUS_STAMPS, FINALE: FINALE,
+      KEY: KEY, COST: COST, RANKS: RANKS, LANTERN_COST: LANTERN_COST, BONUS_STAMPS: BONUS_STAMPS, FINALE: FINALE, DIARY: DIARY,
+      chapters: chapters, chapter: chapter, chapterStories: chapterStories, isChapterEnd: isChapterEnd, chapterFull: chapterFull,
+      chapterGot: chapterGot, diary: diary, visit: visit, dayKey: function () { return dayKey(now()); },
       get data() { return data; }, get saveOk() { return saveOk; },
       onSave: function (f) { listeners.push(f); },
       story: story, stories: stories, cur: cur, curStory: curStory, nextStoryId: nextStoryId,

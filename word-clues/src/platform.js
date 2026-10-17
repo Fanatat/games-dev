@@ -76,6 +76,25 @@
     bridge.subscribe(function (e) { if (e && e.detail && e.detail.type === 'VKWebAppViewHide') f(); });
   }
 
+  /* Поделиться открыткой-загадкой: ВК — окно записи на стене, иначе системное «Поделиться»,
+     иначе копия в буфер. Отдаёт способ ('vk' | 'native' | 'copy') или null, если не вышло/отменили. */
+  function share(text) {
+    var url = location.origin + location.pathname;
+    if (vk) {
+      try {
+        return bridge.send('VKWebAppShowWallPostBox', { message: text })
+          .then(function () { return 'vk'; }, function () { return null; });
+      } catch (e) { return Promise.resolve(null); }
+    }
+    if (navigator.share) {
+      return navigator.share({ text: text, url: url }).then(function () { return 'native'; }, function () { return null; });
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      return navigator.clipboard.writeText(text + ' ' + url).then(function () { return 'copy'; }, function () { return null; });
+    }
+    return Promise.resolve(null);
+  }
+
   root.Platform = {
     name: vk ? 'vk' : 'web',
     storage: storage,
@@ -84,6 +103,7 @@
     ready: ready,
     flush: flush,
     onHide: onHide,
+    share: share,
     params: params,
   };
 })(this);

@@ -426,7 +426,30 @@ button.reward-card { width: 100%; text-align: left; font: inherit; color: inheri
   .finale-grid { grid-template-columns: repeat(10, 1fr); }
 }
 
+/* круг 4: главы в атласе, дневник маршрута, «На сегодня всё», открытка */
+.atlas-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin: 6px 0 2px; }
+.atlas-tab { min-height: 44px; padding: 6px 14px; font-size: 15px; }
+.atlas-tab[aria-pressed="true"] { background: var(--green); color: #fff; border-color: var(--green); }
+.diary { display: flex; flex-direction: column; gap: 6px; padding: 10px 14px; }
+.diary-days { display: flex; gap: 6px; }
+.dd { width: 34px; height: 34px; border-radius: 50%; border: 2px dashed #CDBB95; display: grid; place-items: center;
+  font-size: 13px; color: var(--muted); }
+.dd.on { border: 2px solid var(--green); background: #E5F0E2; color: var(--green); }
+.dd .i { width: 18px; height: 18px; }
+.postcard { display: flex; gap: 12px; align-items: center; padding: 10px 12px; }
+.pc-img { width: 72px; height: 54px; flex: none; border-radius: 8px; background: var(--soft); }
+.pc-img > img { object-fit: contain; }
+.postcard > span:last-child { display: flex; flex-direction: column; gap: 2px; font-family: var(--font); }
+#scr-finale .result-foot .link-row, #scr-rest .result-foot .link-row { flex-wrap: wrap; }
+@media (orientation: landscape) and (max-height: 560px), (min-aspect-ratio: 3/2) and (max-height: 760px) {
+  #scr-rest .finale-scroll, #scr-rest .result-foot { max-width: 560px; margin: 0 auto; width: 100%; }
+}
+
 /* ---------- меньше движения ---------- */
 body.rm *, body.rm *::before, body.rm *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 body.rm .finger { animation: none; opacity: 1; }
 body.rm .cell.hint-start { animation: none; }
+/* круг 4: золотые марки в кошельке атласа отличаются от обычных; 15 фонарей не налезают друг на друга */
+#wallet .gold { color: #A86F12; }
+#wallet .gold svg { color: #C9962B; }
+.town-lamps.many .town-lamp { width: 8%; }

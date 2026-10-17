@@ -531,8 +531,6 @@ body.rm .cell.hint-start { animation: none; }
 .daily .dt:disabled { opacity: .3; box-shadow: none; }
 .daily-done { color: var(--green-d); display: inline-flex; align-items: center; gap: 4px; }
 /* Напоминание при возвращении (круг 8): картинка прошлой истории и висящий вопрос */
-.recap-art { height: 150px; border-radius: 12px; background-color: var(--soft); background-size: cover; background-position: center; flex: none; }
-.recap-q { font-family: var(--font); font-size: 20px; line-height: 1.3; }
 /* цена с значком марки не разрывается на 320 (круг 8) */
 .nw { white-space: nowrap; }
 @media (max-width: 359px) { #btn-next { font-size: 15px; padding-left: 10px; padding-right: 10px; } }

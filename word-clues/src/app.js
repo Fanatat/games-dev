@@ -290,20 +290,16 @@
   }
 
   /* ---------- напоминание при возвращении (п. 2.3): одна картинка, что узнали, висящий вопрос ---------- */
-  function showRecap() {
-    var L = S.lastLearned();
+  var recapOn = false, recapSent = false;
+  function homeRecap(t) {
+    var L = recapOn && t.mode !== 'done' && S.lastLearned();
     if (!L) return false;
-    A.event('recap_shown', { story_id: L.story.id, away_days: visitInfo.away });
-    openSheet('recap', '<div class="recap-art art" id="recap-art"></div>' +
-      '<p class="muted">В прошлый раз · ' + esc(L.story.title) + '</p><h3 class="recap-q">' + esc(L.question) + '</h3>' +
-      '<button class="btn-main" id="btn-recap-go">Продолжить</button><button class="btn-link" data-close>На главную</button>', function (el) {
-      art(el.querySelector('#recap-art'), L.story.scene, '🏞️');
-      el.querySelector('#btn-recap-go').addEventListener('click', function () {
-        A.event('recap_continue', { story_id: L.story.id });
-        closeSheet();
-        onContinue();
-      });
-    });
+    art($('home-art'), L.story.scene, '🏞️');
+    $('home-kicker').textContent = 'В прошлый раз · ' + L.story.title;
+    $('home-question').textContent = L.question;
+    $('home-sub').textContent = 'Дальше · ' + t.story.title;
+    $('btn-continue').textContent = 'Продолжить';
+    if (!recapSent) { recapSent = true; A.event('recap_shown', { story_id: L.story.id, away_days: visitInfo.away }); }
     return true;
   }
 
@@ -339,6 +335,7 @@
       btn.textContent = 'Открыть атлас';
       art($('home-art'), 'bg_town', '🏞️');
     }
+    homeRecap(t);
     btn.dataset.mode = t.mode;
     var ch = t.story ? t.story.chapter : lastChapter();
     $('atlas-sub').textContent = 'Глава ' + ch + ': ' + S.chapterGot(ch) + ' из ' + S.chapter(ch).slots + ' · ' + S.rank().name;
@@ -360,6 +357,7 @@
   function onContinue() {
     var t = homeTarget();
     window.Sound.play('tap');
+    if (recapOn) { recapOn = false; A.event('recap_continue', { mode: t.mode }); }
     if (t.mode === 'continue') openField();
     else if (t.mode === 'start') showIntro(t.story);
     else showAtlas('home');
@@ -1395,8 +1393,8 @@
     if (visitInfo.back) A.event('visit_back', { away_days: visitInfo.away, completed: S.data.completed_story_ids.length, diary: S.diary().days });
     if (!S.data.opened) showBox();
     else {
+      recapOn = visitInfo.back && visitInfo.away >= 1 && !!S.lastLearned();
       showHome();
-      if (visitInfo.back && visitInfo.away >= 1) showRecap();
     }
     A.event('game_ready', { screen: screen, opened: S.data.opened, completed: S.data.completed_story_ids.length,
       in_progress: S.cur() ? S.cur().story_id : null, persistent: P.persistent });

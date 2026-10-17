@@ -759,7 +759,9 @@ const PLATFORM = (() => {
     // Бесплатной ветки нет: без SDK (kind 'none': adblock убил sdk.js, чужой
     // домен, стенд вне iframe ВК) бонус не выдаётся. Заглушка showTestAd —
     // только для локальной разработки (DEV_ADS: localhost/127.0.0.1/file:).
-    showBonusAd() {
+    // place — где нажата кнопка ролика (для Метрики: rewarded_click {place}).
+    showBonusAd(place) {
+      try { if (typeof Analytics !== 'undefined') Analytics.track('rewarded_click', { place: place || 'bonus' }); } catch (e) { /* аналитика не ломает рекламу */ }
       let p;
       if (DEV_ADS_MODE === 'off') p = Promise.resolve({ shown: false, reason: 'blocked' });
       else if (DEV_ADS_MODE === 'fail') p = showTestAd().then(() => ({ shown: false, reason: 'blocked' }));
@@ -786,11 +788,17 @@ const PLATFORM = (() => {
     // Всегда резолвится (true — ролик показан), не бросает: вызывающий код
     // продолжает переход между миссиями в любом исходе.
     showInterstitial() {
-      if (DEV_ADS_MODE === 'off') return Promise.resolve(false);
-      if (kind === 'vk') return showVkInterstitial();
-      if (kind === 'yandex') return showYandexInterstitial();
-      if (DEV_ADS && window.CONVOY_PROTOTYPE) return showTestInterstitial();
-      return Promise.resolve(false);
+      let p;
+      if (DEV_ADS_MODE === 'off') p = Promise.resolve(false);
+      else if (kind === 'vk') p = showVkInterstitial();
+      else if (kind === 'yandex') p = showYandexInterstitial();
+      else if (DEV_ADS && window.CONVOY_PROTOTYPE) p = showTestInterstitial();
+      else p = Promise.resolve(false);
+      // Воронка и Метрика (js/analytics.js): показанная межэкранная — interstitial_shown.
+      return p.then((shown) => {
+        try { if (shown && typeof Analytics !== 'undefined') Analytics.track('interstitial_shown'); } catch (e) { /* аналитика не ломает рекламу */ }
+        return shown;
+      });
     },
     // «Рассказать друзьям» («Последний конвой», сборка 11): окно «Поделиться» ВК со ссылкой на игру
     // (без link ВК подставляет ссылку на само приложение). Вне ВК кнопки нет; на стенде — заглушка.

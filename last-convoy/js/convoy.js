@@ -591,6 +591,7 @@ const Convoy = (() => {
     p.cvDayLast = o.today;
     p.cvDayStreak = o.streak;
     saveProgress(p);
+    funnel('daily_take', { streak: o.streak });
     SFX.coin(0.3);
     renderDaily();
     renderMenu();
@@ -760,7 +761,8 @@ const Convoy = (() => {
     dev.lose = q.has('lose');
     dev.seed = Math.floor(Number(q.get('seed')) || 0);
   }
-  function startRun(lvl) {
+  // how — откуда поход начат (для Метрики): 'menu' | 'again' (тот же уровень с итога) | 'next' (следующий).
+  function startRun(lvl, how) {
     newRun({ level: lvl || pickedLevel(), seed: dev.seed || undefined });
     Sprites.setRegion(run.level);
     match = setupMatch();
@@ -776,7 +778,15 @@ const Convoy = (() => {
     MUSIC.play(match.currentBattleTrack, { force: true });
     // ВК грузит ролик по проверке: заранее, чтобы к «Второму шансу» он успел прийти
     if (PLATFORM.rewardedPossible()) PLATFORM.checkRewardedAvailable();
+    funnel('mission_start', { id: run.level, how: how || 'menu' });
     return match;
+  }
+  // Воронка и Метрика (js/analytics.js): поход = уровень. Расчёты (headless) не отмечаются.
+  function funnel(name, params) {
+    try { if (typeof Analytics !== 'undefined' && !(run && run.headless)) Analytics.track(name, params); } catch (e) { /* аналитика не ломает игру */ }
+  }
+  function firstMove() {
+    try { if (typeof Analytics !== 'undefined' && run && !run.headless) Analytics.firstMove({ id: run.level }); } catch (e) { /* пусто */ }
   }
   function startSquad() {
     for (const id of CONVOY.startSquad) {
@@ -1208,6 +1218,7 @@ const Convoy = (() => {
       if (!C.headless) VFX.burst(m, 'spark', u.x, -30 * VIEW.fig, 4, { speed: 70, life: 0.7, size: 2.6, colors: ['#b8f5a0', '#6fd46a', '#fff6c0'], lift: 40, gravity: -20 });
     }
     if (C.headless) return;
+    funnel('stop_clear', { id: run.level, stop: run.stop });
     banner('Волна отбита!', `+${bonus}`, 'gold', CONVOY.clearSec + 0.3, true);
     SFX.waveClear();
   }
@@ -1294,6 +1305,7 @@ const Convoy = (() => {
     w.ageStep.player = run.ageStep;
     w.teamAge.player = AGE_ORDER[run.ageStep];
     m.convoy.eraFx = true;
+    funnel('era_up', { id: run.level, stop: run.stop, age: w.teamAge.player });
   }
   function eraFx() {
     const m = match, C = m.convoy, w = m.world;
@@ -1401,7 +1413,7 @@ const Convoy = (() => {
     if (!C || !C.revive || C.revive.state !== 'offer') return;
     C.revive.state = 'ad';
     renderRevive();
-    PLATFORM.showBonusAd().then((r) => {
+    PLATFORM.showBonusAd('revive').then((r) => {
       if (!match || match.convoy !== C || !C.revive) return;
       if (!r.shown) {
         C.revive.state = 'none';
@@ -1446,7 +1458,7 @@ const Convoy = (() => {
     if (!g || run.doubled || !btn || btn.disabled) return;
     btn.disabled = true;
     btn.querySelector('span').textContent = 'Реклама…';
-    PLATFORM.showBonusAd().then((r) => {
+    PLATFORM.showBonusAd('glory_x2').then((r) => {
       if (!run || run.glory !== g) return;
       if (!r.shown) {
         btn.querySelector('span').textContent = 'Реклама недоступна';
@@ -1477,6 +1489,7 @@ const Convoy = (() => {
     if (C.headless) return;
     runsSinceAd++;
     saveRun();
+    funnel(win ? 'mission_win' : 'mission_lose', Object.assign({ id: run.level, sec: Math.round(m.elapsed) }, win ? {} : { stop: run.stop }));
     // рейтинг (сборка 15): золото повозок на финише — в казну; место приходит с сервера позже, итог его дорисует
     if (win) {
       const r = run, gold = Math.floor(m.gold);
@@ -1858,6 +1871,7 @@ const Convoy = (() => {
     if (run.mods.rockDouble) C.rockQueue.push({ x, t: CONVOY.rock.doubleDelay });
     C.rockCd = rockCdMax();
     run.stats.rocks++;
+    if (!C.headless) firstMove();
     return true;
   }
   function dropRocks(x) {
@@ -1908,6 +1922,7 @@ const Convoy = (() => {
     if (m.gold < cost) { deny(typeId, 'cvGoldBox'); return false; }
     m.gold -= cost;
     spawnPlayer(typeId);
+    if (!m.convoy.headless) firstMove();
     run.stats.bought++;
     run.stats.types[typeId] = (run.stats.types[typeId] || 0) + 1;
     pulseCard(typeId, 'bought');
@@ -2208,6 +2223,11 @@ const Convoy = (() => {
 
   // ------------------------------------------------------------ экраны
   function onScreen(name) {
+    // Домик на паузе посреди похода — игрок сам бросил уровень (level_quit). Итог ведёт в меню через toMenu (run = null).
+    if (name === 'cmenu' && run && !run.finished && !run.headless && !run.quitSent) {
+      run.quitSent = true;
+      funnel('mission_quit', { id: run.level, stop: run.stop });
+    }
     $('cvMenu').classList.toggle('hidden', name !== 'cmenu');
     if (name !== 'cmenu') RANKS.close();
     $('cvHud').classList.toggle('hidden', !(name === 'match' || name === 'paused'));
@@ -3182,8 +3202,12 @@ const Convoy = (() => {
     };
     $('cvResultAgain').addEventListener('click', () => {
       SFX.click();
-      const lvl = run && run.next;
-      leaveResult(() => { if (lvl) pickLevel(lvl); startRun(lvl); });
+      const lvl = run && run.next, same = !!run && lvl === run.level;
+      leaveResult(() => {
+        if (lvl) pickLevel(lvl);
+        if (same) funnel('mission_restart', { id: lvl });  // тот же уровень ещё раз (после поражения)
+        startRun(lvl, same ? 'again' : 'next');
+      });
     });
     $('cvResultMenu').addEventListener('click', () => { SFX.click(); leaveResult(toMenu); });
     $('cvReviveAd').addEventListener('click', (e) => { SFX.click(); acceptRevive(); e.currentTarget.blur(); });

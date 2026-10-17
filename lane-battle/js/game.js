@@ -1728,9 +1728,16 @@ refreshMuteButtons();
 
 DOM.pauseBtn.addEventListener('click', () => togglePause());
 DOM.btnResume.addEventListener('click', () => togglePause());
-DOM.btnToMenuFromPause.addEventListener('click', () => { showScreen('menu'); });
+DOM.btnToMenuFromPause.addEventListener('click', () => {
+  // Метрика: level_quit — миссия брошена из паузы до итога (js/analytics.js).
+  try { if (match && !match.resolved) Analytics.track('mission_quit', { id: match.mission.id, sec: Math.round(match.elapsed) }); } catch (e) { /* аналитика не ломает выход */ }
+  showScreen('menu');
+});
 DOM.btnToMenuFromResult.addEventListener('click', () => { showScreen('menu'); });
-DOM.btnRetry.addEventListener('click', () => startMission(match.missionIndex));
+DOM.btnRetry.addEventListener('click', () => {
+  try { Analytics.track('mission_restart', { id: match.mission.id }); } catch (e) { /* аналитика не ломает повтор */ } // Метрика: level_restart
+  startMission(match.missionIndex);
+});
 // Магазин доступен сразу с экрана итога миссии (раунд 5, запрос
 // основателя), не только из главного меню.
 DOM.btnShopFromResult.addEventListener('click', () => { SFX.click(); renderShop(); showScreen('shop'); });
@@ -2584,6 +2591,7 @@ function playerAgeReady() {
 
 function tryAgeUp() {
   if (!match || match.resolved || !playerAgeReady()) { denyAgeBtn(R15_DOM.ageBtn); return; }
+  try { Analytics.firstMove('age', match.mission.id); } catch (e) { /* аналитика не ломает бой */ }
   const w = match.world;
   w.xp.player -= playerAgeXpNeed();
   w.ageStep.player += 1;
@@ -2653,6 +2661,7 @@ function onEnemyAgeUp(ageId) {
 
 function tryVolley() {
   if (!match || match.resolved || match.countdown > 0 || match.volleyCd > 0) { denyAgeBtn(R15_DOM.volleyBtn); return; }
+  try { Analytics.firstMove('volley', match.mission.id); } catch (e) { /* аналитика не ломает бой */ }
   const cx = volleyTargetX(match.world, 'player');
   if (cx === null) { denyAgeBtn(R15_DOM.volleyBtn); return; }
   launchVolley(match.world, 'player', cx, match.world.teamAge.player, ageStatMult(match.world.ageStep.player));
@@ -2727,6 +2736,7 @@ function tryBuyUnit(id) {
   const bi = match.world.buyIntents || (match.world.buyIntents = []);
   bi.push({ t: match.ai.elapsed || 0, id });
   if (bi.length > 40) bi.shift();
+  try { Analytics.firstMove('unit', match.mission.id); } catch (e) { /* аналитика не ломает бой */ }
   if (match.gold >= cost) {
     match.gold -= cost;
     spawnUnit(match.world, 'player', id);
@@ -2735,6 +2745,7 @@ function tryBuyUnit(id) {
   }
 }
 function tryUpgrade() {
+  try { Analytics.firstMove('upgrade', match.mission.id); } catch (e) { /* аналитика не ломает бой */ }
   const cost = currentUpgradeCost();
   if (incomeUpgradeMaxed()) { denyButton('#upgradeBtn'); return; } // r15 И15: потолок апгрейдов
   if (match.gold >= cost) {
@@ -3099,6 +3110,8 @@ function endMatch(result) {
   noteMatchResult(match.mission.id, result === 'win'); // r15 И11: счётчик поражений подряд
   hideHelpTip();
   Analytics.track(result === 'win' ? 'mission_win' : 'mission_lose', Object.assign({ id: match.mission.id, sec: Math.round(match.elapsed) }, result === 'win' ? { coreHpPct: Math.round(100 * Math.max(0, match.world.playerCore.hp) / match.world.playerCore.maxHp) } : {})); // воронка (js/analytics.js)
+  // Метрика: chapter_complete — победа в последней миссии главы (js/analytics.js).
+  if (result === 'win' && match.mission.id % MISSIONS_PER_CHAPTER === 0) Analytics.track('chapter_complete', { chapter: match.mission.id / MISSIONS_PER_CHAPTER });
   // Валюта магазина копится за убийства независимо от исхода миссии
   // (см. ПЛАН.md, раунд 3).
   // r15 И13: поражение — не больше половины «эталона победы» (data.js, lossRewardCap).

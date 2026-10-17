@@ -733,6 +733,7 @@ const PLATFORM = (() => {
     // домен, стенд вне iframe ВК) бонус не выдаётся. Заглушка showTestAd —
     // только для локальной разработки (DEV_ADS: localhost/127.0.0.1/file:).
     showBonusAd() {
+      try { if (typeof Analytics !== 'undefined') Analytics.adRewardClick(); } catch (e) { /* аналитика не ломает рекламу */ }
       let p;
       if (kind === 'yandex') p = bonusAdFormat() === 'interstitial' ? showYandexFullscreen() : showYandexRewardedResult();
       else if (kind === 'vk') p = showVkRewarded().then((ok) => ({ shown: ok, reason: ok ? 'ok' : 'blocked' }));
@@ -756,9 +757,15 @@ const PLATFORM = (() => {
     // Всегда резолвится (true — ролик показан), не бросает: вызывающий код
     // продолжает переход между миссиями в любом исходе.
     showInterstitial() {
-      if (kind === 'vk') return showVkInterstitial();
-      if (kind === 'yandex') return showYandexInterstitial();
-      return Promise.resolve(false);
+      let p;
+      if (kind === 'vk') p = showVkInterstitial();
+      else if (kind === 'yandex') p = showYandexInterstitial();
+      else return Promise.resolve(false);
+      // Метрика: interstitial_shown — только подтверждённый показ.
+      return p.then((shown) => {
+        try { if (shown && typeof Analytics !== 'undefined') Analytics.track('interstitial_shown'); } catch (e) { /* аналитика не ломает рекламу */ }
+        return shown;
+      });
     },
     supportsInterstitial() { return kind === 'vk' || kind === 'yandex'; },
     preloadInterstitial() { if (kind === 'vk') preloadVkInterstitial(); },

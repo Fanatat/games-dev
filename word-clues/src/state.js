@@ -45,6 +45,11 @@
   /* Дневник маршрута (план эксперта b009, круг 2): первая разгаданная история дня ставит штамп,
      пять штампов — страница. Пропуск дня ничего не отнимает: штампы не сгорают. */
   var DIARY = [{ stamps: 20 }, { loupes: 1 }, { stamps: 30 }, { loupes: 1 }, { cover: 'copper', stamps: 50 }];
+  /* Улика дня (план эксперта №4, круг 2, п. 2.2): одна загадка на календарный день, общая для всех.
+     Разгадал — лупа и штамп дневника; дни подряд — серия «🔥 N». Пропуск обнуляет серию, дневник не трогает. */
+  var DAILY = { loupes: 1 };
+  var DAILY_EPOCH = '2026-01-01';
+  var DAILY_DECOYS = 'АЕИОУКЛМНПРСТВДГ';
   function dayKey(t) {
     var d = new Date(t);
     return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
@@ -73,6 +78,7 @@
       seed: seedOf(), bonus_total: 0, bonus_drop: 0, golden: 0, lanterns: [], secret: {}, guesses: {}, caches: [], parcels: [],
       cover: 'paper', covers: ['paper'], seen_new: [], finale: false, finales: [],
       diary: [], diary_pages: 0, last_day: null, visits: 0,
+      daily: { last: null, streak: 0, best: 0, solved: 0 },
       free_demo: { start: true, path: true },
       settings: { sound: true, reduced_motion: false, large_text: false },
       updated_at: null,
@@ -93,7 +99,7 @@
       s.pos = perCh[s.chapter] = (perCh[s.chapter] === undefined ? 0 : perCh[s.chapter] + 1);
     });
     var data = null;
-    var saveOk = true;
+    var saveOk = true; // хранилище приняло запись; подтверждение облака ВК — Platform.sync
     var timer = null;
     var listeners = [];
 
@@ -180,6 +186,44 @@
       d.push(today);
       if (g.cover) data.covers.push(g.cover);
       return { day: d.length, of: DIARY.length, stamps: g.stamps || 0, loupes: g.loupes || 0, cover: g.cover || null };
+    }
+    function dailyOf(key) {
+      var list = content.daily || [];
+      if (!list.length) return null;
+      var n = daysBetween(DAILY_EPOCH, key), i = ((n % list.length) + list.length) % list.length;
+      return list[i];
+    }
+    function dailyTiles(answer, key) {
+      var letters = answer.split(''), pool = DAILY_DECOYS.split('').filter(function (ch) { return answer.indexOf(ch) < 0; });
+      var k = answer.length <= 4 ? 2 : 3;
+      for (var j = 0; j < k; j++) letters.push(pool[Math.floor(chance(key, 'd' + j) * pool.length)]);
+      return letters.map(function (ch, i) { return { ch: ch, r: chance(key, 't' + i) }; })
+        .sort(function (a, b) { return a.r - b.r; }).map(function (x) { return x.ch; });
+    }
+    function daily() {
+      var today = dayKey(now()), d = data.daily, c = dailyOf(today);
+      if (!c) return null;
+      var done = d.last === today, alive = done || (!!d.last && daysBetween(d.last, today) === 1);
+      return { day: today, clue: c.clue, answer: c.answer, done: done, streak: alive ? d.streak : 0, lost: !alive && d.streak > 0,
+        best: d.best, solved: d.solved, tiles: dailyTiles(c.answer, today), loupes: DAILY.loupes };
+    }
+    function dailySolve(word) {
+      var x = daily();
+      if (!x || x.done) return { ok: false, done: !!x };
+      if (word !== x.answer) return { ok: false };
+      var d = data.daily;
+      d.streak = d.last && daysBetween(d.last, x.day) === 1 ? d.streak + 1 : 1;
+      d.best = Math.max(d.best, d.streak); d.last = x.day; d.solved++;
+      data.wallet.loupes += DAILY.loupes;
+      var dy = diaryStamp();
+      if (dy) { data.wallet.stamps += dy.stamps; data.wallet.loupes += dy.loupes; }
+      writeNow();
+      return { ok: true, streak: d.streak, loupes: DAILY.loupes, diary: dy };
+    }
+    function lastLearned() {
+      var ids = data.completed_story_ids, s = ids.length ? byId[ids[ids.length - 1]] : null;
+      if (!s) return null;
+      return { story: s, question: isChapterEnd(s) ? chapter(s.chapter).end && chapter(s.chapter).end.question || s.next_question : s.next_question };
     }
     // Заход в игру: «с возвращением», если был другой день. Вызывается один раз при запуске.
     function visit() {
@@ -483,7 +527,7 @@
     return {
       KEY: KEY, COST: COST, RANKS: RANKS, LANTERN_COST: LANTERN_COST, LANTERN_STEP: LANTERN_STEP, BONUS_DROP: BONUS_DROP, BONUS_STAMPS: BONUS_STAMPS, BONUS_FULL: BONUS_FULL, FINALE: FINALE, DIARY: DIARY,
       chapters: chapters, chapter: chapter, chapterStories: chapterStories, isChapterEnd: isChapterEnd, chapterFull: chapterFull,
-      chapterGot: chapterGot, diary: diary, visit: visit, dayKey: function () { return dayKey(now()); },
+      chapterGot: chapterGot, diary: diary, visit: visit, daily: daily, dailySolve: dailySolve, lastLearned: lastLearned, DAILY: DAILY, dayKey: function () { return dayKey(now()); },
       get data() { return data; }, get saveOk() { return saveOk; },
       onSave: function (f) { listeners.push(f); },
       story: story, stories: stories, cur: cur, curStory: curStory, nextStoryId: nextStoryId,

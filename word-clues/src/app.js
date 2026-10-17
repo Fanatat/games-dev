@@ -103,6 +103,13 @@
     toastTimer = setTimeout(function () { el.hidden = true; }, 2200);
   }
 
+  /* Надпись о сохранении (P.sync): «в профиле ВК» — только после ответа ВК;
+     обычное ожидание сети не пугает, отказ ВК виден. */
+  var SYNC_TEXT = {
+    device: 'Прогресс сохраняется на этом устройстве',
+    pending: 'Прогресс отправляется в профиль ВК…',
+    cloud: 'Прогресс сохранён в профиле ВК',
+  };
   function newTip(msg) {
     var el = $('toast');
     el.textContent = msg; el.hidden = false;
@@ -113,15 +120,21 @@
   }
 
   function saveLine(el) {
-    if (S.saveOk) { el.textContent = !P.persistent ? '' : P.cloud ? 'Прогресс сохраняется в профиле ВК' : 'Прогресс сохраняется на этом устройстве'; el.classList.remove('warn'); }
-    else { el.textContent = 'Сейчас прогресс не сохраняется'; el.classList.add('warn'); }
+    var sync = P.sync, ok = S.saveOk && P.persistent;
+    if (sync === 'failed') el.textContent = ok ? 'В профиль ВК не сохранилось — прогресс есть на этом устройстве' : 'Не получилось сохранить в профиле ВК, пробуем ещё';
+    else if (!S.saveOk) el.textContent = 'Сейчас прогресс не сохраняется';
+    else el.textContent = SYNC_TEXT[sync] || '';
+    el.classList.toggle('warn', !ok || sync === 'failed');
   }
   var saveErrorSent = false;
-  S.onSave(function (ok) {
+  function onSaveStatus() {
+    var ok = S.saveOk && P.persistent;
     $('field-save').hidden = ok;
     saveLine($('home-save'));
-    if (!ok && !saveErrorSent) { saveErrorSent = true; A.event('save_error', { persistent: P.persistent }); }
-  });
+    if (!ok && !saveErrorSent) { saveErrorSent = true; A.event('save_error', { persistent: P.persistent, sync: P.sync }); }
+  }
+  S.onSave(onSaveStatus);
+  P.onSync(onSaveStatus);
 
   /* ---------- настройки ---------- */
   function applySettings() {
@@ -216,6 +229,84 @@
     el.hidden = false;
   }
 
+  /* ---------- улика дня (план эксперта №4, круг 2, п. 2.2): загадка на сегодня, плитки букв, серия «🔥 N» ---------- */
+  var dailyPick = { day: null, picks: [], shown: null };
+  function renderDaily() {
+    var el = $('home-daily'), x = S.data.completed_story_ids.length ? S.daily() : null;
+    if (!x) { el.hidden = true; return; }
+    if (dailyPick.day !== x.day) dailyPick = { day: x.day, picks: [], shown: dailyPick.shown };
+    if (dailyPick.shown !== x.day) {
+      dailyPick.shown = x.day;
+      A.event('daily_shown', { day: x.day, done: x.done, streak: x.streak, lost: x.lost });
+    }
+    var fire = x.streak ? '<span class="streak" aria-label="Дней подряд: ' + x.streak + '">🔥 ' + x.streak + '</span>' : '';
+    var html = '<div class="daily-head"><b>Улика дня</b>' + fire + '</div><p class="daily-clue">' + esc(x.clue) + '</p>';
+    if (x.done) {
+      html += '<p class="daily-done">' + icon('check') + ' <b>' + esc(x.answer) + '</b> · завтра — новая улика</p>';
+    } else {
+      var p = dailyPick.picks, slots = '', tiles = '';
+      for (var i = 0; i < x.answer.length; i++) {
+        slots += p[i] != null ? '<button class="ds on" data-ds="' + i + '" aria-label="Убрать букву ' + x.tiles[p[i]] + '">' + x.tiles[p[i]] + '</button>'
+          : '<span class="ds"></span>';
+      }
+      x.tiles.forEach(function (ch, j) {
+        tiles += '<button class="dt" data-dt="' + j + '"' + (p.indexOf(j) >= 0 ? ' disabled' : '') + '>' + ch + '</button>';
+      });
+      html += '<div class="daily-slots" id="daily-slots">' + slots + '</div><div class="daily-tiles">' + tiles + '</div>' +
+        '<p class="muted small">Разгадайте: +' + nLoupes(x.loupes) + (x.lost ? ' · серия начнётся заново' : x.streak ? ' · серия станет ' + (x.streak + 1) : '') + '</p>';
+    }
+    el.innerHTML = html;
+    el.hidden = false;
+  }
+  function onDailyClick(e) {
+    var x = S.daily();
+    if (!x || x.done) return;
+    var t = e.target.closest('[data-dt],[data-ds]');
+    if (!t) return;
+    var p = dailyPick.picks;
+    if (t.dataset.ds != null) { p.splice(+t.dataset.ds, 1); window.Sound.play('tap'); renderDaily(); return; }
+    if (p.length >= x.answer.length) return;
+    p.push(+t.dataset.dt);
+    window.Sound.play('tap');
+    if (p.length < x.answer.length) { renderDaily(); return; }
+    var word = p.map(function (j) { return x.tiles[j]; }).join('');
+    var r = S.dailySolve(word);
+    if (!r.ok) {
+      A.event('daily_wrong', { day: x.day, len: word.length });
+      renderDaily();
+      var sl = $('daily-slots');
+      if (sl) sl.classList.add('shake');
+      window.Sound.play('wrong');
+      setTimeout(function () { dailyPick.picks = []; renderDaily(); }, 650);
+      return;
+    }
+    A.event('daily_solved', { day: x.day, streak: r.streak, loupes: S.data.wallet.loupes, diary: r.diary ? r.diary.day : null });
+    window.Sound.play('found');
+    renderDaily();
+    renderDiary($('home-diary'), { back: visitInfo.back });
+    pulse($('home-daily'));
+    var gift = '+' + nLoupes(r.loupes) + (r.diary ? ' · дневник: ' + giftText(r.diary) : '');
+    toast('Улика дня разгадана! ' + gift + (r.streak > 1 ? ' · 🔥 ' + r.streak + ' дня подряд' : ''));
+  }
+
+  /* ---------- напоминание при возвращении (п. 2.3): одна картинка, что узнали, висящий вопрос ---------- */
+  function showRecap() {
+    var L = S.lastLearned();
+    if (!L) return false;
+    A.event('recap_shown', { story_id: L.story.id, away_days: visitInfo.away });
+    openSheet('recap', '<div class="recap-art art" id="recap-art"></div>' +
+      '<p class="muted">В прошлый раз · ' + esc(L.story.title) + '</p><h3 class="recap-q">' + esc(L.question) + '</h3>' +
+      '<button class="btn-main" id="btn-recap-go">Продолжить</button><button class="btn-link" data-close>На главную</button>', function (el) {
+      art(el.querySelector('#recap-art'), L.story.scene, '🏞️');
+      el.querySelector('#btn-recap-go').addEventListener('click', function () {
+        A.event('recap_continue', { story_id: L.story.id });
+        closeSheet();
+        onContinue();
+      });
+    });
+    return true;
+  }
+
   /* ---------- главная ---------- */
   function homeTarget() {
     var cur = S.curStory();
@@ -253,6 +344,7 @@
     $('atlas-sub').textContent = 'Глава ' + ch + ': ' + S.chapterGot(ch) + ' из ' + S.chapter(ch).slots + ' · ' + S.rank().name;
     $('town-tile-sub').textContent = 'Фонарей: ' + S.data.lanterns.length + ' из ' + S.stories.length + ' · марок ' + S.data.wallet.stamps;
     renderSecret($('home-secret'), ch);
+    renderDaily();
     if (S.data.completed_story_ids.length) renderDiary($('home-diary'), { back: visitInfo.back });
     else $('home-diary').hidden = true;
     var nx = $('home-next');
@@ -827,7 +919,9 @@
       $('demo-end-title').textContent = che.title;
       $('demo-end-text').textContent = che.text;
     }
-    $('btn-next').textContent = full ? 'Финал главы' : end ? 'Открыть атлас' : 'Следующая история';
+    var nxs = end ? null : S.stories[s.index + 1];
+    $('result-question-kicker').textContent = nxs ? 'Следующий вопрос · история ' + (nxs.pos + 1) : 'Вопрос главы';
+    $('btn-next').textContent = full ? 'Финал главы' : end ? 'Открыть атлас' : 'Узнать · история ' + (nxs.pos + 1);
     $('btn-next').dataset.end = end ? '1' : '';
     $('btn-res-atlas').hidden = end;
     S.markResultSeen(s.id);
@@ -988,7 +1082,7 @@
       b.hidden = true;
       lampMain = true;
       nx.dataset.text = nx.textContent;
-      nx.innerHTML = icon('lamp') + ' Зажечь фонарь · ' + cost + ' ' + icon('stamp');
+      nx.innerHTML = '<span class="nw">' + icon('lamp') + ' Зажечь фонарь · ' + cost + ' ' + icon('stamp') + '</span>';
       nx.setAttribute('aria-label', 'Зажечь фонарь: ' + s.place + ', ' + cost + ' марок');
       return;
     }
@@ -1269,6 +1363,7 @@
     $('btn-town-back').addEventListener('click', showHome);
     $('btn-accept').addEventListener('click', acceptShown);
     $('btn-next').addEventListener('click', onNext);
+    $('home-daily').addEventListener('click', onDailyClick);
     $('btn-res-atlas').addEventListener('click', function () { showAtlas('result'); });
     $('btn-res-home').addEventListener('click', showRest);
     $('btn-rest-home').addEventListener('click', function () { window.Sound.play('tap'); showHome(); });
@@ -1299,7 +1394,10 @@
     visitInfo = S.visit();
     if (visitInfo.back) A.event('visit_back', { away_days: visitInfo.away, completed: S.data.completed_story_ids.length, diary: S.diary().days });
     if (!S.data.opened) showBox();
-    else showHome();
+    else {
+      showHome();
+      if (visitInfo.back && visitInfo.away >= 1) showRecap();
+    }
     A.event('game_ready', { screen: screen, opened: S.data.opened, completed: S.data.completed_story_ids.length,
       in_progress: S.cur() ? S.cur().story_id : null, persistent: P.persistent });
   }
@@ -1307,7 +1405,7 @@
   function start(env) {
     var restored = !!(env && env.cloud && S.adopt(env.cloud));
     A.event('launch', { persistent: P.persistent, w: innerWidth, h: innerHeight, dpr: devicePixelRatio || 1,
-      cloud: P.cloud, restored: restored });
+      cloud: P.cloud, sync: P.sync, restored: restored });
     window.Board.mount();
     bind();
     initStaticArt();

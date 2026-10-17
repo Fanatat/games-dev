@@ -368,21 +368,30 @@
     return !!(L && p && p.difficulty !== 'tutorial' && Math.max(p.rows.length, p.rows[0].length) >= L.min_side);
   }
 
+  // Сколько стоит одна линия: крупнее поле — дороже линия (by_side: [сторона, монет]).
+  function lineCoinsOf(C, pid) {
+    if (!lineCoinsOn(C, pid)) return 0;
+    var L = C.economy.line_coins, p = C.puzzles[pid], side = Math.max(p.rows.length, p.rows[0].length), n = L.coins;
+    (L.by_side || []).forEach(function (x) { if (side >= x[0]) n = x[1]; });
+    return n;
+  }
+
   function closeLine(C, s, pid, kind, idx) {
     if (!lineCoinsOn(C, pid) || has(s.completed_puzzles, pid)) return 0;
     var bit = 1 << (kind === 'row' ? idx : C.puzzles[pid].rows.length + idx), m = s.lines[pid] | 0;
     if (m & bit) return 0;
     s.lines[pid] = m | bit;
-    s.coins += C.economy.line_coins.coins;
+    var n = lineCoinsOf(C, pid);
+    s.coins += n;
     touch(s);
-    return C.economy.line_coins.coins;
+    return n;
   }
 
   // Монеты, уже полученные на поле: найденные монетки и закрытые линии.
   function fieldEarned(C, s, pid) {
-    var n = 0, m = s.lines[pid] | 0, F = C.economy.field_coins, L = C.economy.line_coins;
+    var n = 0, m = s.lines[pid] | 0, F = C.economy.field_coins, per = lineCoinsOf(C, pid);
     fieldCoins(C, pid).forEach(function (x, i) { if (has(s.granted, 'f:' + pid + ':' + i)) n += F.coins; });
-    for (; m; m &= m - 1) n += L.coins;
+    for (; m; m &= m - 1) n += per;
     return n;
   }
 
@@ -1058,7 +1067,7 @@
     canStartObject: canStartObject, activeDraftObjects: activeDraftObjects,
     findVariant: findVariant, isVariantOwned: isVariantOwned,
     rand: rand, puzzleCoins: puzzleCoins, fieldCoins: fieldCoins, collectFieldCoins: collectFieldCoins,
-    lineCoinsOn: lineCoinsOn, closeLine: closeLine, fieldEarned: fieldEarned,
+    lineCoinsOn: lineCoinsOn, lineCoinsOf: lineCoinsOf, closeLine: closeLine, fieldEarned: fieldEarned,
     markGlow: markGlow, sinceGlow: sinceGlow, placeGold: placeGold, collectGold: collectGold,
     freeHintsLeft: freeHintsLeft, useFreeHint: useFreeHint, openChest: openChest,
     roomChoices: roomChoices, pickRoomReward: pickRoomReward, pendingGift: pendingGift, affordableVariant: affordableVariant,

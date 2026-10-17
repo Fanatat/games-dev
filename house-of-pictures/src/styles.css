@@ -855,8 +855,8 @@ html.rm .hint-spark { display: none; }
 }
 .variant-note { margin: 0; text-align: center; }
 
-/* предмет решён частично: цветной спрайт стадии */
-.spr-obj.is-stage { filter: saturate(.85); }
+/* предмет решён частично: спрайт стадии в полном цвете (круг 8) */
+.spr-obj.is-stage { filter: none; }
 .obj.is-preview .spr-obj { animation: obj-arrive .6s cubic-bezier(.3, 1.5, .5, 1) both; }
 .pv-label {
   position: absolute; left: 50%; top: -6px; transform: translate(-50%, -100%);

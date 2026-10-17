@@ -538,6 +538,8 @@
     var picks = playable.slice(0, 4 - more), cards = picks.length + more;
     var grid = h('div', 'choice-grid' + (cards > 2 ? ' is-compact' : ''));
     grid.style.setProperty('--n', cards);
+    // Хватает на уют — эта карточка первая: покупка и есть событие (круг 8).
+    if (dec) grid.appendChild(decorChoice(dec));
     picks.forEach(function (oid) {
       var o = C.objects[oid];
       var b = h('button', 'card card-choice');
@@ -556,7 +558,6 @@
       grid.appendChild(b);
     });
     if (lan) grid.appendChild(lanternChoice(lan));
-    if (dec) grid.appendChild(decorChoice(dec));
     panel.appendChild(grid);
   }
 

@@ -270,15 +270,25 @@
 
   /* ---------- журнал и награды ---------- */
 
-  // Слушатель журнала (src/track.js шлёт события на сервер). Ошибка слушателя
-  // не должна ломать ход игры.
+  // Слушатели журнала: src/track.js шлёт события на сервер (setEventHook),
+  // src/analytics.js — цели в Яндекс.Метрику (addEventHook). Ошибка слушателя
+  // не должна ломать ход игры и соседнего слушателя.
   var eventHook = null;
+  var extraHooks = [];
   function setEventHook(fn) { eventHook = fn; }
+  function addEventHook(fn) { if (typeof fn === 'function') extraHooks.push(fn); }
 
   function logEvent(s, type, data) {
     s.log.push({ t: nowIso(), type: type, data: data || null });
     if (s.log.length > MAX_LOG) s.log.splice(0, s.log.length - MAX_LOG);
     if (eventHook) { try { eventHook(type, data || null); } catch (e) { /* журнал важнее */ } }
+    for (var i = 0; i < extraHooks.length; i++) { try { extraHooks[i](type, data || null); } catch (e) { /* журнал важнее */ } }
+  }
+
+  // Номер дня с первого запуска (1 — день первого запуска), по Москве, как письма.
+  function dayNumber(s, day) {
+    var first = s.created_at ? dayKey(new Date(s.created_at)) : (s.visits[0] || today());
+    return Math.max(1, daysBetween(first, day || today()) + 1);
   }
 
   function touch(s) { s.revision++; s.updated_at = nowIso(); }
@@ -1095,7 +1105,7 @@
     canOfferSku: canOfferSku, applyOrder: applyOrder, adsLeft: adsLeft, rewardedGrant: rewardedGrant,
     stampsActive: stampsActive, dailyLetters: dailyLetters, todayLetter: todayLetter, lettersBadge: lettersBadge,
     openLetterEnvelope: openLetterEnvelope,
-    setFlag: setFlag, registerVisit: registerVisit, daysAway: daysAway, comebackGift: comebackGift, logEvent: logEvent, setEventHook: setEventHook,
+    setFlag: setFlag, registerVisit: registerVisit, daysAway: daysAway, comebackGift: comebackGift, logEvent: logEvent, setEventHook: setEventHook, addEventHook: addEventHook, dayNumber: dayNumber,
     deliverLetters: deliverLetters, addPlayTime: addPlayTime, paidOpen: paidOpen,
     secretsCount: secretsCount, findSecret: findSecret, startEvent: startEvent, renewEvent: renewEvent, eventInfo: eventInfo, eventOpen: eventOpen,
     encodeBoard: encodeBoard, decodeBoard: decodeBoard, load: load, persist: persist,

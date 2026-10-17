@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="ru" data-metrika-frame="1">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="referrer" content="strict-origin-when-cross-origin" />
+  <title>Дом картинок</title>
+  <!--
+    Фрейм-изолятор Яндекс.Метрики (как game2/metrika.html). Пустая страница того же
+    сайта: src/analytics.js открывает её невидимым <iframe referrerpolicy="no-referrer">
+    без query/hash и грузит tag.js внутрь. tag.js видит здесь чистый адрес и пустой
+    реферер, а не адрес ВК-фрейма с vk_user_id/sign. Кнопок и форм нет.
+    Первый скрипт — keepalive для запросов Метрики (level_quit при закрытии игры
+    в Android WebView иначе обрывается), второй — стандартная очередь ym().
+  -->
+  <script>
+    (function () {
+      var orig = window.fetch;
+      if (typeof orig !== 'function') return;
+      var MC = /^https:\/\/([a-z0-9-]+\.)*mc\.yandex\.[a-z.]+\//i;
+      window.fetch = function (input, init) {
+        var args = arguments;
+        try {
+          var url = typeof input === 'string' ? input : String((input && input.url) || '');
+          if (MC.test(url) && !(init && init.keepalive)) {
+            var o = {};
+            if (init) for (var k in init) o[k] = init[k];
+            o.keepalive = true;
+            args = [input, o];
+          }
+        } catch (e) { /* запрос уходит как есть */ }
+        return orig.apply(window, args);
+      };
+    })();
+  </script>
+  <script>window.ym=window.ym||function(){(window.ym.a=window.ym.a||[]).push(arguments)};window.ym.l=1*new Date();</script>
+</head>
+<body></body>
+</html>

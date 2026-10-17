@@ -13,6 +13,8 @@
   var C = window.HOP_CONTENT;
   var St = window.HopState;
   var N = window.Nonogram;
+  // Цели Яндекс.Метрики (src/analytics.js); нет модуля — заглушка, игра не ломается.
+  var Metrika = window.HopMetrika || { goal: function () {}, levelQuit: function () {} };
   var ART = 'assets/art/';
   var SAVE_DELAY = 300;
 
@@ -1365,6 +1367,7 @@
     if (!N.isWon()) { St.saveDraft(S, cur.pid, N.getBoardState()); }
     saveNow();
     coachHide();
+    Metrika.levelQuit('back');
     var wasLetter = !!(cur.letter || cur.lantern) && !cur.home;
     cur = null;
     showScreen(wasLetter ? 'letters' : 'home');
@@ -2909,6 +2912,7 @@
   function watchAd(kind, after) {
     if (St.adsLeft(C, S, St.today()) <= 0) { toast('До завтра', null, 'video'); return; }
     var done = function (ok) {
+      Metrika.goal('rewarded_result', { ok: !!ok, kind: kind });
       if (!ok) { toast('Без награды', null, 'video'); return; }
       var r = St.rewardedGrant(C, S, kind);
       if (!r.ok) return;
@@ -3005,7 +3009,7 @@
   var dayNow = St.today();
   function onNewDay() {
     dayNow = St.today();
-    if (St.registerVisit(S)) log('day_start', { day: dayNow });
+    if (St.registerVisit(S)) { log('day_start', { day: dayNow }); Metrika.goal('return_day', { day: St.dayNumber(S) }); }
     if (St.renewEvent(C, S)) toast('Новый вечер', null, 'lantern');
     saveNow();
     if (screen === 'home') renderHome();
@@ -3092,9 +3096,11 @@
     if (St.renewEvent(C, S)) S.story_flags.event_renewed = true;
     // Пауза помнится, пока «С возвращением» не показано: день засчитан, а окно могли не увидеть.
     var away = Math.max(St.daysAway(S), S.story_flags.welcome_away | 0);
-    St.registerVisit(S);
+    var newDay = St.registerVisit(S) && S.visits.length > 1;
     if (away >= 1 && hallDone()) S.story_flags.welcome_away = away;
     St.logEvent(S, 'session_start', { build: BUILD, platform: Platform.name, fresh: loaded.fresh, viewport: innerWidth + 'x' + innerHeight, day: St.today() });
+    // Метрика: вернулся в другой календарный день (day — номер дня с первого запуска).
+    if (newDay) Metrika.goal('return_day', { day: St.dayNumber(S) });
     saveNow();
     applySettings();
     Platform.init();

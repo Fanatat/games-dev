@@ -1,14 +1,14 @@
 {
  "game": "house-of-pictures",
- "build_number": "011",
- "app_build": "0.1.0+b011",
- "git_branch": "worktree-release-polish",
- "git_sha": "5dcd263",
+ "build_number": "012",
+ "app_build": "0.1.0+b012",
+ "git_branch": "feat/metrika",
+ "git_sha": "a27fd1e",
  "dirty": false,
  "content_version": 3,
  "api": "https://api.vanatat.ru/hop",
- "built_at": "2026-10-17T12:57:36+00:00",
- "total_bytes": 7012574,
+ "built_at": "2026-10-17T18:48:24+00:00",
+ "total_bytes": 7027813,
  "files": [
   {
    "path": "assets/art/armchair_a.webp",
@@ -1017,13 +1017,23 @@
   },
   {
    "path": "index.html",
-   "bytes": 12418,
-   "sha256": "1a58e9d9ddfc14fd1b6e8ea50578436c976c10cb823aa2496fc28e83105f680f"
+   "bytes": 12465,
+   "sha256": "715f2cae9b71d5c0312045e93cb008cbbc5353919c4f2c7fc72b0f53cec3e7b6"
+  },
+  {
+   "path": "metrika.html",
+   "bytes": 1814,
+   "sha256": "31002a833efb3e51045c7a09f646c70086da244d2828b424e2df02f5ce6d3eaf"
+  },
+  {
+   "path": "src/analytics.js",
+   "bytes": 11974,
+   "sha256": "36b89fc6208bbae49bc6d0fb695b4a548273f23374c81fba7c5974fbbf834fd4"
   },
   {
    "path": "src/app.js",
-   "bytes": 143748,
-   "sha256": "ccac29ee6e9030f33ebc3895ab5c3298a20f5e33040275c735d5245329a37b31"
+   "bytes": 144384,
+   "sha256": "5676266b7436ceb98006ba51fb1dc45336ebef6face8c5010cb4f5ba49652f92"
   },
   {
    "path": "src/cloud.js",
@@ -1057,8 +1067,8 @@
   },
   {
    "path": "src/state.js",
-   "bytes": 53705,
-   "sha256": "fe2ed7a369992154846385edc1fa215a7ef0a28e310d0c619a56ce940bca382d"
+   "bytes": 54473,
+   "sha256": "350a99bb447a0986d2de3e757c41c69fed6c247e9bef73de51740e51f807247c"
   },
   {
    "path": "src/styles.css",

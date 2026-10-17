@@ -85,7 +85,7 @@ window.HOP_CONTENT = {
       final_text: 'Сад открыт!',
       invitation: {
         title: 'Вечер фонариков',
-        text: 'Оранжерея ожила! Новые комнаты скоро откроются.',
+        text: 'Вера ждала тебя к Вечеру фонариков. Сад открыт!',
         sign: 'Вера',
         button: 'Хорошо'
       },
@@ -103,12 +103,19 @@ window.HOP_CONTENT = {
         bird: { x: 0.785, y: 0.925, w: 0.075 }
       },
       z: ['r03_herbarium', 'r03_glass_door', 'r03_hanging_pot', 'r03_seed_table', 'r03_birdhouse', 'r03_bench', 'r03_watering_can', 'r03_pond'],
+      // Развязка порциями (круг 9): на 2-й вещи — частичный ответ и новый вопрос,
+      // на 4-й — улика (clues), в финале — ответ в приглашении.
       twist: {
-        after: 4, flag: 'twist_r03', title: 'Фото бабушки', sprite: 'grandma_photo',
-        text: 'Финик нашёл фото: бабушка у лимона.',
-        question: 'А где же её лимон?',
+        after: 2, flag: 'twist_r03', title: 'Фото бабушки', sprite: 'grandma_photo',
+        text: 'Бабушка ставит печать с птицей. Письмо — отсюда!',
+        question: 'Но кто отправил?',
         place: { x: 0.40, y: 0.52, w: 0.07 }
-      }
+      },
+      clues: [
+        { after: 4, flag: 'clue_r03', title: 'Черновик письма', sprite: 'letter_scrap',
+          text: 'Финик нашёл черновик письма. Почерк — Верин!',
+          question: 'Зачем Вера тебя позвала?' }
+      ]
     }
   },
 
@@ -275,7 +282,7 @@ window.HOP_CONTENT = {
         { id: 'r03_seed_table_b', title: 'Шалфейный', sprite: 'seed_table_b' },
         { id: 'r03_seed_table_c', title: 'Вечерний с огоньками', sprite: 'seed_table_c', premium: true, price_coins: 800 }
       ],
-      tap_secret: 'Финик шуршит в мешке с семенами.'
+      tap_secret: 'В семенах — сургуч с птицей.'
     },
     r03_watering_can: {
       room: 'r03', title: 'Лейка', verb: 'Начистить',
@@ -317,7 +324,7 @@ window.HOP_CONTENT = {
         { id: 'r03_birdhouse_b', title: 'Голубой', sprite: 'birdhouse_b' },
         { id: 'r03_birdhouse_c', title: 'Звёздный с фонариком', sprite: 'birdhouse_c', premium: true, price_coins: 900 }
       ],
-      tap_secret: 'Малиновка высунулась из окошка и свистнула.'
+      tap_secret: 'Малиновка — та самая птица с печати!'
     },
     r03_herbarium: {
       room: 'r03', title: 'Гербарий', verb: 'Собрать',

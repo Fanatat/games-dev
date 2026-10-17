@@ -73,6 +73,7 @@
       secrets: [],
       decor: [],
       event_start: null,
+      event_carry: 0,
       settings: { music: true, sound: true, vibration: true, reduced_motion: false },
       log: []
     };
@@ -113,6 +114,7 @@
     s.glow_at = Math.max(0, Math.min(Math.round(s.glow_at), s.play_s));
     if (!isObj(s.gold) || typeof s.gold.pid !== 'string') s.gold = null;
     if (typeof s.event_start !== 'string') s.event_start = null;
+    s.event_carry = Math.max(0, s.event_carry | 0);
     s.schema_version = SCHEMA_VERSION;
     if (C && from < 2) backfill(C, s);
     if (C) healProgress(C, s);
@@ -944,12 +946,24 @@
     return true;
   }
 
+  // Вечер кончился, а зажжены не все, — начинается новый на столько же дней (круг 9):
+  // зажжённые горят, сверх них открыто столько же, сколько в первый день.
+  function renewEvent(C, s, day) {
+    var ev = eventInfo(C, s, day);
+    if (!ev || !ev.over || ev.complete) return false;
+    s.event_start = day || today();
+    s.event_carry = ev.done;
+    logEvent(s, 'event_renew', { id: ev.id, day: s.event_start, done: ev.done });
+    touch(s);
+    return true;
+  }
+
   function eventInfo(C, s, day) {
     var E = C.event;
     if (!E || !s.event_start) return null;
     day = day || today();
     var since = Math.max(0, daysBetween(s.event_start, day));
-    var open = Math.min(E.lanterns.length, E.open_first + since);
+    var open = Math.min(E.lanterns.length, E.open_first + since + (s.event_carry | 0));
     var items = E.lanterns.map(function (L, i) {
       return { id: L.id, title: L.title, status: has(s.completed_puzzles, L.id) ? 'solved' : i < open ? 'open' : 'locked' };
     });
@@ -1079,7 +1093,7 @@
     openLetterEnvelope: openLetterEnvelope,
     setFlag: setFlag, registerVisit: registerVisit, daysAway: daysAway, comebackGift: comebackGift, logEvent: logEvent, setEventHook: setEventHook,
     deliverLetters: deliverLetters, addPlayTime: addPlayTime, paidOpen: paidOpen,
-    secretsCount: secretsCount, findSecret: findSecret, startEvent: startEvent, eventInfo: eventInfo, eventOpen: eventOpen,
+    secretsCount: secretsCount, findSecret: findSecret, startEvent: startEvent, renewEvent: renewEvent, eventInfo: eventInfo, eventOpen: eventOpen,
     encodeBoard: encodeBoard, decodeBoard: decodeBoard, load: load, persist: persist,
     cloudSave: cloudSave, preferRemote: preferRemote, adoptRemote: adoptRemote
   };

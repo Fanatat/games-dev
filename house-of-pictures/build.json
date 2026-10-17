@@ -1,14 +1,14 @@
 {
  "game": "house-of-pictures",
- "build_number": "009",
- "app_build": "0.1.0+b009",
+ "build_number": "010",
+ "app_build": "0.1.0+b010",
  "git_branch": "worktree-release-polish",
- "git_sha": "aea4af6",
+ "git_sha": "c6ace10",
  "dirty": false,
  "content_version": 3,
  "api": "https://api.vanatat.ru/hop",
- "built_at": "2026-10-17T07:30:28+00:00",
- "total_bytes": 5242065,
+ "built_at": "2026-10-17T08:30:03+00:00",
+ "total_bytes": 5245746,
  "files": [
   {
    "path": "assets/art/armchair_a.webp",
@@ -752,18 +752,18 @@
   },
   {
    "path": "data/content.js",
-   "bytes": 60858,
-   "sha256": "76b57274850bbd5b04b8f301be30d428a3b505425e53a0427d2b39602a43697a"
+   "bytes": 61393,
+   "sha256": "de201e4f48e83de85f2f0c46f192f650331ff6cfc68e5e554c9b85cb30ca9c2a"
   },
   {
    "path": "index.html",
    "bytes": 12418,
-   "sha256": "739ae9f438d4555c8c4ce768538a6c5847f07f2e68d1e9e20ad6e73efac13ccb"
+   "sha256": "b6c4455d36c52b2c923fe030b2f60d882e0e44fcdcebc9b5282139ea009b058d"
   },
   {
    "path": "src/app.js",
-   "bytes": 137011,
-   "sha256": "43e3638d749ee7c819ca54555dc39cd817552ae43d39654e3456b84222127294"
+   "bytes": 138813,
+   "sha256": "57143fb729deb60eb0281026bfab7689ff9c32779012b1f8b6b4189ed607f285"
   },
   {
    "path": "src/cloud.js",
@@ -797,13 +797,13 @@
   },
   {
    "path": "src/state.js",
-   "bytes": 52697,
-   "sha256": "a58d56b929b7aa411357deea5b0204004e00fd06c60cd5c294c9b15c01074864"
+   "bytes": 53404,
+   "sha256": "cd677418fb2e6988bbeb6aff5c89efb6e7039a683265562a02166e3abfd608c3"
   },
   {
    "path": "src/styles.css",
-   "bytes": 80573,
-   "sha256": "bce086b78e304268fcb8d1e00413a3eb255c01feb75a05c2d1a0627ea9e6437c"
+   "bytes": 81210,
+   "sha256": "264d6d0a5a79133dbf59f64deec90b39529f929debfa823a42c7883474685e25"
   },
   {
    "path": "src/track.js",

@@ -916,6 +916,12 @@ html.rm .hint-spark { display: none; }
 .tm-hrs { display: inline-flex; align-items: center; gap: 3px; font-size: 15px; font-weight: 900; color: var(--terra-d, var(--terra)); white-space: nowrap; }
 .tm-hrs .ico { width: 16px; height: 16px; }
 .row-actions .tomorrow { min-height: 52px; }
+/* рядом с главной кнопкой — без слова: конверт с единицей и часы, кнопка ужимается, а не выталкивает плашку */
+.row-actions.has-tomorrow .btn-main { min-width: 0; padding: 0 16px; }
+.row-actions.has-tomorrow .tomorrow .tm-word { display: none; }
+/* не разгадано письмо дня — конверт с единицей на месте «Завтра» (круг 9) */
+.tomorrow .tm-env { position: relative; display: block; }
+.tomorrow .tm-env .chip-badge { right: -6px; top: -4px; bottom: auto; background: var(--terra); color: #fff; }
 @media (max-width: 380px) {
   .tomorrow { padding: 4px 10px 4px 6px; gap: 4px; }
   .tomorrow .tm-word { display: none; }

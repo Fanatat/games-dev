@@ -61,7 +61,7 @@
       decor: decor, owned: {}, pieces: {}, choice: {}, fav: null,
       pay: { cursor: 0, noadsUntil: 0, royal: false },
       install: intIn(ctx.today, 1, 1e6) ? ctx.today : 0,
-      flags: { favAsked: false, noadsOfferDay: 0, ftue: 0 }
+      flags: { favAsked: false, noadsOfferDay: 0, ftue: 0, lastDay: 0 }
     };
   }
 
@@ -166,6 +166,7 @@
         out.flags.favAsked = f.favAsked === true;
         if (intIn(f.noadsOfferDay, 0, 1e6)) out.flags.noadsOfferDay = f.noadsOfferDay;
         if (intIn(f.ftue, 0, 0xffff)) out.flags.ftue = f.ftue;
+        if (intIn(f.lastDay, 0, 1e6)) out.flags.lastDay = f.lastDay;   // день прошлого запуска (return_day)
       }
       // Из v3: кто уже побеждал, первые минуты прошёл — шаги не повторяются в воронке.
       if (d.v === 3 && Object.keys(out.stars).length) out.flags.ftue |= (ctx.ftueAll || 0);

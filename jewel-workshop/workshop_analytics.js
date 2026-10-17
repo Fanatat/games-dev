@@ -15,8 +15,9 @@
    2. Если Метрика включена — отправляет reachGoal(цель, { <цель>: параметры }).
       Параметры вложены под имя цели: иначе одноимённые ключи разных целей
       (level, moves) слиплись бы в «Параметрах визитов» (урок game3, 27.09).
-      В Метрику уходят только события из схемы (GOAL_EVENTS); служебные
-      (move, delivery, stamp, undo…) остаются в журнале.
+      В Метрику уходят только 18 целей (GOALS: общий набор студии + 8 своих;
+      goalsFor() переводит событие игры в цель), остальные события — только
+      журнал. Номер счётчика игры (113661736) — в workshop_config.json.
 
    Метрика включена, только если одновременно:
      - есть номер счётчика (WS_CONFIG.metrikaId или init({counterId}));
@@ -63,91 +64,70 @@
 
   /* ---------- схема ---------- */
 
-  // События схемы: в Метрику уходят цели с этими именами.
-  var GOAL_EVENTS = [
-    'session_start', 'ftue_step',
-    'level_start', 'level_win', 'level_lose', 'level_quit', 'next_click', 'rescue', 'unwinnable',
-    'choice_shown', 'choice_pick', 'case_open', 'piece_view', 'fav_set', 'chest', 'fav_ask', 'fav_result',
-    'ad_offer', 'ad_click', 'ad_request', 'ad_result', 'ad_reward', 'ad_skip',
-    'shop_open', 'noads_offer', 'buy_click', 'buy_result', 'grant',
-    'coin_earn', 'coin_spend'
+  /* В Метрику уходит короткий набор целей (решение 17.10.2026, подключение счётчика 113661736):
+     общий набор студии (10 целей, имена одинаковы во всех играх) и 8 своих ключевых моментов игры.
+     Остальные события (ftue_step, ad_offer/ad_request/ad_reward/ad_skip, монеты, шкатулка коллекции,
+     избранное, grant, rescue, unwinnable, move, delivery…) остаются только в журнале __wsEvents:
+     ни целями, ни параметрами визита в Метрику они не идут — подробности (место рекламы, исход, уровень)
+     уже лежат в параметрах ключевых целей. */
+  var STUDIO_GOALS = [
+    'game_loaded', 'first_move', 'level_start', 'level_win', 'level_restart', 'level_quit',
+    'rewarded_click', 'rewarded_result', 'interstitial_shown', 'return_day'
   ];
+  var OWN_GOALS = [
+    'level_lose', 'next_click', 'choice_pick', 'case_open', 'shop_open', 'noads_offer', 'buy_click', 'buy_result'
+  ];
+  var GOALS = STUDIO_GOALS.concat(OWN_GOALS);
+
+  // Событие игры -> цель Метрики один к одному (параметры события уходят под именем цели).
+  var DIRECT = {
+    session_start: 'game_loaded', level_start: 'level_start', level_win: 'level_win', restart: 'level_restart',
+    level_quit: 'level_quit', level_lose: 'level_lose', next_click: 'next_click', choice_pick: 'choice_pick',
+    case_open: 'case_open', shop_open: 'shop_open', noads_offer: 'noads_offer', buy_click: 'buy_click',
+    buy_result: 'buy_result'
+  };
 
   // Прежние имена журнала: новое имя события -> имя записи в __wsEvents.
   // Тесты (ws_acceptance.py) и __wsMetrics() ищут win / lose / quit / next.
   var LEGACY = { level_win: 'win', level_lose: 'lose', level_quit: 'quit', next_click: 'next' };
 
   var REWARD_PLACES = ['win_x2', 'lose_moves', 'hint'];
-  var AD_PLACES = REWARD_PLACES.concat(['next', 'banner']);
-  var AD_OUTCOMES = ['shown', 'declined', 'no_ad', 'timeout', 'error', 'closed'];
-  var AD_SKIP_REASONS = ['early', 'interval', 'near_reward', 'owner'];
-  var MILESTONES = [1, 3, 5, 10, 15, 20, 30, 40, 50, 60];
-  var RETURN_DAYS = [1, 3, 7];
 
   // Ключи, которые в Метрику не уходят никогда (личные данные).
   var PII_KEY = /(user|viewer|vk)_?id|^uid$|^id$|first_?name|last_?name|full_?name|user_?name|e_?mail|phone|login|nick|fio|photo|avatar|^sign$|token/i;
 
-  // Исходы показа по местам: у баннера нет отказа и таймаута, «закрыл» бывает только у баннера.
-  function outcomeAllowed(place, outcome) {
-    if (AD_PLACES.indexOf(place) === -1 || AD_OUTCOMES.indexOf(outcome) === -1) return false;
-    if (place === 'banner') return outcome !== 'declined' && outcome !== 'timeout';
-    return outcome !== 'closed';
+  function pick(p, keys) {
+    var out = {};
+    keys.forEach(function (k) { if (p[k] !== undefined) out[k] = p[k]; });
+    return out;
   }
 
-  function pad2(n) { return (n < 10 ? '0' : '') + n; }
-
-  // Плоские цели, производные от события (для составных целей-воронок Метрики:
-  // шаги воронки не умеют фильтровать по параметрам, поэтому место, номер шага
-  // или день зашиты в имя цели). Без параметров: только счётчик.
-  function derivedGoals(name, p) {
+  // Цели Метрики для события игры: [{ goal, params }] (пусто — событие только в журнале).
+  function goalsFor(name, p) {
     var out = [];
-    p = p || {};
-    if (name === 'ftue_step' && typeof p.step === 'number' && /^[a-z0-9_]{1,24}$/.test(String(p.name || ''))) {
-      out.push('ftue_' + pad2(p.step) + '_' + p.name);
-    } else if (name === 'level_win' && p.first && MILESTONES.indexOf(p.level) !== -1) {
-      out.push('win_lvl_' + pad2(p.level));
-    } else if (name === 'session_start') {
-      if (p.session === 1) out.push('new_player');
-      if (RETURN_DAYS.indexOf(p.day) !== -1) out.push('return_d' + p.day);
-    } else if (name === 'ad_result' && outcomeAllowed(p.place, p.outcome)) {
-      out.push('ad_' + p.outcome + '_' + p.place);
-    } else if ((name === 'ad_offer' || name === 'ad_click' || name === 'ad_reward') && REWARD_PLACES.indexOf(p.place) !== -1) {
-      out.push(name + '_' + p.place);
-    } else if (name === 'ad_request' && (REWARD_PLACES.indexOf(p.place) !== -1 || p.place === 'next')) {
-      out.push('ad_request_' + p.place);
-    } else if (name === 'ad_skip' && AD_SKIP_REASONS.indexOf(p.reason) !== -1) {
-      out.push('ad_skip_' + p.reason);
+    if (DIRECT[name]) out.push({ goal: DIRECT[name], params: p });
+    if (name === 'session_start' && retDay !== null) out.push({ goal: 'return_day', params: { day: retDay } });
+    if (name === 'move' && !firstMoveSent) {
+      firstMoveSent = true;                         // первый ход игрока в этом запуске
+      out.push({ goal: 'first_move', params: pick(p, ['level']) });
+    }
+    if (name === 'ad_click' && REWARD_PLACES.indexOf(p.place) !== -1) {
+      out.push({ goal: 'rewarded_click', params: pick(p, ['place', 'format', 'level']) });
+    }
+    if (name === 'ad_result') {
+      if (REWARD_PLACES.indexOf(p.place) !== -1) {
+        var r = pick(p, ['place', 'outcome', 'ms', 'late', 'level']);
+        r.ok = p.outcome === 'shown';
+        out.push({ goal: 'rewarded_result', params: r });
+      } else if (p.place === 'next' && p.outcome === 'shown') {
+        out.push({ goal: 'interstitial_shown', params: pick(p, ['ms', 'level']) });
+      }
     }
     return out;
   }
 
-  // Имя основной цели: возобновлённая партия — не новый старт уровня.
-  function mainGoal(name, p) {
-    if (name === 'level_start' && p && p.resumed) return 'level_resume';
-    return name;
-  }
-
-  // Полный список целей Метрики, которые надо создать в интерфейсе (JS-событие).
-  function goalList() {
-    var set = {};
-    var add = function (g) { set[g] = 1; };
-    GOAL_EVENTS.forEach(add);
-    add('level_resume');
-    add('new_player');
-    RETURN_DAYS.forEach(function (d) { add('return_d' + d); });
-    MILESTONES.forEach(function (l) { add('win_lvl_' + pad2(l)); });
-    // шаги FTUE: номера и имена зафиксированы схемой
-    FTUE_STEPS.forEach(function (s) { add('ftue_' + pad2(s[0]) + '_' + s[1]); });
-    REWARD_PLACES.forEach(function (pl) {
-      ['ad_offer_', 'ad_click_', 'ad_request_', 'ad_reward_'].forEach(function (pre) { add(pre + pl); });
-    });
-    add('ad_request_next');
-    AD_PLACES.forEach(function (pl) {
-      AD_OUTCOMES.forEach(function (o) { if (outcomeAllowed(pl, o)) add('ad_' + o + '_' + pl); });
-    });
-    AD_SKIP_REASONS.forEach(function (r) { add('ad_skip_' + r); });
-    return Object.keys(set);
-  }
+  // Список целей Метрики, которые надо завести в счётчике (JS-событие).
+  function goalList() { return GOALS.slice(); }
 
   var FTUE_STEPS = [[1, 'first_move'], [2, 'first_delivery'], [3, 'first_win'], [4, 'first_next'], [5, 'third_win'],
     [6, 'first_choice'], [7, 'first_case'], [8, 'first_fav']];   // B2: первый выбор оправы, первая шкатулка, первое любимое
@@ -249,6 +229,8 @@
   var queue = [];               // [{ goal, params|null }]
   var dropped = 0;
   var sessionStarted = false;
+  var firstMoveSent = false;
+  var retDay = null;           // return_day: день с установки, если запуск в другой календарный день, чем прошлый
   var visit = { platform: 'web', build: 'unknown', day: null, session: null };
 
   /* ---------- журнал ---------- */
@@ -340,6 +322,10 @@
       }
       var sess = Number(cfg.sessions);
       if (isFinite(sess) && sess >= 1) visit.session = Math.floor(sess);
+      // возврат: день с установки не нулевой и прошлый запуск был в другой календарный день
+      // (lastDay — номер дня прошлого запуска из сохранения; 0 или нет — игрок до этой версии)
+      var last = Number(cfg.lastDay);
+      if (visit.day !== null && visit.day >= 1 && !(isFinite(last) && last > 0 && last === dayNumber())) retDay = visit.day;
 
       debugFlag = isDebug();
       enabled = counterId > 0 && !isLocalRun();
@@ -403,10 +389,8 @@
       journal(name, p);
       log(enabled ? 'event' : 'event (журнал)', name, p);
 
-      if (GOAL_EVENTS.indexOf(name) === -1) return;   // служебное событие: только журнал
       if (inited && !enabled) return;                 // не шлём и очередь не копим
-      dispatch({ goal: mainGoal(name, p), params: cleanParams(p) });
-      derivedGoals(name, p).forEach(function (g) { dispatch({ goal: g, params: null }); });
+      goalsFor(name, p).forEach(function (g) { dispatch({ goal: g.goal, params: cleanParams(g.params) }); });
     } catch (e) { /* аналитика не роняет игру */ }
   }
 
@@ -420,6 +404,6 @@
 
   window.WSAnalytics = {
     init: init, event: event, state: state, goalList: goalList, dayNumber: dayNumber,
-    GOAL_EVENTS: GOAL_EVENTS.slice(), FTUE_STEPS: FTUE_STEPS.map(function (s) { return s.slice(); })
+    STUDIO_GOALS: STUDIO_GOALS.slice(), OWN_GOALS: OWN_GOALS.slice(), FTUE_STEPS: FTUE_STEPS.map(function (s) { return s.slice(); })
   };
 })();

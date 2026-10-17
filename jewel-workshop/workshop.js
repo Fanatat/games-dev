@@ -3116,12 +3116,15 @@
     try { raw = await WSPlatform.loadSave(); } catch (e) { raw = null; }
     Store.load(raw);
     Store.data.sessions++;
+    // день прошлого запуска — для цели return_day (возврат в другой календарный день)
+    const lastDay = Store.data.flags.lastDay;
+    Store.data.flags.lastDay = WSAnalytics.dayNumber();
     Store.save();
     /* ?level=N — открыть уровень сразу (проверки и отладка; замок не действует). Только вне пакета ВК
        (ревью 1.0, P2-2): игрок ВК не обходит замок уровней адресом. Читается до WSAnalytics.init — та
        очищает адрес от параметров запуска ВК (P0-2). */
     const startLevel = (window.WS_CONFIG || {}).target === 'vk' ? null : /[?&]level=(\d+)/.exec(location.search);
-    WSAnalytics.init({ install: Store.data.install, sessions: Store.data.sessions });
+    WSAnalytics.init({ install: Store.data.install, sessions: Store.data.sessions, lastDay });
     track('session_start', { coins: Store.data.coins, passed: Object.keys(Store.data.stars).length });
     document.body.classList.toggle('is-owner', isOwner());
     applyDecor();

@@ -68,12 +68,18 @@ window.HOP_CONTENT = {
       z: ['r02_window', 'r02_clock', 'r02_photo', 'r02_sideboard', 'r02_musicbox', 'r02_armchair', 'r02_table', 'r02_tea_set'],
       // Поворот на середине комнаты: окно в несколько слов, находка остаётся на сцене.
       // Флаг story_answer — от «Тайны птицы» 006: видевшие её второй раз окна не получат.
+      // Круг 10: поворот на 2-й вещи, улика на 5-й — у Новичка нет 5 минут без нового.
       twist: {
-        after: 3, flag: 'story_answer', title: 'Тайна птицы', sprite: 'letter_scrap',
+        after: 2, flag: 'story_answer', title: 'Тайна птицы', sprite: 'letter_scrap',
         text: 'Финик принёс обрывок письма. Птица — знак дома.',
         question: 'Кто же прислал письмо?',
         place: { x: 0.36, y: 0.985, w: 0.10 }
-      }
+      },
+      clues: [
+        { after: 5, flag: 'clue_r02', title: 'Запах лимонов', sprite: 'cozy_lemon',
+          text: 'Из-за двери пахнет лимонами. Финик принюхивается.',
+          question: 'Что растёт за дверью?' }
+      ]
     },
     r03: {
       title: 'Оранжерея',
@@ -82,10 +88,11 @@ window.HOP_CONTENT = {
       background: 'assets/art/bg_orangery.webp',
       intro: 'Здесь бабушка растила лимоны. Начнём со стола для рассады.',
       intro_sign: 'Вера',
-      final_text: 'Сад открыт!',
+      // Сада в игре пока нет — финал его не обещает (01_GAME_DESIGN.md:79), а ведёт к фонарикам.
+      final_text: 'Оранжерея ожила!',
       invitation: {
         title: 'Вечер фонариков',
-        text: 'Вера ждала тебя к Вечеру фонариков. Сад открыт!',
+        text: 'Вера ждала тебя к Вечеру фонариков. Зажги их!',
         sign: 'Вера',
         button: 'Хорошо'
       },
@@ -104,7 +111,7 @@ window.HOP_CONTENT = {
       },
       z: ['r03_herbarium', 'r03_glass_door', 'r03_hanging_pot', 'r03_seed_table', 'r03_birdhouse', 'r03_bench', 'r03_watering_can', 'r03_pond'],
       // Развязка порциями (круг 9): на 2-й вещи — частичный ответ и новый вопрос,
-      // на 4-й — улика (clues), в финале — ответ в приглашении.
+      // на 3-й и 6-й — улики (clues, круг 10), в финале — ответ в приглашении.
       twist: {
         after: 2, flag: 'twist_r03', title: 'Фото бабушки', sprite: 'grandma_photo',
         text: 'Бабушка ставит печать с птицей. Письмо — отсюда!',
@@ -112,9 +119,12 @@ window.HOP_CONTENT = {
         place: { x: 0.40, y: 0.52, w: 0.07 }
       },
       clues: [
-        { after: 4, flag: 'clue_r03', title: 'Черновик письма', sprite: 'letter_scrap',
+        { after: 3, flag: 'clue_r03', title: 'Черновик письма', sprite: 'letter_scrap',
           text: 'Финик нашёл черновик письма. Почерк — Верин!',
-          question: 'Зачем Вера тебя позвала?' }
+          question: 'Зачем Вера тебя позвала?' },
+        { after: 6, flag: 'clue2_r03', title: 'Старый фонарик', sprite: 'lantern_pic',
+          text: 'Финик нашёл фонарик. Ярлык: «К вечеру».',
+          question: 'Какой вечер ждёт Вера?' }
       ]
     }
   },
@@ -126,7 +136,7 @@ window.HOP_CONTENT = {
       room: 'r01', title: 'Лампа', verb: 'Зажечь',
       puzzles: ['r01_lamp_01'], prerequisites: [],
       pitch: 'Вернуть в прихожую тёплый свет',
-      done_text: 'Свет вернулся. На стене проступил знак птицы.',
+      done_text: 'Свет вернулся. На стене — птица.',
       variants: [
         { id: 'r01_lamp_a', title: 'Медовый абажур', sprite: 'lamp_a' },
         { id: 'r01_lamp_b', title: 'Сливочный абажур', sprite: 'lamp_b' },
@@ -138,7 +148,7 @@ window.HOP_CONTENT = {
       room: 'r01', title: 'Почтовая полка', verb: 'Починить',
       puzzles: ['r01_shelf_01'], prerequisites: ['r01_lamp'],
       pitch: 'Полка — и придёт почта',
-      done_text: 'На полке — письмо с птичьей печатью.',
+      done_text: 'Письмо с птичьей печатью!',
       variants: [
         { id: 'r01_shelf_a', title: 'Светлая берёза', sprite: 'shelf_a' },
         { id: 'r01_shelf_b', title: 'Тёмный орех', sprite: 'shelf_b' },
@@ -162,7 +172,7 @@ window.HOP_CONTENT = {
       room: 'r01', title: 'Оконный цветок', verb: 'Посадить',
       puzzles: ['r01_flower_01'], prerequisites: ['r01_shelf', 'r01_rug'],
       pitch: 'Цветок — и кто-то прилетит',
-      done_text: 'За окном села птица — как на печати!',
+      done_text: 'За окном птица — как на печати!',
       variants: [
         { id: 'r01_flower_a', title: 'Белый цветок', sprite: 'flower_a' },
         { id: 'r01_flower_b', title: 'Жёлтый цветок', sprite: 'flower_b' },
@@ -177,7 +187,7 @@ window.HOP_CONTENT = {
       puzzles: ['r02_tea_set_02', 'r02_tea_set_01'], unlock_after: 0,
       stage_sprites: ['tea_set_s2'],
       pitch: 'Чайник — и можно звать гостей',
-      done_text: 'Чайник запыхтел паром. Пахнет мятой и малиной.',
+      done_text: 'Чайник запыхтел. Пахнет мятой.',
       variants: [
         { id: 'r02_tea_set_a', title: 'Белый с кобальтом', sprite: 'tea_set_a' },
         { id: 'r02_tea_set_b', title: 'Шалфейный в горох', sprite: 'tea_set_b' },
@@ -189,7 +199,7 @@ window.HOP_CONTENT = {
       room: 'r02', title: 'Чайный столик', verb: 'Накрыть',
       puzzles: ['r02_table_02'], unlock_after: 0,
       pitch: 'Круглый столик для чая на двоих',
-      done_text: 'Столик снова крепко стоит. Салфетка пахнет лавандой.',
+      done_text: 'Столик крепок. Пахнет лавандой.',
       variants: [
         { id: 'r02_table_a', title: 'Кружевная салфетка', sprite: 'table_a' },
         { id: 'r02_table_b', title: 'Терракотовая клетка', sprite: 'table_b' },
@@ -263,7 +273,7 @@ window.HOP_CONTENT = {
       life: { kind: 'waltz', x: 0.62, y: 0.42 },
       puzzles: ['r02_musicbox_04'], unlock_after: 7,
       pitch: 'Какую песню помнит шкатулка?',
-      done_text: 'Шкатулка заиграла вальс. Птичка на крышке закружилась.',
+      done_text: 'Заиграл вальс. Птичка кружится.',
       variants: [
         { id: 'r02_musicbox_a', title: 'Палисандр', sprite: 'musicbox_a' },
         { id: 'r02_musicbox_b', title: 'Кремовая с золотом', sprite: 'musicbox_b' },
@@ -276,7 +286,7 @@ window.HOP_CONTENT = {
       life: { kind: 'bloom' },
       puzzles: ['r03_seed_table_06'], unlock_after: 0,
       pitch: 'Разбудить спящие семена',
-      done_text: 'Проклюнулись первые ростки. Пахнет землёй.',
+      done_text: 'Проклюнулись первые ростки.',
       variants: [
         { id: 'r03_seed_table_a', title: 'Медовый', sprite: 'seed_table_a' },
         { id: 'r03_seed_table_b', title: 'Шалфейный', sprite: 'seed_table_b' },
@@ -290,7 +300,7 @@ window.HOP_CONTENT = {
       puzzles: ['r03_watering_can_06', 'r03_watering_can_01'], unlock_after: 1,
       stage_sprites: ['watering_can_s2'],
       pitch: 'Будет чем поливать ростки',
-      done_text: 'Лейка пустила струйку. Ростки повеселели.',
+      done_text: 'Лейка полила. Ростки повеселели.',
       variants: [
         { id: 'r03_watering_can_a', title: 'Медная', sprite: 'watering_can_a' },
         { id: 'r03_watering_can_b', title: 'С ромашками', sprite: 'watering_can_b' },
@@ -304,7 +314,7 @@ window.HOP_CONTENT = {
       puzzles: ['r03_hanging_pot_06', 'r03_hanging_pot_03'], unlock_after: 1,
       stage_sprites: ['hanging_pot_s2'],
       pitch: 'Подвесить зелёный плющ',
-      done_text: 'Плющ свесился зелёной косой. Кашпо тихо покачивается.',
+      done_text: 'Плющ свесился зелёной косой.',
       variants: [
         { id: 'r03_hanging_pot_a', title: 'Терракотовое', sprite: 'hanging_pot_a' },
         { id: 'r03_hanging_pot_b', title: 'Белое', sprite: 'hanging_pot_b' },
@@ -318,7 +328,7 @@ window.HOP_CONTENT = {
       puzzles: ['r03_birdhouse_06', 'r03_birdhouse_01', 'r03_birdhouse_02'], unlock_after: 2,
       stage_sprites: ['birdhouse_s1', 'birdhouse_s2'],
       pitch: 'Домик — и прилетит жилец',
-      done_text: 'В скворечник заглянула малиновка и решила остаться.',
+      done_text: 'В домик заселилась малиновка.',
       variants: [
         { id: 'r03_birdhouse_a', title: 'Рыжая крыша', sprite: 'birdhouse_a' },
         { id: 'r03_birdhouse_b', title: 'Голубой', sprite: 'birdhouse_b' },
@@ -332,7 +342,7 @@ window.HOP_CONTENT = {
       puzzles: ['r03_herbarium_06', 'r03_herbarium_02', 'r03_herbarium_12'], unlock_after: 2,
       stage_sprites: ['herbarium_s1', 'herbarium_s2'],
       pitch: 'Память о лете под стеклом',
-      done_text: 'Под стеклом — клён. Ярлык бабушкиной рукой.',
+      done_text: 'Под стеклом — бабушкин клён.',
       variants: [
         { id: 'r03_herbarium_a', title: 'Дубовая рамка', sprite: 'herbarium_a' },
         { id: 'r03_herbarium_b', title: 'Шалфейная рамка', sprite: 'herbarium_b' },
@@ -346,7 +356,7 @@ window.HOP_CONTENT = {
       puzzles: ['r03_bench_06', 'r03_bench_01', 'r03_bench_12'], unlock_after: 4,
       stage_sprites: ['bench_s1', 'bench_s2'],
       pitch: 'Скамейка, чтобы присесть',
-      done_text: 'Скамейка крепка. Финик уже на подушке.',
+      done_text: 'Скамейка крепка. Финик на ней.',
       variants: [
         { id: 'r03_bench_a', title: 'Терракотовая', sprite: 'bench_a' },
         { id: 'r03_bench_b', title: 'В полоску', sprite: 'bench_b' },
@@ -360,7 +370,7 @@ window.HOP_CONTENT = {
       puzzles: ['r03_pond_06', 'r03_pond_01', 'r03_pond_12'], unlock_after: 4,
       stage_sprites: ['pond_s1', 'pond_s2'],
       pitch: 'Пруд с кувшинкой оживёт',
-      done_text: 'Вода стала прозрачной. На кувшинке сидит лягушка.',
+      done_text: 'Вода чиста. На кувшинке лягушка.',
       variants: [
         { id: 'r03_pond_a', title: 'Летний', sprite: 'pond_a' },
         { id: 'r03_pond_b', title: 'Солнечный', sprite: 'pond_b' },
@@ -374,7 +384,7 @@ window.HOP_CONTENT = {
       puzzles: ['r03_glass_door_12', 'r03_glass_door_15'], unlock_after: 6,
       stage_sprites: ['glass_door_s1'],
       pitch: 'Дверь в сад откроется',
-      done_text: 'Дверь распахнулась — из сада тёплый ветер.',
+      done_text: 'Стекло сияет. Пахнет лимонами.',
       variants: [
         { id: 'r03_glass_door_a', title: 'Кремовая с розами', sprite: 'glass_door_a' },
         { id: 'r03_glass_door_b', title: 'Шалфейная с вьюнком', sprite: 'glass_door_b' },
@@ -925,17 +935,18 @@ window.HOP_CONTENT = {
   }
 };
 
-// Письма дня — тоже головоломки: матрица выводится из цветного рисунка.
+// Письма дня — тоже головоломки: матрица выводится из цветного рисунка;
+// награда — рисунок rw_<id> в стиле дома (круг 10), клетки остаются запасом.
 (function (C) {
   C.daily.letters.forEach(function (L) {
     C.puzzles[L.id] = {
-      kind: 'daily', title: L.title, difficulty: 'daily', pic: L.pic, palette: L.palette,
+      kind: 'daily', title: L.title, difficulty: 'daily', pic: L.pic, palette: L.palette, art: 'rw_' + L.id,
       rows: L.pic.map(function (r) { return r.replace(/[^.]/g, '#'); })
     };
   });
   C.event.lanterns.forEach(function (L) {
     C.puzzles[L.id] = {
-      kind: 'event', title: L.title, difficulty: 'daily', pic: L.pic, palette: L.palette,
+      kind: 'event', title: L.title, difficulty: 'daily', pic: L.pic, palette: L.palette, art: 'rw_' + L.id,
       rows: L.pic.map(function (r) { return r.replace(/[^.]/g, '#'); })
     };
   });

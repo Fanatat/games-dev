@@ -313,6 +313,7 @@
     var cb = sheetOnClose;
     sheetOnClose = null;
     if (cb && !silent) cb();
+    if (!silent) setTimeout(flushTap, 0);
   }
   $('sheet-backdrop').addEventListener('click', function () {
     // Подарок за комнату касанием мимо не закрывается: «Забрать» или крестик.
@@ -575,7 +576,7 @@
     b.setAttribute('data-lantern', it.id);
     b.setAttribute('aria-label', 'Фонарик: ' + it.title + ', ' + puzzleSize(it.id));
     var t = h('span', 'thumb thumb-lantern');
-    t.appendChild(icon('lantern'));
+    t.appendChild(pic('lantern_pic_off'));
     b.appendChild(t);
     b.appendChild(h('b', 'card-title', 'Фонарик'));
     b.appendChild(h('span', 'card-sub', C.event.title));
@@ -901,7 +902,7 @@
       var lan = h('button', 'scene-chip chip-lantern' + (ev.waiting ? ' is-new' : ''));
       lan.type = 'button';
       lan.setAttribute('data-chip', 'lantern');
-      lan.appendChild(icon('lantern'));
+      lan.appendChild(pic('lantern_pic'));
       lan.appendChild(h('b', 'chip-badge', ev.done + '/' + ev.of));
       lan.setAttribute('aria-label', ev.title + ': зажжено ' + ev.done + ' из ' + ev.of + ', осталось ' + ev.days_left + ' дн.');
       lan.addEventListener('click', function () {
@@ -938,7 +939,7 @@
 
   $('scene').addEventListener('click', function (e) {
     var t = e.target.closest('button');
-    if (!t || $('scene').classList.contains('is-busy')) return;
+    if (!t || isBusy()) return;
     if (t.hasAttribute('data-letter')) { openLetter(); return; }
     if (t.hasAttribute('data-decor')) { Sound.play('tap'); openDecorSheet(t.getAttribute('data-decor')); return; }
     var oid = t.getAttribute('data-obj');
@@ -958,17 +959,62 @@
     } else refuseLocked(oid, t);
   });
 
-  // Пока вещь прилетает и открывается сундучок, панель, вкладки и плашки ждут: иначе окно
-  // оформления откроется по таймеру поверх следующей картинки. Нажатие — кнопка вздрагивает.
+  // Пока вещь прилетает и открывается сундучок, сцена, панель, вкладки и плашки ждут: иначе окно
+  // оформления откроется по таймеру поверх следующей картинки. Касание не пропадает (круг 10):
+  // показ доигрывается сразу, кнопка вздрагивает со звуком, а нажатое (ценник уюта, карточка,
+  // вещь, вкладка) выполнится, когда окна награды закроются.
+  var busy = { skip: null, fast: false, queued: null, at: 0 };
+  function isBusy() { return $('scene').classList.contains('is-busy'); }
+  // Шаг показа, который касание может доиграть сразу; после касания все шаги идут без пауз.
+  function busyWait(ms, fn) {
+    var t, run = function () { clearTimeout(t); if (busy.skip === run) busy.skip = null; fn(); };
+    busy.skip = run;
+    t = setTimeout(run, busy.fast ? 0 : ms);
+  }
+  function busySkip() {
+    busy.fast = true;
+    var f = busy.skip;
+    busy.skip = null;
+    if (f) f();
+  }
+  function busyEnd() {
+    $('scene').classList.remove('is-busy');
+    busy.skip = null;
+    busy.fast = false;
+    setTimeout(flushTap, 0);
+  }
+  function tapKey(t) {
+    if (t.id) return '#' + t.id;
+    var box = t.parentElement && t.parentElement.closest('[id]');
+    var pre = box ? '#' + box.id + ' ' : '';
+    var attrs = ['data-decor', 'data-obj', 'data-lantern', 'data-tomorrow', 'data-chip', 'data-tab', 'data-letter'];
+    for (var i = 0; i < attrs.length; i++) if (t.hasAttribute(attrs[i])) return pre + '[' + attrs[i] + '="' + t.getAttribute(attrs[i]) + '"]';
+    return t.classList.contains('btn-main') ? pre + '.btn-main' : null;
+  }
+  // Отложенное касание — когда показ кончился и окон нет; через полминуты оно уже не нужно.
+  function flushTap() {
+    var q = busy.queued;
+    if (!q || isBusy() || !$('sheet').hidden || screen !== 'home') return;
+    busy.queued = null;
+    if (Date.now() - busy.at > 30000 || q.room !== curRoom()) return;
+    var el = document.querySelector(q.key);
+    if (el && !el.disabled && (q.text === null || el.textContent === q.text)) { log('tap_replay', { key: q.key }); el.click(); }
+  }
   document.addEventListener('click', function (e) {
-    if (screen !== 'home' || !$('scene').classList.contains('is-busy')) return;
+    if (screen !== 'home' || !isBusy()) return;
     var t = e.target.closest && e.target.closest('button');
-    if (!t || !$('shell').contains(t) || $('scene').contains(t)) return;
-    e.preventDefault();
-    e.stopPropagation();
-    t.classList.remove('is-nudge');
-    void t.offsetWidth;
-    t.classList.add('is-nudge');
+    if (t && $('shell').contains(t)) {
+      e.preventDefault();
+      e.stopPropagation();
+      Sound.play('tap');
+      t.classList.remove('is-nudge');
+      void t.offsetWidth;
+      t.classList.add('is-nudge');
+      var key = tapKey(t);
+      // Главная кнопка после картинки бывает уже другой — повторяем, только если на ней то же.
+      if (key) { busy.queued = { key: key, room: curRoom(), text: /\.btn-main$/.test(key) ? t.textContent : null }; busy.at = Date.now(); }
+    }
+    busySkip();
   }, true);
 
   // Спящая вещь: краснеют вещи, которых она ждёт, или плашка комнаты с замочком и числом.
@@ -1631,6 +1677,16 @@
     return cv;
   }
 
+  // Награда письма и фонарика — рисунок в стиле дома (круг 10); нет рисунка — цветные клетки.
+  function rewardPic(pid, cls) {
+    var p = C.puzzles[pid];
+    var cells = function () { var cv = pixelCanvas(pid, true); cv.className = cls; return cv; };
+    if (!p.art) return cells();
+    var i = pic(p.art, cls);
+    i.onerror = function () { if (i.parentNode) i.parentNode.replaceChild(cells(), i); };
+    return i;
+  }
+
   var revealState = null;
   function showReveal(ctx) {
     var box = $('reveal');
@@ -1639,9 +1695,7 @@
     stage.appendChild(pixelCanvas(ctx.pid));
     var title;
     if (ctx.letter || ctx.lantern) {
-      var col = pixelCanvas(ctx.pid, true);
-      col.className = 'reveal-sprite reveal-color';
-      stage.appendChild(col);
+      stage.appendChild(rewardPic(ctx.pid, 'reveal-sprite reveal-color'));
       title = C.puzzles[ctx.pid].title + '!';
     } else {
       var o = C.objects[ctx.oid], n = o.puzzles.length;
@@ -1680,6 +1734,9 @@
     // Сначала комната «до» этой картинки, затем полёт и появление.
     renderHome({ hide: rs.oid });
     $('scene').classList.add('is-busy');
+    busy.fast = false;
+    // Плитки оформления грузятся, пока вещь летит: в окне они сразу с картинками.
+    C.objects[rs.oid].variants.forEach(function (v) { pic(v.sprite); });
     var to = Scene.objectRect($('scene'), rs.oid);
     var rm = reducedMotion();
     var land = function () { arrive(rs); };
@@ -1700,8 +1757,11 @@
       { transform: 'translate(' + dx + 'px,' + dy + 'px) scale(' + sx + ',' + sy + ')', offset: 1 }
     ], { duration: 720, easing: 'cubic-bezier(.45,.05,.35,1)', fill: 'forwards' });
     fly.style.transformOrigin = '0 0';
-    anim.onfinish = function () { fly.remove(); land(); };
-    anim.oncancel = function () { fly.remove(); land(); };
+    var landed = false;
+    var fin = function () { if (landed) return; landed = true; busy.skip = null; fly.remove(); land(); };
+    anim.onfinish = fin;
+    anim.oncancel = fin;
+    busy.skip = fin;
   }
 
   function arrive(rs) {
@@ -1717,26 +1777,27 @@
     if (!res.object_done) {
       var left = o.puzzles.length - res.stage;
       toast('Ещё ' + left, 3600, Scene.stageSprite(C, S, rs.oid, res.stage));
-      if (gift) setTimeout(function () { $('scene').classList.remove('is-busy'); showGift(gift); }, 1600);
-      else $('scene').classList.remove('is-busy');
+      if (gift) busyWait(1600, function () { busyEnd(); showGift(gift); });
+      else busyEnd();
       return;
     }
     var newly = St.playableObjects(C, S, o.room).filter(function (oid) { return St.objectStatus(C, S, oid) === 'available'; });
     if (newly.length && !res.room_done) setTimeout(function () { Sound.play('unlock'); }, 600);
     var sheet = function () {
-      $('scene').classList.remove('is-busy');
+      busyEnd();
       openVariantSheet(rs.oid, {
         afterReveal: true,
         story: o.done_text,
         onDone: function () {
-          if (res.room_done) roomFinale(res.room_id, gift);
+          // Финал комнаты — свой большой момент: отложенное касание его не перебивает.
+          if (res.room_done) { busy.queued = null; roomFinale(res.room_id, gift); }
           else if (storyDue(o.room)) showTwist(o.room, gift, storyDue(o.room));
           else if (gift) showGift(gift);
         }
       });
     };
     var waltz = o.life && o.life.kind === 'waltz';
-    setTimeout(function () { playChest(rs.oid, chest, waltz ? function () { playWaltz(rs.oid); setTimeout(sheet, reducedMotion() ? 300 : 2200); } : sheet); }, reducedMotion() ? 200 : 900);
+    busyWait(reducedMotion() ? 200 : 900, function () { playChest(rs.oid, chest, waltz ? function () { playWaltz(rs.oid); busyWait(reducedMotion() ? 300 : 2200, sheet); } : sheet); });
   }
 
   // Шкатулка играет вальс: ноты чаще, шкатулка покачивается в такт.
@@ -1772,10 +1833,10 @@
         toast('Сияние!', 2600, 'star');
       }
       playRewards(list, rect);
-      setTimeout(done, rm ? 300 : rare ? 1500 : 1000);
+      busyWait(rm ? 300 : rare ? 1500 : 1000, done);
     };
     log('chest_show', { object_id: oid, kind: chest.kind });
-    if (rm || !document.body.animate) { open(); return; }
+    if (rm || busy.fast || !document.body.animate) { open(); return; }
     var box = h('div', 'fx-chest' + (rare ? ' is-rare' : ''));
     box.appendChild(pic(rare ? 'chest_b' : 'chest_a'));
     box.style.left = (rect.left + rect.width / 2) + 'px';
@@ -1791,8 +1852,9 @@
       { transform: 'translate(-50%,-90%) scale(1.05) rotate(0)', opacity: 1, offset: 0.8 },
       { transform: 'translate(-50%,-90%) scale(1.6)', opacity: 0, offset: 1 }
     ], { duration: 1300, easing: 'ease-out', fill: 'forwards' });
-    var fin = function () { box.remove(); open(); };
+    var fin = function () { if (busy.skip === fin) busy.skip = null; box.remove(); open(); };
     a.onfinish = fin; a.oncancel = fin;
+    busy.skip = fin;
     setTimeout(fin, 2500); // вкладка в фоне: не держать награду
   }
 
@@ -2153,9 +2215,7 @@
 
   function postcard(id, big) {
     var w = h('div', 'postcard' + (big ? ' is-big' : ''));
-    var cv = pixelCanvas(id, true);
-    cv.className = 'postcard-pic';
-    w.appendChild(cv);
+    w.appendChild(rewardPic(id, 'postcard-pic'));
     return w;
   }
 
@@ -2352,7 +2412,7 @@
     row.appendChild(button('btn-main', 'Готово', 'check', function () { Sound.play('tap'); closeSheet(); }));
     var sh = button('tile tile-round', '', 'share', function () {
       Sound.play('tap');
-      sharePicture(L.title, '— ' + L.from, id).then(function (how) {
+      sharePicture(L.title, '— ' + L.from, id, node.querySelector('img.postcard-pic')).then(function (how) {
         log('share', { kind: 'postcard', id: id, how: how });
         if (how === 'download') toast('Сохранено', null, 'share');
       });
@@ -2378,7 +2438,7 @@
     var c = h('section', 'card card-event');
     var head = h('div', 'card-head');
     if (!inSheet) {
-      head.appendChild(icon('lantern'));
+      head.appendChild(pic('lantern_pic', 'card-pic'));
       head.appendChild(h('b', 'card-title', ev.title));
     }
     var left = h('span', 'event-left');
@@ -2393,13 +2453,11 @@
       b.type = 'button';
       b.setAttribute('data-lantern', it.id);
       if (it.status === 'solved') {
-        var cv = pixelCanvas(it.id, true);
-        cv.className = 'lantern-pic';
-        b.appendChild(cv);
+        b.appendChild(rewardPic(it.id, 'lantern-pic'));
         b.setAttribute('aria-label', it.title + ' — зажжён');
         b.addEventListener('click', function () { Sound.play('tap'); toast(it.title, null, 'lantern'); });
       } else if (it.status === 'open') {
-        b.appendChild(icon('lantern'));
+        b.appendChild(pic('lantern_pic_off', 'lan-ico'));
         b.appendChild(h('span', 'lantern-go', 'Зажечь'));
         b.setAttribute('aria-label', 'Зажечь: ' + it.title + ' ' + puzzleSize(it.id));
         b.addEventListener('click', function () { closeSheet(true); startLantern(it.id); });
@@ -2417,7 +2475,7 @@
     var rw = h('p', 'card-sub event-reward');
     rw.setAttribute('aria-label', (ev.complete ? 'Награда получена: ' : 'За все пять: ') + R.coins + ' монет' + (R.pencils ? ', карандашей ' + R.pencils : ''));
     var five = h('span', 'price');
-    five.appendChild(icon('lantern'));
+    five.appendChild(pic('lantern_pic'));
     five.appendChild(h('b', '', '×' + ev.of));
     rw.appendChild(five);
     rw.appendChild(icon(ev.complete ? 'check' : 'chev'));
@@ -2445,7 +2503,7 @@
     log('lantern_start', { id: id, from: home ? 'home' : 'letters' });
     startPuzzle(id, { lantern: id, home: home, title: L.title, preview: ART + 'envelope.webp', ghost: false });
     var t = $('puzzle-preview').querySelector('.thumb');
-    if (t) { t.innerHTML = ''; t.appendChild(icon('lantern')); }
+    if (t) { t.innerHTML = ''; t.appendChild(pic('lantern_pic_off')); }
   }
 
   function lanternSolved(rs, from) {
@@ -2457,14 +2515,19 @@
     log('lantern_lit', { id: rs.pid, done: ev ? ev.done : 0 });
     var node = h('div', 'lantern-sheet');
     node.appendChild(sheetHead(L.title + ' горит!'));
-    var pc = h('div', 'postcard is-big');
-    var cv = pixelCanvas(rs.pid, true);
-    cv.className = 'postcard-pic';
-    pc.appendChild(cv);
-    node.appendChild(pc);
-    var text = rs.res.event_done ? 'Вечер вернулся! Над комнатой — гирлянда.'
-      : 'Горит ' + (ev ? ev.done : 1) + '/' + C.event.lanterns.length + '. ' + (ev && ev.waiting ? 'Ещё один ждёт.' : 'Новый — завтра.');
-    node.appendChild(h('p', 'card-text', text));
+    node.appendChild(postcard(rs.pid, true));
+    if (rs.res.event_done) node.appendChild(h('p', 'card-text', 'Вечер вернулся! Над комнатой — гирлянда.'));
+    else {
+      // Круг 10: счёт значками, а не фразой — горящий фонарик «1/5», рядом ждущий «+1» или часы «завтра».
+      var lit = ev ? ev.done : 1, of = C.event.lanterns.length, wait = ev ? ev.waiting : 0;
+      var cnt = h('p', 'card-text lantern-count');
+      cnt.appendChild(pic('lantern_pic', 'lc-ico'));
+      cnt.appendChild(h('b', 'lc-n', lit + '/' + of));
+      if (wait) { cnt.appendChild(pic('lantern_pic_off', 'lc-ico')); cnt.appendChild(h('b', 'lc-n', '+' + wait)); }
+      else { cnt.appendChild(icon('clock')); cnt.appendChild(h('span', 'lc-n', 'завтра')); }
+      cnt.setAttribute('aria-label', 'Горит ' + lit + ' из ' + of + (wait ? ', ещё ' + wait + ' ждёт' : ', новый завтра'));
+      node.appendChild(cnt);
+    }
     node.appendChild(button('btn-main', 'Хорошо', 'check', function () { Sound.play('tap'); closeSheet(); }));
     openSheet(node, function () {
       if (rs.home) renderHome(); else renderLetters();
@@ -2572,9 +2635,19 @@
     return Platform.shareImage(t.cv.toDataURL('image/png'), 'dom-kartinok.png');
   }
 
-  function sharePicture(title, sub, pid) {
+  // im — показанный рисунок открытки (круг 10); не загрузился — те же цветные клетки.
+  function sharePicture(title, sub, pid, im) {
     var t = storyCanvas(title);
     var g = t.g, p = C.puzzles[pid], H = p.rows.length, W = p.rows[0].length;
+    if (im && im.complete && im.naturalWidth) {
+      var q = Math.min(760 / im.naturalWidth, 1100 / im.naturalHeight), iw = im.naturalWidth * q, ih = im.naturalHeight * q;
+      var ix = (1080 - iw) / 2, iy = 260 + (1300 - ih) / 2;
+      g.fillStyle = '#fff'; roundRect(g, ix - 48, iy - 48, iw + 96, ih + 96, 18); g.fill();
+      g.drawImage(im, ix, iy, iw, ih);
+      g.fillStyle = '#6e5a48'; g.textAlign = 'center'; g.font = 'italic 700 44px Nunito, system-ui, sans-serif';
+      g.fillText(sub, 540, 1700);
+      return Platform.shareImage(t.cv.toDataURL('image/png'), 'otkrytka.png');
+    }
     var k = Math.floor(Math.min(760 / W, 1200 / H)), w = W * k, hh = H * k, x = (1080 - w) / 2, y = 260 + (1300 - hh) / 2;
     g.fillStyle = '#fff'; roundRect(g, x - 36, y - 36, w + 72, hh + 72, 18); g.fill();
     for (var r = 0; r < H; r++) for (var c = 0; c < W; c++) {
@@ -2877,7 +2950,7 @@
     node.appendChild(h('p', 'card-text', away >= 7 ? 'Дом соскучился!' : away >= 3 ? 'Финик ждал у двери.' : 'Финик проснулся!'));
     if (evNew) {
       var en = h('p', 'card-sub welcome-event');
-      en.appendChild(icon('lantern'));
+      en.appendChild(pic('lantern_pic'));
       en.appendChild(document.createTextNode('Новый вечер · ' + ev.done + '/' + ev.of + ' · ' + ev.days_left + ' дн.'));
       en.setAttribute('aria-label', 'Новый ' + ev.title + ': зажжено ' + ev.done + ' из ' + ev.of + ', ' + ev.days_left + ' дн.');
       node.appendChild(en);
@@ -2885,13 +2958,14 @@
     // Что пришло, пока тебя не было, — значками с числом, подпись только для чтеца.
     var news = h('div', 'news-row');
     [[gr ? 1 : 0, 'chest_b', '1', 'Подарок за комнату'],
-     [cards.length, 'letter', '+' + cards.length, cards.length + ' ' + plural(cards.length, 'открытка', 'открытки', 'открыток') + ' в альбоме'],
+     // круг 10: открытки — рисунком последней пришедшей, а не плоским конвертом рядом с рисованным письмом
+     [cards.length, function () { return rewardPic(cards[cards.length - 1], 'news-pic'); }, '+' + cards.length, cards.length + ' ' + plural(cards.length, 'открытка', 'открытки', 'открыток') + ' в альбоме'],
      [fresh ? 1 : 0, 'envelope', '1', 'Новое письмо'],
-     [ev && !ev.over ? ev.waiting : 0, 'lantern', String(ev ? ev.waiting : 0), 'Фонариков ждёт: ' + (ev ? ev.waiting : 0)]].forEach(function (a) {
+     [ev && !ev.over ? ev.waiting : 0, 'lantern_pic', String(ev ? ev.waiting : 0), 'Фонариков ждёт: ' + (ev ? ev.waiting : 0)]].forEach(function (a) {
       if (!a[0]) return;
       var c = h('span', 'news-chip');
       c.setAttribute('aria-label', a[3]);
-      c.appendChild(document.getElementById('i-' + a[1]) ? icon(a[1]) : pic(a[1]));
+      c.appendChild(typeof a[1] === 'function' ? a[1]() : document.getElementById('i-' + a[1]) ? icon(a[1]) : pic(a[1]));
       c.appendChild(h('b', '', a[2]));
       news.appendChild(c);
     });

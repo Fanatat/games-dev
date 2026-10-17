@@ -661,6 +661,7 @@ button.obj::after, button.spr-letter::after {
 }
 .news-chip img, .news-chip .ico { width: 30px; height: 30px; display: block; }
 .news-chip .ico { color: var(--terra); }
+.news-chip .news-pic { width: 34px; height: 30px; object-fit: cover; border-radius: 4px; border: 2px solid #fff; box-sizing: border-box; display: block; image-rendering: auto; }
 .invite-body {
   position: absolute; left: 12%; right: 12%; top: 54%; bottom: 7%;
   display: flex !important; flex-direction: column; justify-content: center; gap: 0 !important;
@@ -868,7 +869,7 @@ html.rm .hint-spark { display: none; }
 /* ---------------- панель дома ---------------- */
 
 .stage-dots { display: inline-flex; gap: 4px; align-items: center; }
-.stage-dots i { width: 9px; height: 9px; border-radius: 50%; background: var(--line); }
+.stage-dots i { width: 11px; height: 11px; border-radius: 50%; background: var(--line); }
 .stage-dots i.is-on { background: var(--sage); }
 .goal-side { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex: none; }
 .card-goal .thumb { width: 60px; height: 60px; }
@@ -930,6 +931,10 @@ html.rm .hint-spark { display: none; }
 .thumb-lantern { display: flex; align-items: center; justify-content: center; }
 .thumb-lantern .ico { width: 34px; height: 34px; color: var(--terra); animation: letter-hop 1.6s ease-in-out infinite; }
 html.rm .thumb-lantern .ico { animation: none; }
+/* круг 10: фонарь нарисован, как конверт */
+.thumb-lantern img { width: 42px; height: 42px; object-fit: contain; animation: letter-hop 1.6s ease-in-out infinite; }
+html.rm .thumb-lantern img { animation: none; }
+.welcome-event img { width: 24px; height: 24px; vertical-align: -6px; margin-right: 4px; display: inline-block; }
 .daily-env { flex: none; width: 58px; height: 58px; display: flex; align-items: center; justify-content: center; }
 .daily-env img { width: 100%; display: block; }
 .daily-env.is-new img { animation: letter-hop 1.6s ease-in-out infinite; }
@@ -1012,6 +1017,7 @@ html.rm .thumb-lantern .ico { animation: none; }
 /* «Вечер фонариков» */
 .card-event { display: flex; flex-direction: column; gap: 8px; background: linear-gradient(180deg, #fff3d6, var(--card)); }
 .card-event .card-head > .ico { width: 28px; height: 28px; color: var(--terra); flex: none; }
+.card-event .card-head > .card-pic { width: 32px; height: 32px; object-fit: contain; flex: none; }
 .card-event .card-sub { margin: 0; }
 .event-left {
   margin-left: auto; padding: 2px 9px; border-radius: 9px; white-space: nowrap;
@@ -1026,10 +1032,18 @@ html.rm .thumb-lantern .ico { animation: none; }
 .lantern .ico { width: 30px; height: 30px; color: var(--ink-2); }
 .lantern.is-open { background: var(--accent); }
 .lantern.is-open .ico { color: var(--ink); animation: letter-hop 1.6s ease-in-out infinite; }
+.lantern .lan-ico { width: 36px; height: 36px; object-fit: contain; display: block; }
+/* круг 10: «горит 1/5» значками в окне зажжённого фонарика */
+.lantern-count { display: flex; align-items: center; justify-content: center; gap: 6px; }
+.lantern-count .lc-ico { width: 28px; height: 28px; object-fit: contain; }
+.lantern-count .lc-n { font-size: 18px; margin-right: 8px; }
+.lantern-count .ico { width: 22px; height: 22px; }
+.lantern.is-open .lan-ico { animation: letter-hop 1.6s ease-in-out infinite; }
+html.rm .lantern.is-open .lan-ico { animation: none; }
 .lantern.is-locked { opacity: .6; cursor: default; }
 .lantern.is-locked .ico { width: 20px; height: 20px; }
 .lantern.is-solved { background: #3a3140; }
-.lantern-pic { width: 78%; height: auto; display: block; image-rendering: pixelated; filter: drop-shadow(0 0 6px rgba(247, 211, 107, .8)); }
+.lantern-pic { width: 86%; height: auto; display: block; filter: drop-shadow(0 0 6px rgba(247, 211, 107, .8)); }
 .lantern-go { font-size: 12px; font-weight: 900; line-height: 1.1; text-align: center; }
 .event-reward { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-weight: 700; }
 .story-q { font-weight: 800; margin-top: 10px; }
@@ -1044,7 +1058,11 @@ html.rm .thumb-lantern .ico { animation: none; }
   box-shadow: 0 2px 6px rgba(59, 44, 34, .18);
   transform: rotate(-1.5deg);
 }
-.postcard-pic { display: block; width: 100%; height: auto; image-rendering: pixelated; border-radius: 2px; }
+.postcard-pic { display: block; width: 100%; height: auto; border-radius: 2px; }
+/* запасные цветные клетки, если рисунка награды нет */
+canvas.postcard-pic, canvas.lantern-pic, canvas.reveal-color { image-rendering: pixelated; }
+/* рисунок — в квадрат открытки: высокий фонарь не вытягивает окно и не уводит кнопку вниз */
+img.postcard-pic { aspect-ratio: 1; object-fit: contain; }
 .postcard.is-big { width: min(70%, 240px, 34dvh); align-self: center; padding: 10px; }
 
 .album { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 12px; }
@@ -1328,7 +1346,7 @@ html.rm .thumb-gift img { animation: none; }
 .puzzle-title .puzzle-coins[hidden] { display: none; }
 .puzzle-coins img { width: 16px; height: 16px; display: block; }
 .puzzle-coins.is-all .pz-dots { color: var(--sage-d); }
-.puzzle-coins .pz-dots { font-style: normal; font-size: 8px; letter-spacing: 1px; margin-left: 2px; opacity: .85; }
+.puzzle-coins .pz-dots { font-style: normal; font-size: 12px; letter-spacing: 1px; margin-left: 2px; opacity: .85; }
 .puzzle-coins .pz-dots:empty { display: none; }
 .fx-line-coin { position: fixed; z-index: 60; width: 22px; height: 22px; pointer-events: none; }
 .fx-line-coin img { width: 100%; height: 100%; display: block; filter: drop-shadow(0 1px 2px rgba(80,50,10,.35)); }

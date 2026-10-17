@@ -1016,9 +1016,13 @@
     if (raw === null || raw === undefined) return { state: emptyState(), fresh: true, storage_ok: true };
     try {
       var parsed = JSON.parse(raw);
+      // Версию читаем до переноса: migrate правит сам сейв, и иначе «перенос» писался бы каждый запуск.
+      var from = parsed && typeof parsed === 'object' ? parsed.schema_version | 0 : 0;
       var s = migrate(parsed, C);
       if (!s) throw new Error('bad save');
-      return { state: s, fresh: false, storage_ok: true, migrated_from: parsed.schema_version | 0 };
+      var out = { state: s, fresh: false, storage_ok: true };
+      if (from < SCHEMA_VERSION) out.migrated_from = from;
+      return out;
     } catch (e) {
       try { storage.setItem(STORAGE_KEY + '.broken.' + Date.now(), raw); } catch (e2) { /* место кончилось — оставляем как есть */ }
       return { state: emptyState(), fresh: true, storage_ok: true, recovered_from_broken: true };

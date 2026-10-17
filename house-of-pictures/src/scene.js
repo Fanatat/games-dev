@@ -273,7 +273,27 @@ window.Scene = (function () {
       place(guest, L.bird);
       host.appendChild(guest);
     }
+    if (opts.interactive !== false) clampPrices(host);
   }
+
+  // Круг 10: ценник у края сцены не обрезается (на 320×568 сцена ~206 px) — сдвигаем его внутрь.
+  function clampPrices(host) {
+    function run() {
+      var br = host.getBoundingClientRect();
+      if (!br.width) return;
+      Array.prototype.forEach.call(host.querySelectorAll('.decor-price'), function (b) {
+        b.style.marginLeft = '';
+        var r = b.getBoundingClientRect(), pad = 3, dx = 0;
+        if (r.left < br.left + pad) dx = br.left + pad - r.left;
+        else if (r.right > br.right - pad) dx = br.right - pad - r.right;
+        if (dx) b.style.marginLeft = Math.round(dx) + 'px';
+      });
+    }
+    if (window.requestAnimationFrame) requestAnimationFrame(run); else run();
+    clampHost = host;
+  }
+  var clampHost = null;
+  window.addEventListener('resize', function () { if (clampHost) setTimeout(function () { clampPrices(clampHost); }, 220); });
 
   // Функция готового предмета: пар над чайником, отблеск маятника, ноты шкатулки, цветы оранжереи.
   var BLOOM = ['#f2b6c6', '#f7d36b', '#c9b6f2'];

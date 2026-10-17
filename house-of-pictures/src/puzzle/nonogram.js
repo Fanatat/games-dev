@@ -23,6 +23,11 @@ window.Nonogram = (function () {
   var _won        = false;
   var _paused     = false;   // true во время рекламы — блокирует ввод
   var _strokeSnapshot = null; // снимок доски в начале штриха для отмены при pinch
+  var _strokeAuto = null;     // снимок _auto к нему же
+  // Круг 10: какие крестики поставила сама игра (авто-крестики). Снимает
+  // закраску игрок — авто-крестики той же строки и столбца, которые из доски
+  // больше не следуют, уходят; свои крестики игрока не трогаем никогда.
+  var _auto = [];
   // Форк: стек отмены — снимок доски до каждого жеста/подсказки, изменившего поле.
   var _undoStack = [];
   var UNDO_MAX = 60;
@@ -585,6 +590,7 @@ window.Nonogram = (function () {
     var prev = _boardState[r][c];
     if (_dragAction === 'set') {
       if (prev === 0) {
+        _auto[r][c] = false;
         _boardState[r][c] = _dragValue;
         renderCell(r, c);
         countStroke();
@@ -593,8 +599,10 @@ window.Nonogram = (function () {
       }
     } else {
       if (prev !== 0) {
+        _auto[r][c] = false;
         _boardState[r][c] = 0;
         renderCell(r, c);
+        dropStaleAuto(r, c);
         countStroke();
         if (_onMove) _onMove('erase');
         return prev === 1;
@@ -606,6 +614,7 @@ window.Nonogram = (function () {
   // Сохраняет снимок доски в начале штриха.
   function beginStroke() {
     _strokeSnapshot = _boardState.map(function (row) { return row.slice(); });
+    _strokeAuto = _auto.map(function (row) { return row.slice(); });
   }
 
   // Откатывает все изменения штриха (включая авто-крестики) по снимку.
@@ -620,7 +629,8 @@ window.Nonogram = (function () {
         }
       }
     }
-    _strokeSnapshot = null;
+    if (_strokeAuto) _auto = _strokeAuto;
+    _strokeSnapshot = null; _strokeAuto = null;
     // ТЗ №57: откатанный штрих (второй палец — pinch) ходом не был.
     if (_strokeCounted) { _strokeCounted = false; _moves--; }
     refreshAllClueFade();
@@ -714,7 +724,7 @@ window.Nonogram = (function () {
     processLine(
       _boardState[r].slice(),
       _clues.rows[r],
-      function (i) { _boardState[r][i] = 2; renderCell(r, i); }
+      function (i) { _boardState[r][i] = 2; _auto[r][i] = true; renderCell(r, i); }
     );
 
     var col = [];
@@ -722,8 +732,38 @@ window.Nonogram = (function () {
     processLine(
       col,
       _clues.cols[c],
-      function (i) { _boardState[i][c] = 2; renderCell(i, c); }
+      function (i) { _boardState[i][c] = 2; _auto[i][c] = true; renderCell(i, c); }
     );
+  }
+
+  /* dropStaleAuto(r, c) — круг 10, обратная сторона autoFillCrosses.
+     Игрок снял отметку в (r, c): авто-крестики строки r и столбца c, которые
+     больше не следуют из доски, уходят. Крестик остаётся, если он «пуст во
+     всех раскладках» своей строки или своего столбца — считаем так, будто
+     авто-крестиков нет (свои крестики игрока на месте). Новых крестиков не
+     ставит (Фикс 5 — снятое не возвращается). Линию без раскладок
+     (ошибка ещё на поле) не судим — такой крестик остаётся. */
+  function dropStaleAuto(r, c) {
+    if (!_level || !_clues) return;
+    var W = _level.width, H = _level.height, i;
+    function emptyIn(line, clue, at) {
+      var placements = getValidPlacements(line, clue);
+      if (!placements.length) return true;
+      for (var p = 0; p < placements.length; p++) if (placements[p][at]) return false;
+      return true;
+    }
+    function rowLine(rr) { var l = []; for (var k = 0; k < W; k++) l.push(_auto[rr][k] ? 0 : _boardState[rr][k]); return l; }
+    function colLine(cc) { var l = []; for (var k = 0; k < H; k++) l.push(_auto[k][cc] ? 0 : _boardState[k][cc]); return l; }
+    var cells = [];
+    for (i = 0; i < W; i++) if (_auto[r][i] && _boardState[r][i] === 2) cells.push([r, i]);
+    for (i = 0; i < H; i++) if (i !== r && _auto[i][c] && _boardState[i][c] === 2) cells.push([i, c]);
+    var gone = cells.filter(function (q) {
+      return !emptyIn(rowLine(q[0]), _clues.rows[q[0]], q[1]) && !emptyIn(colLine(q[1]), _clues.cols[q[1]], q[0]);
+    });
+    gone.forEach(function (q) {
+      _auto[q[0]][q[1]] = false; _boardState[q[0]][q[1]] = 0;
+      renderCell(q[0], q[1]); updateClueFade(q[0], q[1]);
+    });
   }
 
   function boardDiffers(snap) {
@@ -748,6 +788,7 @@ window.Nonogram = (function () {
     for (var r = 0; r < _level.height; r++) {
       for (var c = 0; c < _level.width; c++) {
         if (_boardState[r][c] !== snap[r][c]) { _boardState[r][c] = snap[r][c]; renderCell(r, c); }
+        if (_boardState[r][c] !== 2) _auto[r][c] = false;
       }
     }
     refreshAllClueFade();
@@ -812,6 +853,7 @@ window.Nonogram = (function () {
     _dragPointerId   = null;
     if (_strokeSnapshot && boardDiffers(_strokeSnapshot)) pushUndo(_strokeSnapshot);
     _strokeSnapshot  = null; // штрих зафиксирован
+    _strokeAuto      = null;
     window.removeEventListener('pointermove',   onPointerMove);
     window.removeEventListener('pointerup',     onPointerUp);
     window.removeEventListener('pointercancel', onPointerUp);
@@ -831,17 +873,17 @@ window.Nonogram = (function () {
     _won    = false;
     _mode   = 1;
     _isDragging = false; _dragAction = null; _dragValue = 1; _lastCell = null;
-    _strokeSnapshot = null;
+    _strokeSnapshot = null; _strokeAuto = null;
     _moves = 0; _strokeCounted = false;
     _undoStack = [];
     _scale = 1; _tx = 0; _ty = 0; _pinch = null; _pinchActive = false;
     _dragPointerId = null; _panning = false;
     _fitAll = false; _cluePan = null;
 
-    _boardState = [];
+    _boardState = []; _auto = [];
     for (var ri = 0; ri < level.height; ri++) {
-      _boardState[ri] = [];
-      for (var ci = 0; ci < level.width; ci++) _boardState[ri][ci] = 0;
+      _boardState[ri] = []; _auto[ri] = [];
+      for (var ci = 0; ci < level.width; ci++) { _boardState[ri][ci] = 0; _auto[ri][ci] = false; }
     }
 
     var clues = calcClues(level.solution);
@@ -983,9 +1025,11 @@ window.Nonogram = (function () {
       // режиме, где мы явно знаем об ошибке) — короткий шейк, антистресс-
       // тон, без красного (см. CSS .grid-cell.is-shake).
       shakeCell(hint.r, hint.c);
+      _auto[hint.r][hint.c] = false;
       _boardState[hint.r][hint.c] = 2;
       renderCell(hint.r, hint.c);
     } else {
+      _auto[hint.r][hint.c] = false;
       _boardState[hint.r][hint.c] = 1;
       renderCell(hint.r, hint.c);
     }
@@ -1010,6 +1054,7 @@ window.Nonogram = (function () {
     for (var i = 0; i < n; i++) {
       var r = kind === 'row' ? idx : i, c = kind === 'row' ? i : idx;
       var want = _level.solution[r][c] ? 1 : 2;
+      _auto[r][c] = false; // по решению — верно, обратно не снимается
       if (_boardState[r][c] !== want) { _boardState[r][c] = want; renderCell(r, c); }
     }
     if (_onMove) _onMove('pencil');
@@ -1043,6 +1088,7 @@ window.Nonogram = (function () {
     var H = _level.height, W = _level.width;
     for (var r = 0; r < H; r++) {
       for (var c = 0; c < W; c++) {
+        _auto[r][c] = false;
         if (_boardState[r][c] !== 0) {
           _boardState[r][c] = 0;
           renderCell(r, c);
@@ -1060,8 +1106,9 @@ window.Nonogram = (function () {
      клетке КАРТИНКИ — тоже ошибка, её снимает «Проверить»
      (findWrongCrosses). Чаще всего такой крестик ставит сама игра:
      лишняя закраска запускает авто-крестики по текущей доске, а снятие
-     закраски их не убирает. Чей крестик — игры или игрока — игра не
-     помнит, поэтому снимаются все такие. Тост «лишняя клетка»
+     закраски их не убирает. С круга 10 игра помнит свои крестики (_auto)
+     и снимает их вместе с ошибкой (dropStaleAuto); «Проверить» снимает
+     любые крестики на картинке, в том числе игрока. Тост «лишняя клетка»
      (hasErrors) по-прежнему только про закраску — так он и звучит.
   ---------------------------------------------------------- */
   function findErrors() {
@@ -1124,12 +1171,14 @@ window.Nonogram = (function () {
     for (i = 0; i < crosses.length; i++) {
       r = crosses[i].r; c = crosses[i].c;
       shakeCell(r, c);
+      _auto[r][c] = false;
       _boardState[r][c] = 0;
       renderCell(r, c);
     }
     for (i = 0; i < errors.length; i++) {
       r = errors[i].r; c = errors[i].c;
       shakeCell(r, c);
+      _auto[r][c] = false;
       _boardState[r][c] = 2;
       renderCell(r, c);
     }

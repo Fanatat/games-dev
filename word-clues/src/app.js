@@ -304,15 +304,16 @@
     return n;
   }
   function clue(id) { return F.story.clues.filter(function (c) { return c.id === id; })[0]; }
-  // «Нить 2/5 ●●○»: сколько историй до следующего общего секрета маршрута.
+  // «Нить 1/5 ●●○»: сколько общих секретов маршрута уже собрано и сколько историй до следующего.
+  // Считаем собранные, а не текущий: «Нить 6/6» на последнем отрезке читалась как «всё собрано».
   function renderThread() {
     var el = $('scene-thread'), all = C.route_secrets.length, k = S.trioCount();
     if (!all || k >= all) { el.hidden = true; return; }
     var inTrio = S.data.completed_story_ids.length % 3, dots = '';
     for (var i = 0; i < 3; i++) dots += '<i class="' + (i < inTrio ? 'on' : i === inTrio ? 'cur' : '') + '"></i>';
     el.hidden = false;
-    el.innerHTML = icon('book') + '<b>Нить ' + (k + 1) + '/' + all + '</b><span class="th-dots">' + dots + '</span>';
-    el.setAttribute('aria-label', 'Нить маршрута ' + (k + 1) + ' из ' + all + ': историй до неё ' + (3 - inTrio));
+    el.innerHTML = icon('book') + '<b>Нить ' + k + '/' + all + '</b><span class="th-dots">' + dots + '</span>';
+    el.setAttribute('aria-label', 'Нить маршрута: собрано ' + k + ' из ' + all + ', до следующей историй: ' + (3 - inTrio));
   }
   function selId() { return S.cur() ? S.cur().selected_clue_id : null; }
   function clueIdx(id) { var i = -1; F.story.clues.forEach(function (c, k) { if (c.id === id) i = k; }); return i; }
@@ -324,7 +325,9 @@
     $('field-title').textContent = s.title;
     $('field-sub').textContent = s.place;
     art($('scene-bg'), s.scene, '');
-    $('scene').dataset.story = s.id;    renderSceneItems($('scene-items'), s, function (c) { return S.isFound(c.id); }, false);
+    $('scene').dataset.story = s.id;
+    $('scr-field').classList.toggle('evening', !!s.evening);
+       renderSceneItems($('scene-items'), s, function (c) { return S.isFound(c.id); }, false);
     renderThread();
     show('scr-field');
     sizeClueCard();
@@ -492,7 +495,7 @@
     // Письмо Полины: улика её словами, с подписью (новинка 9-й и 15-й историй)
     var letter = c.letter && !found;
     $('clue-card').classList.toggle('letter', !!letter);
-    $('clue-card').dataset.letter = letter ? (F.story.chapter === 1 ? 'Письмо от «П.»' : 'Письмо Полины') : '';
+    $('clue-card').dataset.letter = letter ? (F.story.letter_label || (F.story.chapter === 1 ? 'Письмо от «П.»' : 'Письмо Полины')) : '';
     var meta = (c.double ? 'Двойная улика · ' : '') + L.lettersLabel(c.answer.length) + ' · ' + (i + 1) + ' из ' + F.story.clues.length;
     var ans = found || h.path || h.explain;
     if (ans) meta = (found ? 'Найдено: ' : 'Ответ: ') + c.answer + ' · ' + meta;
@@ -992,7 +995,7 @@
 
   /* ---------- фонари Тихоречья: трата марок ---------- */
   var LAMP_SPOTS = [[18, 52], [30, 66], [44, 58], [24, 78], [56, 72], [66, 54], [78, 64], [40, 84], [86, 78], [60, 88],
-    [10, 68], [34, 48], [52, 44], [72, 84], [92, 58]];
+    [10, 68], [34, 48], [52, 44], [72, 84], [92, 58], [14, 90], [48, 72], [82, 46], [95, 90], [64, 70]];
   function showTown() {
     A.event('town_open', { count: S.data.lanterns.length });
     renderTown();
@@ -1007,7 +1010,9 @@
       var on = S.data.lanterns.indexOf(st.id) >= 0;
       var el = document.createElement('span');
       el.className = 'town-lamp art' + (on ? ' on' : '');
-      el.style.left = LAMP_SPOTS[i][0] + '%'; el.style.top = LAMP_SPOTS[i][1] + '%';
+      // мест на карте меньше, чем историй, — не падаем, а ставим фонарь со сдвигом
+      var sp = LAMP_SPOTS[i % LAMP_SPOTS.length], k = Math.floor(i / LAMP_SPOTS.length);
+      el.style.left = Math.min(96, sp[0] + 3 * k) + '%'; el.style.top = Math.max(30, sp[1] - 6 * k) + '%';
       art(el, 'street_lamp', '🏮');
       map.appendChild(el);
     });

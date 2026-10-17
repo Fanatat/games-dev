@@ -488,3 +488,12 @@ body.rm .cell.hint-start { animation: none; }
 .intro-guess.good { background: #E4EFE7; }
 .guess-opts { display: flex; gap: 8px; flex-wrap: wrap; }
 .guess-opts .btn-small { min-height: 44px; min-width: 96px; font-weight: 700; letter-spacing: .04em; }
+
+/* Вечернее поле (пометка evening): сумерки и тёплый свет фонарей */
+#scr-field.evening { background: linear-gradient(180deg, #3B3F5C 0%, #5A4A5E 38%, #7A5844 100%); --muted: #E6D9C2; }
+#scr-field.evening .field-head, #scr-field.evening .loupes { color: #FFF4DE; }
+#scr-field.evening .clue-card { --muted: #6E6A5C; }
+#scr-field.evening .scene::after { content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  background: radial-gradient(circle at 18% 30%, rgba(255, 196, 92, .38), transparent 28%),
+    radial-gradient(circle at 82% 26%, rgba(255, 196, 92, .34), transparent 26%),
+    linear-gradient(180deg, rgba(34, 38, 76, .34), rgba(110, 64, 28, .14)); }

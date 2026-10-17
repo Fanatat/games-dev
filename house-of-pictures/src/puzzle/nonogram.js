@@ -497,7 +497,7 @@ window.Nonogram = (function () {
   // раньше отклик был только в бледнеющих цифрах. Таймаут, а не
   // animationend — см. комментарий у shakeCell.
   function onLineJustClosed(kind, idx) {
-    if (_onLineClosed) _onLineClosed();
+    if (_onLineClosed) _onLineClosed(kind, idx);
     var n = (kind === 'row') ? _level.width : _level.height;
     var cells = [];
     for (var i = 0; i < n; i++) {

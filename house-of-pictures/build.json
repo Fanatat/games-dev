@@ -1,14 +1,14 @@
 {
  "game": "house-of-pictures",
- "build_number": "007",
- "app_build": "0.1.0+b007",
+ "build_number": "008",
+ "app_build": "0.1.0+b008",
  "git_branch": "worktree-release-polish",
- "git_sha": "5dc9f28",
+ "git_sha": "e940ce3",
  "dirty": false,
  "content_version": 3,
  "api": "https://api.vanatat.ru/hop",
- "built_at": "2026-10-17T02:06:58+00:00",
- "total_bytes": 4823000,
+ "built_at": "2026-10-17T02:58:06+00:00",
+ "total_bytes": 5242465,
  "files": [
   {
    "path": "assets/art/armchair_a.webp",
@@ -166,6 +166,56 @@
    "sha256": "1b39a8d41dd6ad35f5716a157d3fa054abe228f22c27090f5f60dab070b2c281"
   },
   {
+   "path": "assets/art/cozy_basket.webp",
+   "bytes": 44004,
+   "sha256": "fca169c154ca01b668f0362922bb78961f42a036e426a6c15e3f874ac0629116"
+  },
+  {
+   "path": "assets/art/cozy_cathouse.webp",
+   "bytes": 35070,
+   "sha256": "e2e56b32c93cc35a46aeb93489927888938cdab4e3d557033f8d3ec5ec970ad5"
+  },
+  {
+   "path": "assets/art/cozy_coats.webp",
+   "bytes": 49240,
+   "sha256": "7a33e2d97b365c6d3d5effc90548db6e724b8d09d8b38c9123db3ef690b07f95"
+  },
+  {
+   "path": "assets/art/cozy_floorlamp.webp",
+   "bytes": 22406,
+   "sha256": "6a4e2b9d1ae97e2356a513d14e5f64dd30da38f71d2705b20f7eab6e25c8d3ea"
+  },
+  {
+   "path": "assets/art/cozy_garland.webp",
+   "bytes": 23268,
+   "sha256": "106f779882dcd54ea81e4ecafe418b122da72814a03a702097680b380f529c50"
+  },
+  {
+   "path": "assets/art/cozy_lantern.webp",
+   "bytes": 24124,
+   "sha256": "0e505924234fd50a9f19607c3ecfc11d2523b31d5194e7af49b30a2238463579"
+  },
+  {
+   "path": "assets/art/cozy_lemon.webp",
+   "bytes": 49694,
+   "sha256": "47dea7b33ff9cd342d97767e3c3cec79d1062cd3962f7e08953473b7d1b30e5a"
+  },
+  {
+   "path": "assets/art/cozy_pouf.webp",
+   "bytes": 36800,
+   "sha256": "b8416a2bcb44dadad542e3bf8a88e3b720a1c2548956d1d16cff7180cad50621"
+  },
+  {
+   "path": "assets/art/cozy_sconce.webp",
+   "bytes": 21478,
+   "sha256": "28108aa226f4b8d6a5da2b75c08ae5592921ea77919d44f2bbe56648e2559977"
+  },
+  {
+   "path": "assets/art/cozy_scratch.webp",
+   "bytes": 22882,
+   "sha256": "20faccf0c713ac8081d4c96b603028c9e7716a3f140d49a8588d5a57aed06f76"
+  },
+  {
    "path": "assets/art/envelope.webp",
    "bytes": 8498,
    "sha256": "aad96249e3f4bd1386865d436069132d8e3fdf96456a0151870c8fc2bd6b3b0b"
@@ -219,6 +269,11 @@
    "path": "assets/art/glass_door_s3.webp",
    "bytes": 20854,
    "sha256": "5cb8d9451f08f05ab36e50ea63159e5c919446478a2fd8faf8ed86aaa4b33355"
+  },
+  {
+   "path": "assets/art/grandma_photo.webp",
+   "bytes": 36518,
+   "sha256": "64a62ae3afdbd3bae616b2e8fbb91086d8245a5115be6cf5abf0630a6168de91"
   },
   {
    "path": "assets/art/hanging_pot_a.webp",
@@ -304,6 +359,11 @@
    "path": "assets/art/letter.webp",
    "bytes": 34462,
    "sha256": "14432507e83e8b324d8402c0c95f7ab5a545a65bd1bf5429966f0cf70c13dfe5"
+  },
+  {
+   "path": "assets/art/letter_scrap.webp",
+   "bytes": 28006,
+   "sha256": "31f21ecafe35329cac39df763143edf2a0e6f478be310ee47e3298284fe8360d"
   },
   {
    "path": "assets/art/musicbox_a.webp",
@@ -692,18 +752,18 @@
   },
   {
    "path": "data/content.js",
-   "bytes": 58258,
-   "sha256": "09ece87551fd737c845a93920120c25ffe37dd2fa69c9cc5f0a57076caeb7d17"
+   "bytes": 61843,
+   "sha256": "1b12e15ce2c3d4122359b0e0fec2efbaa3f1a536eef4634196965eee15a5c2fb"
   },
   {
    "path": "index.html",
-   "bytes": 12356,
-   "sha256": "833c37104e65e8512fa57385792381449b858c69d64cafccf48bcde63fd4c7f1"
+   "bytes": 12418,
+   "sha256": "76666bd32cbf2e00fa58ce31ff82bed03027b1c995c418fabc6530cacbba3a04"
   },
   {
    "path": "src/app.js",
-   "bytes": 128926,
-   "sha256": "86058086b28a85468e1ae754588b732f030c841e8db60abb5f1f5477c82d546a"
+   "bytes": 136879,
+   "sha256": "47e81a247b947072695037cbdfd90fb5b2c9277479b8438173a5178b1b056701"
   },
   {
    "path": "src/cloud.js",
@@ -717,8 +777,8 @@
   },
   {
    "path": "src/puzzle/nonogram.js",
-   "bytes": 53267,
-   "sha256": "34b9b706b3c357061009468bc65b8379c7b2920fb8cba4e301fe60ca9242ac12"
+   "bytes": 53276,
+   "sha256": "90de6bcaf8ad5f242864f894c7120cc6adc12c90c3106aec2bed0c5c31f69bd2"
   },
   {
    "path": "src/puzzle/nonogram_logic.js",
@@ -727,8 +787,8 @@
   },
   {
    "path": "src/scene.js",
-   "bytes": 16299,
-   "sha256": "10d36f5b6f5e6652d7441d1c62a2b1da55a865c1b59427ecce58ea10de633764"
+   "bytes": 19352,
+   "sha256": "b59a41eb27a06da5cf05f6a7ec28c79c21dfe1bb5d4f29131b9014941d220b95"
   },
   {
    "path": "src/sound.js",
@@ -737,13 +797,13 @@
   },
   {
    "path": "src/state.js",
-   "bytes": 44476,
-   "sha256": "b98b4532313a79413bcfad91860ec7ac8ff711a6f299b56b323f3abbad4e5428"
+   "bytes": 52260,
+   "sha256": "0e7ee4cb6dcfb7768a29de425f52ae1340aa5dc9be63225dbacdcfa660428d12"
   },
   {
    "path": "src/styles.css",
-   "bytes": 77028,
-   "sha256": "f03cc67954d4591c79c6ac907698820069d7fca9d70446012800df8ea6e08e44"
+   "bytes": 80557,
+   "sha256": "669d12613d345e8103c8633ad9f3137b8415d6b12125e51d30328abdba45d203"
   },
   {
    "path": "src/track.js",

@@ -13,6 +13,7 @@ window.HOP_CONTENT = {
       objects: ['r01_lamp', 'r01_shelf', 'r01_rug', 'r01_flower'],
       background: 'assets/art/bg_hallway.webp',
       next_room: 'r02',
+      decor_after: 2,
       intro: 'В этом доме картинки помнят вещи. Разгадай картинку — и вещь вернётся.',
       intro_sign: 'Вера',
       final_text: 'Финик дома. На полке ждёт письмо.',
@@ -64,7 +65,15 @@ window.HOP_CONTENT = {
         r02_tea_set: { x: 0.50, y: 0.73, w: 0.20 },
         cat: { x: 0.80, y: 0.76, w: 0.17 }
       },
-      z: ['r02_window', 'r02_clock', 'r02_photo', 'r02_sideboard', 'r02_musicbox', 'r02_armchair', 'r02_table', 'r02_tea_set']
+      z: ['r02_window', 'r02_clock', 'r02_photo', 'r02_sideboard', 'r02_musicbox', 'r02_armchair', 'r02_table', 'r02_tea_set'],
+      // Поворот на середине комнаты: окно в несколько слов, находка остаётся на сцене.
+      // Флаг story_answer — от «Тайны птицы» 006: видевшие её второй раз окна не получат.
+      twist: {
+        after: 3, flag: 'story_answer', title: 'Тайна птицы', sprite: 'letter_scrap',
+        text: 'Финик принёс обрывок письма. Птица — знак дома.',
+        question: 'Кто же прислал письмо?',
+        place: { x: 0.36, y: 0.985, w: 0.10 }
+      }
     },
     r03: {
       title: 'Оранжерея',
@@ -93,7 +102,13 @@ window.HOP_CONTENT = {
         cat: { x: 0.62, y: 0.635, w: 0.15 },
         bird: { x: 0.785, y: 0.925, w: 0.075 }
       },
-      z: ['r03_herbarium', 'r03_glass_door', 'r03_hanging_pot', 'r03_seed_table', 'r03_birdhouse', 'r03_bench', 'r03_watering_can', 'r03_pond']
+      z: ['r03_herbarium', 'r03_glass_door', 'r03_hanging_pot', 'r03_seed_table', 'r03_birdhouse', 'r03_bench', 'r03_watering_can', 'r03_pond'],
+      twist: {
+        after: 4, flag: 'twist_r03', title: 'Фото бабушки', sprite: 'grandma_photo',
+        text: 'Финик нашёл фото: бабушка у лимона.',
+        question: 'А где же её лимон?',
+        place: { x: 0.40, y: 0.52, w: 0.07 }
+      }
     }
   },
 
@@ -108,7 +123,7 @@ window.HOP_CONTENT = {
       variants: [
         { id: 'r01_lamp_a', title: 'Медовый абажур', sprite: 'lamp_a' },
         { id: 'r01_lamp_b', title: 'Сливочный абажур', sprite: 'lamp_b' },
-        { id: 'r01_lamp_c', title: 'Мозаичный абажур', sprite: 'lamp_c', premium: true, price_coins: 300 }
+        { id: 'r01_lamp_c', title: 'Мозаичный абажур', sprite: 'lamp_c', premium: true, price_coins: 150 }
       ],
       tap_secret: 'Щёлк — и лампа снова светит.'
     },
@@ -120,7 +135,7 @@ window.HOP_CONTENT = {
       variants: [
         { id: 'r01_shelf_a', title: 'Светлая берёза', sprite: 'shelf_a' },
         { id: 'r01_shelf_b', title: 'Тёмный орех', sprite: 'shelf_b' },
-        { id: 'r01_shelf_c', title: 'Полка с открытками', sprite: 'shelf_c', premium: true, price_coins: 800 }
+        { id: 'r01_shelf_c', title: 'Полка с открытками', sprite: 'shelf_c', premium: true, price_coins: 200 }
       ],
       tap_secret: 'На сургуче птица. Где-то она встречалась…'
     },
@@ -165,8 +180,7 @@ window.HOP_CONTENT = {
     },
     r02_table: {
       room: 'r02', title: 'Чайный столик', verb: 'Накрыть',
-      puzzles: ['r02_table_03', 'r02_table_02'], unlock_after: 0,
-      stage_sprites: ['table_s2'],
+      puzzles: ['r02_table_02'], unlock_after: 0,
       pitch: 'Круглый столик для чая на двоих',
       done_text: 'Столик снова крепко стоит. Салфетка пахнет лавандой.',
       variants: [
@@ -178,8 +192,7 @@ window.HOP_CONTENT = {
     },
     r02_armchair: {
       room: 'r02', title: 'Кресло', verb: 'Обить',
-      puzzles: ['r02_armchair_01', 'r02_armchair_03'], unlock_after: 0,
-      stage_sprites: ['armchair_s2'],
+      puzzles: ['r02_armchair_03'], unlock_after: 0,
       pitch: 'Кресло, где кто-то спит',
       done_text: 'Финик тут же занял кресло.',
       variants: [
@@ -192,8 +205,7 @@ window.HOP_CONTENT = {
     r02_clock: {
       room: 'r02', title: 'Часы', verb: 'Завести',
       life: { kind: 'glint', x: 0.59, y: 0.55 },
-      puzzles: ['r02_clock_01', 'r02_clock_03'], unlock_after: 2,
-      stage_sprites: ['clock_s2'],
+      puzzles: ['r02_clock_01'], unlock_after: 2,
       pitch: 'Часы стоят с прошлой зимы',
       done_text: 'Часы пробили пять — время чая.',
       variants: [
@@ -205,8 +217,7 @@ window.HOP_CONTENT = {
     },
     r02_window: {
       room: 'r02', title: 'Окно в сад', verb: 'Украсить',
-      puzzles: ['r02_window_01', 'r02_window_02'], unlock_after: 2,
-      stage_sprites: ['window_s2'],
+      puzzles: ['r02_window_01'], unlock_after: 2,
       pitch: 'Витраж, чтобы свет был мягче',
       done_text: 'На витраже — птица с печати.',
       variants: [
@@ -218,8 +229,7 @@ window.HOP_CONTENT = {
     },
     r02_sideboard: {
       room: 'r02', title: 'Буфет', verb: 'Расставить',
-      puzzles: ['r02_sideboard_02', 'r02_sideboard_03'], unlock_after: 4,
-      stage_sprites: ['sideboard_s2'],
+      puzzles: ['r02_sideboard_04'], unlock_after: 4,
       pitch: 'Буфет для чашек и варенья',
       done_text: 'На полке — варенье «Для гостей».',
       variants: [
@@ -231,152 +241,199 @@ window.HOP_CONTENT = {
     },
     r02_photo: {
       room: 'r02', title: 'Фотография', verb: 'Повесить',
-      puzzles: ['r02_photo_01', 'r02_photo_02'], unlock_after: 4,
-      stage_sprites: ['photo_s2'],
+      puzzles: ['r02_photo_03'], unlock_after: 4,
       pitch: 'Каким был этот дом?',
       done_text: 'На снимке — дом, полный гостей.',
       variants: [
         { id: 'r02_photo_a', title: 'Золочёная рамка', sprite: 'photo_a' },
         { id: 'r02_photo_b', title: 'Ореховая рамка', sprite: 'photo_b' },
-        { id: 'r02_photo_c', title: 'Вечерняя рамка', sprite: 'photo_c', premium: true, price_coins: 120 }
+        { id: 'r02_photo_c', title: 'Вечерняя рамка', sprite: 'photo_c', premium: true, price_coins: 350 }
       ],
       tap_secret: 'Подпись: «Вечер фонариков. Все в сборе».'
     },
     r02_musicbox: {
       room: 'r02', title: 'Музыкальная шкатулка', verb: 'Починить',
       life: { kind: 'waltz', x: 0.62, y: 0.42 },
-      puzzles: ['r02_musicbox_02', 'r02_musicbox_03'], unlock_after: 7,
-      stage_sprites: ['musicbox_s2'],
+      puzzles: ['r02_musicbox_04'], unlock_after: 7,
       pitch: 'Какую песню помнит шкатулка?',
       done_text: 'Шкатулка заиграла вальс. Птичка на крышке закружилась.',
       variants: [
         { id: 'r02_musicbox_a', title: 'Палисандр', sprite: 'musicbox_a' },
         { id: 'r02_musicbox_b', title: 'Кремовая с золотом', sprite: 'musicbox_b' },
-        { id: 'r02_musicbox_c', title: 'Полночная', sprite: 'musicbox_c', premium: true, price_coins: 300 }
+        { id: 'r02_musicbox_c', title: 'Полночная', sprite: 'musicbox_c', premium: true, price_coins: 450 }
       ],
       tap_secret: 'Шкатулка играет три ноты и ждёт.'
     },
     r03_seed_table: {
       room: 'r03', title: 'Стол для рассады', verb: 'Расставить',
       life: { kind: 'bloom' },
-      puzzles: ['r03_seed_table_01', 'r03_seed_table_02', 'r03_seed_table_04'], unlock_after: 0,
+      puzzles: ['r03_seed_table_01', 'r03_seed_table_02', 'r03_seed_table_06'], unlock_after: 0,
       stage_sprites: ['seed_table_s1', 'seed_table_s2'],
       pitch: 'Разбудить спящие семена',
       done_text: 'Проклюнулись первые ростки. Пахнет землёй.',
       variants: [
         { id: 'r03_seed_table_a', title: 'Медовый', sprite: 'seed_table_a' },
         { id: 'r03_seed_table_b', title: 'Шалфейный', sprite: 'seed_table_b' },
-        { id: 'r03_seed_table_c', title: 'Вечерний с огоньками', sprite: 'seed_table_c', premium: true, price_coins: 150 }
+        { id: 'r03_seed_table_c', title: 'Вечерний с огоньками', sprite: 'seed_table_c', premium: true, price_coins: 800 }
       ],
       tap_secret: 'Финик шуршит в мешке с семенами.'
     },
     r03_watering_can: {
       room: 'r03', title: 'Лейка', verb: 'Начистить',
       life: { kind: 'bloom' },
-      puzzles: ['r03_watering_can_01', 'r03_watering_can_02', 'r03_watering_can_04'], unlock_after: 0,
+      puzzles: ['r03_watering_can_01', 'r03_watering_can_02', 'r03_watering_can_06'], unlock_after: 0,
       stage_sprites: ['watering_can_s1', 'watering_can_s2'],
       pitch: 'Будет чем поливать ростки',
       done_text: 'Лейка пустила струйку. Ростки повеселели.',
       variants: [
         { id: 'r03_watering_can_a', title: 'Медная', sprite: 'watering_can_a' },
         { id: 'r03_watering_can_b', title: 'С ромашками', sprite: 'watering_can_b' },
-        { id: 'r03_watering_can_c', title: 'Звёздная', sprite: 'watering_can_c', premium: true, price_coins: 120 }
+        { id: 'r03_watering_can_c', title: 'Звёздная', sprite: 'watering_can_c', premium: true, price_coins: 750 }
       ],
       tap_secret: 'Капля упала Финику на нос.'
     },
     r03_hanging_pot: {
       room: 'r03', title: 'Подвесное кашпо', verb: 'Повесить',
       life: { kind: 'bloom' },
-      puzzles: ['r03_hanging_pot_01', 'r03_hanging_pot_03', 'r03_hanging_pot_04'], unlock_after: 0,
+      puzzles: ['r03_hanging_pot_01', 'r03_hanging_pot_03', 'r03_hanging_pot_06'], unlock_after: 0,
       stage_sprites: ['hanging_pot_s1', 'hanging_pot_s2'],
       pitch: 'Подвесить зелёный плющ',
       done_text: 'Плющ свесился зелёной косой. Кашпо тихо покачивается.',
       variants: [
         { id: 'r03_hanging_pot_a', title: 'Терракотовое', sprite: 'hanging_pot_a' },
         { id: 'r03_hanging_pot_b', title: 'Белое', sprite: 'hanging_pot_b' },
-        { id: 'r03_hanging_pot_c', title: 'Синее с золотом', sprite: 'hanging_pot_c', premium: true, price_coins: 150 }
+        { id: 'r03_hanging_pot_c', title: 'Синее с золотом', sprite: 'hanging_pot_c', premium: true, price_coins: 850 }
       ],
       tap_secret: 'Кашпо качнулось — с листьев осыпались капли.'
     },
     r03_birdhouse: {
       room: 'r03', title: 'Скворечник', verb: 'Собрать',
       life: { kind: 'bloom' },
-      puzzles: ['r03_birdhouse_01', 'r03_birdhouse_02', 'r03_birdhouse_03'], unlock_after: 2,
+      puzzles: ['r03_birdhouse_01', 'r03_birdhouse_02', 'r03_birdhouse_06'], unlock_after: 2,
       stage_sprites: ['birdhouse_s1', 'birdhouse_s2'],
       pitch: 'Домик — и прилетит жилец',
       done_text: 'В скворечник заглянула малиновка и решила остаться.',
       variants: [
         { id: 'r03_birdhouse_a', title: 'Рыжая крыша', sprite: 'birdhouse_a' },
         { id: 'r03_birdhouse_b', title: 'Голубой', sprite: 'birdhouse_b' },
-        { id: 'r03_birdhouse_c', title: 'Звёздный с фонариком', sprite: 'birdhouse_c', premium: true, price_coins: 180 }
+        { id: 'r03_birdhouse_c', title: 'Звёздный с фонариком', sprite: 'birdhouse_c', premium: true, price_coins: 900 }
       ],
       tap_secret: 'Малиновка высунулась из окошка и свистнула.'
     },
     r03_herbarium: {
       room: 'r03', title: 'Гербарий', verb: 'Собрать',
       life: { kind: 'bloom' },
-      puzzles: ['r03_herbarium_01', 'r03_herbarium_02', 'r03_herbarium_03'], unlock_after: 2,
+      puzzles: ['r03_herbarium_12', 'r03_herbarium_02', 'r03_herbarium_06'], unlock_after: 2,
       stage_sprites: ['herbarium_s1', 'herbarium_s2'],
       pitch: 'Память о лете под стеклом',
       done_text: 'Под стеклом — клён. Ярлык бабушкиной рукой.',
       variants: [
         { id: 'r03_herbarium_a', title: 'Дубовая рамка', sprite: 'herbarium_a' },
         { id: 'r03_herbarium_b', title: 'Шалфейная рамка', sprite: 'herbarium_b' },
-        { id: 'r03_herbarium_c', title: 'Золочёная', sprite: 'herbarium_c', premium: true, price_coins: 150 }
+        { id: 'r03_herbarium_c', title: 'Золочёная', sprite: 'herbarium_c', premium: true, price_coins: 950 }
       ],
       tap_secret: 'Ярлык: «К первому Вечеру фонариков».'
     },
     r03_bench: {
       room: 'r03', title: 'Скамейка', verb: 'Починить',
       life: { kind: 'bloom' },
-      puzzles: ['r03_bench_01', 'r03_bench_02', 'r03_bench_03'], unlock_after: 4,
+      puzzles: ['r03_bench_01', 'r03_bench_12', 'r03_bench_06'], unlock_after: 4,
       stage_sprites: ['bench_s1', 'bench_s2'],
       pitch: 'Скамейка, чтобы присесть',
       done_text: 'Скамейка крепка. Финик уже на подушке.',
       variants: [
         { id: 'r03_bench_a', title: 'Терракотовая', sprite: 'bench_a' },
         { id: 'r03_bench_b', title: 'В полоску', sprite: 'bench_b' },
-        { id: 'r03_bench_c', title: 'Полночная', sprite: 'bench_c', premium: true, price_coins: 200 }
+        { id: 'r03_bench_c', title: 'Полночная', sprite: 'bench_c', premium: true, price_coins: 1000 }
       ],
       tap_secret: 'Финик перевернулся на другой бок.'
     },
     r03_pond: {
       room: 'r03', title: 'Пруд', verb: 'Расчистить',
       life: { kind: 'bloom' },
-      puzzles: ['r03_pond_01', 'r03_pond_02', 'r03_pond_03'], unlock_after: 4,
+      puzzles: ['r03_pond_01', 'r03_pond_12', 'r03_pond_06'], unlock_after: 4,
       stage_sprites: ['pond_s1', 'pond_s2'],
       pitch: 'Пруд с кувшинкой оживёт',
       done_text: 'Вода стала прозрачной. На кувшинке сидит лягушка.',
       variants: [
         { id: 'r03_pond_a', title: 'Летний', sprite: 'pond_a' },
         { id: 'r03_pond_b', title: 'Солнечный', sprite: 'pond_b' },
-        { id: 'r03_pond_c', title: 'С фонариками', sprite: 'pond_c', premium: true, price_coins: 250 }
+        { id: 'r03_pond_c', title: 'С фонариками', sprite: 'pond_c', premium: true, price_coins: 1050 }
       ],
       tap_secret: 'Лягушка квакнула и спряталась.'
     },
     r03_glass_door: {
       room: 'r03', title: 'Дверь в сад', verb: 'Открыть',
       life: { kind: 'bloom' },
-      puzzles: ['r03_glass_door_01', 'r03_glass_door_02', 'r03_glass_door_03'], unlock_after: 6,
+      puzzles: ['r03_glass_door_12', 'r03_glass_door_15', 'r03_glass_door_06'], unlock_after: 6,
       stage_sprites: ['glass_door_s1', 'glass_door_s2'],
       pitch: 'Дверь в сад откроется',
       done_text: 'Дверь распахнулась — из сада тёплый ветер.',
       variants: [
         { id: 'r03_glass_door_a', title: 'Кремовая с розами', sprite: 'glass_door_a' },
         { id: 'r03_glass_door_b', title: 'Шалфейная с вьюнком', sprite: 'glass_door_b' },
-        { id: 'r03_glass_door_c', title: 'Полночная с цветами', sprite: 'glass_door_c', premium: true, price_coins: 300 }
+        { id: 'r03_glass_door_c', title: 'Полночная с цветами', sprite: 'glass_door_c', premium: true, price_coins: 1100 }
       ],
       tap_secret: 'За стеклом мелькнула птица с печати.'
     }
   },
 
+  /* Снятые картинки → их вещь (чайная сокращена в 008, оранжерея перестроена в 008:
+     передышки 6×6 и крупные поля). Решённая снятая картинка или выданная награда
+     за вещь — вещь остаётся готовой (healProgress). */
+  retired_puzzles: {
+    r02_table_03: 'r02_table', r02_armchair_01: 'r02_armchair', r02_clock_03: 'r02_clock',
+    r02_window_02: 'r02_window', r02_sideboard_02: 'r02_sideboard', r02_sideboard_03: 'r02_sideboard',
+    r02_photo_01: 'r02_photo', r02_photo_02: 'r02_photo', r02_musicbox_02: 'r02_musicbox',
+    r02_musicbox_03: 'r02_musicbox',
+    r03_seed_table_04: 'r03_seed_table', r03_watering_can_04: 'r03_watering_can', r03_hanging_pot_04: 'r03_hanging_pot',
+    r03_birdhouse_03: 'r03_birdhouse', r03_herbarium_01: 'r03_herbarium', r03_herbarium_03: 'r03_herbarium',
+    r03_bench_02: 'r03_bench', r03_bench_03: 'r03_bench', r03_pond_02: 'r03_pond',
+    r03_pond_03: 'r03_pond', r03_glass_door_01: 'r03_glass_door', r03_glass_door_02: 'r03_glass_door',
+    r03_glass_door_03: 'r03_glass_door'
+  },
+
+  /* Уютные покупки (круг 7в): по три на комнату, только за монеты, цена растёт
+     от комнаты к комнате (150 → 400 → 900). place — как у предметов (x — центр,
+     y — низ, w — ширина), back — за вещами комнаты. Места видны с decor_after
+     готовых вещей комнаты (прихожая — когда горит лампа и встала ещё вещь). */
+  decor: {
+    r01_sconce: { room: 'r01', title: 'Бра', sprite: 'cozy_sconce', price: 150, back: true,
+      place: { x: 0.37, y: 0.27, w: 0.07 }, text: 'Тёплый свет у двери.', done: 'Светлее!' },
+    r01_basket: { room: 'r01', title: 'Лежанка Финику', sprite: 'cozy_basket', price: 150,
+      place: { x: 0.80, y: 0.97, w: 0.17 }, text: 'Мягкое место для кота.', done: 'Финику мягко!' },
+    r01_coats: { room: 'r01', title: 'Вешалка', sprite: 'cozy_coats', price: 150, back: true,
+      place: { x: 0.17, y: 0.50, w: 0.15 }, text: 'Шарф и шляпа бабушки.', done: 'Как дома!' },
+    r02_floorlamp: { room: 'r02', title: 'Торшер', sprite: 'cozy_floorlamp', price: 400, back: true,
+      place: { x: 0.88, y: 0.70, w: 0.13 }, text: 'Мягкий свет для чая.', done: 'Уютнее!' },
+    r02_scratch: { room: 'r02', title: 'Когтеточка', sprite: 'cozy_scratch', price: 400,
+      place: { x: 0.70, y: 0.99, w: 0.09 }, text: 'Финик будет рад.', done: 'Финик рад!' },
+    r02_pouf: { room: 'r02', title: 'Пуфик', sprite: 'cozy_pouf', price: 400,
+      place: { x: 0.16, y: 0.985, w: 0.15 }, text: 'Ногам тепло у чая.', done: 'Мягко!' },
+    r03_garland: { room: 'r03', title: 'Гирлянда', sprite: 'cozy_garland', price: 900,
+      place: { x: 0.50, y: 0.13, w: 0.36 }, text: 'Огоньки под стеклянной крышей.', done: 'Светится!' },
+    r03_cathouse: { room: 'r03', title: 'Домик Финика', sprite: 'cozy_cathouse', price: 900, back: true,
+      place: { x: 0.10, y: 0.72, w: 0.14 }, text: 'Свой домик для кота.', done: 'Финик в домике!' },
+    r03_lemon: { room: 'r03', title: 'Лимон бабушки', sprite: 'cozy_lemon', price: 900,
+      place: { x: 0.88, y: 0.99, w: 0.17 }, text: 'Тот самый лимон с фото.', done: 'Лимон вернулся!' }
+  },
+
   /* Экономика (ТЗ 03). Монеты — за игру, голоса ВК — только за наборы. */
   economy: {
     coins_per_puzzle: 20,
-    // Монеты за поле по площади: до 25 клеток — 10, до 49 — 20, 10×10 — 40.
-    coins_by_area: [[25, 10], [36, 15], [49, 20], [64, 25], [81, 30], [100, 40], [1e9, 60]],
+    // Монеты за поле по площади: до 25 клеток — 10, до 49 — 20, 10×10 — 40, 12×12 — 50.
+    coins_by_area: [[25, 10], [36, 15], [49, 20], [64, 25], [81, 30], [100, 40], [144, 50], [1e9, 60]],
+    // Дальше комната — щедрее поле (круг 7г): множитель к цене по площади, округление
+    // до 5 и коридор. Чайная 20…40, оранжерея 40…80 (передышка 6×6 — 40, 15×15 — 80).
+    room_coins: { r02: { mult: 1.6, min: 20, max: 40 }, r03: { mult: 1.4, min: 40, max: 80 } },
     // Монетки в клетках поля: находятся, когда клетку закрасят.
     field_coins: { coins: 5, by_area: [[25, 0], [49, 1], [81, 2]], max: 3 },
+    // «Сияние» не реже раза в 4 минуты игры: через field_after_s без него в незакрашенной
+    // клетке поля прячется золотая (монеты, карандаш, вещь засияет), через chest_after_s
+    // сундучок готовой вещи — точно редкий.
+    glow_pity: { field_after_s: 150, chest_after_s: 240, coins: 40, pencils: 1 },
+    // Закрытая строка или столбец на поле от 8×8 — монетка в табло (раз за линию).
+    line_coins: { min_side: 8, coins: 2 },
     // Готовый предмет: бонус по числу его картинок (1 — 15, 3 — 50) и сундучок
     // (монеты 20–100, карандаш или редкое «Сияние»).
     object_bonus: [15, 30, 50, 60],
@@ -751,60 +808,32 @@ window.HOP_CONTENT = {
       rows: ['.###.', '##.##', '#.#.#', '##.##', '.###.']
     },
     r02_table_02: {
-      object: 'r02_table', stage: 2, title: "Столешница", difficulty: 'normal',
+      object: 'r02_table', stage: 1, title: "Столешница", difficulty: 'normal',
       rows: ['.#####.', '#######', '.#...#.', '.#...#.', '.#...#.', '.#...#.', '##...##']
     },
-    r02_table_03: {
-      object: 'r02_table', stage: 1, title: "Салфетка", difficulty: 'normal',
-      rows: ['#.#.#', '.###.', '##.##', '.###.', '#.#.#']
-    },
-    r02_armchair_01: {
-      object: 'r02_armchair', stage: 1, title: "Ножки", difficulty: 'normal',
-      rows: ['#####', '#####', '.#.#.', '#...#', '#...#']
-    },
     r02_armchair_03: {
-      object: 'r02_armchair', stage: 2, title: "Подушка", difficulty: 'normal',
+      object: 'r02_armchair', stage: 1, title: "Подушка", difficulty: 'normal',
       rows: ['#.....#', '#######', '.##.##.', '#######', '#.....#']
     },
     r02_clock_01: {
       object: 'r02_clock', stage: 1, title: "Маятник", difficulty: 'normal',
       rows: ['#######', '#..#..#', '#..#..#', '#..#..#', '#.###.#', '#.###.#', '#######']
     },
-    r02_clock_03: {
-      object: 'r02_clock', stage: 2, title: "Ключик", difficulty: 'normal',
-      rows: ['.#####.', '##...##', '##...##', '##...##', '.#####.', '...#...', '...####', '...#...', '...####']
-    },
     r02_window_01: {
       object: 'r02_window', stage: 1, title: "Занавеска", difficulty: 'easy',
       rows: ['#######', '##.#.##', '#.....#', '#.....#', '##...##', '##...##', '###.###']
     },
-    r02_window_02: {
-      object: 'r02_window', stage: 2, title: "Подвязка", difficulty: 'easy',
-      rows: ['.######.', '..####..', '##.##.##', '#.####.#', '##.##.##', '..#..#..', '.##..##.', '########']
+    r02_sideboard_04: {
+      object: 'r02_sideboard', stage: 1, title: "Банка варенья", difficulty: 'normal',
+      rows: ['..###..', '.#####.', '..###..', '#######', '##.#.##', '###.###', '.#####.']
     },
-    r02_sideboard_02: {
-      object: 'r02_sideboard', stage: 1, title: "Ручка", difficulty: 'normal',
-      rows: ['...##...', '..####..', '...##...', '.######.', '##....##', '#......#', '##....##', '.######.']
+    r02_photo_03: {
+      object: 'r02_photo', stage: 1, title: "Домик", difficulty: 'easy',
+      rows: ['...##...', '..####..', '.######.', '########', '.#....#.', '.#.##.#.', '.#.##.#.', '########']
     },
-    r02_sideboard_03: {
-      object: 'r02_sideboard', stage: 2, title: "Банка варенья", difficulty: 'normal',
-      rows: ['..######..', '.########.', '###.##.###', '..######..', '.########.', '##......##', '##.####.##', '##..##..##', '##......##', '.########.']
-    },
-    r02_photo_01: {
-      object: 'r02_photo', stage: 1, title: "Уголок рамки", difficulty: 'easy',
-      rows: ['########', '########', '##......', '##.###..', '##.#.#..', '##.##...', '##......', '##......']
-    },
-    r02_photo_02: {
-      object: 'r02_photo', stage: 2, title: "Домик", difficulty: 'easy',
-      rows: ['....##.##.', '...######.', '..######..', '.########.', '##########', '.#......#.', '.#.##.#.#.', '.#.##.#.#.', '.#....#.#.', '##########']
-    },
-    r02_musicbox_02: {
-      object: 'r02_musicbox', stage: 1, title: "Гребёнка", difficulty: 'normal',
-      rows: ['##########', '#.######.#', '##########', '#.#.#.#.#.', '#.#.#.#.#.', '#.#.#.#...', '#.#.#.#...', '#.#.#.....', '#.#.......', '#.........']
-    },
-    r02_musicbox_03: {
-      object: 'r02_musicbox', stage: 2, title: "Птичка", difficulty: 'normal',
-      rows: ['.....###..', '.....####.', '.....##.##', '#.#.####..', '#.######..', '.#######..', '.######...', '..####....', '..#.#.....', '##########']
+    r02_musicbox_04: {
+      object: 'r02_musicbox', stage: 1, title: "Птичка", difficulty: 'normal',
+      rows: ['...##...', '...###..', '...#.##.', '#.####..', '.#####..', '..####..', '..#..#..', '########']
     },
     r03_seed_table_01: {
       object: 'r03_seed_table', stage: 1, title: "Стол", difficulty: 'normal',
@@ -814,9 +843,9 @@ window.HOP_CONTENT = {
       object: 'r03_seed_table', stage: 2, title: "Ящик с землёй", difficulty: 'normal',
       rows: ['.##.###.##', '##########', '##.###.###', '##########', '#........#', '#..####..#', '#........#', '##########']
     },
-    r03_seed_table_04: {
-      object: 'r03_seed_table', stage: 3, title: "Росток", difficulty: 'normal',
-      rows: ['###....##', '####..###', '####.####', '..##.##..', '...###...', '....#....', '....#....', '....#....', '.#######.', '#########']
+    r03_seed_table_06: {
+      object: 'r03_seed_table', stage: 3, title: "Горшочек", difficulty: 'normal',
+      rows: ['..##..', '.####.', '..##..', '######', '.####.', '..##..']
     },
     r03_watering_can_01: {
       object: 'r03_watering_can', stage: 1, title: "Корпус лейки", difficulty: 'normal',
@@ -826,9 +855,9 @@ window.HOP_CONTENT = {
       object: 'r03_watering_can', stage: 2, title: "Ручка", difficulty: 'normal',
       rows: ['...####...', '..##..##..', '.##....##.', '.#......#.', '##########', '##########', '#........#', '##########', '##########', '.########.']
     },
-    r03_watering_can_04: {
+    r03_watering_can_06: {
       object: 'r03_watering_can', stage: 3, title: "Капля", difficulty: 'normal',
-      rows: ['...##...', '...##...', '..####..', '..####..', '.######.', '.######.', '########', '###.####', '.##.###.', '..####..']
+      rows: ['..#...', '.###..', '.###..', '#####.', '#####.', '.###..']
     },
     r03_hanging_pot_01: {
       object: 'r03_hanging_pot', stage: 1, title: "Крючок с кольцом", difficulty: 'normal',
@@ -838,9 +867,9 @@ window.HOP_CONTENT = {
       object: 'r03_hanging_pot', stage: 2, title: "Глиняный горшок", difficulty: 'normal',
       rows: ['.########.', '##########', '.########.', '.##....##.', '##......##', '##......##', '.##....##.', '..######..', '..######..']
     },
-    r03_hanging_pot_04: {
-      object: 'r03_hanging_pot', stage: 3, title: "Лист плюща", difficulty: 'normal',
-      rows: ['....#....', '...###...', '...###...', '.#.###.#.', '.#######.', '########.', '#########', '.###.###.', '...###...', '....#....']
+    r03_hanging_pot_06: {
+      object: 'r03_hanging_pot', stage: 3, title: "Листик", difficulty: 'normal',
+      rows: ['....##', '..####', '.####.', '#####.', '.##...', '#.....']
     },
     r03_birdhouse_01: {
       object: 'r03_birdhouse', stage: 1, title: "Столбик", difficulty: 'normal',
@@ -850,57 +879,57 @@ window.HOP_CONTENT = {
       object: 'r03_birdhouse', stage: 2, title: "Крыша", difficulty: 'normal',
       rows: ['....##....', '...####...', '..##..##..', '.########.', '##########', '##########', '#........#', '#........#']
     },
-    r03_birdhouse_03: {
-      object: 'r03_birdhouse', stage: 3, title: "Леток с жёрдочкой", difficulty: 'normal',
-      rows: ['....#....', '...###...', '..#####..', '.#######.', '#########', '..#...#..', '..#...#..', '..#####..', '#######..', '..##.##..']
+    r03_birdhouse_06: {
+      object: 'r03_birdhouse', stage: 3, title: "Гнездо", difficulty: 'normal',
+      rows: ['.#..#.', '######', '#.##.#', '######', '.####.', '..##..']
     },
-    r03_bench_01: {
-      object: 'r03_bench', stage: 1, title: "Чугунная ножка", difficulty: 'normal',
-      rows: ['##########', '##########', '.##....##.', '.##....##.', '..##..##..', '..##..##..', '.##....##.', '.##....##.', '##......##', '#........#']
-    },
-    r03_bench_02: {
-      object: 'r03_bench', stage: 2, title: "Сиденье", difficulty: 'normal',
-      rows: ['##########', '##########', '#........#', '##########', '#.######.#', '##########', '.#......#.', '.##....##.']
-    },
-    r03_bench_03: {
-      object: 'r03_bench', stage: 3, title: "Спинка", difficulty: 'normal',
-      rows: ['...####...', '.########.', '##......##', '##.#..#.##', '####..####', '####..####', '##......##', '##########']
-    },
-    r03_herbarium_01: {
-      object: 'r03_herbarium', stage: 1, title: "Рамка", difficulty: 'normal',
-      rows: ['##########', '#.##..##.#', '##......##', '#..####..#', '#..#..#..#', '#..#..#..#', '#..####..#', '##......##', '#.##..##.#', '##########']
+    r03_herbarium_12: {
+      object: 'r03_herbarium', stage: 1, title: "Большой лист", difficulty: 'normal',
+      rows: ['.....##.....', '....####....', '...######...', '..########..', '.##########.', '############', '############', '.##########.', '..########..', '...######...', '.....##.....', '.....##.....']
     },
     r03_herbarium_02: {
       object: 'r03_herbarium', stage: 2, title: "Кленовый лист", difficulty: 'normal',
       rows: ['....#....', '...###...', '.#.###.#.', '.#######.', '#########', '.#######.', '..#####..', '.###.###.', '....#....', '....#....']
     },
-    r03_herbarium_03: {
-      object: 'r03_herbarium', stage: 3, title: "Папоротник", difficulty: 'normal',
-      rows: ['....#....', '...###...', '...#.#...', '..##.##..', '..##.##..', '..##.##..', '.###.###.', '####.####', '.###.###.', '....#....']
+    r03_herbarium_06: {
+      object: 'r03_herbarium', stage: 3, title: "Цветок", difficulty: 'normal',
+      rows: ['.#..#.', '######', '.####.', '######', '.#..#.', '..##..']
+    },
+    r03_bench_01: {
+      object: 'r03_bench', stage: 1, title: "Чугунная ножка", difficulty: 'normal',
+      rows: ['##########', '##########', '.##....##.', '.##....##.', '..##..##..', '..##..##..', '.##....##.', '.##....##.', '##......##', '#........#']
+    },
+    r03_bench_12: {
+      object: 'r03_bench', stage: 2, title: "Финик на скамейке", difficulty: 'normal',
+      rows: ['..#...#.....', '..##.##.....', '..#####.....', '..#.#.#.....', '..#####..##.', '...###....#.', '..######..#.', '.########.#.', '############', '############', '.#........#.', '.#........#.']
+    },
+    r03_bench_06: {
+      object: 'r03_bench', stage: 3, title: "Сердечко", difficulty: 'normal',
+      rows: ['.##.##', '######', '######', '.####.', '..##..', '...#..']
     },
     r03_pond_01: {
       object: 'r03_pond', stage: 1, title: "Камни у воды", difficulty: 'normal',
       rows: ['.##....###', '####..####', '####.#####', '.##..####.', '..........', '##########', '#..####..#', '##########', '###..###..', '##########']
     },
-    r03_pond_02: {
+    r03_pond_12: {
       object: 'r03_pond', stage: 2, title: "Кувшинка", difficulty: 'normal',
-      rows: ['....##....', '....##....', '..######..', '#.######.#', '.########.', '..######..', '..######..', '##########', '#####.####']
+      rows: ['.....#......', '....###.....', '..#.###.#...', '..#######...', '...#####....', '....###.....', '.##########.', '############', '#####..#####', '.####..####.', '..###..###..', '............']
     },
-    r03_pond_03: {
-      object: 'r03_pond', stage: 3, title: "Лягушка", difficulty: 'normal',
-      rows: ['.###..###.', '.###..###.', '.########.', '##########', '##########', '.########.', '.########.', '##.####.##', '####..####']
+    r03_pond_06: {
+      object: 'r03_pond', stage: 3, title: "Рыбка", difficulty: 'normal',
+      rows: ['..###.', '.####.', '######', '.####.', '..###.', '...#..']
     },
-    r03_glass_door_01: {
-      object: 'r03_glass_door', stage: 1, title: "Дверь со стёклами", difficulty: 'normal',
-      rows: ['..####..', '.######.', '#..##..#', '########', '#..##..#', '########', '#..##..#', '########', '########', '########']
+    r03_glass_door_12: {
+      object: 'r03_glass_door', stage: 1, title: "Дверь в сад", difficulty: 'normal',
+      rows: ['...######...', '..##....##..', '.##.####.##.', '.#.##..##.#.', '.##########.', '.#..#..#..#.', '.#..#..#..#.', '.##########.', '.#..#..#..#.', '.##########.', '.####..####.', '############']
     },
-    r03_glass_door_02: {
-      object: 'r03_glass_door', stage: 2, title: "Круглая ручка", difficulty: 'normal',
-      rows: ['....##....', '..######..', '.##.##.##.', '.#.####.#.', '##########', '##########', '.#.####.#.', '.##.##.##.', '..######..', '....##....']
+    r03_glass_door_15: {
+      object: 'r03_glass_door', stage: 2, title: "Лимонное дерево", difficulty: 'normal',
+      rows: ['.....#####.....', '...#########...', '..####.######..', '.#####..######.', '.##.####.#####.', '#####.##..#####', '.#######.#####.', '..###.###.###..', '....#######....', '......###......', '.......#.......', '.......#.......', '...#########...', '....#######....', '.....#####.....']
     },
-    r03_glass_door_03: {
-      object: 'r03_glass_door', stage: 3, title: "Старый ключ", difficulty: 'normal',
-      rows: ['.####.....', '##..##....', '#....#####', '#....#####', '##..##.#.#', '.####..#.#']
+    r03_glass_door_06: {
+      object: 'r03_glass_door', stage: 3, title: "Ключик", difficulty: 'normal',
+      rows: ['.##...', '#..#..', '.##...', '..#...', '..###.', '..#.#.']
     }
   }
 };

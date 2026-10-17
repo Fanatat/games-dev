@@ -78,13 +78,47 @@ window.Scene = (function () {
     return svg;
   }
 
+  // Уютные покупки: купленные стоят на сцене, не купленные — бледный набросок с ценником.
+  function decorLayer(host, C, S, rid, opts, back) {
+    var St = window.HopState;
+    if (opts.before || !C.decor) return;
+    var open = St.decorOpen(C, S, rid), inter = opts.interactive !== false;
+    St.roomDecor(C, rid).forEach(function (id) {
+      var d = C.decor[id];
+      var bought = (S.decor || []).indexOf(id) !== -1;
+      if (!!d.back !== back && (bought || back)) return;
+      if (bought) {
+        var img = el('img', 'spr spr-decor is-shown' + (opts.fresh === 'decor:' + id ? ' is-fresh' : ''),
+          { src: ART + d.sprite + '.webp', alt: '', draggable: 'false', 'data-decor': id });
+        place(img, d.place);
+        host.appendChild(img);
+        return;
+      }
+      if (!open || !inter) return;
+      // Набросок «заднего» места — за вещами, а ценник у всех — поверх вещей (иначе касание
+      // уходит в кресло или стол): во втором проходе — пустое место того же размера с ценой.
+      var spot = el('div', 'decor-spot', { 'data-spot': id });
+      place(spot, d.place);
+      spot.appendChild(el('img', 'decor-ghost', { src: ART + d.sprite + '.webp', alt: '', draggable: 'false' }));
+      if (back) { host.appendChild(spot); return; }
+      if (d.back) { spot.removeAttribute('data-spot'); spot.firstChild.className = 'decor-ghost is-blank'; }
+      var b = el('button', 'decor-price' + (S.coins >= d.price ? ' is-afford' : ''),
+        { type: 'button', 'data-decor': id, 'aria-label': d.title + ' — ' + d.price + ' монет' });
+      b.appendChild(el('img', '', { src: ART + 'coin.webp', alt: '', draggable: 'false' }));
+      b.appendChild(el('b')).textContent = String(d.price);
+      spot.appendChild(b);
+      host.appendChild(spot);
+    });
+  }
+
   /* opts: { before: true } — вид «до» (ничего не восстановлено),
            interactive: false — без кнопок (для «до/после»),
            hide: oid — нарисовать этот предмет на стадию раньше (пока летит миниатюра),
            fresh: oid | 'room' — проиграть появление предмета / прихода кота,
            preview: { oid, vid } — примерка оформления (ещё не куплено),
            noGlow: oid — пока не показывать «Сияние» (сундучок ещё не открыт),
-           afford: oid — значок «Хватает!» (монет хватает на оформление). */
+           afford: oid — значок «Хватает!» (монет хватает на оформление), affordPrice — цена на нём,
+           fresh: 'decor:<id>' — только что купленная уютная вещь. */
   function render(host, C, S, rid, opts) {
     opts = opts || {};
     var room = C.rooms[rid], L = room.layout;
@@ -153,6 +187,7 @@ window.Scene = (function () {
       });
     }
 
+    decorLayer(host, C, S, rid, opts, true);
     var order = room.z || room.objects;
     order.forEach(function (oid) {
       var o = C.objects[oid];
@@ -184,10 +219,11 @@ window.Scene = (function () {
         dot.innerHTML = '<svg class="ico"><use href="#i-palette"/></svg>';
         wrap.appendChild(dot);
       } else if (inter && opts.afford === oid && st === 'restored') {
-        var coin = el('span', 'hs-badge hs-afford');
+        var coin = el('span', 'hs-badge hs-afford' + (opts.affordPrice ? ' has-price' : ''));
         coin.appendChild(el('img', '', { src: ART + 'coin.webp', alt: '', draggable: 'false' }));
+        if (opts.affordPrice) coin.appendChild(el('b')).textContent = String(opts.affordPrice);
         wrap.appendChild(coin);
-        wrap.setAttribute('aria-label', o.title + ' — хватает на оформление');
+        wrap.setAttribute('aria-label', o.title + ' — оформление за ' + (opts.affordPrice || '') + ' монет');
       }
       // Секрет не подписан: только что вставшая готовая вещь один раз блестит, когда
       // игрок снова видит сцену (после окна оформления), — и всё.
@@ -217,6 +253,16 @@ window.Scene = (function () {
         host.appendChild(letter);
       }
     });
+    decorLayer(host, C, S, rid, opts, false);
+    // Находка из поворота сюжета остаётся в комнате (и в готовой — даже если окно не показывалось:
+    // старый сейв, где середина комнаты пройдена до поворота).
+    var T = room.twist;
+    if (T && T.place && !opts.before && (S.story_flags[T.flag] || S.completed_rooms.indexOf(rid) !== -1)) {
+      var tw = el('img', 'spr spr-twist is-shown' + (opts.fresh === 'twist' ? ' is-fresh' : ''),
+        { src: ART + T.sprite + '.webp', alt: '', draggable: 'false', 'data-twist': T.flag });
+      place(tw, T.place);
+      host.appendChild(tw);
+    }
     if (hall) {
       var bird = el('img', 'spr spr-bird' + (restored.r01_flower ? ' is-shown' : '') + (opts.fresh === 'r01_flower' ? ' is-fresh' : ''), { src: ART + 'bird.webp', alt: '', draggable: 'false' });
       place(bird, L.bird);

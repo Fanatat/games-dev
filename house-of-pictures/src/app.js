@@ -504,7 +504,8 @@
       return;
     }
     var lan = waitingLantern();
-    if (playable.length === 1 && !lan) {
+    var dec = St.affordableDecor(C, S, rid);
+    if (playable.length === 1 && !lan && !dec) {
       var oid = playable[0], o = C.objects[oid];
       var c1 = h('div', 'card card-goal');
       c1.appendChild(objectThumb(oid));
@@ -533,7 +534,8 @@
     var tm = tomorrowPill();
     if (tm) { ph.classList.add('has-tomorrow'); ph.appendChild(tm); }
     panel.appendChild(ph);
-    var picks = playable.slice(0, lan ? 3 : 4), cards = picks.length + (lan ? 1 : 0);
+    var more = (lan ? 1 : 0) + (dec ? 1 : 0);
+    var picks = playable.slice(0, 4 - more), cards = picks.length + more;
     var grid = h('div', 'choice-grid' + (cards > 2 ? ' is-compact' : ''));
     grid.style.setProperty('--n', cards);
     picks.forEach(function (oid) {
@@ -554,6 +556,7 @@
       grid.appendChild(b);
     });
     if (lan) grid.appendChild(lanternChoice(lan));
+    if (dec) grid.appendChild(decorChoice(dec));
     panel.appendChild(grid);
   }
 
@@ -580,6 +583,65 @@
     b.appendChild(meta);
     b.addEventListener('click', function () { startLantern(it.id, true); });
     return b;
+  }
+
+  // Уютная вещь, на которую уже хватает монет, — карточкой рядом с картинками.
+  function decorChoice(id) {
+    var d = C.decor[id];
+    var b = h('button', 'card card-choice card-decor');
+    b.type = 'button';
+    b.setAttribute('data-decor', id);
+    b.setAttribute('aria-label', d.title + ' — ' + d.price + ' монет');
+    var t = h('span', 'thumb thumb-decor');
+    t.appendChild(pic(d.sprite));
+    b.appendChild(t);
+    b.appendChild(h('b', 'card-title', d.title));
+    b.appendChild(h('span', 'card-sub', 'Для уюта'));
+    var meta = h('span', 'choice-meta');
+    meta.appendChild(priceTag('coins', d.price));
+    b.appendChild(meta);
+    b.addEventListener('click', function () { Sound.play('tap'); openDecorSheet(id); });
+    return b;
+  }
+
+  // Окно уютной вещи: набросок, строка и «Поставить» с ценой; не хватает — сколько ещё.
+  function openDecorSheet(id) {
+    var d = C.decor[id];
+    if (!d || S.decor.indexOf(id) !== -1) return;
+    log('decor_open', { decor_id: id, coins: S.coins });
+    var node = h('div', 'decor-sheet');
+    node.appendChild(sheetHead(d.title));
+    var art = h('span', 'story-art decor-art');
+    art.appendChild(pic(d.sprite));
+    node.appendChild(art);
+    node.appendChild(h('p', 'card-sub decor-text', d.text));
+    if (S.coins < d.price) {
+      var note = h('p', 'decor-note');
+      note.appendChild(h('span', '', 'Ещё'));
+      note.appendChild(priceTag('coins', d.price - S.coins));
+      note.appendChild(h('span', '', '— за картинки'));
+      node.appendChild(note);
+      node.appendChild(button('btn-main', 'Хорошо', 'check', function () { Sound.play('tap'); closeSheet(); }));
+    } else {
+      var b = button('btn-main btn-decor', 'Поставить', null, function () { buyDecorNow(id, b); });
+      b.appendChild(priceTag('coins', d.price));
+      node.appendChild(b);
+    }
+    openSheet(node, null, 'sheet-decor');
+  }
+
+  function buyDecorNow(id, btn) {
+    var r = St.buyDecor(C, S, id);
+    if (!r.ok) {
+      if (r.reason === 'coins') { refuse(btn, [$('hud-coins')]); log('refuse', { what: 'coins', need: r.need }); }
+      return;
+    }
+    Sound.play('reward');
+    saveNow();
+    closeSheet(true);
+    renderHome({ fresh: 'decor:' + id });
+    bump($('hud-coins'));
+    toast(C.decor[id].done, 2200, 'star');
   }
 
   // «Завтра»: письмо дня разгадано — что придёт и через сколько часов (видно без захода в разделы).
@@ -767,6 +829,7 @@
     if (so.afford === undefined) {
       var af = St.affordableVariant(C, S, curRoom());
       so.afford = af ? af.object_id : null;
+      so.affordPrice = af ? af.price : null;
     }
     Scene.render($('scene'), C, S, curRoom(), so);
     renderPill();
@@ -854,6 +917,7 @@
     var t = e.target.closest('button');
     if (!t || $('scene').classList.contains('is-busy')) return;
     if (t.hasAttribute('data-letter')) { openLetter(); return; }
+    if (t.hasAttribute('data-decor')) { Sound.play('tap'); openDecorSheet(t.getAttribute('data-decor')); return; }
     var oid = t.getAttribute('data-obj');
     if (!oid) return;
     var st = St.objectStatus(C, S, oid);
@@ -1026,6 +1090,13 @@
     var sol = solutionOf(pid);
     N.render({ width: sol[0].length, height: sol.length, solution: sol }, $('puzzle-container'), onWin, onMove, onLine);
     markFiveLines(sol[0].length, sol.length);
+    // Первое поле крупнее 10×10 (оранжерея): оно и щедрее — сказать сразу.
+    if (!cur.letter && !cur.lantern && Math.max(sol.length, sol[0].length) > 10 && !S.story_flags.big_tip) {
+      St.setFlag(S, 'big_tip');
+      cur.bigTip = true;
+      log('big_field_tip', { puzzle_id: pid });
+      setTimeout(function () { if (cur && cur.pid === pid) toast('Большое поле: +' + St.puzzleCoins(C, pid), 2600, 'coin'); }, 400);
+    }
     setupLens();
     var d = S.drafts[pid];
     if (d) N.restoreBoard(St.decodeBoard(d.board, sol[0].length, sol.length));
@@ -1095,6 +1166,7 @@
     if (!N.isWon()) {
       var board = N.getBoardState();
       if (kind === 'fill' || kind === 'pencil') foundCoins(board);
+      goldTick(board);
       St.saveDraft(S, cur.pid, board);
       scheduleSave();
     }
@@ -1120,18 +1192,67 @@
     if (got.length) renderFieldCoins();
   }
 
+  // «Сияние» в клетке: давно не было — золотая прячется в незакрашенной клетке поля;
+  // закрасил — золотая вспышка, «Сияние!», монеты и карандаш летят на плашки.
+  function goldTick(board) {
+    St.placeGold(C, S, cur.pid, board);
+    var g = St.collectGold(C, S, cur.pid, board);
+    if (!g) return;
+    var cell = $('puzzle-container').querySelector('.grid-cell[data-r="' + g.r + '"][data-c="' + g.c + '"]');
+    if (cell) {
+      var burst = h('i', 'cell-gold');
+      cell.appendChild(burst);
+      setTimeout(function () { burst.remove(); }, 1500);
+    }
+    Sound.cue('rare');
+    Sound.buzz([15, 40, 25]);
+    hideToast();
+    toast('Сияние!', 2600, 'star');
+    playRewards([{ type: 'coins', n: g.coins }, { type: 'pencils', n: g.pencils }], cell ? cell.getBoundingClientRect() : null);
+    scheduleSave();
+  }
+
+  // Плашка монет поля: сколько уже получено здесь (монетки в клетках и
+  // закрытые линии), точки — спрятанные монетки, найденные — закрашены.
   function renderFieldCoins() {
     var box = $('puzzle-coins');
     var all = cur ? St.fieldCoins(C, cur.pid) : [];
-    box.hidden = !all.length;
-    if (!all.length) return;
+    var lines = !!cur && St.lineCoinsOn(C, cur.pid);
+    box.hidden = !all.length && !lines;
+    if (box.hidden) return;
     var found = all.filter(function (x, i) { return S.granted.indexOf('f:' + cur.pid + ':' + i) !== -1; }).length;
-    $('puzzle-coins-n').textContent = found + '/' + all.length;
-    box.setAttribute('aria-label', 'Монетки на поле: найдено ' + found + ' из ' + all.length);
-    box.classList.toggle('is-all', found === all.length);
+    var earned = St.fieldEarned(C, S, cur.pid);
+    $('puzzle-coins-n').textContent = String(earned);
+    $('puzzle-coins-k').textContent = all.map(function (x, i) { return i < found ? '●' : '○'; }).join('');
+    box.setAttribute('aria-label', 'Монеты на поле: ' + earned + (all.length ? ', монеток найдено ' + found + ' из ' + all.length : ''));
+    box.classList.toggle('is-all', !!all.length && found === all.length);
   }
 
-  function onLine() { Sound.line(); }
+  // Закрытая линия: звук, а на поле от 8×8 — монетка от подсказки к плашке.
+  function onLine(kind, idx) {
+    Sound.line();
+    if (!cur || N.isWon()) return;
+    var n = St.closeLine(C, S, cur.pid, kind, idx);
+    if (!n) return;
+    var clue = $('puzzle-container').querySelectorAll(kind === 'row' ? '.row-clue' : '.col-clue')[idx];
+    var box = $('puzzle-coins');
+    var land = function () { renderFieldCoins(); renderHud(); bump(box); };
+    scheduleSave();
+    if (reducedMotion() || !clue || !document.body.animate || box.hidden) { land(); return; }
+    var f = clue.getBoundingClientRect(), t = box.getBoundingClientRect();
+    var c = h('i', 'fx-line-coin');
+    c.appendChild(pic('coin'));
+    $('fx').appendChild(c);
+    var fx = f.left + f.width / 2, fy = f.top + f.height / 2;
+    c.style.left = fx + 'px'; c.style.top = fy + 'px';
+    var a = c.animate([
+      { transform: 'translate(-50%,-50%) scale(.5)', opacity: 0 },
+      { transform: 'translate(-50%,-80%) scale(1.1)', opacity: 1, offset: 0.25 },
+      { transform: 'translate(calc(-50% + ' + (t.left + 14 - fx) + 'px), calc(-50% + ' + (t.top + t.height / 2 - fy) + 'px)) scale(.7)', opacity: 0.9 }
+    ], { duration: 650, easing: 'cubic-bezier(.4,.1,.3,1)', fill: 'forwards' });
+    var fin = function () { c.remove(); land(); Sound.play('coin'); };
+    a.onfinish = fin; a.oncancel = fin;
+  }
 
   // Название поля — в одну строку без многоточия: шрифт ужимается с 18 до 11 px
   // («Музыкальная шкатулка» на 320 px влезает только с 12 px).
@@ -1155,7 +1276,7 @@
     b.setAttribute('aria-pressed', String(N.isZoomed()));
     if (N.isZoomed() && !S.story_flags.zoom_tip) {
       St.setFlag(S, 'zoom_tip');
-      setTimeout(function () { if (cur && N.isZoomed()) toast('Тяни за числа', 2600); }, 1200);
+      setTimeout(function () { if (cur && N.isZoomed()) toast('Тяни за числа', 2600); }, cur && cur.bigTip ? 3200 : 1200);
     }
   }
   $('puzzle-preview').addEventListener('click', function () {
@@ -1586,7 +1707,7 @@
         story: o.done_text,
         onDone: function () {
           if (res.room_done) roomFinale(res.room_id, gift);
-          else if (storyDue()) showStory(gift);
+          else if (twistDue(o.room)) showTwist(o.room, gift);
           else if (gift) showGift(gift);
         }
       });
@@ -2331,25 +2452,33 @@
     playRewards(rs.res.rewards, from);
   }
 
-  /* ---------------- «Тайна птицы» ---------------- */
+  /* ---------------- поворот сюжета ---------------- */
 
-  function storyDue() {
-    return !S.story_flags.story_answer && St.restoredCount(C, S, 'r02') >= 3;
+  // На середине комнаты — находка Финика: окно в несколько слов и вопрос,
+  // а сама находка остаётся на сцене (обрывок письма в чайной, фото в оранжерее).
+  function twistDue(rid) {
+    var T = C.rooms[rid] && C.rooms[rid].twist;
+    return !!T && !S.story_flags[T.flag] && St.restoredCount(C, S, rid) >= T.after;
   }
 
-  function showStory(gift) {
-    St.setFlag(S, 'story_answer');
-    log('story_answer');
+  function showTwist(rid, gift) {
+    var T = C.rooms[rid].twist;
+    St.setFlag(S, T.flag);
+    St.markGlow(S);
+    log('story_twist', { room_id: rid, flag: T.flag });
     saveNow();
     Sound.play('reward');
     var node = h('div', 'story-sheet');
-    node.appendChild(sheetHead('Тайна птицы', 'letter'));
+    node.appendChild(sheetHead(T.title, 'letter'));
     var card = h('div', 'card card-letter');
-    card.appendChild(h('p', 'card-text', 'Птица — знак дома. Тут зажигали фонари.'));
-    card.appendChild(h('p', 'card-text story-q', 'Кто же прислал письмо?'));
+    var art = h('span', 'story-art');
+    art.appendChild(pic(T.sprite));
+    card.appendChild(art);
+    card.appendChild(h('p', 'card-text', T.text));
+    card.appendChild(h('p', 'card-text story-q', T.question));
     node.appendChild(card);
     node.appendChild(button('btn-main', 'Узнаю дальше', 'chev', function () { Sound.play('tap'); closeSheet(); }));
-    openSheet(node, function () { renderHome(); if (gift) showGift(gift); }, 'sheet-story');
+    openSheet(node, function () { renderHome({ fresh: 'twist' }); if (gift) showGift(gift); }, 'sheet-story');
   }
 
   /* ---------------- поделиться ---------------- */
@@ -2515,6 +2644,17 @@
     s3.appendChild(grid);
     page.appendChild(s3);
 
+    // Уютные вещи открытых комнат: купить — окно вещи в её комнате.
+    var cozy = [];
+    St.openRooms(C, S).forEach(function (rid) { cozy = cozy.concat(St.roomDecor(C, rid)); });
+    if (cozy.length) {
+      var s4 = section('Уют', 'cozy_lantern');
+      var g4 = h('div', 'deco-grid');
+      cozy.forEach(function (id) { g4.appendChild(cozyCard(id)); });
+      s4.appendChild(g4);
+      page.appendChild(s4);
+    }
+
     var s1 = section('Карандаши', 'pencil');
     s1.appendChild(pencilOffers(null));
     page.appendChild(s1);
@@ -2558,6 +2698,25 @@
     b.addEventListener('click', function () { buySku(sku); });
     c.appendChild(b);
     return c;
+  }
+
+  function cozyCard(id) {
+    var d = C.decor[id];
+    var owned = S.decor.indexOf(id) !== -1, open = St.decorOpen(C, S, d.room);
+    var b = h('button', 'deco deco-cozy' + (owned ? ' is-owned' : '') + (open ? '' : ' is-locked') + (!owned && open && S.coins >= d.price ? ' is-afford' : ''));
+    b.type = 'button';
+    b.setAttribute('data-decor', id);
+    b.appendChild(pic(d.sprite, 'deco-art'));
+    b.appendChild(h('span', 'deco-title', d.title));
+    if (owned) b.appendChild(h('span', 'deco-state', 'Стоит'));
+    else if (!open) { var l = h('span', 'price price-lock'); l.appendChild(icon('lock')); b.appendChild(l); }
+    else b.appendChild(priceTag('coins', d.price));
+    b.addEventListener('click', function () {
+      if (!open) { refuse(b, [b.querySelector('.price-lock')]); return; }
+      goRoom(d.room);
+      if (!owned) openDecorSheet(id);
+    });
+    return b;
   }
 
   function decoCard(oid, v) {

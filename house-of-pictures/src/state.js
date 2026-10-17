@@ -64,10 +64,14 @@
       ads: { day: null, n: 0 },
       rng: seedRng(),
       hints: {},
+      lines: {},
       glows: [],
       room_gifts: [],
       play_s: 0,
+      glow_at: 0,
+      gold: null,
       secrets: [],
+      decor: [],
       event_start: null,
       settings: { music: true, sound: true, vibration: true, reduced_motion: false },
       log: []
@@ -86,9 +90,9 @@
     var base = emptyState();
     if (!isObj(s.settings)) s.settings = base.settings;
     ['completed_puzzles', 'applied_stages', 'completed_rooms', 'seen_variant_choice', 'visits', 'log',
-      'owned_variants', 'owned_skus', 'granted', 'orders', 'glows', 'secrets', 'room_gifts']
+      'owned_variants', 'owned_skus', 'granted', 'orders', 'glows', 'secrets', 'room_gifts', 'decor']
       .forEach(function (key) { if (!Array.isArray(s[key])) s[key] = []; });
-    ['object_variants', 'drafts', 'story_flags', 'hints'].forEach(function (key) { if (!isObj(s[key])) s[key] = {}; });
+    ['object_variants', 'drafts', 'story_flags', 'hints', 'lines'].forEach(function (key) { if (!isObj(s[key])) s[key] = {}; });
     ['stamps', 'daily', 'ads'].forEach(function (key) { if (!isObj(s[key])) s[key] = base[key]; });
     if (!Array.isArray(s.stamps.days)) s.stamps.days = [];
     s.stamps.card = s.stamps.card | 0;
@@ -102,7 +106,12 @@
     if (typeof s.room_choice_pending === 'string') add(s.room_gifts, s.room_choice_pending);
     delete s.room_choice_pending;
     s.room_gifts = s.room_gifts.filter(function (rid) { return typeof rid === 'string'; });
+    s.decor = s.decor.filter(function (id) { return typeof id === 'string'; });
     s.play_s = Math.max(0, Math.round(+s.play_s || 0));
+    // Отсчёт до следующего «Сияния»: старый сейв начинает его с нынешнего времени игры.
+    if (typeof raw.glow_at !== 'number' || !isFinite(raw.glow_at)) s.glow_at = s.play_s;
+    s.glow_at = Math.max(0, Math.min(Math.round(s.glow_at), s.play_s));
+    if (!isObj(s.gold) || typeof s.gold.pid !== 'string') s.gold = null;
     if (typeof s.event_start !== 'string') s.event_start = null;
     s.schema_version = SCHEMA_VERSION;
     if (C && from < 2) backfill(C, s);
@@ -114,6 +123,23 @@
   // стало меньше (чайная — 2 вместо 3). Отмечаем их так же, как при победе.
   function healProgress(C, s) {
     var day = today(), E = C.economy;
+    // Картинки вещи сменились (чайная, 008): вещь, за которую уже была награда
+    // или решена снятая картинка, остаётся готовой — новые картинки без монет.
+    var retired = C.retired_puzzles || {}, touched = {};
+    s.completed_puzzles.forEach(function (pid) { if (retired[pid]) touched[retired[pid]] = true; });
+    Object.keys(C.objects).forEach(function (oid) {
+      if (isObjectRestored(C, s, oid) || !(touched[oid] || has(s.granted, 'o:' + oid) || has(s.seen_variant_choice, oid))) return;
+      C.objects[oid].puzzles.forEach(function (pid) {
+        add(s.completed_puzzles, pid);
+        add(s.applied_stages, pid);
+        add(s.granted, 'p:' + pid);
+        delete s.drafts[pid];
+      });
+      add(s.granted, 'o:' + oid);
+      logEvent(s, 'object_healed', { object_id: oid });
+    });
+    Object.keys(s.drafts).forEach(function (pid) { if (!C.puzzles[pid]) delete s.drafts[pid]; });
+    Object.keys(s.lines).forEach(function (pid) { if (!C.puzzles[pid] || has(s.completed_puzzles, pid)) delete s.lines[pid]; });
     Object.keys(C.objects).forEach(function (oid) {
       if (isObjectRestored(C, s, oid) && !s.object_variants[oid]) s.object_variants[oid] = C.objects[oid].variants[0].id;
     });
@@ -291,9 +317,13 @@
   function area(p) { return p.rows.length * p.rows[0].length; }
 
   // Монеты за поле растут с его площадью (5×5 — 10, 10×10 — 40).
+  // Монеты за поле: по площади, дальше комната — щедрее (economy.room_coins).
   function puzzleCoins(C, pid) {
-    var E = C.economy;
-    return byArea(E.coins_by_area, area(C.puzzles[pid]), E.coins_per_puzzle);
+    var E = C.economy, p = C.puzzles[pid];
+    var n = byArea(E.coins_by_area, area(p), E.coins_per_puzzle);
+    var o = p && p.object && C.objects[p.object], R = o && E.room_coins && E.room_coins[o.room];
+    if (!R) return n;
+    return Math.max(R.min, Math.min(R.max, Math.round(n * R.mult / 5) * 5));
   }
 
   function fnv(str) {
@@ -331,6 +361,70 @@
     return got;
   }
 
+  // Монетка за закрытую линию на полях от min_side: каждая строка и столбец —
+  // один раз (бит r — строка, H + c — столбец), стёртая и снова закрытая не платит.
+  function lineCoinsOn(C, pid) {
+    var L = C.economy.line_coins, p = C.puzzles[pid];
+    return !!(L && p && p.difficulty !== 'tutorial' && Math.max(p.rows.length, p.rows[0].length) >= L.min_side);
+  }
+
+  function closeLine(C, s, pid, kind, idx) {
+    if (!lineCoinsOn(C, pid) || has(s.completed_puzzles, pid)) return 0;
+    var bit = 1 << (kind === 'row' ? idx : C.puzzles[pid].rows.length + idx), m = s.lines[pid] | 0;
+    if (m & bit) return 0;
+    s.lines[pid] = m | bit;
+    s.coins += C.economy.line_coins.coins;
+    touch(s);
+    return C.economy.line_coins.coins;
+  }
+
+  // Монеты, уже полученные на поле: найденные монетки и закрытые линии.
+  function fieldEarned(C, s, pid) {
+    var n = 0, m = s.lines[pid] | 0, F = C.economy.field_coins, L = C.economy.line_coins;
+    fieldCoins(C, pid).forEach(function (x, i) { if (has(s.granted, 'f:' + pid + ':' + i)) n += F.coins; });
+    for (; m; m &= m - 1) n += L.coins;
+    return n;
+  }
+
+  // Страховка «Сияния» (не реже раза в 4 минуты игры): если с прошлого прошло
+  // field_after_s, в ещё не закрашенной клетке поля (не с монеткой) прячется золотая.
+  // Закрасил — монеты, карандаш и сияние на вещи. Ушёл с поля — золотая переедет на следующее.
+  function markGlow(s) { s.glow_at = s.play_s || 0; }
+  function sinceGlow(s) { return Math.max(0, (s.play_s || 0) - (s.glow_at || 0)); }
+
+  function placeGold(C, s, pid, board) {
+    var G = C.economy.glow_pity, p = C.puzzles[pid];
+    if (!G || !p || p.difficulty === 'tutorial' || has(s.completed_puzzles, pid)) return null;
+    if (s.gold && s.gold.pid === pid) return s.gold;
+    if (sinceGlow(s) < G.field_after_s) return null;
+    var W = p.rows[0].length, coins = fieldCoins(C, pid), free = [];
+    p.rows.forEach(function (row, r) {
+      for (var c = 0; c < W; c++) {
+        if (row[c] === '#' && !(board && board[r] && board[r][c] === 1) && coins.indexOf(r * W + c) === -1) free.push(r * W + c);
+      }
+    });
+    if (!free.length) return null;
+    var cell = free[Math.floor(rand(s) * free.length)];
+    s.gold = { pid: pid, r: (cell / W) | 0, c: cell % W };
+    touch(s);
+    return s.gold;
+  }
+
+  // Золотая клетка закрашена (board = null — при победе): награда один раз.
+  function collectGold(C, s, pid, board) {
+    var g = s.gold, G = C.economy.glow_pity;
+    if (!g || !G || g.pid !== pid || board && !(board[g.r] && board[g.r][g.c] === 1)) return null;
+    s.gold = null;
+    s.coins += G.coins;
+    s.pencils += G.pencils;
+    var oid = C.puzzles[pid].object || null;
+    if (oid) add(s.glows, oid);
+    markGlow(s);
+    logEvent(s, 'gold_cell', { puzzle_id: pid, object_id: oid, coins: G.coins, pencils: G.pencils });
+    touch(s);
+    return { r: g.r, c: g.c, coins: G.coins, pencils: G.pencils, object_id: oid };
+  }
+
   // Бесплатные подсказки: free_hints на поле, обучение — без счёта.
   function freeHintsLeft(C, s, pid) {
     var n = C.economy.free_hints, p = C.puzzles[pid];
@@ -360,11 +454,13 @@
     if (!K || has(s.granted, key)) return null;
     s.granted.push(key);
     var roll = rand(s), out = { object_id: oid, kind: 'coins', coins: 0, pencils: 0 };
-    var guaranteed = !has(s.granted, 'cr:' + rid) && restoredCount(C, s, rid) >= K.rare_by;
+    var G = C.economy.glow_pity, pity = !!G && sinceGlow(s) >= G.chest_after_s;
+    var guaranteed = pity || !has(s.granted, 'cr:' + rid) && restoredCount(C, s, rid) >= K.rare_by;
     if (guaranteed || roll < K.rare) {
       out.kind = 'rare';
       out.coins = K.rare_coins;
       add(s.glows, oid);
+      markGlow(s);
       add(s.granted, 'cr:' + rid);
     } else if (roll < K.rare + K.pencil) {
       out.kind = 'pencil';
@@ -440,6 +536,42 @@
     return best && s.coins >= best.price_coins ? { variant: best.id, object_id: findVariant(C, best.id).object, price: best.price_coins } : null;
   }
 
+  /* ---------- уютные покупки ---------- */
+
+  function roomDecor(C, rid) {
+    return Object.keys(C.decor || {}).filter(function (id) { return C.decor[id].room === rid; });
+  }
+
+  // Места уютных вещей видны с decor_after готовых вещей комнаты.
+  function decorOpen(C, s, rid) {
+    return !!C.decor && isRoomUnlocked(C, s, rid) && restoredCount(C, s, rid) >= (C.rooms[rid].decor_after | 0);
+  }
+
+  // Самая дешёвая не купленная уютная вещь комнаты, на которую уже хватает монет.
+  function affordableDecor(C, s, rid) {
+    if (!decorOpen(C, s, rid)) return null;
+    var best = null;
+    roomDecor(C, rid).forEach(function (id) {
+      var d = C.decor[id];
+      if (!has(s.decor, id) && s.coins >= d.price && (!best || d.price < C.decor[best].price)) best = id;
+    });
+    return best;
+  }
+
+  // Уютная вещь за монеты: сразу встаёт в комнату.
+  function buyDecor(C, s, id) {
+    var d = (C.decor || {})[id];
+    if (!d) return { ok: false, reason: 'unknown' };
+    if (has(s.decor, id)) return { ok: false, reason: 'owned' };
+    if (!decorOpen(C, s, d.room)) return { ok: false, reason: 'locked' };
+    if (s.coins < d.price) return { ok: false, reason: 'coins', need: d.price - s.coins };
+    s.coins -= d.price;
+    s.decor.push(id);
+    logEvent(s, 'buy_decor', { decor_id: id, room_id: d.room, coins: d.price });
+    touch(s);
+    return { ok: true };
+  }
+
   /* ---------- черновики и победа ---------- */
 
   function saveDraft(s, pid, board) {
@@ -489,13 +621,19 @@
     var objectDone = oid ? isObjectRestored(C, s, oid) : false;
     if (objectDone && !s.object_variants[oid]) s.object_variants[oid] = C.objects[oid].variants[0].id;
     var roomDone = !!rid && !wasRoomComplete && isRoomComplete(C, s, rid);
-    if (roomDone) add(s.completed_rooms, rid);
+    if (roomDone) { add(s.completed_rooms, rid); markGlow(s); }
 
     rewards = rewards.concat(grant(s, 'p:' + pid, puzzleCoins(C, pid), 0));
     // Не найденные по ходу монетки поля (подсказка, карандаш) — при победе.
     var rest = collectFieldCoins(C, s, pid, null).reduce(function (n, f) { return n + f.n; }, 0);
     if (rest) rewards.push({ type: 'coins', n: rest, key: 'f:' + pid });
+    // Золотая клетка, закрашенная последней или подсказкой, — тоже при победе.
+    var gold = collectGold(C, s, pid, null);
+    if (gold) rewards.push({ type: 'coins', n: gold.coins, key: 'g:' + pid }, { type: 'pencils', n: gold.pencils, key: 'g:' + pid });
     delete s.hints[pid];
+    var lineBits = s.lines[pid] | 0, lines = 0;
+    for (; lineBits; lineBits &= lineBits - 1) lines++;
+    delete s.lines[pid];
     if (p.difficulty === 'tutorial') rewards = rewards.concat(grant(s, 't:tutorial', 0, E.tutorial_pencils));
     rewards = rewards.concat(grant(s, 'd:' + day, E.coins_daily_first, 0));
     var chest = null;
@@ -517,11 +655,11 @@
       if (eventDone) logEvent(s, 'event_complete', { id: C.event.id, day: day });
     }
 
-    logEvent(s, 'puzzle_complete', { puzzle_id: pid, object_id: oid, object_done: objectDone, room_done: roomDone, day: day });
+    logEvent(s, 'puzzle_complete', { puzzle_id: pid, object_id: oid, object_done: objectDone, room_done: roomDone, day: day, lines: lines });
     touch(s);
     return { duplicate: false, object_done: objectDone, room_done: roomDone, object_id: oid, room_id: rid,
       stage: oid ? objectStage(C, s, oid) : 0, rewards: rewards, chest: chest,
-      room_choice: roomDone && has(s.room_gifts, rid), event_done: eventDone };
+      room_choice: roomDone && has(s.room_gifts, rid), event_done: eventDone, gold: gold };
   }
 
   function chooseVariant(C, s, oid, vid) {
@@ -885,6 +1023,7 @@
     var o = JSON.parse(JSON.stringify(s));
     delete o.log;
     delete o.drafts;
+    delete o.lines;
     return o;
   }
 
@@ -903,6 +1042,7 @@
     var s = migrate(JSON.parse(JSON.stringify(remote)), C);
     if (!s) return null;
     s.drafts = local.drafts;
+    s.lines = local.lines;
     s.log = local.log;
     s.settings = local.settings;
     return s;
@@ -918,8 +1058,11 @@
     canStartObject: canStartObject, activeDraftObjects: activeDraftObjects,
     findVariant: findVariant, isVariantOwned: isVariantOwned,
     rand: rand, puzzleCoins: puzzleCoins, fieldCoins: fieldCoins, collectFieldCoins: collectFieldCoins,
+    lineCoinsOn: lineCoinsOn, closeLine: closeLine, fieldEarned: fieldEarned,
+    markGlow: markGlow, sinceGlow: sinceGlow, placeGold: placeGold, collectGold: collectGold,
     freeHintsLeft: freeHintsLeft, useFreeHint: useFreeHint, openChest: openChest,
     roomChoices: roomChoices, pickRoomReward: pickRoomReward, pendingGift: pendingGift, affordableVariant: affordableVariant,
+    roomDecor: roomDecor, decorOpen: decorOpen, affordableDecor: affordableDecor, buyDecor: buyDecor,
     saveDraft: saveDraft, completePuzzle: completePuzzle, chooseVariant: chooseVariant,
     closeVariantChoice: closeVariantChoice, buyVariant: buyVariant, buyPencil: buyPencil, usePencil: usePencil,
     canOfferSku: canOfferSku, applyOrder: applyOrder, adsLeft: adsLeft, rewardedGrant: rewardedGrant,

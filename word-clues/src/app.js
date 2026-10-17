@@ -1345,7 +1345,11 @@
     $('btn-settings').addEventListener('click', function () { window.Sound.play('tap'); openSettings(); });
     $('btn-intro-go').addEventListener('click', function () { window.Sound.play('tap'); beginStory(introStory); });
     $('btn-intro-home').addEventListener('click', showHome);
-    $('btn-back').addEventListener('click', function () { S.flush(); showHome(); });
+    $('btn-back').addEventListener('click', function () {
+      var c = S.cur();   // уход с поля до развязки: в Метрике level_quit
+      if (c) A.event('story_leave', { story_id: c.story_id, solved: S.foundCount() });
+      S.flush(); showHome();
+    });
     $('clue-prev').addEventListener('click', function () { stepClue(-1); });
     $('clue-next').addEventListener('click', function () { stepClue(1); });
     $('clue-card').addEventListener('click', function (e) {

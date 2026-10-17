@@ -14,6 +14,8 @@
 
   var ICONS = {
     back: '<path d="M15 5l-7 7 7 7"/>',
+    music: '<path d="M9 18V5l11-2v13"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="17.5" cy="16" r="2.5"/>',
+    nomusic: '<path d="M9 18V5l11-2v13"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="17.5" cy="16" r="2.5"/><path d="M3 3l18 18"/>',
     sound: '<path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/>',
     mute: '<path d="M11 5 6 9H3v6h3l5 4z"/><path d="M16 9l5 6M21 9l-5 6"/>',
     gear: '<path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/>',
@@ -26,6 +28,7 @@
     star: '<path d="M12 4l2.4 5 5.4.6-4 3.7 1.1 5.3L12 16l-4.9 2.6 1.1-5.3-4-3.7 5.4-.6z"/>',
     bulb: '<path d="M9 17h6M10 20h4"/><path d="M12 4a5 5 0 0 0-3 9c.6.5 1 1.3 1 2h4c0-.7.4-1.5 1-2a5 5 0 0 0-3-9z"/>',
     check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+    share: '<circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.2 10.8l7.6-3.6M8.2 13.2l7.6 3.6"/>',
     gift: '<rect x="4" y="10" width="16" height="10" rx="1"/><path d="M3 7h18v3H3zM12 7v13M12 7c-2-3-5-3-5-1s3 1 5 1c2 0 5 1 5-1s-3-2-5 1"/>',
     lamp: '<path d="M9 3h6l1 3H8zM8 6h8l-1 8H9zM12 14v7M9 21h6"/>',
     chat: '<path d="M5 5h14a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1h-8l-4 3.5V16H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z"/><path d="M8 9.5h8M8 12.5h5"/>',
@@ -45,19 +48,33 @@
   var missing = {};
   function art(el, name, emoji) {
     el.innerHTML = '';
-    el.classList.remove('has-img');
+    el.classList.remove('has-img', 'art-wait');
     var ic = document.createElement('span');
     ic.className = 'art-icon'; ic.textContent = emoji || '';
     el.appendChild(ic);
     // В сборке tools/build.py кладёт список готовых картинок (имя → хеш): лишних запросов нет, кэш сбрасывается по хешу.
     var list = window.G1F_ART;
     if (!name || missing[name] || (list && !list[name])) return;
+    // пока грузится картинка — пустая бумажная плашка, а значок-эмодзи только если картинки нет (план эксперта №5, п. 4.2)
+    el.classList.add('art-wait');
     var img = new Image();
     img.alt = ''; img.decoding = 'async'; img.draggable = false;
-    img.onload = function () { el.classList.add('has-img'); };
-    img.onerror = function () { missing[name] = true; img.remove(); };
-    img.src = 'assets/art/' + name + '.webp' + (list ? '?v=' + list[name] : '');
+    img.onload = function () { el.classList.add('has-img'); el.classList.remove('art-wait'); };
+    img.onerror = function () { missing[name] = true; img.remove(); el.classList.remove('art-wait'); };
+    img.src = artUrl(name);
     el.appendChild(img);
+  }
+  function artUrl(name) { var list = window.G1F_ART; return 'assets/art/' + name + '.webp' + (list ? '?v=' + list[name] : ''); }
+  // картинки следующей истории — заранее, пока открыт итог
+  var preloaded = {};
+  function preloadStory(s) {
+    if (!s) return;
+    var list = window.G1F_ART;
+    [s.scene, s.keepsake_img].concat(s.clues.map(function (c) { return c.img; })).forEach(function (n) {
+      if (!n || preloaded[n] || missing[n] || (list && !list[n])) return;
+      preloaded[n] = new Image();
+      preloaded[n].src = artUrl(n);
+    });
   }
   function initStaticArt() {
     document.querySelectorAll('.art[data-art]').forEach(function (el) { art(el, el.dataset.art, el.dataset.icon); });
@@ -70,6 +87,7 @@
     document.querySelectorAll('.screen').forEach(function (s) { s.hidden = s.id !== id; });
     screen = id;
     document.body.dataset.screen = id;
+    window.Sound.duck(id === 'scr-result');
     var sc = $(id).querySelector('[class$="-scroll"]');
     if (sc) sc.scrollTop = 0;
     if (id === 'scr-field') requestAnimationFrame(function () { window.Board.fit(); });
@@ -145,24 +163,32 @@
     document.body.classList.toggle('rm', !!st.reduced_motion || sysRm);
     document.body.classList.toggle('lt', !!st.large_text);
     window.Sound.setEnabled(st.sound);
-    $('btn-sound').innerHTML = icon(st.sound ? 'sound' : 'mute');
-    $('btn-sound').setAttribute('aria-checked', !!st.sound);
+    window.Sound.setMusic(st.music);
+    ['sound', 'music'].forEach(function (k) {
+      $('btn-' + k).innerHTML = tileIcon(k, st[k]);
+      $('btn-' + k).setAttribute('aria-checked', !!st[k]);
+    });
     if (screen === 'scr-field') requestAnimationFrame(function () { sizeClueCard(); window.Board.fit(); });
   }
   window.addEventListener('resize', function () { if (screen === 'scr-field') { sizeClueCard(); window.Board.fit(); } });
   function toggleRow(key, title, sub) {
     var on = !!S.data.settings[key];
-    return '<button class="opt toggle" data-set="' + key + '" role="switch" aria-checked="' + on + '"><span><b>' + title + '</b><span class="muted">' + sub + '</span></span><span class="sw"></span></button>';
+    return '<button class="opt toggle" data-set="' + key + '" role="switch" aria-checked="' + on + '"><span><b>' + title + '</b>' + (sub ? '<span class="muted">' + sub + '</span>' : '') + '</span><span class="sw"></span></button>';
+  }
+  var TILE_ICONS = { sound: ['sound', 'mute'], music: ['music', 'nomusic'] };
+  function tileIcon(k, on) { return icon(TILE_ICONS[k][on ? 0 : 1]); }
+  function tile(k, title) {
+    var on = !!S.data.settings[k];
+    return '<button class="tile-btn" data-set="' + k + '" role="switch" aria-checked="' + on + '">' + tileIcon(k, on) + '<span>' + title + '</span></button>';
   }
   function openSettings() {
     var build = (document.querySelector('meta[name="g1f-build"]') || {}).content || 'dev';
     var html = '<h3>Настройки</h3>' +
-      '<div class="tile-row"><button class="tile-btn" data-set="sound" role="switch" aria-checked="' + !!S.data.settings.sound + '">' +
-        icon(S.data.settings.sound ? 'sound' : 'mute') + '<span>Звук</span></button></div>' +
-      toggleRow('reduced_motion', 'Меньше движения', 'Без волн и покачиваний') +
-      toggleRow('large_text', 'Крупный текст', 'Улики и кнопки крупнее') +
+      '<div class="tile-row">' + tile('sound', 'Звук') + tile('music', 'Музыка') + '</div>' +
+      toggleRow('reduced_motion', 'Меньше движения', '') +
+      toggleRow('large_text', 'Крупный текст', '') +
       (P.params.has('journal') ? '<button class="opt" id="opt-journal"><span><b>Журнал событий</b><span class="muted">Скачать JSON для разбора плейтеста</span></span></button>' : '') +
-      '<button class="opt danger" id="opt-reset"><span><b>Начать заново</b><span class="muted">Сотрёт истории, атлас и лупы</span></span></button>' +
+      '<button class="opt danger" id="opt-reset"><span><b>Начать заново</b><span class="muted">Сотрёт весь прогресс</span></span></button>' +
       '<p class="muted small">Сборка ' + esc(build) + ' · ' + esc(C.content_version) + '</p>' +
       '<button class="btn-link" data-close>Закрыть</button>';
     openSheet('settings', html, function (el) {
@@ -171,7 +197,7 @@
           var k = b.dataset.set, v = !S.data.settings[k];
           S.setSetting(k, v);
           b.setAttribute('aria-checked', v);
-          if (k === 'sound') b.querySelector('svg').outerHTML = icon(v ? 'sound' : 'mute');
+          if (TILE_ICONS[k]) b.querySelector('svg').outerHTML = tileIcon(k, v);
           applySettings();
           window.Sound.play('tap');
         });
@@ -248,7 +274,9 @@
     var fire = x.streak ? '<span class="streak" aria-label="Дней подряд: ' + x.streak + '">🔥 ' + x.streak + '</span>' : '';
     var html = '<div class="daily-head"><b>Улика дня</b>' + fire + '</div><p class="daily-clue">' + esc(x.clue) + '</p>';
     if (x.done) {
-      html += '<p class="daily-done">' + icon('check') + ' <b>' + esc(x.answer) + '</b> · завтра — новая улика</p>';
+      html += '<div class="daily-share"><span class="daily-marks" aria-label="Попыток: ' + (x.misses + 1) + '">' + dailyMarks(x) + '</span>' +
+        '<button class="chip" id="btn-daily-share">' + icon('share') + 'Поделиться</button></div>' +
+        '<p class="daily-done">' + icon('check') + ' <b>' + esc(x.answer) + '</b> · завтра новая</p>';
     } else {
       var p = dailyPick.picks, slots = '', tiles = '';
       for (var i = 0; i < x.answer.length; i++) {
@@ -264,7 +292,23 @@
     el.innerHTML = html;
     el.hidden = false;
   }
+  // Карточка без ответа, как строка кружков Strands: промахи — ⬜, разгадка — 🟩
+  function dailyMarks(x) { return new Array(Math.min(x.misses, 8) + 1).join('⬜') + '🟩'; }
+  function shareDaily() {
+    var x = S.daily();
+    if (!x || !x.done || !C.share || !C.share.daily) return;
+    var dm = x.day.split('-');
+    var text = C.share.daily.replace('{date}', dm[2] + '.' + dm[1]).replace('{fire}', x.streak ? '🔥 ' + x.streak : '')
+      .replace('{marks}', dailyMarks(x)).replace('{clue}', x.clue.replace(/\n/g, ' ')).replace('{n}', String(x.answer.length));
+    window.Sound.play('tap');
+    A.event('share_open', { from: 'daily', day: x.day, streak: x.streak, tries: x.misses + 1 });
+    P.share(text).then(function (how) {
+      A.event('share_done', { from: 'daily', method: how || 'cancel' });
+      if (how === 'copy') toast('Скопировано — отправьте другу');
+    });
+  }
   function onDailyClick(e) {
+    if (e.target.closest('#btn-daily-share')) { shareDaily(); return; }
     var x = S.daily();
     if (!x || x.done) return;
     var t = e.target.closest('[data-dt],[data-ds]');
@@ -292,7 +336,7 @@
     renderDiary($('home-diary'), { back: visitInfo.back });
     pulse($('home-daily'));
     var gift = '+' + nLoupes(r.loupes) + (r.diary ? ' · дневник: ' + giftText(r.diary) : '');
-    toast('Улика дня разгадана! ' + gift + (r.streak > 1 ? ' · 🔥 ' + r.streak + ' дня подряд' : ''));
+    toast('Разгадано! ' + gift + (r.streak > 1 ? ' · 🔥 ' + r.streak : ''));
   }
 
   /* ---------- напоминание при возвращении (п. 2.3): одна картинка, что узнали, висящий вопрос ---------- */
@@ -829,11 +873,11 @@
         '<b>' + title + '</b><span class="tag">' + esc(tag) + '</span><span class="muted sub">' + sub + '</span></button>';
     }
     var html = '<button class="sheet-x" data-close aria-label="Вернуться к улике">×</button><h3>Подсказка</h3><p class="sheet-clue">' + esc(c.clue) + '</p><div class="hint-grid">' +
-      opt('extra', 'Ещё улика', 'Описание конкретнее, без ответа') +
-      opt('start', 'Начало', 'Первая буква и её клетка') +
-      opt('path', 'Показать путь', 'Ответ и вся цепочка на поле') +
-      opt('explain', 'Разобрать вместе', left > 0 && !h.explain ? 'Ответ и путь бесплатно — после ещё ' + mmss(left) + ' раздумий над уликой' : 'Ответ и путь — бесплатно', 'explain') + '</div>' +
-      '<p class="muted small hint-note">' + icon('loupe') + ' ' + loupes + ' · без «Начала», «Пути» и «Разбора» — +5 ' + icon('star') + ' и шанс золотой марки</p>' +
+      opt('extra', 'Ещё улика', 'Конкретнее') +
+      opt('start', 'Начало', 'Первая буква') +
+      opt('path', 'Показать путь', 'Ответ на поле') +
+      opt('explain', 'Разобрать вместе', 'Ответ на поле', 'explain') + '</div>' +
+      '<p class="muted small hint-note">' + icon('loupe') + ' ' + loupes + ' · без подсказок +5 ' + icon('star') + '</p>' +
       '<button class="btn-link" data-close>Вернуться к улике</button>';
     openSheet('hints', html, function (el) {
       el.querySelectorAll('[data-hint]').forEach(function (b) {
@@ -906,9 +950,10 @@
   function showResult(s, reward) {
     resultStory = s;
     art($('result-bg'), s.scene, '');
+    preloadStory(S.stories[s.index + 1]);
     $('result-scene').dataset.story = s.id;
     renderSceneItems($('result-items'), s, function () { return true; }, true);
-    $('result-scene').querySelectorAll('.scene-lamp').forEach(function (x) { x.remove(); });
+    $('result-scene').querySelectorAll('.scene-lamp, .lamp-cost').forEach(function (x) { x.remove(); });
     $('result-scene').classList.remove('lamp-flash');
     $('result-title').textContent = s.title;
     $('result-ending').textContent = s.ending;
@@ -956,7 +1001,7 @@
     big.appendChild(rankBar(r));
     var cards = [];
     if (r.finale) cards.push(['atlas_cover', '📔', 'Финал главы', '+' + nLoupes(r.finale.loupes) + ' · +' + nStamps(r.finale.stamps)]);
-    if (r.golden) cards.push(['golden_stamp', '🏅', 'Золотая марка!', '+1 лупа · +10 марок · всего ' + S.data.golden]);
+    if (r.golden) cards.push(['golden_stamp', '🏅', 'Золотая марка!', '+' + nStamps(S.GOLDEN.stamps) + ' · всего ' + S.data.golden]);
     if (r.parcel) cards.push(['reward_parcel', '🎁', 'Посылка хранителей', '+' + nLoupes(r.parcel.loupes) + ' · +' + nStamps(r.parcel.stamps)]);
     if (r.rank) cards.push(['', '⭐', r.rank.name, 'Новое звание · +' + nStamps(r.rank.stamps)]);
     if (r.trio && C.route_secrets[r.trio - 1]) cards.push(['map', '🧵', 'Нить маршрута ' + r.trio + '/' + C.route_secrets.length, '+1 строчка в атласе']);
@@ -1074,14 +1119,13 @@
       });
     });
   }
-  /* Фонарь у пройденного места (план эксперта №4, круг 1): хватает марок — его зажигает главная кнопка
-     итога, второе нажатие ведёт дальше. Не хватает — карточка показывает, сколько ещё нужно. */
-  var lampMain = false;
+  /* Фонарь у пройденного места: хватает марок — загорается сам в анимации итога (план эксперта №5, п. 1.3:
+     зажечь — не выбор, лишний тап убран). Не хватает — карточка показывает, сколько ещё нужно. */
+  var lampTimer = 0;
   function renderLantern(s) {
-    var b = $('btn-lantern'), nx = $('btn-next');
+    var b = $('btn-lantern');
     var lit = S.data.lanterns.indexOf(s.id) >= 0;
-    lampMain = false;
-    if (nx.dataset.text) { nx.textContent = nx.dataset.text; nx.dataset.text = ''; }
+    clearTimeout(lampTimer); lampTimer = 0;
     renderGoal();
     if (lit || S.data.completed_story_ids.indexOf(s.id) < 0) { b.hidden = true; return; }
     var can = S.canLight(s.id), cost = S.lanternCost();
@@ -1089,10 +1133,7 @@
     b.onclick = function () { lightLantern(s, b); };
     if (can) {
       b.hidden = true;
-      lampMain = true;
-      nx.dataset.text = nx.textContent;
-      nx.innerHTML = '<span class="nw">' + icon('lamp') + ' Зажечь фонарь · ' + cost + ' ' + icon('stamp') + '</span>';
-      nx.setAttribute('aria-label', 'Зажечь фонарь: ' + s.place + ', ' + cost + ' марок');
+      lampTimer = setTimeout(autoLamp, 1100);
       return;
     }
     b.hidden = false;
@@ -1110,6 +1151,11 @@
     g.innerHTML = icon('lamp') + '<b>' + nf.have + ' / ' + nf.lamps + '</b><span class="bar"><i style="width:' + pct + '%"></i></span><span class="rank-name">' + esc(name) + '</span>';
     g.setAttribute('aria-label', 'Фонари: ' + nf.have + ' из ' + nf.lamps + ' до награды «' + name + '»');
   }
+  function autoLamp() {
+    lampTimer = 0;
+    var s = resultStory;
+    if (s && screen === 'scr-result' && S.canLight(s.id)) return lightLantern(s, null, 'result_auto');
+  }
   function lightLantern(s, b, from) {
     var r = S.light(s.id);
     if (!r) return;
@@ -1126,12 +1172,17 @@
       art(lamp, 'street_lamp', '🏮');
       sc.appendChild(lamp);
       sc.classList.remove('lamp-flash'); void sc.offsetWidth; sc.classList.add('lamp-flash');
-      if (lampMain) { lampMain = false; var nx = $('btn-next'); nx.textContent = nx.dataset.text; nx.dataset.text = ''; nx.removeAttribute('aria-label'); }
+      var cost = document.createElement('span');
+      cost.className = 'lamp-cost';
+      cost.innerHTML = '−' + r.cost + ' ' + icon('stamp');
+      sc.appendChild(cost);
+      setTimeout(function () { cost.remove(); }, 1600);
       renderGoal();
       pulse($('result-goal'));
     }
     if (r.frame) frameGift(r.frame);
     if (screen === 'scr-town') renderTown();
+    return r;
   }
   // Рамка атласа за фонари: карточка на итоге (или подпись в городке), рамка уже надета.
   function frameGift(id) {
@@ -1175,7 +1226,8 @@
       var on = S.data.lanterns.indexOf(st.id) >= 0, done = S.data.completed_story_ids.indexOf(st.id) >= 0;
       var row = document.createElement('div');
       row.className = 'town-row' + (on ? ' on' : '');
-      var right = on ? '<span class="tag">' + icon('lamp') + 'горит</span>' : !done ? '<span class="muted">после истории</span>' :
+      // значки вместо слов (план эксперта №5, п. 20): горит — фонарь, ещё не разгадано — замок
+      var right = on ? '<span class="tag" aria-label="Горит">' + icon('lamp') + '</span>' : !done ? '<span class="muted" aria-label="После истории">' + icon('lock') + '</span>' :
         '<button class="btn-small" data-light="' + st.id + '"' + (S.canLight(st.id) ? '' : ' disabled') + '>' + S.lanternCost() + ' ' + icon('stamp') + '</button>';
       row.innerHTML = '<b>' + esc(st.place) + '</b>' + right;
       list.appendChild(row);
@@ -1187,7 +1239,7 @@
 
   function onNext() {
     var s = resultStory;
-    if (lampMain && s && screen === 'scr-result') { lightLantern(s, null, 'result_main'); return; }
+    if (lampTimer) { clearTimeout(lampTimer); var lr = autoLamp(); if (lr && lr.frame) return; } // рамку не пропустить
     var end = !s || S.isChapterEnd(s), next = s && !end ? S.stories[s.index + 1] : null;
     A.event('story_next_clicked', { story_id: s ? s.id : null, next_story_id: next ? next.id : null });
     window.Sound.play('tap');
@@ -1354,9 +1406,11 @@
     $('btn-continue').addEventListener('click', onContinue);
     $('btn-atlas').addEventListener('click', function () { window.Sound.play('tap'); showAtlas('home'); });
     $('btn-settings').addEventListener('click', function () { window.Sound.play('tap'); openSettings(); });
-    $('btn-sound').addEventListener('click', function () {
-      S.setSetting('sound', !S.data.settings.sound); applySettings(); window.Sound.play('tap');
-      A.event('setting_changed', { key: 'sound', value: S.data.settings.sound, via: 'home' });
+    ['sound', 'music'].forEach(function (k) {
+      $('btn-' + k).addEventListener('click', function () {
+        S.setSetting(k, !S.data.settings[k]); applySettings(); window.Sound.play('tap');
+        A.event('setting_changed', { key: k, value: S.data.settings[k], via: 'home' });
+      });
     });
     $('btn-ending').addEventListener('click', function () {
       var open = $('result-ending').hidden; $('result-ending').hidden = !open;

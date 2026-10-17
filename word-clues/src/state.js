@@ -14,7 +14,7 @@
      а не копят; марки приходят чаще и тратятся на фонари и оформление атласа (ТЗ §8.2). */
   var BONUS_STAMPS = 2, BONUS_FULL = 25;           // бонусное слово — только марки; после 25-го в истории — по 1
   var NO_HINT_XP = 5;                              // история без «Начала», «Пути» и «Разбора»
-  var GOLDEN_CHANCE = 0.2, GOLDEN = { loupes: 1, stamps: 10 }; // золотая марка: изредка за историю без подсказок
+  var GOLDEN_CHANCE = 0.2, GOLDEN = { loupes: 0, stamps: 20 }; // золотая марка: изредка за историю без подсказок; только марки (круг 10: лупы в дефицит)
   var GOLDEN_AT = [4, 8];                          // …и всегда на 5-й и 9-й истории главы (круг 5: награда растёт к концу главы)
   var GUESS = { loupes: 1, stamps: 15 };           // тайное слово угадано до последней буквы
   var PARCELS = { 4: { loupes: 1, stamps: 40 }, 12: { loupes: 1, stamps: 40 } }; // посылка хранителей: 5-я и 13-я истории
@@ -23,7 +23,7 @@
   /* Фонарь дорожает ступенькой (план эксперта №4, круг 1): 30, 35, 40… — марки всегда есть куда деть,
      а 8 фонарей за первые полчаса остаются по силам. */
   var LANTERN_COST = 30, LANTERN_STEP = 5;
-  var BONUS_DROP = 5;                              // каждые 5 бонусных слов — лупа (капля у значка лупы)
+  var BONUS_DROP = 10;                             // каждые 10 бонусных слов — лупа (капля у значка лупы; круг 10: было 5)
   var EXPLAIN_BROKE_MS = 45000;                    // без луп «Разобрать вместе» открывается раньше
   var TRIO = 3;                                    // каждые 3 истории — общий секрет маршрута (ТЗ §6.2)
   // Звания каждые ~40–100 опыта, 12 штук (ТЗ §8.3); за звание — марки, не лупы.
@@ -80,7 +80,7 @@
       diary: [], diary_pages: 0, last_day: null, visits: 0,
       daily: { last: null, streak: 0, best: 0, solved: 0 },
       free_demo: { start: true, path: true },
-      settings: { sound: true, reduced_motion: false, large_text: false },
+      settings: { sound: true, music: true, reduced_motion: false, large_text: false },
       updated_at: null,
     };
   }
@@ -205,13 +205,19 @@
       if (!c) return null;
       var done = d.last === today, alive = done || (!!d.last && daysBetween(d.last, today) === 1);
       return { day: today, clue: c.clue, answer: c.answer, done: done, streak: alive ? d.streak : 0, lost: !alive && d.streak > 0,
-        best: d.best, solved: d.solved, tiles: dailyTiles(c.answer, today), loupes: DAILY.loupes };
+        best: d.best, solved: d.solved, tiles: dailyTiles(c.answer, today), loupes: DAILY.loupes,
+        misses: d.miss_day === today ? d.miss || 0 : 0 };
     }
     function dailySolve(word) {
       var x = daily();
       if (!x || x.done) return { ok: false, done: !!x };
-      if (word !== x.answer) return { ok: false };
       var d = data.daily;
+      if (word !== x.answer) {
+        // промахи за сегодня — для карточки «Поделиться» (план эксперта №5, п. 2.2)
+        if (d.miss_day !== x.day) { d.miss_day = x.day; d.miss = 0; }
+        d.miss++; writeNow();
+        return { ok: false };
+      }
       d.streak = d.last && daysBetween(d.last, x.day) === 1 ? d.streak + 1 : 1;
       d.best = Math.max(d.best, d.streak); d.last = x.day; d.solved++;
       data.wallet.loupes += DAILY.loupes;
@@ -525,7 +531,7 @@
 
     load();
     return {
-      KEY: KEY, COST: COST, RANKS: RANKS, LANTERN_COST: LANTERN_COST, LANTERN_STEP: LANTERN_STEP, BONUS_DROP: BONUS_DROP, BONUS_STAMPS: BONUS_STAMPS, BONUS_FULL: BONUS_FULL, FINALE: FINALE, DIARY: DIARY,
+      KEY: KEY, COST: COST, RANKS: RANKS, LANTERN_COST: LANTERN_COST, LANTERN_STEP: LANTERN_STEP, BONUS_DROP: BONUS_DROP, GOLDEN: GOLDEN, BONUS_STAMPS: BONUS_STAMPS, BONUS_FULL: BONUS_FULL, FINALE: FINALE, DIARY: DIARY,
       chapters: chapters, chapter: chapter, chapterStories: chapterStories, isChapterEnd: isChapterEnd, chapterFull: chapterFull,
       chapterGot: chapterGot, diary: diary, visit: visit, daily: daily, dailySolve: dailySolve, lastLearned: lastLearned, DAILY: DAILY, dayKey: function () { return dayKey(now()); },
       get data() { return data; }, get saveOk() { return saveOk; },

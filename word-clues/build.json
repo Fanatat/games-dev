@@ -1,5 +1,5 @@
 {
- "build": "0.1.0+b017 · 8493714",
+ "build": "0.1.0+b018 · 5fba4a5",
  "art": [
   "acorn",
   "address",
@@ -333,6 +333,7 @@
   "assets/art/wick.webp": "79fafb8e0cb4bea55a10b995add3cbd3128f69c92df01103e04b467717a22623",
   "assets/art/windlass.webp": "65886f39bec336fb44c83c67a8f193816ba1bbc652e1fc9b2d679aff18856837",
   "assets/art/window.webp": "bec33ad897d091699ab748f858e133bbc537dfb2ac3038d52e48094749124bd6",
+  "assets/music/day.mp3": "c3841f2e21d2e466b629faec385c59c44eae9a6b4e0b5ab8339d83d694349890",
   "assets/sfx/CREDITS.md": "4bec6ba6a7db1b98fc13dbcc5129fcc613abf870c18c8d6c1ed2121e5ae97da3",
   "assets/sfx/chapter.mp3": "e7b0baf2f4ea9292aa760a74958f96821d5622594b3862f676a0c34ad1efc7f2",
   "assets/sfx/found.mp3": "55ee33ee3e93e6fa33634601565a6af45b4ba88e8519511e298b5c7a2b60ce52",
@@ -342,16 +343,16 @@
   "assets/sfx/tap.mp3": "8cb413ca2f49b945861fdd7b69e452ff0c222882011be7bfeae92baaec2614cc",
   "assets/sfx/win.mp3": "468d5f3b8bf8c8ea8bcef52906b0da44ab35547d763035470621e2c9309cde0d",
   "assets/sfx/wrong.mp3": "cd172cec43bb120ad724e809a543e2e1608579441897b249ad916fc68b18f924",
-  "data/content.js": "56a0c6317c6e3dd1ded62e124824b9e20312d448199995170346d2936d1c106c",
-  "index.html": "0c48340f46059845588255ea0961c6068abb6c5cf4d95ecc24e39fde7a404e52",
+  "data/content.js": "3bc6cd4dbfd3cc6e0841cee74b752efdcabc54c75fd88f81180d4066ad09c818",
+  "index.html": "3469507a7ad6b4ca2850c01fa2ef4d1ddc2a548988d317a9452986f75afc8caa",
   "src/analytics.js": "839724c1521a0e1f94657ae92203788baf104657657d36f51f35fee11c532b28",
-  "src/app.js": "d1ff4201cff15c7835987c9dd331873bc53f96ff62dffb696af19c0a63a3a9e2",
+  "src/app.js": "7c8ddee0c0b79134aaf273e65b1d01c57c5fe4056b1047a211bf185648e5010d",
   "src/board.js": "6de0a67091b9fd6e8f988fdf474db8b2f2fddc6ccb287f06357e32550500483f",
   "src/logic.js": "751efbcdcdc906b6ce093387588e905aaece51c0a05653cc99c501c715af8d4b",
   "src/platform.js": "706e233b0494e687c85776441878cfc03fbb1d139b5303d887c4b11854928089",
-  "src/sound.js": "a77c31e1d39cdba7eb2ca8b89464816a80198fd2258b9c61c8432ab1187ac70b",
-  "src/state.js": "ac7193255595128629e14ff04fa1dd6c45e550a9d87685976343c10c4e293fae",
-  "src/styles.css": "db57b9838050b10ae187b5e466f6c9425fd7b003b8b5d823bcc916bf6af70047",
+  "src/sound.js": "805f5585c65fac49721ae5dacaf67adb5820db1aecc79e05f27dc5d8d069e91f",
+  "src/state.js": "4fc76afeee331a8b9daea04fb959443cb88367d6d2a544028dcce52bcd3d45ed",
+  "src/styles.css": "16ac3ea036d2585a76b15852b50bdbcc1fe63f61e24b246cb026bab08a70d19a",
   "vendor/VK_BRIDGE.md": "954dbcac21cccc2676d7cd91c1c8241e0bc8695ff6cb75f40d547520df8dc8ba",
   "vendor/vk-bridge.min.js": "827ba6f457cd9e73519b58b2c66564caf138645202f1bba37dca0b567f601bb4"
  }

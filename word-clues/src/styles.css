@@ -607,3 +607,32 @@ body.rm .cell.hint-start { animation: none; }
 .field-foot.accepting .btn-accept { white-space: nowrap; padding-left: 10px; padding-right: 10px; }
 .field-foot.accepting .btn-hint { padding-left: 12px; padding-right: 12px; }
 .field-foot.accepting { gap: 6px; }
+/* вторая серия, круг 1: марки за слово, серия, счётчик бонусов, выбор фонаря, «вау» на первых итогах */
+.fly-letter { position: fixed; z-index: 30; display: grid; place-items: center; pointer-events: none; font-weight: 800; font-size: 24px;
+  color: #8A5A12; background: #FFF3D6; border-radius: 10px; transition: transform .6s cubic-bezier(.5, 0, .7, .4), opacity .6s ease-in; }
+.word-stamps { position: absolute; z-index: 4; transform: translateX(-50%); display: inline-flex; align-items: center; gap: 2px; padding: 2px 8px;
+  border-radius: 10px; background: rgba(255, 246, 226, .95); color: #8A5A12; font-weight: 800; font-size: 16px; pointer-events: none;
+  box-shadow: 0 2px 8px rgba(60, 50, 30, .2); animation: wordStamps 1.8s ease-out forwards; }
+.word-stamps .i { width: 16px; height: 16px; }
+.word-stamps i { font-style: normal; margin-left: 3px; padding: 0 4px; border-radius: 6px; background: #C9962B; color: #fff; font-size: 13px; }
+@keyframes wordStamps { 0% { opacity: 0; transform: translate(-50%, 8px) scale(.7); } 15% { opacity: 1; transform: translate(-50%, 0) scale(1.1); }
+  25%, 75% { opacity: 1; transform: translate(-50%, 0) scale(1); } 100% { opacity: 0; transform: translate(-50%, -18px); } }
+.streak { position: absolute; z-index: 4; top: 6px; right: 6px; padding: 2px 10px; border-radius: 12px; background: #C9962B; color: #fff;
+  font-weight: 800; font-size: 14px; box-shadow: 0 2px 6px rgba(60, 50, 30, .25); pointer-events: none; }
+.streak.out { opacity: 0; transform: scale(.8); transition: opacity .35s, transform .35s; }
+#chip-bonus .of { font-weight: 600; color: var(--muted); font-size: 14px; }
+#chip-bonus .i { color: var(--amber); }
+#chip-bonus.full { background: #FFF3D6; }
+.lamp-pick { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; background: #FFF8E8; }
+.lamp-pick > b { display: flex; align-items: center; gap: 6px; }
+.lamp-pick .i { width: 18px; height: 18px; color: var(--amber); }
+.pick-opts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.pick-opt { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-height: 48px; padding: 8px 10px; border-radius: 12px;
+  border: 1px solid #E2C68E; background: var(--surface); font: inherit; text-align: left; cursor: pointer; }
+.pick-opt .muted { display: inline-flex; align-items: center; gap: 3px; font-size: 15px; color: #8A5A12; font-weight: 700; }
+.pick-opt .muted .i { width: 16px; height: 16px; }
+.keepsake.wow .keepsake-img { animation: keepWow 2.4s ease both; position: relative; z-index: 6; }
+@keyframes keepWow { 0% { transform: scale(.4); opacity: 0; } 18% { transform: translate(calc(50vw - 100px), -40px) scale(3); opacity: 1;
+  box-shadow: 0 0 0 10px rgba(255, 220, 140, .5), 0 0 40px rgba(255, 196, 80, .8); } 70% { transform: translate(calc(50vw - 100px), -40px) scale(3);
+  box-shadow: 0 0 0 10px rgba(255, 220, 140, .5), 0 0 40px rgba(255, 196, 80, .8); } 100% { transform: none; box-shadow: none; } }
+.rm .keepsake.wow .keepsake-img { animation: none; }

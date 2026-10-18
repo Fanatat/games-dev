@@ -29,6 +29,7 @@
     bulb: '<path d="M9 17h6M10 20h4"/><path d="M12 4a5 5 0 0 0-3 9c.6.5 1 1.3 1 2h4c0-.7.4-1.5 1-2a5 5 0 0 0-3-9z"/>',
     check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
     share: '<circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.2 10.8l7.6-3.6M8.2 13.2l7.6 3.6"/>',
+    chest: '<path d="M4 11h16v8a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z"/><path d="M4 11V9a4 4 0 0 1 4-4h8a4 4 0 0 1 4 4v2"/><path d="M11 11v3h2v-3"/>',
     gift: '<rect x="4" y="10" width="16" height="10" rx="1"/><path d="M3 7h18v3H3zM12 7v13M12 7c-2-3-5-3-5-1s3 1 5 1c2 0 5 1 5-1s-3-2-5 1"/>',
     lamp: '<path d="M9 3h6l1 3H8zM8 6h8l-1 8H9zM12 14v7M9 21h6"/>',
     chat: '<path d="M5 5h14a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1h-8l-4 3.5V16H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z"/><path d="M8 9.5h8M8 12.5h5"/>',
@@ -500,8 +501,11 @@
     var n = S.cur().bonus.length;
     var showBonus = n > 0 || F.story.index >= 3 || S.seenNew('bonus');
     $('chip-bonus').hidden = !showBonus;
-    $('chip-bonus').innerHTML = icon('stamp') + '<b>' + n + '</b>';
-    $('chip-bonus').setAttribute('aria-label', 'Бонусные слова: ' + n);
+    var g = S.bonusGoal();
+    $('chip-bonus').innerHTML = icon('chest') + '<b>' + g.got + '</b><span class="of">/' + g.of + '</span>';
+    $('chip-bonus').classList.toggle('full', !!g.of && g.got >= g.of);
+    $('chip-bonus').setAttribute('aria-label', 'Бонусные слова: ' + g.got + ' из ' + g.of + (g.next ? '. Сундучок на ' + g.next : '') + (n > g.got ? '. Редких: ' + (n - g.got) : ''));
+    renderStreak();
     var cache = F.story.cache;
     $('chip-cache').hidden = !cache || S.cacheDone(F.story.id);
     if (cache) $('chip-cache').innerHTML = icon('gift') + '<b>' + cache.answer.length + '</b>';
@@ -520,14 +524,60 @@
     }
     setTimeout(function () { el.remove(); }, / tip/.test(' ' + cls) ? 2700 : 1500);
   }
+  // «Серия ×2» над полем (вторая серия, п. 1.2): три слова подряд без ошибки и подсказки.
+  function renderStreak(fresh) {
+    var el = $('streak'), k = S.streak();
+    el.hidden = !k.on;
+    if (!k.on) return;
+    el.textContent = 'Серия ×' + k.mult;
+    el.setAttribute('aria-label', 'Серия: марки за слово ×' + k.mult);
+    if (fresh) pulse(el);
+  }
+  function breakStreak() {
+    if (!S.miss()) return;
+    A.event('streak_end', { story_id: F.story.id });
+    var el = $('streak');
+    el.classList.add('out');
+    setTimeout(function () { el.classList.remove('out'); renderStreak(); }, 400);
+  }
+  // Марки за слово (п. 1.1): буквы слетают с поля в предмет сцены, рядом «+N».
+  function flyLetters(path, id, stamps, mult) {
+    var item = $('scene-items').querySelector('[data-clue="' + id + '"]'), scene = $('scene');
+    if (!item) return;
+    var t = item.getBoundingClientRect(), sc = scene.getBoundingClientRect();
+    if (!document.body.classList.contains('rm')) {
+      path.forEach(function (p, i) {
+        var r = window.Board.cellRect(p);
+        if (!r) return;
+        var g = document.createElement('span');
+        g.className = 'fly-letter';
+        g.textContent = F.story.grid[p[0]][p[1]];
+        g.style.cssText = 'left:' + r.left + 'px;top:' + r.top + 'px;width:' + r.width + 'px;height:' + r.height + 'px';
+        document.body.appendChild(g);
+        setTimeout(function () {
+          g.style.transform = 'translate(' + Math.round(t.left + t.width / 2 - r.left - r.width / 2) + 'px,' + Math.round(t.top + t.height / 2 - r.top - r.height / 2) + 'px) scale(.3)';
+          g.style.opacity = '0';
+        }, 30 + i * 45);
+        setTimeout(function () { g.remove(); }, 800 + i * 45);
+      });
+    }
+    var plus = document.createElement('span');
+    plus.className = 'word-stamps' + (mult > 1 ? ' x2' : '');
+    plus.innerHTML = '+' + stamps + ' ' + icon('stamp') + (mult > 1 ? '<i>×' + mult + '</i>' : '');
+    plus.style.left = Math.round(t.left + t.width / 2 - sc.left) + 'px';
+    plus.style.bottom = Math.round(Math.max(2, Math.min(sc.bottom - t.top + 2, sc.height - 28))) + 'px';
+    setTimeout(function () { scene.appendChild(plus); }, document.body.classList.contains('rm') ? 0 : 450);
+    setTimeout(function () { plus.remove(); }, 2300);
+  }
   function pulse(el) { el.classList.remove('pulse'); void el.offsetWidth; el.classList.add('pulse'); }
   function openBonusSheet() {
     if (!F || !S.cur()) return;
     window.Sound.play('tap');
     var c = S.cur();
     var words = c.bonus.length ? c.bonus.map(function (w) { return '<span class="bw">' + esc(w) + '</span>'; }).join('') : '<span class="muted">Пока ни одного</span>';
-    var html = '<h3>' + icon('stamp') + ' Бонусные слова: ' + c.bonus.length + '</h3><div class="bonus-words">' + words + '</div>' +
-      '<p class="muted small">+' + S.BONUS_STAMPS + ' ' + icon('stamp') + ' за слово</p>' +
+    var g = S.bonusGoal();
+    var html = '<h3>' + icon('chest') + ' Бонусные слова: ' + g.got + ' / ' + g.of + '</h3><div class="bonus-words">' + words + '</div>' +
+      '<p class="muted small">Сундучки на ' + g.chests.join(', ') + ' · +' + S.BONUS_STAMPS + ' ' + icon('stamp') + ' за слово, редкое +' + S.RARE_STAMPS + '</p>' +
       '<button class="btn-link" data-close>Закрыть</button>';
     openSheet('bonus', html);
   }
@@ -710,6 +760,7 @@
       A.event('word_attempt', { story_id: s.id, clue_id: sel, result: 'wrong', length: path.length, turns: L.turns(path) });
       window.Sound.play('wrong');
       wrongFeedback(sel);
+      breakStreak();
       scheduleGhost();
       // на третьей улике первой истории поворот показываем жестом, а не словами (ТЗ §5)
       if (!turnTipShown && s.index === 0 && clueIdx(sel) === 2 && L.turns(clue(sel).path) > 0) {
@@ -760,14 +811,19 @@
       floatText(word + ' · уже есть', 'muted');
       return 'tap';
     }
-    A.event('bonus_word', { story_id: s.id, clue_id: selId(), length: path.length, count: b.count, value: b.stamps });
-    window.Sound.play('reward');
+    A.event('bonus_word', { story_id: s.id, clue_id: selId(), length: path.length, count: b.count, value: b.stamps, rare: b.rare, goal: b.goal, of: b.of });
+    window.Sound.play('found');
     window.Board.flashBonus(path);
     if (!S.data.traced) S.markTraced();
     renderChips();
     renderFoot();
-    floatText((b.count === 1 ? 'Бонус!' : word) + ' +' + b.stamps, 'bonus', $('chip-bonus'));
+    floatText((b.rare ? word + ' · редкое' : b.count === 1 ? 'Бонус!' : word) + ' +' + b.stamps, 'bonus', $('chip-bonus'));
     setTimeout(function () { pulse($('chip-bonus')); }, 700);
+    if (b.chest) {
+      var ch = b.chest, what = ch.golden ? 'золотая марка +' + ch.stamps : ch.loupes ? '+' + nLoupes(ch.loupes) : '+' + nStamps(ch.stamps);
+      A.event('bonus_chest', { story_id: s.id, count: ch.n, goal: b.goal, value: ch.loupes, stamps: ch.stamps, golden: ch.golden });
+      setTimeout(function () { floatText('Сундучок: ' + what, 'gold tip', ch.loupes ? $('loupes') : null); window.Sound.play('reward'); pulse(ch.loupes ? $('loupes') : $('chip-bonus')); renderFoot(); }, 1000);
+    }
     if (b.loupe) {
       A.event('bonus_loupe', { story_id: s.id, loupes: S.data.wallet.loupes });
       setTimeout(function () { floatText('+1 лупа', 'loupe', $('loupes')); pulse($('loupes')); window.Sound.play('found'); }, 900);
@@ -805,8 +861,15 @@
     if (how === 'trace' && !S.data.traced) S.markTraced();
     clearTimeout(F.ghostTimer);
     window.Sound.play('found');
+    setTimeout(function () { window.Sound.play('reward'); }, 140);
+    flyLetters(path, id, r.stamps, r.mult);
+    if (r.series) {
+      A.event('streak_start', { story_id: s.id, clue_id: id });
+      renderStreak(true);
+      setTimeout(function () { floatText('Серия ×2: марок вдвое', 'gold tip', $('streak')); }, 500);
+    }
     A.event('clue_solved', { story_id: s.id, clue_id: id, method: how, active_ms: Math.round(active), attempts: F.attempts,
-      selected_clue_id: sel, hints: Object.keys(h).filter(function (k) { return h[k]; }) });
+      selected_clue_id: sel, hints: Object.keys(h).filter(function (k) { return h[k]; }), value: r.stamps, mult: r.mult });
     F.attempts = 0; F.wrongRow = 0;
     if (!r.complete && wordsFound() >= NEW_BONUS_AT && !S.seenNew('bonus') && S.markNew('bonus')) {
       A.event('feature_intro', { story_id: s.id, feature: 'bonus', words: wordsFound() });
@@ -926,6 +989,7 @@
     A.event(type === 'explain' ? 'free_explain_used' : 'hint_used', { story_id: F.story.id, clue_id: id, hint_type: type,
       price: r.price, free_demo: r.free_demo, active_ms: Math.round(S.activeMs(id)), loupes_left: S.data.wallet.loupes });
     window.Sound.play('hint');
+    if (type !== 'extra') breakStreak();
     closeSheet();
     renderClue();
     if (type === 'start') window.Board.showStart(c.path[0]);
@@ -1015,7 +1079,10 @@
     renderLantern(s);
     atlasChip($('res-atlas-chip'), s.chapter, S.chapterGot(s.chapter) - (reward && reward.item ? 1 : 0));
     show('scr-result');
-    if (reward && reward.item) flyKeepsake(s.chapter);
+    var wow = !!(reward && reward.item && s.chapter === 1 && s.pos <= 1);
+    $('result-keepsake').classList.toggle('wow', wow);
+    if (wow) { A.event('result_wow', { story_id: s.id }); if (s.pos === 0) flyItems(s.chapter); }
+    if (reward && reward.item) flyKeepsake(s.chapter, wow ? 2600 : 1200);
     window.Sound.play(end ? 'chapter' : 'win');
     setTimeout(function () { window.Sound.play('reward'); }, 900);
     $('btn-next').focus({ preventScroll: true });
@@ -1026,6 +1093,8 @@
     big.innerHTML = '';
     if (!r || !r.first) { line.innerHTML = 'Награда уже получена'; return; }
     var out = chip('stamp', '+' + s.reward.first_completion_stamps) + chip('star', '+' + r.xp);
+    if (r.words) out += chip('stamp', '+' + r.words + ' за слова', 'good');
+    if (r.chests) out += chip('chest', '×' + r.chests, 'good');
     if (r.no_hints) out += chip('check', 'без подсказок', 'good');
     if (r.bonus) out += chip('stamp', r.bonus + ' бонус', 'good');
     line.innerHTML = out;
@@ -1094,7 +1163,27 @@
     });
   }
   // Находка сама влетает в значок атласа (план эксперта: коллекция на виду).
-  function flyKeepsake(ch) {
+  // Итог первой истории: все предметы сцены по очереди улетают на первую страницу атласа (п. 1.5).
+  function flyItems(ch) {
+    if (document.body.classList.contains('rm')) return;
+    var to = $('res-atlas-chip');
+    $('result-items').querySelectorAll('.scene-item').forEach(function (it, i) {
+      setTimeout(function () {
+        var a = it.getBoundingClientRect(), b = to.getBoundingClientRect();
+        if (!a.width || !b.width || screen !== 'scr-result') return;
+        var ghost = it.cloneNode(true);
+        ghost.className = 'art fly-keep';
+        ghost.style.cssText = 'left:' + a.left + 'px;top:' + a.top + 'px;width:' + a.width + 'px;height:' + a.height + 'px';
+        document.body.appendChild(ghost);
+        requestAnimationFrame(function () {
+          ghost.style.transform = 'translate(' + (b.left + b.width / 2 - a.left - a.width / 2) + 'px,' + (b.top + b.height / 2 - a.top - a.height / 2) + 'px) scale(.3)';
+          ghost.style.opacity = '.4';
+        });
+        setTimeout(function () { ghost.remove(); pulse(to); window.Sound.play('step', i + 2); }, 800);
+      }, 1300 + i * 220);
+    });
+  }
+  function flyKeepsake(ch, delay) {
     var from = $('keepsake-img'), to = $('res-atlas-chip');
     if (document.body.classList.contains('rm')) { atlasChip(to, ch); return; }
     setTimeout(function () {
@@ -1114,7 +1203,7 @@
         atlasChip(to, ch);
         pulse(to);
       }, 800);
-    }, 1200);
+    }, delay || 1200);
   }
   // Тайное слово главы: «_ _ _ _ Н _». У каждой главы своё (круг 5).
   function secretCells(sw) {
@@ -1150,28 +1239,60 @@
       });
     });
   }
-  /* Фонарь у пройденного места: хватает марок — загорается сам в анимации итога (план эксперта №5, п. 1.3:
-     зажечь — не выбор, лишний тап убран). Не хватает — карточка показывает, сколько ещё нужно. */
-  var lampTimer = 0;
+  /* Фонарь у пройденного места — выбор игрока (вторая серия, п. 1.4: автозажигание съедало марки, эксперт №6).
+     Хватает марок — кнопка «Зажечь»; «Дальше» по-прежнему один тап и марки не трогает.
+     Раз в 3 истории — бесплатный фонарь у одного из двух мест, у каждого свой подарок. */
   function renderLantern(s) {
     var b = $('btn-lantern');
     var lit = S.data.lanterns.indexOf(s.id) >= 0;
-    clearTimeout(lampTimer); lampTimer = 0;
     renderGoal();
-    if (lit || S.data.completed_story_ids.indexOf(s.id) < 0) { b.hidden = true; return; }
+    renderLampPick(s);
+    if (lit || S.data.completed_story_ids.indexOf(s.id) < 0 || !$('lamp-pick').hidden) { b.hidden = true; return; }
     var can = S.canLight(s.id), cost = S.lanternCost();
     b.classList.remove('lit');
     b.onclick = function () { lightLantern(s, b); };
-    if (can) {
-      b.hidden = true;
-      lampTimer = setTimeout(autoLamp, 1100);
-      return;
-    }
     b.hidden = false;
-    b.disabled = true;
-    b.innerHTML = '<span class="lan-img art"></span><span><b>Фонарь: ' + esc(s.place) + '</b><span class="muted">' +
-      S.data.wallet.stamps + ' / ' + cost + ' ' + icon('stamp') + '</span></span>';
+    b.disabled = !can;
+    b.innerHTML = '<span class="lan-img art"></span><span><b>' + (can ? 'Зажечь фонарь: ' : 'Фонарь: ') + esc(s.place) + '</b><span class="muted">' +
+      (can ? cost + ' ' + icon('stamp') + ' · у вас ' + S.data.wallet.stamps : S.data.wallet.stamps + ' / ' + cost + ' ' + icon('stamp')) + '</span></span>';
     art(b.querySelector('.lan-img'), 'street_lamp', '🏮');
+  }
+  function giftIcons(g) { return g.loupes ? '+' + g.loupes + ' ' + icon('loupe') : '+' + g.stamps + ' ' + icon('stamp'); }
+  function giftLabel(g) { return g.loupes ? '+' + nLoupes(g.loupes) : '+' + nStamps(g.stamps); }
+  function renderLampPick(s) {
+    var box = $('lamp-pick'), o = S.lampOffer();
+    if (!o) { box.hidden = true; box.innerHTML = ''; return; }
+    box.hidden = false;
+    box.innerHTML = '<b>' + icon('lamp') + ' Фонарь даром</b><span class="pick-opts">' + o.places.map(function (p) {
+      return '<button class="pick-opt" data-pick="' + p.id + '" aria-label="Зажечь фонарь даром: ' + esc(S.story(p.id).place) + ', ' + giftLabel(p.gift) + '"><b>' + esc(S.story(p.id).place) + '</b><span class="muted">' + giftIcons(p.gift) + '</span></button>';
+    }).join('') + '</span>';
+    if (!box.dataset.shown || box.dataset.shown !== String(o.trio)) { box.dataset.shown = o.trio; A.event('lamp_offer', { story_id: s.id, count: o.trio, places: o.places.map(function (p) { return p.id; }).join(',') }); }
+    box.querySelectorAll('[data-pick]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var r = S.pickLamp(btn.dataset.pick);
+        if (!r) return;
+        A.event('lantern_lit', { story_id: btn.dataset.pick, count: S.data.lanterns.length, stamps: S.data.wallet.stamps, cost: 0, frame: r.frame, from: 'trio_pick', value: r.gift.loupes, gift: r.gift.stamps });
+        window.Sound.play('reward');
+        if (btn.dataset.pick === s.id) lampScene(null);
+        toast(S.story(btn.dataset.pick).place + ': фонарь горит · ' + giftLabel(r.gift));
+        if (r.frame) frameGift(r.frame);
+        renderLantern(s);
+        pulse($('result-goal'));
+      });
+    });
+  }
+  function lampScene(cost) {
+    var sc = $('result-scene'), lamp = document.createElement('span');
+    lamp.className = 'scene-lamp art';
+    art(lamp, 'street_lamp', '🏮');
+    sc.appendChild(lamp);
+    sc.classList.remove('lamp-flash'); void sc.offsetWidth; sc.classList.add('lamp-flash');
+    if (!cost) return;
+    var el = document.createElement('span');
+    el.className = 'lamp-cost';
+    el.innerHTML = '−' + cost + ' ' + icon('stamp');
+    sc.appendChild(el);
+    setTimeout(function () { el.remove(); }, 1600);
   }
   // Шкала «фонари → ближайшая рамка атласа»: рамка выдаётся сама, когда фонарей хватает.
   function renderGoal() {
@@ -1181,11 +1302,6 @@
     g.hidden = false;
     g.innerHTML = icon('lamp') + '<b>' + nf.have + ' / ' + nf.lamps + '</b><span class="bar"><i style="width:' + pct + '%"></i></span><span class="rank-name">' + esc(name) + '</span>';
     g.setAttribute('aria-label', 'Фонари: ' + nf.have + ' из ' + nf.lamps + ' до награды «' + name + '»');
-  }
-  function autoLamp() {
-    lampTimer = 0;
-    var s = resultStory;
-    if (s && screen === 'scr-result' && S.canLight(s.id)) return lightLantern(s, null, 'result_auto');
   }
   function lightLantern(s, b, from) {
     var r = S.light(s.id);
@@ -1198,16 +1314,7 @@
       b.disabled = true; b.classList.add('lit');
     }
     if (screen === 'scr-result') {
-      var sc = $('result-scene'), lamp = document.createElement('span');
-      lamp.className = 'scene-lamp art';
-      art(lamp, 'street_lamp', '🏮');
-      sc.appendChild(lamp);
-      sc.classList.remove('lamp-flash'); void sc.offsetWidth; sc.classList.add('lamp-flash');
-      var cost = document.createElement('span');
-      cost.className = 'lamp-cost';
-      cost.innerHTML = '−' + r.cost + ' ' + icon('stamp');
-      sc.appendChild(cost);
-      setTimeout(function () { cost.remove(); }, 1600);
+      lampScene(r.cost);
       renderGoal();
       pulse($('result-goal'));
     }
@@ -1270,7 +1377,6 @@
 
   function onNext() {
     var s = resultStory;
-    if (lampTimer) { clearTimeout(lampTimer); var lr = autoLamp(); if (lr && lr.frame) return; } // рамку не пропустить
     var end = !s || S.isChapterEnd(s), next = s && !end ? S.stories[s.index + 1] : null;
     A.event('story_next_clicked', { story_id: s ? s.id : null, next_story_id: next ? next.id : null });
     window.Sound.play('tap');

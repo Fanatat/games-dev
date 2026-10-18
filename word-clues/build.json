@@ -1,5 +1,5 @@
 {
- "build": "0.1.0+b018 · 5fba4a5",
+ "build": "0.1.0+b019 · 03fa77f",
  "art": [
   "acorn",
   "address",
@@ -344,9 +344,9 @@
   "assets/sfx/win.mp3": "468d5f3b8bf8c8ea8bcef52906b0da44ab35547d763035470621e2c9309cde0d",
   "assets/sfx/wrong.mp3": "cd172cec43bb120ad724e809a543e2e1608579441897b249ad916fc68b18f924",
   "data/content.js": "3bc6cd4dbfd3cc6e0841cee74b752efdcabc54c75fd88f81180d4066ad09c818",
-  "index.html": "3469507a7ad6b4ca2850c01fa2ef4d1ddc2a548988d317a9452986f75afc8caa",
-  "src/analytics.js": "839724c1521a0e1f94657ae92203788baf104657657d36f51f35fee11c532b28",
-  "src/app.js": "7c8ddee0c0b79134aaf273e65b1d01c57c5fe4056b1047a211bf185648e5010d",
+  "index.html": "752d44e8f679751e3f58f62ae43b6024de04a6e968c1e1426be4937573ad98bf",
+  "src/analytics.js": "746bf45411ff48a367fc50cdf16f10c936d44929ed57f119851de8e15a5aec0c",
+  "src/app.js": "3e6c42d2e0d254ee22f3b74e7e3ffe20a73f4c85563fdff5f624122fdbcb1517",
   "src/board.js": "6de0a67091b9fd6e8f988fdf474db8b2f2fddc6ccb287f06357e32550500483f",
   "src/logic.js": "751efbcdcdc906b6ce093387588e905aaece51c0a05653cc99c501c715af8d4b",
   "src/platform.js": "706e233b0494e687c85776441878cfc03fbb1d139b5303d887c4b11854928089",

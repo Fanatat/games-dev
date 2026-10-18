@@ -26,10 +26,8 @@
 
 game6 (Godot, CrazyGames) и game8 (Unity, Steam) на стенде не выкладываются.
 
-Старые папки (`slovokhod/`, `catnonogram/`, `color-sort/`, `lane-battle/`, `royal-solitaire/`,
-`game7-horde/`, `police-runner-bb/`, `word-clues/`, `house-of-pictures/`, `jewel-workshop/`,
-`jewel-workshop-vk/`, `last-convoy/`) с 18.10.2026 только перенаправляют на новые адреса
-и будут удалены.
+Старые имена папок (`slovokhod/`, `royal-solitaire/`, `game7-horde/` и др.) удалены 18.10.2026,
+после того как тестовые ссылки в кабинетах ВК заменены на новые. Туда не выкладывать.
 
 Версию сборки показывает сама игра (штамп сборки в углу или в настройках).
 Обновление сборки — замена папки игры целиком.

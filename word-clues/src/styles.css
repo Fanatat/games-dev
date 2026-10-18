@@ -325,6 +325,8 @@ button.slot.got { background: var(--surface); }
 .float-word.loupe { color: var(--green-d); background: #EEF3EC; }
 .float-word.muted { color: var(--muted); font-weight: 600; }
 .float-word.fly { animation: floatFly 1.3s ease-in both; }
+.float-word.tip { animation-duration: 2.6s; }
+.clue-card.shake { animation: shake .3s ease; }
 @keyframes floatUp { 0% { opacity: 0; transform: translate(-50%, 8px); } 15%, 75% { opacity: 1; transform: translate(-50%, 0); } 100% { opacity: 0; transform: translate(-50%, -14px); } }
 @keyframes floatFly { 0% { opacity: 0; transform: translate(-50%, 8px); } 15%, 45% { opacity: 1; transform: translate(-50%, 0); }
   100% { opacity: 0; transform: translate(calc(-50% + var(--dx, 0px)), var(--dy, 0px)) scale(.6); } }

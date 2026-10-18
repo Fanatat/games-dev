@@ -87,6 +87,8 @@
     var src = ctx.createBufferSource();
     src.buffer = buffers[name];
     if (name === 'step') src.playbackRate.value = Math.pow(2, STEPS[Math.min(i || 0, STEPS.length - 1)] / 12);
+    // ошибка ниже и длиннее шага, чтобы на слух не путать их (план эксперта №6, 0.3 и 4.3)
+    if (name === 'wrong') src.playbackRate.value = 0.7;
     var g = ctx.createGain();
     g.gain.value = EVENTS[name].vol;
     src.connect(g); g.connect(out);

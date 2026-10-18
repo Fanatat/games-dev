@@ -1,5 +1,5 @@
 {
- "build": "0.1.0+b019 · 03fa77f",
+ "build": "0.1.0+b020 · ed7a9a3",
  "art": [
   "acorn",
   "address",
@@ -343,16 +343,16 @@
   "assets/sfx/tap.mp3": "8cb413ca2f49b945861fdd7b69e452ff0c222882011be7bfeae92baaec2614cc",
   "assets/sfx/win.mp3": "468d5f3b8bf8c8ea8bcef52906b0da44ab35547d763035470621e2c9309cde0d",
   "assets/sfx/wrong.mp3": "cd172cec43bb120ad724e809a543e2e1608579441897b249ad916fc68b18f924",
-  "data/content.js": "3bc6cd4dbfd3cc6e0841cee74b752efdcabc54c75fd88f81180d4066ad09c818",
-  "index.html": "752d44e8f679751e3f58f62ae43b6024de04a6e968c1e1426be4937573ad98bf",
+  "data/content.js": "c74479f28299c8b78ced5643e5f7a1749fbfd84be565badaa413e62d804b7a6a",
+  "index.html": "cbb3f161c8c984ecd870b417a9e98e6f555fba75d5e5140fcd544e8f890bebd0",
   "src/analytics.js": "746bf45411ff48a367fc50cdf16f10c936d44929ed57f119851de8e15a5aec0c",
-  "src/app.js": "3e6c42d2e0d254ee22f3b74e7e3ffe20a73f4c85563fdff5f624122fdbcb1517",
+  "src/app.js": "10c081aa293dcfa755898ed7d76f292bd1acd5f550865a1b3b30f6acf036cc4a",
   "src/board.js": "6de0a67091b9fd6e8f988fdf474db8b2f2fddc6ccb287f06357e32550500483f",
-  "src/logic.js": "751efbcdcdc906b6ce093387588e905aaece51c0a05653cc99c501c715af8d4b",
+  "src/logic.js": "5b87c230d0b45a85d9550abaf868f7eb1b10a1c456d9e50d5f0fe244965845a6",
   "src/platform.js": "706e233b0494e687c85776441878cfc03fbb1d139b5303d887c4b11854928089",
-  "src/sound.js": "805f5585c65fac49721ae5dacaf67adb5820db1aecc79e05f27dc5d8d069e91f",
-  "src/state.js": "4fc76afeee331a8b9daea04fb959443cb88367d6d2a544028dcce52bcd3d45ed",
-  "src/styles.css": "16ac3ea036d2585a76b15852b50bdbcc1fe63f61e24b246cb026bab08a70d19a",
+  "src/sound.js": "6a51a1e8499c4c0205a45da5bf7ed9f29bda42d60636be38156172827f598d5f",
+  "src/state.js": "63bde95447c5eeeb0ba93b1c28975e40194d58d838110cec6ad632c16e439caa",
+  "src/styles.css": "037115e74c3b1ff2f355044fd5080ea2c3baed65d712dda1d04ffc6521fb3a40",
   "vendor/VK_BRIDGE.md": "954dbcac21cccc2676d7cd91c1c8241e0bc8695ff6cb75f40d547520df8dc8ba",
   "vendor/vk-bridge.min.js": "827ba6f457cd9e73519b58b2c66564caf138645202f1bba37dca0b567f601bb4"
  }

@@ -96,7 +96,18 @@
     return n + ' ' + w;
   }
 
-  var api = { norm: norm, adjacent: adjacent, pathValid: pathValid, pathWord: pathWord, match: match,
+  /* Другая форма того же слова: СПИЧКА / СПИЧКИ, РЕЛЬС / РЕЛЬСЫ, ПЕРЧАТКА / ПЕРЧАТКИ.
+     Слова совпадают до окончания: длина отличается не больше чем на 1, а разные хвосты — только из гласных, Ь и Й. */
+  var ENDING = /^[АЕИОУЫЭЮЯЬЙ]*$/;
+  function nearForm(word, answer) {
+    word = norm(word); answer = norm(answer);
+    if (word === answer || word.length < 3 || answer.length < 3 || Math.abs(word.length - answer.length) > 1) return false;
+    var k = 0, n = Math.min(word.length, answer.length);
+    while (k < n && word[k] === answer[k]) k++;
+    return k >= 3 && k >= n - 1 && ENDING.test(word.slice(k)) && ENDING.test(answer.slice(k));
+  }
+
+  var api = { nearForm: nearForm, norm: norm, adjacent: adjacent, pathValid: pathValid, pathWord: pathWord, match: match,
     findPaths: findPaths, turns: turns, demoPath: demoPath, lettersLabel: lettersLabel };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.WordLogic = api;

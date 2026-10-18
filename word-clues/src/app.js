@@ -518,7 +518,7 @@
       el.style.setProperty('--dy', Math.round(t.top + t.height / 2 - (w.top + 40)) + 'px');
       el.classList.add('fly');
     }
-    setTimeout(function () { el.remove(); }, 1500);
+    setTimeout(function () { el.remove(); }, / tip/.test(' ' + cls) ? 2700 : 1500);
   }
   function pulse(el) { el.classList.remove('pulse'); void el.offsetWidth; el.classList.add('pulse'); }
   function openBonusSheet() {
@@ -702,10 +702,14 @@
     if (!m) {
       var word = L.pathWord(s.grid, path);
       if (s.cache && (word === s.cache.answer || word.split('').reverse().join('') === s.cache.answer)) return onCache(path);
+      // другая форма ответа (СПИЧКА при ответе СПИЧКИ) — «почти», а не бонус и не тишина (круг 0.4 второй серии)
+      var near = s.clues.filter(function (c) { return !S.isFound(c.id) && S.isOpen(c.id) && L.nearForm(word, c.answer); })[0];
+      if (near) return onNear(word, path, near);
       var b = S.bonusWord(word);
       if (b) return onBonus(word, path, b);
       A.event('word_attempt', { story_id: s.id, clue_id: sel, result: 'wrong', length: path.length, turns: L.turns(path) });
       window.Sound.play('wrong');
+      wrongFeedback(sel);
       scheduleGhost();
       // на третьей улике первой истории поворот показываем жестом, а не словами (ТЗ §5)
       if (!turnTipShown && s.index === 0 && clueIdx(sel) === 2 && L.turns(clue(sel).path) > 0) {
@@ -722,6 +726,32 @@
     return 'ok';
   }
 
+  /* Отклик на ошибку (ТЗ §4.2): дрожит карточка улики; вторая ошибка подряд на той же улике —
+     одна строка, без упрёка. Ошибка ничего не отнимает. */
+  function shakeEl(el) {
+    if (!el || document.body.classList.contains('rm')) return;
+    el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake');
+    setTimeout(function () { el.classList.remove('shake'); }, 350);
+  }
+  function wrongFeedback(sel) {
+    shakeEl($('clue-card'));
+    if (F.wrongClue !== sel) { F.wrongClue = sel; F.wrongRow = 0; }
+    F.wrongRow++;
+    if (F.wrongRow === 2) {
+      A.event('wrong_tip', { story_id: F.story.id, clue_id: sel });
+      floatText('Попробуем другую цепочку', 'muted tip');
+    }
+  }
+  function onNear(word, path, c) {
+    A.event('word_attempt', { story_id: F.story.id, clue_id: selId(), result: 'near', near_clue_id: c.id, length: path.length });
+    window.Sound.play('hint');
+    window.Board.flashBonus(path);
+    if (c.id !== selId()) selectClue(c.id, 'near');
+    shakeEl($('clue-card'));
+    floatText('Почти! Другая форма слова', 'gold tip');
+    scheduleGhost();
+    return 'tap';
+  }
   function onBonus(word, path, b) {
     var s = F.story;
     if (b.repeat) {
@@ -777,7 +807,7 @@
     window.Sound.play('found');
     A.event('clue_solved', { story_id: s.id, clue_id: id, method: how, active_ms: Math.round(active), attempts: F.attempts,
       selected_clue_id: sel, hints: Object.keys(h).filter(function (k) { return h[k]; }) });
-    F.attempts = 0;
+    F.attempts = 0; F.wrongRow = 0;
     if (!r.complete && wordsFound() >= NEW_BONUS_AT && !S.seenNew('bonus') && S.markNew('bonus')) {
       A.event('feature_intro', { story_id: s.id, feature: 'bonus', words: wordsFound() });
       renderChips(); pulse($('chip-bonus'));
@@ -866,7 +896,8 @@
     var loupes = S.data.wallet.loupes;
     function opt(type, title, sub, extraCls) {
       var price = S.hintPrice(type, id);
-      var dis = (type === 'explain' && left > 0 && !h.explain) || price > loupes;
+      // открытая «Ещё улика» уже видна на карточке: строка гаснет, а не молчит на нажатие (круг 0.1 второй серии)
+      var dis = (type === 'explain' && left > 0 && !h.explain) || (type === 'extra' && h.extra) || price > loupes;
       var tag = type === 'explain' ? (h.explain ? 'Уже открыто' : left > 0 ? 'через ' + mmss(left) : 'Бесплатно') : type === 'extra' ? (h.extra ? 'Уже открыта' : 'Бесплатно') : priceText(type, id);
       if (price > loupes) tag = 'Нужно ' + price + ' · у вас ' + loupes;
       return '<button class="hint-opt ' + (extraCls || '') + '" data-hint="' + type + '"' + (dis ? ' disabled' : '') + '>' +

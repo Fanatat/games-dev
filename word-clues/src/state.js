@@ -24,7 +24,9 @@
      а 8 фонарей за первые полчаса остаются по силам. */
   var LANTERN_COST = 30, LANTERN_STEP = 5;
   var BONUS_DROP = 10;                             // каждые 10 бонусных слов — лупа (капля у значка лупы; круг 10: было 5)
-  var EXPLAIN_BROKE_MS = 45000;                    // без луп «Разобрать вместе» открывается раньше
+  /* «Разобрать вместе» (ТЗ §4.3: «если люди застревают раньше, уменьшить его»): эксперт №6 видел застревания
+     Новичка на 54–78 с при запертом разборе, поэтому 45 с вместо 90, а без луп — 30 с. */
+  var EXPLAIN_MS = 45000, EXPLAIN_BROKE_MS = 30000;
   var TRIO = 3;                                    // каждые 3 истории — общий секрет маршрута (ТЗ §6.2)
   // Звания каждые ~40–100 опыта, 12 штук (ТЗ §8.3); за звание — марки, не лупы.
   var RANKS = [
@@ -509,7 +511,7 @@
     function explainAfter(clueId) {
       var s = curStory();
       var c = s && s.clues.filter(function (x) { return x.id === clueId; })[0];
-      var ms = (c && c.explain_ms) || 90000;
+      var ms = Math.min((c && c.explain_ms) || EXPLAIN_MS, EXPLAIN_MS);
       return data.wallet.loupes > 0 ? ms : Math.min(ms, EXPLAIN_BROKE_MS);
     }
 
@@ -531,7 +533,7 @@
 
     load();
     return {
-      KEY: KEY, COST: COST, RANKS: RANKS, LANTERN_COST: LANTERN_COST, LANTERN_STEP: LANTERN_STEP, BONUS_DROP: BONUS_DROP, GOLDEN: GOLDEN, BONUS_STAMPS: BONUS_STAMPS, BONUS_FULL: BONUS_FULL, FINALE: FINALE, DIARY: DIARY,
+      KEY: KEY, COST: COST, RANKS: RANKS, LANTERN_COST: LANTERN_COST, LANTERN_STEP: LANTERN_STEP, BONUS_DROP: BONUS_DROP, EXPLAIN_MS: EXPLAIN_MS, EXPLAIN_BROKE_MS: EXPLAIN_BROKE_MS, GOLDEN: GOLDEN, BONUS_STAMPS: BONUS_STAMPS, BONUS_FULL: BONUS_FULL, FINALE: FINALE, DIARY: DIARY,
       chapters: chapters, chapter: chapter, chapterStories: chapterStories, isChapterEnd: isChapterEnd, chapterFull: chapterFull,
       chapterGot: chapterGot, diary: diary, visit: visit, daily: daily, dailySolve: dailySolve, lastLearned: lastLearned, DAILY: DAILY, dayKey: function () { return dayKey(now()); },
       get data() { return data; }, get saveOk() { return saveOk; },

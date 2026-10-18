@@ -341,7 +341,7 @@ button.slot.got { background: var(--surface); }
 .bw { padding: 3px 10px; border-radius: 12px; background: #FFF6E2; border: 1px solid #E2C68E; font-weight: 600; letter-spacing: .04em; }
 /* итог */
 .result-body { position: relative; }
-.res-atlas-chip { position: absolute; top: 12px; right: 16px; }
+.res-atlas-chip { position: absolute; z-index: 2; top: 12px; right: 16px; }
 .rw { display: inline-flex; align-items: center; gap: 2px; padding: 1px 8px 1px 4px; border-radius: 10px; background: #EEF3EC; }
 .rw.good { background: #FFF3D6; color: #8A5A12; }
 .reward-big { display: flex; flex-direction: column; gap: 8px; }
@@ -371,9 +371,28 @@ button.slot.got { background: var(--surface); }
 .town-map { position: relative; flex: none; aspect-ratio: 16 / 10; border-radius: var(--r); overflow: hidden; background: linear-gradient(160deg, #E7DDC5, #CFDCC9); }
 .town-bg { position: absolute; inset: 0; }
 .town-lamps { position: absolute; inset: 0; }
-.town-lamp { position: absolute; width: 11%; aspect-ratio: 1 / 2; transform: translate(-50%, -100%); filter: grayscale(1) brightness(.75); opacity: .75; }
-.town-lamp > img { object-fit: contain; }
-.town-lamp.on { filter: drop-shadow(0 0 10px rgba(255, 200, 90, .95)); opacity: 1; }
+.town-lamp { position: absolute; width: 4.5%; aspect-ratio: 1 / 2; transform: translate(-50%, -100%); }
+.tl-lamp { position: absolute; inset: 0; filter: grayscale(1) brightness(.75); opacity: .8; }
+.tl-lamp > img { object-fit: contain; }
+.town-lamp.far .tl-lamp { opacity: .35; }
+.town-lamp.on .tl-lamp { filter: drop-shadow(0 0 6px rgba(255, 200, 90, .95)); opacity: 1; }
+.town-lamp.t2 .tl-lamp, .town-lamp.t3 .tl-lamp { filter: drop-shadow(0 0 10px rgba(255, 210, 110, 1)) brightness(1.08); }
+/* ступени места: окна и жители — маленькие значки у фонаря */
+.tl-badge { position: absolute; width: 120%; aspect-ratio: 1; left: 60%; border-radius: 50%; background: rgba(255, 246, 226, .92);
+  box-shadow: 0 0 6px rgba(255, 200, 90, .9); }
+.tl-badge > img { object-fit: contain; }
+.tl-badge > .art-icon { font-size: 9px; }
+.tl-win { top: 10%; }
+.tl-folk { top: 52%; }
+.town-row b { flex: 1; min-width: 0; }
+.tiers { display: inline-flex; gap: 3px; flex: none; }
+.tier { width: 24px; height: 24px; border-radius: 6px; background: #F1ECDF; filter: grayscale(1); opacity: .45; }
+.tier > img { object-fit: contain; }
+.tier > .art-icon { font-size: 15px; }
+.tier.got { filter: none; opacity: 1; background: #FBEBC4; }
+#btn-town.ready .tile-sub, #btn-town.ready #town-tile-sub { color: #8A5A12; font-weight: 700; }
+/* «вау»: главная кнопка ждёт конца полёта находки */
+#btn-next.hold { opacity: .55; }
 .town-list { display: flex; flex-direction: column; gap: 6px; }
 .town-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 52px; padding: 6px 12px;
   border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
@@ -473,7 +492,6 @@ body.rm .cell.hint-start { animation: none; }
 /* круг 4: золотые марки в кошельке атласа отличаются от обычных; 15 фонарей не налезают друг на друга */
 #wallet .gold { color: #A86F12; }
 #wallet .gold svg { color: #C9962B; }
-.town-lamps.many .town-lamp { width: 8%; }
 /* круг 5: фонарь прямо на итоге — карточка с картинкой, вспышка на сцене */
 .btn-lantern.card { justify-content: flex-start; gap: 12px; text-align: left; width: 100%; font: inherit; }
 .btn-lantern > span:last-child { display: flex; flex-direction: column; }
@@ -522,7 +540,7 @@ body.rm .cell.hint-start { animation: none; }
 /* Улика дня на главной (круг 8): загадка, ячейки ответа, плитки букв, серия «🔥 N» */
 .daily { padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; border-left: 4px solid var(--amber); }
 .daily-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.daily .streak { font-weight: 700; color: var(--danger); background: #FBE9C6; border-radius: 12px; padding: 2px 10px; }
+.daily .day-streak { font-weight: 700; color: var(--danger); background: #FBE9C6; border-radius: 12px; padding: 2px 10px; }
 .daily-clue { font-family: var(--font); font-size: calc(var(--clue-fs) - 1px); line-height: 1.35; }
 .daily-slots { display: flex; gap: 4px; justify-content: center; flex-wrap: wrap; }
 .daily-slots.shake { animation: shake .3s ease; }
@@ -617,9 +635,9 @@ body.rm .cell.hint-start { animation: none; }
 .word-stamps i { font-style: normal; margin-left: 3px; padding: 0 4px; border-radius: 6px; background: #C9962B; color: #fff; font-size: 13px; }
 @keyframes wordStamps { 0% { opacity: 0; transform: translate(-50%, 8px) scale(.7); } 15% { opacity: 1; transform: translate(-50%, 0) scale(1.1); }
   25%, 75% { opacity: 1; transform: translate(-50%, 0) scale(1); } 100% { opacity: 0; transform: translate(-50%, -18px); } }
-.streak { position: absolute; z-index: 4; top: 6px; right: 6px; padding: 2px 10px; border-radius: 12px; background: #C9962B; color: #fff;
+#streak { position: absolute; z-index: 4; top: 6px; right: 6px; padding: 2px 10px; border-radius: 12px; background: #C9962B; color: #fff;
   font-weight: 800; font-size: 14px; box-shadow: 0 2px 6px rgba(60, 50, 30, .25); pointer-events: none; }
-.streak.out { opacity: 0; transform: scale(.8); transition: opacity .35s, transform .35s; }
+#streak.out { opacity: 0; transform: scale(.8); transition: opacity .35s, transform .35s; }
 #chip-bonus .of { font-weight: 600; color: var(--muted); font-size: 14px; }
 #chip-bonus .i { color: var(--amber); }
 #chip-bonus.full { background: #FFF3D6; }
@@ -631,7 +649,7 @@ body.rm .cell.hint-start { animation: none; }
   border: 1px solid #E2C68E; background: var(--surface); font: inherit; text-align: left; cursor: pointer; }
 .pick-opt .muted { display: inline-flex; align-items: center; gap: 3px; font-size: 15px; color: #8A5A12; font-weight: 700; }
 .pick-opt .muted .i { width: 16px; height: 16px; }
-.keepsake.wow .keepsake-img { animation: keepWow 2.4s ease both; position: relative; z-index: 6; }
+.keepsake.wow .keepsake-img { animation: keepWow 2s ease both; position: relative; z-index: 6; }
 @keyframes keepWow { 0% { transform: scale(.4); opacity: 0; } 18% { transform: translate(calc(50vw - 100px), -40px) scale(3); opacity: 1;
   box-shadow: 0 0 0 10px rgba(255, 220, 140, .5), 0 0 40px rgba(255, 196, 80, .8); } 70% { transform: translate(calc(50vw - 100px), -40px) scale(3);
   box-shadow: 0 0 0 10px rgba(255, 220, 140, .5), 0 0 40px rgba(255, 196, 80, .8); } 100% { transform: none; box-shadow: none; } }

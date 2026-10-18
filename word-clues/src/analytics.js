@@ -76,7 +76,14 @@
     chapter_finale: ['chapter_complete', function (f) { return { chapter: f.chapter }; }],
     lantern_lit: ['lantern_lit', function (f) { return { count: f.count, from: f.from }; }],
     atlas_cover: ['cover_bought', function (f) { return f.bought ? { cover: f.cover, price: f.price } : false; }],
-    share_done: ['share_done', function (f) { return f.method && f.method !== 'cancel' ? { from: f.from, method: f.method } : false; }]
+    share_done: ['share_done', function (f) { return f.method && f.method !== 'cancel' ? { from: f.from, method: f.method } : false; }],
+    // вторая серия, круг 2 (план эксперта №7, «До кругов»): где новичок тонет и что видит после победы
+    clue_solved: ['clue_solved', function (f) { return /^s00[1-3]$/.test(f.story_id || '') ? { story: f.story_id, clue: f.clue_id, active_ms: f.active_ms, hints: (f.hints || []).length } : false; }],
+    result_wow: ['result_wow', function (f) { return { story: f.story_id }; }],
+    ending_read: ['ending_read', function (f) { return { story: f.story_id }; }],
+    visit_back: ['visit_back', function (f) { return { away_days: f.away_days }; }],
+    lamp_offer: ['lamp_offer', function (f) { return { story: f.story_id }; }],
+    place_upgrade: ['place_upgrade', function (f) { return { tier: f.tier, from: f.from }; }]
   };
 
   function isLocalRun() {

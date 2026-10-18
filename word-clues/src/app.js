@@ -272,7 +272,7 @@
       dailyPick.shown = x.day;
       A.event('daily_shown', { day: x.day, done: x.done, streak: x.streak, lost: x.lost });
     }
-    var fire = x.streak ? '<span class="streak" aria-label="Дней подряд: ' + x.streak + '">🔥 ' + x.streak + '</span>' : '';
+    var fire = x.streak ? '<span class="day-streak" aria-label="Дней подряд: ' + x.streak + '">🔥 ' + x.streak + '</span>' : '';
     var html = '<div class="daily-head"><b>Улика дня</b>' + fire + '</div><p class="daily-clue">' + esc(x.clue) + '</p>';
     if (x.done) {
       html += '<div class="daily-share"><span class="daily-marks" aria-label="Попыток: ' + (x.misses + 1) + '">' + dailyMarks(x) + '</span>' +
@@ -391,7 +391,10 @@
     btn.dataset.mode = t.mode;
     var ch = t.story ? t.story.chapter : lastChapter();
     $('atlas-sub').textContent = 'Глава ' + ch + ': ' + S.chapterGot(ch) + ' из ' + S.chapter(ch).slots + ' · ' + S.rank().name;
-    $('town-tile-sub').textContent = 'Фонарей: ' + S.data.lanterns.length + ' из ' + S.stories.length + ' · марок ' + S.data.wallet.stamps;
+    var up = S.nextUpgrade();
+    $('town-tile-sub').textContent = up ? S.story(up.id).place + ': ' + TIER[up.tier].title.toLowerCase() + ' · ' + Math.min(up.have, up.cost) + ' / ' + up.cost
+      : 'Фонарей: ' + S.data.lanterns.length + ' из ' + S.stories.length;
+    $('btn-town').classList.toggle('ready', !!(up && up.can));
     renderSecret($('home-secret'), ch);
     renderDaily();
     if (S.data.completed_story_ids.length) renderDiary($('home-diary'), { back: visitInfo.back });
@@ -499,12 +502,13 @@
     atlasChip($('chip-atlas'), F ? F.story.chapter : curChapter());
     if (!F || !S.cur()) return;
     var n = S.cur().bonus.length;
-    var showBonus = n > 0 || F.story.index >= 3 || S.seenNew('bonus');
+    // сундук поля наполняют и слова улик (+1), и бонус-слова (+2): новичок видит его с первого слова (план эксперта №7, п. 1.5)
+    var g = S.bonusGoal(), top = g.next || g.chests[g.chests.length - 1];
+    var showBonus = n > 0 || g.pts > 0 || F.story.index >= 1 || S.seenNew('bonus');
     $('chip-bonus').hidden = !showBonus;
-    var g = S.bonusGoal();
-    $('chip-bonus').innerHTML = icon('chest') + '<b>' + g.got + '</b><span class="of">/' + g.of + '</span>';
-    $('chip-bonus').classList.toggle('full', !!g.of && g.got >= g.of);
-    $('chip-bonus').setAttribute('aria-label', 'Бонусные слова: ' + g.got + ' из ' + g.of + (g.next ? '. Сундучок на ' + g.next : '') + (n > g.got ? '. Редких: ' + (n - g.got) : ''));
+    $('chip-bonus').innerHTML = icon('chest') + '<b>' + Math.min(g.pts, top) + '</b><span class="of">/' + top + '</span>';
+    $('chip-bonus').classList.toggle('full', !g.next);
+    $('chip-bonus').setAttribute('aria-label', 'Сундук поля: ' + g.pts + (g.next ? ' из ' + g.next : ', все открыты') + '. Бонусных слов: ' + n);
     renderStreak();
     var cache = F.story.cache;
     $('chip-cache').hidden = !cache || S.cacheDone(F.story.id);
@@ -576,8 +580,8 @@
     var c = S.cur();
     var words = c.bonus.length ? c.bonus.map(function (w) { return '<span class="bw">' + esc(w) + '</span>'; }).join('') : '<span class="muted">Пока ни одного</span>';
     var g = S.bonusGoal();
-    var html = '<h3>' + icon('chest') + ' Бонусные слова: ' + g.got + ' / ' + g.of + '</h3><div class="bonus-words">' + words + '</div>' +
-      '<p class="muted small">Сундучки на ' + g.chests.join(', ') + ' · +' + S.BONUS_STAMPS + ' ' + icon('stamp') + ' за слово, редкое +' + S.RARE_STAMPS + '</p>' +
+    var html = '<h3>' + icon('chest') + ' Бонусные слова: ' + c.bonus.length + '</h3><div class="bonus-words">' + words + '</div>' +
+      '<p class="muted small">Сундук: улика +1, бонус +2 · ' + g.pts + ' / ' + (g.next || g.chests[g.chests.length - 1]) + '</p>' +
       '<button class="btn-link" data-close>Закрыть</button>';
     openSheet('bonus', html);
   }
@@ -819,17 +823,26 @@
     renderFoot();
     floatText((b.rare ? word + ' · редкое' : b.count === 1 ? 'Бонус!' : word) + ' +' + b.stamps, 'bonus', $('chip-bonus'));
     setTimeout(function () { pulse($('chip-bonus')); }, 700);
-    if (b.chest) {
-      var ch = b.chest, what = ch.golden ? 'золотая марка +' + ch.stamps : ch.loupes ? '+' + nLoupes(ch.loupes) : '+' + nStamps(ch.stamps);
-      A.event('bonus_chest', { story_id: s.id, count: ch.n, goal: b.goal, value: ch.loupes, stamps: ch.stamps, golden: ch.golden });
-      setTimeout(function () { floatText('Сундучок: ' + what, 'gold tip', ch.loupes ? $('loupes') : null); window.Sound.play('reward'); pulse(ch.loupes ? $('loupes') : $('chip-bonus')); renderFoot(); }, 1000);
-    }
+    if (b.chest) showChest(b.chest, 'bonus');
     if (b.loupe) {
       A.event('bonus_loupe', { story_id: s.id, loupes: S.data.wallet.loupes });
       setTimeout(function () { floatText('+1 лупа', 'loupe', $('loupes')); pulse($('loupes')); window.Sound.play('found'); }, 900);
     }
     scheduleGhost();
     return 'tap';
+  }
+  // Сундук поля открылся: случайный подарок, изредка большой (план эксперта №7, п. 1.5).
+  function showChest(ch, via) {
+    var s = F.story;
+    var what = ch.big ? '+' + nLoupes(ch.loupes) + ' +' + ch.stamps : ch.golden ? 'золотая марка +' + ch.stamps : ch.loupes ? '+' + nLoupes(ch.loupes) : '+' + nStamps(ch.stamps);
+    A.event('bonus_chest', { story_id: s.id, count: ch.n, via: via, value: ch.loupes, stamps: ch.stamps, golden: ch.golden, big: ch.big });
+    setTimeout(function () {
+      if (!F || F.story !== s) return;
+      floatText((ch.big ? 'Большой сундук: ' : 'Сундук: ') + what, 'gold tip', ch.loupes ? $('loupes') : null);
+      window.Sound.play('reward');
+      pulse(ch.loupes ? $('loupes') : $('chip-bonus'));
+      renderFoot();
+    }, 1000);
   }
   function onCache(path) {
     var s = F.story;
@@ -863,6 +876,8 @@
     window.Sound.play('found');
     setTimeout(function () { window.Sound.play('reward'); }, 140);
     flyLetters(path, id, r.stamps, r.mult);
+    renderChips();
+    if (r.chest && !r.complete) showChest(r.chest, 'clue');
     if (r.series) {
       A.event('streak_start', { story_id: s.id, clue_id: id });
       renderStreak(true);
@@ -1081,11 +1096,20 @@
     show('scr-result');
     var wow = !!(reward && reward.item && s.chapter === 1 && s.pos <= 1);
     $('result-keepsake').classList.toggle('wow', wow);
-    if (wow) { A.event('result_wow', { story_id: s.id }); if (s.pos === 0) flyItems(s.chapter); }
-    if (reward && reward.item) flyKeepsake(s.chapter, wow ? 2600 : 1200);
+    if (wow) { A.event('result_wow', { story_id: s.id }); if (s.pos === 0) flyItems(s.chapter); holdNext(WOW_MS); }
+    if (reward && reward.item) flyKeepsake(s.chapter, wow ? WOW_MS - 600 : 1200);
     window.Sound.play(end ? 'chapter' : 'win');
     setTimeout(function () { window.Sound.play('reward'); }, 900);
     $('btn-next').focus({ preventScroll: true });
+  }
+  // Главная кнопка ждёт конца полёта предметов: «вау» не пролистывают за 2 с (план эксперта №7, п. 1.6).
+  var WOW_MS = 2300, holdTimer = null;
+  function holdNext(ms) {
+    var b = $('btn-next');
+    clearTimeout(holdTimer);
+    if (document.body.classList.contains('rm')) return;
+    b.disabled = true; b.classList.add('hold');
+    holdTimer = setTimeout(function () { b.disabled = false; b.classList.remove('hold'); }, ms);
   }
   function chip(ico, txt, cls) { return '<span class="rw ' + (cls || '') + '">' + (ico ? icon(ico) : '') + esc(txt) + '</span>'; }
   function renderReward(s, r) {
@@ -1095,7 +1119,7 @@
     var out = chip('stamp', '+' + s.reward.first_completion_stamps) + chip('star', '+' + r.xp);
     if (r.words) out += chip('stamp', '+' + r.words + ' за слова', 'good');
     if (r.chests) out += chip('chest', '×' + r.chests, 'good');
-    if (r.no_hints) out += chip('check', 'без подсказок', 'good');
+    if (r.no_hints && !r.extra) out += chip('check', 'без подсказок', 'good');
     if (r.bonus) out += chip('stamp', r.bonus + ' бонус', 'good');
     line.innerHTML = out;
     big.appendChild(rankBar(r));
@@ -1180,7 +1204,7 @@
           ghost.style.opacity = '.4';
         });
         setTimeout(function () { ghost.remove(); pulse(to); window.Sound.play('step', i + 2); }, 800);
-      }, 1300 + i * 220);
+      }, 300 + i * 220);
     });
   }
   function flyKeepsake(ch, delay) {
@@ -1242,20 +1266,49 @@
   /* Фонарь у пройденного места — выбор игрока (вторая серия, п. 1.4: автозажигание съедало марки, эксперт №6).
      Хватает марок — кнопка «Зажечь»; «Дальше» по-прежнему один тап и марки не трогает.
      Раз в 3 истории — бесплатный фонарь у одного из двух мест, у каждого свой подарок. */
+  /* Ступени места (план эксперта №7, п. 1.1): фонарь → окна → жители. На итоге — фонарь этой истории,
+     а если он уже горит — ближайшая по цене ступень любого пройденного места. */
+  var TIER = {
+    1: { title: 'Фонарь', verb: 'Зажечь фонарь', done: 'Фонарь горит', art: 'street_lamp', emoji: '🏮' },
+    2: { title: 'Окна', verb: 'Зажечь окна', done: 'Окна горят', art: 'house_window', emoji: '🪟' },
+    3: { title: 'Жители', verb: 'Позвать жителей', done: 'Жители вернулись', art: 'squirrel', emoji: '🐿️' },
+  };
   function renderLantern(s) {
     var b = $('btn-lantern');
-    var lit = S.data.lanterns.indexOf(s.id) >= 0;
     renderGoal();
     renderLampPick(s);
-    if (lit || S.data.completed_story_ids.indexOf(s.id) < 0 || !$('lamp-pick').hidden) { b.hidden = true; return; }
-    var can = S.canLight(s.id), cost = S.lanternCost();
+    var id = S.tierOf(s.id) === 0 ? s.id : (S.nextUpgrade() || {}).id;
+    if (!id || S.data.completed_story_ids.indexOf(s.id) < 0 || !$('lamp-pick').hidden) { b.hidden = true; return; }
+    var st = S.story(id), tier = S.tierOf(id) + 1, can = S.canUpgrade(id), cost = S.tierCost(id), T = TIER[tier];
     b.classList.remove('lit');
-    b.onclick = function () { lightLantern(s, b); };
+    b.onclick = function () { upgradePlace(id, b); };
     b.hidden = false;
     b.disabled = !can;
-    b.innerHTML = '<span class="lan-img art"></span><span><b>' + (can ? 'Зажечь фонарь: ' : 'Фонарь: ') + esc(s.place) + '</b><span class="muted">' +
+    b.dataset.tier = tier;
+    b.innerHTML = '<span class="lan-img art"></span><span><b>' + (can ? T.verb : T.title) + ': ' + esc(st.place) + '</b><span class="muted">' +
       (can ? cost + ' ' + icon('stamp') + ' · у вас ' + S.data.wallet.stamps : S.data.wallet.stamps + ' / ' + cost + ' ' + icon('stamp')) + '</span></span>';
-    art(b.querySelector('.lan-img'), 'street_lamp', '🏮');
+    art(b.querySelector('.lan-img'), T.art, T.emoji);
+  }
+  function upgradePlace(id, b, from) {
+    var st = S.story(id);
+    if (S.tierOf(id) === 0) return lightLantern(st, b, from);
+    var r = S.upgrade(id);
+    if (!r) return;
+    A.event('place_upgrade', { story_id: id, tier: r.tier, cost: r.cost, stamps: S.data.wallet.stamps, from: from || (screen === 'scr-result' ? 'result' : 'town') });
+    window.Sound.play('reward');
+    if (b) {
+      b.innerHTML = '<span class="lan-img art"></span><span><b>' + TIER[r.tier].done + ': ' + esc(st.place) + '</b><span class="muted">−' + r.cost + ' ' + icon('stamp') + '</span></span>';
+      art(b.querySelector('.lan-img'), TIER[r.tier].art, TIER[r.tier].emoji);
+      b.disabled = true; b.classList.add('lit');
+    }
+    if (screen === 'scr-result') nextOffer();
+    if (screen === 'scr-town') renderTown();
+    return r;
+  }
+  // После покупки на итоге кнопка через миг предлагает следующую ступень: марки всегда есть куда деть.
+  function nextOffer() {
+    var s = resultStory;
+    setTimeout(function () { if (screen === 'scr-result' && resultStory === s && S.nextUpgrade()) renderLantern(s); }, 1600);
   }
   function giftIcons(g) { return g.loupes ? '+' + g.loupes + ' ' + icon('loupe') : '+' + g.stamps + ' ' + icon('stamp'); }
   function giftLabel(g) { return g.loupes ? '+' + nLoupes(g.loupes) : '+' + nStamps(g.stamps); }
@@ -1317,6 +1370,7 @@
       lampScene(r.cost);
       renderGoal();
       pulse($('result-goal'));
+      nextOffer();
     }
     if (r.frame) frameGift(r.frame);
     if (screen === 'scr-town') renderTown();
@@ -1336,42 +1390,52 @@
   }
 
   /* ---------- фонари Тихоречья: трата марок ---------- */
-  var LAMP_SPOTS = [[18, 52], [30, 66], [44, 58], [24, 78], [56, 72], [66, 54], [78, 64], [40, 84], [86, 78], [60, 88],
-    [10, 68], [34, 48], [52, 44], [72, 84], [92, 58], [14, 90], [48, 72], [82, 46], [95, 90], [64, 70]];
+  /* Основание фонаря (x %, y %) у своего места на картине bg_town: дом, станция, оранжерея, мост, сад… Без пересечений
+     и не над рекой (план эксперта №7, п. 3.5). Порядок — порядок историй. */
+  var LAMP_SPOTS = [[21, 61], [82, 57], [70, 51], [35, 55], [89, 55], [90, 70], [49, 59], [10, 72], [8, 57], [27, 66],
+    [44, 47], [19, 80], [95, 59], [40, 62], [37, 77], [75, 62], [55, 48], [62, 49], [77, 47], [95, 74]];
   function showTown() {
     A.event('town_open', { count: S.data.lanterns.length });
     renderTown();
     show('scr-town');
   }
   function renderTown() {
-    $('town-sub').textContent = S.data.lanterns.length + ' / ' + S.stories.length + ' фонарей · ' + S.data.wallet.stamps + ' марок';
+    $('town-sub').textContent = S.data.lanterns.length + ' / ' + S.stories.length + ' · ' + nStamps(S.data.wallet.stamps);
     var map = $('town-lamps');
     map.innerHTML = '';
-    map.classList.toggle('many', S.stories.length > 10);
     S.stories.forEach(function (st, i) {
-      var on = S.data.lanterns.indexOf(st.id) >= 0;
+      var t = S.tierOf(st.id), done = S.data.completed_story_ids.indexOf(st.id) >= 0;
       var el = document.createElement('span');
-      el.className = 'town-lamp art' + (on ? ' on' : '');
+      el.className = 'town-lamp' + (t ? ' on t' + t : '') + (done ? '' : ' far');
+      el.dataset.story = st.id;
       // мест на карте меньше, чем историй, — не падаем, а ставим фонарь со сдвигом
       var sp = LAMP_SPOTS[i % LAMP_SPOTS.length], k = Math.floor(i / LAMP_SPOTS.length);
       el.style.left = Math.min(96, sp[0] + 3 * k) + '%'; el.style.top = Math.max(30, sp[1] - 6 * k) + '%';
-      art(el, 'street_lamp', '🏮');
+      el.innerHTML = '<span class="tl-lamp art"></span>' + (t >= 2 ? '<span class="tl-badge tl-win art"></span>' : '') + (t >= 3 ? '<span class="tl-badge tl-folk art"></span>' : '');
+      art(el.querySelector('.tl-lamp'), 'street_lamp', '🏮');
+      if (t >= 2) art(el.querySelector('.tl-win'), TIER[2].art, TIER[2].emoji);
+      if (t >= 3) art(el.querySelector('.tl-folk'), TIER[3].art, TIER[3].emoji);
       map.appendChild(el);
     });
     var list = $('town-list');
     list.innerHTML = '';
     S.stories.forEach(function (st) {
-      var on = S.data.lanterns.indexOf(st.id) >= 0, done = S.data.completed_story_ids.indexOf(st.id) >= 0;
+      var t = S.tierOf(st.id), done = S.data.completed_story_ids.indexOf(st.id) >= 0;
       var row = document.createElement('div');
-      row.className = 'town-row' + (on ? ' on' : '');
-      // значки вместо слов (план эксперта №5, п. 20): горит — фонарь, ещё не разгадано — замок
-      var right = on ? '<span class="tag" aria-label="Горит">' + icon('lamp') + '</span>' : !done ? '<span class="muted" aria-label="После истории">' + icon('lock') + '</span>' :
-        '<button class="btn-small" data-light="' + st.id + '"' + (S.canLight(st.id) ? '' : ' disabled') + '>' + S.lanternCost() + ' ' + icon('stamp') + '</button>';
-      row.innerHTML = '<b>' + esc(st.place) + '</b>' + right;
+      row.className = 'town-row' + (t ? ' on' : '');
+      // три ступени места значками: горит — цветной, ещё нет — бледный; справа — цена следующей или замок
+      var pips = '<span class="tiers" aria-label="Ступеней: ' + t + ' из 3">' + [1, 2, 3].map(function (k) {
+        return '<span class="tier art' + (t >= k ? ' got' : '') + '" data-k="' + k + '"></span>';
+      }).join('') + '</span>';
+      var right = !done ? '<span class="muted" aria-label="После истории">' + icon('lock') + '</span>' :
+        t >= 3 ? '<span class="tag" aria-label="Всё горит">' + icon('check') + '</span>' :
+        '<button class="btn-small" data-up="' + st.id + '" aria-label="' + TIER[t + 1].verb + ': ' + esc(st.place) + '"' + (S.canUpgrade(st.id) ? '' : ' disabled') + '>' + S.tierCost(st.id) + ' ' + icon('stamp') + '</button>';
+      row.innerHTML = '<b>' + esc(st.place) + '</b>' + (done ? pips : '') + right;
+      row.querySelectorAll('.tier').forEach(function (p) { var T = TIER[p.dataset.k]; art(p, T.art, T.emoji); });
       list.appendChild(row);
     });
-    list.querySelectorAll('[data-light]').forEach(function (b) {
-      b.addEventListener('click', function () { lightLantern(S.story(b.dataset.light), null); });
+    list.querySelectorAll('[data-up]').forEach(function (b) {
+      b.addEventListener('click', function () { upgradePlace(b.dataset.up, null); });
     });
   }
 
@@ -1388,6 +1452,8 @@
   /* ---------- «На сегодня всё»: дневник, завтрашний подарок, вопрос и открытка ---------- */
   function showRest() {
     var s = resultStory, d = S.diary();
+    // «На сегодня всё» на итоге последней истории главы: сначала финал главы, его кнопка «На главную» ведёт дальше
+    if (S.finaleUnseen()) { A.event('finale_shown', { chapter: S.finaleUnseen(), from: 'rest' }); showFinale(S.finaleUnseen()); return; }
     var t = homeTarget();
     A.event('session_rest', { story_id: s ? s.id : null, completed: S.data.completed_story_ids.length, diary: d.days, today: d.today });
     $('rest-sub').textContent = 'Разгадано историй: ' + S.data.completed_story_ids.length + ' · ' + S.rank().name;
@@ -1451,6 +1517,7 @@
       g.appendChild(el);
     });
     renderSecret($('finale-secret'), num);
+    S.markFinaleSeen(num);
     show('scr-finale');
     window.Sound.play('chapter');
   }
@@ -1609,7 +1676,8 @@
     if (!S.data.opened) showBox();
     else {
       recapOn = visitInfo.back && visitInfo.away >= 1 && !!S.lastLearned();
-      showHome();
+      if (S.finaleUnseen()) { A.event('finale_shown', { chapter: S.finaleUnseen(), from: 'boot' }); showFinale(S.finaleUnseen()); }
+      else showHome();
     }
     A.event('game_ready', { screen: screen, opened: S.data.opened, completed: S.data.completed_story_ids.length,
       in_progress: S.cur() ? S.cur().story_id : null, persistent: P.persistent });

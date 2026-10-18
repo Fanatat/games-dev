@@ -14,7 +14,7 @@
      а не копят; марки приходят чаще и тратятся на фонари и оформление атласа (ТЗ §8.2). */
   var BONUS_STAMPS = 2, BONUS_FULL = 25;           // бонусное слово — только марки; после 25-го в истории — по 1
   var NO_HINT_XP = 5;                              // история без «Начала», «Пути» и «Разбора»
-  var GOLDEN_CHANCE = 0.2, GOLDEN = { loupes: 0, stamps: 20 }; // золотая марка: изредка за историю без подсказок; только марки (круг 10: лупы в дефицит)
+  var GOLDEN_CHANCE = 0.2, GOLDEN = { loupes: 0, stamps: 20 }; // золотая марка: изредка за любую историю (вторая серия, круг 2: и с подсказками); только марки
   var GOLDEN_AT = [4, 8];                          // …и всегда на 5-й и 9-й истории главы (круг 5: награда растёт к концу главы)
   var GUESS = { loupes: 1, stamps: 15 };           // тайное слово угадано до последней буквы
   var PARCELS = { 4: { loupes: 1, stamps: 40 }, 12: { loupes: 1, stamps: 40 } }; // посылка хранителей: 5-я и 13-я истории
@@ -22,7 +22,7 @@
   var CACHE_REWARD = { loupes: 1, stamps: 15 };
   /* Фонарь дорожает ступенькой (план эксперта №4, круг 1): 30, 35, 40… — марки всегда есть куда деть,
      а 8 фонарей за первые полчаса остаются по силам. */
-  var LANTERN_COST = 30, LANTERN_STEP = 10;
+  var LANTERN_COST = 30, LANTERN_STEP = 10, LANTERN_MAX = 50;
   var BONUS_DROP = 10;                             // каждые 10 бонусных слов — лупа (капля у значка лупы; круг 10: было 5)
   /* «Разобрать вместе» (ТЗ §4.3: «если люди застревают раньше, уменьшить его»): эксперт №6 видел застревания
      Новичка на 54–78 с при запертом разборе, поэтому 45 с вместо 90, а без луп — 30 с. */
@@ -31,10 +31,14 @@
   /* Вторая серия, круг 1 (план эксперта №6): слово — главная награда (+1 марка за букву), серия из трёх слов
      без ошибки и подсказки удваивает марки за слово, пока не ошибся; ошибка ничего не отнимает. */
   var WORD_STAMP = 1, STREAK_AT = 3, STREAK_MULT = 2;
-  /* Бонус-слова на виду: счётчик «x / N» по частым словам поля (bonus_goal, до 12), сундучки на 3, 6 и 10;
-     редкое слово вне списка — +3 марки. */
-  var RARE_STAMPS = 3, CHESTS_AT = [3, 6, 10];
-  var CHEST_GIFTS = [{ stamps: 10 }, { loupes: 1 }, { stamps: 20, golden: true }];
+  /* Сундук поля (вторая серия, круг 2, план эксперта №7, п. 1.5 и 4.9): деление за каждое слово улики, два — за любое
+     бонус-слово; сундуки на 4, 9 и 15 делениях, внутри — случайный подарок, изредка большой. Редкое слово вне списка
+     частых — +3 марки. Список частых слов (bonus_goal) остаётся подсказкой в листе бонус-слов. */
+  var RARE_STAMPS = 3, CHESTS_AT = [4, 9, 15], CLUE_PTS = 1, BONUS_PTS = 2;
+  var CHEST_POOL = [{ w: 0.30, stamps: 10 }, { w: 0.30, stamps: 15 }, { w: 0.15, loupes: 1 },
+    { w: 0.15, stamps: 20, golden: true }, { w: 0.10, stamps: 25, loupes: 1, big: true }];
+  /* Места городка растут в три ступени (план эксперта №7, п. 1.1): фонарь → окна → жители. Марки всегда есть куда деть. */
+  var TIER_COST = { 2: 60, 3: 120 }, TIERS = 3;
   /* Фонарь — выбор (п. 1.4): сам больше не загорается. Каждые 3 истории — бесплатный фонарь у одного из двух мест,
      у мест разные подарки. Бесплатные фонари не поднимают цену следующих. */
   var LAMP_GIFTS = [{ loupes: 1 }, { stamps: 25 }];
@@ -88,8 +92,8 @@
       completed_story_ids: [], atlas_item_ids: [], seen_result_ids: [],
       wallet: { stamps: 0, loupes: START_LOUPES }, xp: 0,
       seed: seedOf(), bonus_total: 0, bonus_drop: 0, golden: 0, lanterns: [], secret: {}, guesses: {}, caches: [], parcels: [],
-      streak: 0, lamps_free: 0, lamp_picks: 0,
-      cover: 'paper', covers: ['paper'], seen_new: [], finale: false, finales: [],
+      streak: 0, lamps_free: 0, lamp_picks: 0, upgrades: {},
+      cover: 'paper', covers: ['paper'], seen_new: [], finale: false, finales: [], finales_seen: [],
       diary: [], diary_pages: 0, last_day: null, visits: 0,
       daily: { last: null, streak: 0, best: 0, solved: 0 },
       free_demo: { start: true, path: true },
@@ -130,6 +134,7 @@
       var b = blank(content.content_version);
       // старые сохранения: кто уже нашёл слово, того протяжке заново не учим
       if (!('traced' in d)) d.traced = !!((d.completed_story_ids && d.completed_story_ids.length) || (d.current && d.current.found && Object.keys(d.current.found).length));
+      if (!('finales_seen' in d)) d.finales_seen = (d.finales || []).slice(); // кто уже прошёл главу — финал не показываем заново
       for (var k in b) if (!(k in d)) d[k] = b[k];
       for (var s in b.settings) if (!(s in d.settings)) d.settings[s] = b.settings[s];
       // недоигранная история, которой нет в контенте, — начинаем заново
@@ -138,6 +143,7 @@
       if (d.current && d.current.content_version !== content.content_version) d.current = null;
       if (d.current && !d.current.bonus) d.current.bonus = [];
       if (d.current && !('chests' in d.current)) { d.current.chests = 0; d.current.word_stamps = 0; }
+      if (d.current && !('pts' in d.current)) d.current.pts = 0;
       if (d.finale && d.finales.indexOf(1) < 0) d.finales.push(1);
       // рамки теперь за фонари: старым сохранениям выдаём заработанные
       COVERS.forEach(function (c) { if (c.lamps && d.lanterns.length >= c.lamps && d.covers.indexOf(c.id) < 0) d.covers.push(c.id); });
@@ -317,6 +323,7 @@
       var stamps = clue.answer.length * WORD_STAMP * mult;
       data.wallet.stamps += stamps;
       c.word_stamps = (c.word_stamps || 0) + stamps;
+      var chest = addPts(CLUE_PTS);
       var complete = foundCount() === curStory().clues.length;
       if (!complete && (c.selected_clue_id === clueId || isFound(c.selected_clue_id))) c.selected_clue_id = firstUnfound();
       // золотая буква тайного слова главы лежит в этом ответе
@@ -324,7 +331,7 @@
       if (sec && sec.clue_id === clueId && !data.secret[sk]) { data.secret[sk] = sec.letter; letter = sec.letter; }
       writeNow(); // каждое найденное слово — сразу на диск (A06)
       return { already: false, complete: complete, secret: letter, stamps: stamps, streak: data.streak, mult: mult,
-        series: !helped && data.streak === STREAK_AT };
+        series: !helped && data.streak === STREAK_AT, chest: chest };
     }
     // Неверное слово: серия кончается. Возвращает true, если шла серия ×2.
     function miss() {
@@ -345,26 +352,26 @@
       var goal = s.bonus_goal || [], common = goal.indexOf(word) >= 0;
       var got = c.bonus.length > BONUS_FULL ? 1 : common ? BONUS_STAMPS : RARE_STAMPS;
       data.wallet.stamps += got;
-      var chest = null, g = goalCount();
-      if (common && chestAt(goal.length).indexOf(g) >= 0) {
-        var gift = CHEST_GIFTS[Math.min(c.chests || 0, CHEST_GIFTS.length - 1)];
-        c.chests = (c.chests || 0) + 1;
-        chest = { stamps: gift.stamps || 0, loupes: gift.loupes || 0, golden: !!gift.golden, n: c.chests };
-        data.wallet.stamps += chest.stamps; data.wallet.loupes += chest.loupes;
-        if (chest.golden) data.golden++;
-      }
+      var g = goalCount(), chest = addPts(BONUS_PTS);
       data.bonus_drop = (data.bonus_drop || 0) + 1;
       var loupe = data.bonus_drop >= BONUS_DROP;
       if (loupe) { data.bonus_drop = 0; data.wallet.loupes++; }
       writeNow();
       return { ok: true, repeat: false, count: c.bonus.length, stamps: got, loupe: loupe, drop: data.bonus_drop,
-        rare: !common, goal: g, of: goal.length, chest: chest };
+        rare: !common, goal: g, of: goal.length, chest: chest, pts: c.pts };
     }
-    // Сундучки поля: на 3, 6 и 10 частых словах; у короткого списка последний — на всём списке.
-    function chestAt(n) {
-      var t = CHESTS_AT.filter(function (x) { return x <= n; });
-      if (n && n < CHESTS_AT[CHESTS_AT.length - 1] && t[t.length - 1] !== n) t.push(n);
-      return t;
+    // Деления сундука поля; перешли порог — сундук со случайным подарком (стабильно для игрока и истории).
+    function addPts(n) {
+      var c = data.current, before = c.pts || 0;
+      c.pts = before + n;
+      if (!CHESTS_AT.some(function (x) { return x > before && x <= c.pts; })) return null;
+      c.chests = (c.chests || 0) + 1;
+      var r = chance(data.seed, c.story_id + ':chest' + c.chests), acc = 0, gift = CHEST_POOL[CHEST_POOL.length - 1];
+      for (var i = 0; i < CHEST_POOL.length; i++) { acc += CHEST_POOL[i].w; if (r < acc) { gift = CHEST_POOL[i]; break; } }
+      var chest = { stamps: gift.stamps || 0, loupes: gift.loupes || 0, golden: !!gift.golden, big: !!gift.big, n: c.chests };
+      data.wallet.stamps += chest.stamps; data.wallet.loupes += chest.loupes;
+      if (chest.golden) data.golden++;
+      return chest;
     }
     function goalCount() {
       var c = data.current, s = curStory();
@@ -372,10 +379,10 @@
       var goal = s.bonus_goal || [];
       return c.bonus.filter(function (w) { return goal.indexOf(w) >= 0; }).length;
     }
+    // Сундук поля: pts — деления, next — следующий сундук (null — все открыты); got / of — частые бонус-слова.
     function bonusGoal() {
-      var s = curStory(), n = s && s.bonus_goal ? s.bonus_goal.length : 0;
-      var at = chestAt(n), got = goalCount();
-      return { got: got, of: n, chests: at, next: at.filter(function (x) { return x > got; })[0] || null };
+      var s = curStory(), n = s && s.bonus_goal ? s.bonus_goal.length : 0, pts = (data.current && data.current.pts) || 0;
+      return { got: goalCount(), of: n, pts: pts, chests: CHESTS_AT.slice(), next: CHESTS_AT.filter(function (x) { return x > pts; })[0] || null };
     }
     // Тайник: слово без улики. Награда один раз на историю.
     function cacheFound() {
@@ -390,7 +397,8 @@
     function cacheDone(id) { return data.caches.indexOf(id) >= 0; }
 
     // Фонари Тихоречья: за марки зажигается фонарь у пройденного места (видно на картинке городка).
-    function lanternCost() { return LANTERN_COST + LANTERN_STEP * Math.max(0, data.lanterns.length - (data.lamps_free || 0)); }
+    // фонарь дорожает на 10 за каждый купленный, но не дороже окон: ступени места идут по цене вверх (план №7, п. 1.1)
+    function lanternCost() { return Math.min(LANTERN_MAX, LANTERN_COST + LANTERN_STEP * Math.max(0, data.lanterns.length - (data.lamps_free || 0))); }
     function canLight(id) {
       return data.completed_story_ids.indexOf(id) >= 0 && data.lanterns.indexOf(id) < 0 && data.wallet.stamps >= lanternCost();
     }
@@ -403,6 +411,35 @@
       var frame = lampFrame();
       writeNow();
       return { cost: cost, frame: frame };
+    }
+    /* Ступени места: 0 — темно, 1 — фонарь, 2 — окна, 3 — жители. */
+    function tierOf(id) { return data.upgrades[id] || (data.lanterns.indexOf(id) >= 0 ? 1 : 0); }
+    function tierCost(id) { var t = tierOf(id); return t === 0 ? lanternCost() : TIER_COST[t + 1] || null; }
+    function canUpgrade(id) {
+      var t = tierOf(id), cost = tierCost(id);
+      return data.completed_story_ids.indexOf(id) >= 0 && t < TIERS && data.wallet.stamps >= cost;
+    }
+    // Следующая ступень места. Возвращает {tier, cost, frame} или null.
+    function upgrade(id) {
+      var t = tierOf(id);
+      if (t === 0) { var r = light(id); return r && { tier: 1, cost: r.cost, frame: r.frame }; }
+      if (!canUpgrade(id)) return null;
+      var cost = tierCost(id);
+      data.wallet.stamps -= cost;
+      data.upgrades[id] = t + 1;
+      writeNow();
+      return { tier: t + 1, cost: cost, frame: null };
+    }
+    // Ближайшая цель городка: самая дешёвая следующая ступень среди пройденных мест (при равной цене — свежее место).
+    function nextUpgrade() {
+      var best = null;
+      data.completed_story_ids.slice().reverse().forEach(function (id) {
+        var t = tierOf(id);
+        if (t >= TIERS) return;
+        var cost = tierCost(id);
+        if (!best || cost < best.cost) best = { id: id, tier: t + 1, cost: cost, have: data.wallet.stamps, can: data.wallet.stamps >= cost };
+      });
+      return best;
     }
     function lampFrame() {
       var frame = null;
@@ -495,7 +532,9 @@
         reward.stamps = s.reward.first_completion_stamps;
         reward.xp = s.reward.first_completion_xp;
         if (!used) { reward.no_hints = true; reward.xp += NO_HINT_XP; }
-        if (GOLDEN_AT.indexOf(s.pos) >= 0 || (!used && chance(data.seed, s.id) < GOLDEN_CHANCE)) {
+        // «Ещё улика» бесплатна и опыта не отнимает, но значок «без подсказок» за такую историю не показываем (п. 4.2)
+        reward.extra = Object.keys(h).some(function (k) { return h[k].extra; });
+        if (GOLDEN_AT.indexOf(s.pos) >= 0 || chance(data.seed, s.id) < GOLDEN_CHANCE) {
           reward.golden = true; reward.loupes += GOLDEN.loupes; reward.stamps += GOLDEN.stamps; data.golden++;
         }
         var pc = PARCELS[s.index];
@@ -610,6 +649,9 @@
     function setSetting(k, v) { data.settings[k] = v; writeNow(); }
     function markOpened() { if (!data.opened) { data.opened = true; writeNow(); } }
     function markTraced() { if (!data.traced) { data.traced = true; saveSoon(); } }
+    // Финал главы, который начислен, но ещё не показан (нажали «На сегодня всё» на итоге 10-й истории; п. 4.8).
+    function finaleUnseen() { return data.finales.filter(function (n) { return data.finales_seen.indexOf(n) < 0; })[0] || null; }
+    function markFinaleSeen(n) { if (data.finales_seen.indexOf(n) < 0) { data.finales_seen.push(n); saveSoon(); } }
     function markResultSeen(id) { if (data.seen_result_ids.indexOf(id) < 0) { data.seen_result_ids.push(id); saveSoon(); } }
     function reset() { data = blank(content.content_version); writeNow(); }
 
@@ -629,6 +671,8 @@
       bonusWord: bonusWord, cacheFound: cacheFound, cacheDone: cacheDone,
       canLight: canLight, light: light, lanternCost: lanternCost, nextFrame: nextFrame, rank: rank, secretOf: secretOf, canGuess: canGuess, guess: guess, GUESS: GUESS,
       covers: covers, canPickCover: canPickCover, setCover: setCover, markNew: markNew, seenNew: seenNew, trioCount: trioCount,
+      tierOf: tierOf, tierCost: tierCost, canUpgrade: canUpgrade, upgrade: upgrade, nextUpgrade: nextUpgrade, TIER_COST: TIER_COST, CHESTS_AT: CHESTS_AT,
+      finaleUnseen: finaleUnseen, markFinaleSeen: markFinaleSeen,
     };
   }
 

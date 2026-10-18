@@ -170,6 +170,21 @@
     boardEl.querySelectorAll('.gold').forEach(function (e) { e.classList.remove('gold'); });
     if (cell && on) cells[cell[0]][cell[1]].classList.add('gold');
   }
+  // Пыль (план эксперта №7, п. 1.4): буква спрятана, пока рядом не пройдёт найденное слово. Слова читаются из сетки, не с экрана.
+  function setDust(list) {
+    (list || []).forEach(function (p) { var el = cells[p[0]] && cells[p[0]][p[1]]; if (el) { el.classList.add('dust'); el.textContent = ''; } });
+  }
+  function sweep(list) {
+    (list || []).forEach(function (p) {
+      var el = cells[p[0]] && cells[p[0]][p[1]];
+      if (!el) return;
+      el.classList.remove('dust');
+      el.textContent = story.grid[p[0]].charAt(p[1]);
+      if (document.body.classList.contains('rm')) return;
+      el.classList.add('swept');
+      setTimeout(function () { el.classList.remove('swept'); }, 800);
+    });
+  }
   function cellRect(p) { return cells[p[0]] && cells[p[0]][p[1]] ? cells[p[0]][p[1]].getBoundingClientRect() : null; }
 
   /* ---------- подсказки на поле ---------- */
@@ -374,7 +389,7 @@
   }
 
   root.Board = { mount: mount, render: render, fit: fit, markFound: markFound,
-    flashBonus: flashBonus, markCache: markCache, setGold: setGold, cellRect: cellRect, showStart: showStart, clearStart: clearStart,
+    flashBonus: flashBonus, markCache: markCache, setDust: setDust, sweep: sweep, setGold: setGold, cellRect: cellRect, showStart: showStart, clearStart: clearStart,
     showPath: showPath, clearHints: clearHints, pointAt: pointAt, demoTrace: demoTrace, stopPointer: stopPointer,
     get demoing() { return demoing(); }, get demoCells() { return demoCells ? demoCells.slice() : null; }, redraw: drawLines,
     get dragging() { return dragging || kbSelecting; }, COLORS: COLORS };

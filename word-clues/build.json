@@ -1,5 +1,5 @@
 {
- "build": "0.1.0+b022 · 8b845f1",
+ "build": "0.1.0+b023 · eef369c",
  "art": [
   "acorn",
   "address",
@@ -343,16 +343,16 @@
   "assets/sfx/tap.mp3": "8cb413ca2f49b945861fdd7b69e452ff0c222882011be7bfeae92baaec2614cc",
   "assets/sfx/win.mp3": "468d5f3b8bf8c8ea8bcef52906b0da44ab35547d763035470621e2c9309cde0d",
   "assets/sfx/wrong.mp3": "cd172cec43bb120ad724e809a543e2e1608579441897b249ad916fc68b18f924",
-  "data/content.js": "efa6cc806596f747b63ed656cb96a2dd5af53768920fdaa10bcd401abf405d91",
-  "index.html": "9a9b2fb7b280f59d9cdb4f3421f02a743db5f95810fea9569bbe3e84c4f10604",
+  "data/content.js": "5b6bd053ecf5eeb58e29b569d98aa3eb6f71dae7b3076924b67e8723f053800e",
+  "index.html": "4a8fc8d989420e8c6bf433450509faa98151bf1205323e3b097b3cd6c6ae2832",
   "src/analytics.js": "8aec4219f946e2e916c791148f91191883016a93b6fc263aeddf9fef067c90da",
-  "src/app.js": "778877b6110b18d3870a4a2fedca4b0f831cd6809b72ab72c4e9a4b8d2cff288",
-  "src/board.js": "6de0a67091b9fd6e8f988fdf474db8b2f2fddc6ccb287f06357e32550500483f",
+  "src/app.js": "7564e1e1943d0dffc970136af68d641fe180eb4de4d9902375a59765ee44ed90",
+  "src/board.js": "152a18d134f2c993d229ea6c4d6ad57b887eef4835b53b7700059aca41d53473",
   "src/logic.js": "5b87c230d0b45a85d9550abaf868f7eb1b10a1c456d9e50d5f0fe244965845a6",
-  "src/platform.js": "706e233b0494e687c85776441878cfc03fbb1d139b5303d887c4b11854928089",
+  "src/platform.js": "cd34a59168fe00f434cc607e2ae886d233db6f28cc553391d6cd00949411aa95",
   "src/sound.js": "6a51a1e8499c4c0205a45da5bf7ed9f29bda42d60636be38156172827f598d5f",
-  "src/state.js": "a99a5e043e323ed856ae6870ab3807eabbce8f5425223e148aabb839b734d885",
-  "src/styles.css": "193366b4cedd8f669be6583a41307f997001e29c36516efa37737dc29c6f915d",
+  "src/state.js": "9204961c8c1bbfd96114eb66f9b2931d77d4ef5f226d6bc3a1cf4afd62f6254a",
+  "src/styles.css": "b57f59d03b5006755001935af839fe38c21fb03624deeeb8bba5fc2d4fd5dd97",
   "vendor/VK_BRIDGE.md": "954dbcac21cccc2676d7cd91c1c8241e0bc8695ff6cb75f40d547520df8dc8ba",
   "vendor/vk-bridge.min.js": "827ba6f457cd9e73519b58b2c66564caf138645202f1bba37dca0b567f601bb4"
  }

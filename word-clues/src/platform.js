@@ -139,13 +139,40 @@
 
   /* Поделиться открыткой-загадкой: ВК — окно записи на стене, иначе системное «Поделиться»,
      иначе копия в буфер. Отдаёт способ ('vk' | 'native' | 'copy') или null, если не вышло/отменили. */
-  function share(text) {
+  /* Поделиться (оценка эксперта №7, п. 25: уходил только текст). image — функция, отдающая data:image/png карточки:
+     в ВК на телефоне — история с картинкой (VKWebAppShowStoryBox), не вышло или компьютер — запись на стене текстом;
+     в браузере — системное «Поделиться» с файлом, если умеет, иначе текстом, иначе копия в буфер. */
+  function dataFile(png) {
+    try {
+      var bin = atob(png.split(',')[1]), arr = new Uint8Array(bin.length);
+      for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+      return new File([arr], 'ulika-dnya.png', { type: 'image/png' });
+    } catch (e) { return null; }
+  }
+  function wall(text) {
+    try {
+      return bridge.send('VKWebAppShowWallPostBox', { message: text })
+        .then(function () { return 'vk'; }, function () { return null; });
+    } catch (e) { return Promise.resolve(null); }
+  }
+  function share(text, image) {
     var url = location.origin + location.pathname;
+    var png = null;
+    if (image) { try { png = image(); } catch (e) { png = null; } }
     if (vk) {
-      try {
-        return bridge.send('VKWebAppShowWallPostBox', { message: text })
-          .then(function () { return 'vk'; }, function () { return null; });
-      } catch (e) { return Promise.resolve(null); }
+      var mobile = /^mobile_/.test(params.get('vk_platform') || '');
+      if (png && mobile) {
+        var box = { background_type: 'image', blob: png };
+        if (params.get('vk_app_id')) box.attachment = { text: 'go_to', type: 'url', url: 'https://vk.com/app' + params.get('vk_app_id') };
+        try {
+          return bridge.send('VKWebAppShowStoryBox', box).then(function () { return 'vk_story'; }, function () { return wall(text); });
+        } catch (e) { return wall(text); }
+      }
+      return wall(text);
+    }
+    var file = png && navigator.share && navigator.canShare ? dataFile(png) : null;
+    if (file && navigator.canShare({ files: [file] })) {
+      return navigator.share({ files: [file], text: text + ' ' + url }).then(function () { return 'native_image'; }, function () { return null; });
     }
     if (navigator.share) {
       return navigator.share({ text: text, url: url }).then(function () { return 'native'; }, function () { return null; });

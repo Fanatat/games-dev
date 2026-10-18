@@ -252,14 +252,22 @@ button.slot.got { background: var(--surface); }
 .hint-opt { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 2px 10px; width: 100%; min-height: 56px;
   padding: 8px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); text-align: left; }
 .hint-opt .sub { grid-column: 1 / -1; font-size: 13px; }
+.hint-opt b { display: inline-flex; align-items: center; gap: 6px; }
+.hint-opt b .i { width: 18px; height: 18px; flex: none; }
 .hint-opt:disabled { opacity: .6; }
+/* лупа за марки в листе подсказки (вторая серия, круг 3) */
+.hint-note.has-buy { display: flex; align-items: center; justify-content: center; gap: 10px; }
+.btn-buy { display: inline-flex; align-items: center; gap: 5px; min-height: 44px; padding: 4px 14px; border: 1px solid var(--green);
+  border-radius: 22px; background: #EEF3EC; color: var(--green-d); font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; }
+.btn-buy .i { width: 18px; height: 18px; flex: none; }
 .hint-opt.explain:not(:disabled) { border-color: var(--green); background: #EEF3EC; }
 .sheet-x { position: absolute; top: 4px; right: 6px; width: 44px; height: 44px; border: 0; border-radius: 50%; background: none;
   color: var(--muted); font-size: 26px; line-height: 1; }
 /* низкий экран (320×568): лист подсказки целиком в экране, подписи — только ярлыками (оценка №4, п. 5) */
 @media (max-height: 600px) {
   .hint-opt, .hint-grid .hint-opt { min-height: 48px; }
-  .hint-opt .sub, .sheet .hint-note { display: none; }
+  .hint-opt .sub, .sheet .hint-note:not(.has-buy) { display: none; }
+  .sheet .hint-note.has-buy { margin: 6px 0 0; }
 }
 .tag { font-size: 13px; font-weight: 600; color: var(--green-d); background: var(--surface); border-radius: 8px; padding: 3px 8px; white-space: nowrap; }
 .sw { flex: none; width: 46px; height: 28px; border-radius: 14px; background: var(--line); position: relative; transition: background .15s; }
@@ -425,6 +433,7 @@ button.reward-card { width: 100%; text-align: left; font: inherit; color: inheri
 .cv-copper { background: #F3E3D3; box-shadow: inset 0 0 0 5px #B8733F; }
 .cv-silver { background: #EEF0F0; box-shadow: inset 0 0 0 5px #9EA6AA; }
 .cv-gold { background: #FBF0D2; box-shadow: inset 0 0 0 5px #C9962B; }
+.cv-ember { background: radial-gradient(circle at 50% 70%, #FFD58A, #F6E6C8 70%); box-shadow: inset 0 0 0 5px #D4652B; }
 .covers-btn { margin: 0 auto 10px; min-height: 44px; padding: 4px 12px 4px 4px; gap: 8px; }
 .covers-btn .cv-swatch { width: 34px; height: 34px; }
 .cover-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
@@ -442,6 +451,9 @@ button.reward-card { width: 100%; text-align: left; font: inherit; color: inheri
 #scr-atlas[data-cover="copper"] .slot.got { border-color: #B8733F; }
 #scr-atlas[data-cover="silver"] .slot.got { border-color: #9EA6AA; }
 #scr-atlas[data-cover="gold"] .slot.got { border-color: #C9962B; }
+#scr-atlas[data-cover="ember"] .atlas-cover { outline: 6px solid #D4652B; outline-offset: -6px; box-shadow: 0 0 18px rgba(212, 101, 43, .4); }
+#scr-atlas[data-cover="ember"] .slot.got { border-color: #D4652B; }
+.finale-grid[data-cover="ember"] .finale-item { border-color: #D4652B; }
 .atlas-cover { position: relative; }
 .route-secret { display: flex; flex-direction: column; gap: 6px; padding: 10px 14px; margin-bottom: 4px; background: #FFF8E8; border-color: #E2C68E; }
 .route-secret b { display: inline-flex; align-items: center; gap: 6px; color: #6B4A12; }
@@ -571,6 +583,10 @@ body.rm .cell.hint-start { animation: none; }
 .new-badge { display: inline-block; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: #FFF6E2;
   background: #B7791F; border-radius: 6px; padding: 1px 6px; margin-right: 4px; vertical-align: 1px; }
 .daily-gain .i { width: 15px; height: 15px; vertical-align: -2px; color: var(--amber); }
+.btn-gold { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; min-height: 44px; margin-bottom: 8px;
+  border: 1.5px solid #C9962B; border-radius: 14px; background: #FFF6E2; color: #7A4E0E; font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; }
+.btn-gold .i { width: 18px; height: 18px; flex: none; }
+.big-badge { background: #2F6B53; text-transform: none; letter-spacing: 0; font-size: 13px; }
 /* 3.6 звук — круглая кнопка в углу главной и плитка в настройках */
 .head-btns { display: flex; gap: 4px; flex: none; }
 #btn-sound, #btn-music { border-radius: 50%; }
@@ -637,6 +653,21 @@ body.rm .cell.hint-start { animation: none; }
   25%, 75% { opacity: 1; transform: translate(-50%, 0) scale(1); } 100% { opacity: 0; transform: translate(-50%, -18px); } }
 #streak { position: absolute; z-index: 4; top: 6px; right: 6px; padding: 2px 10px; border-radius: 12px; background: #C9962B; color: #fff;
   font-weight: 800; font-size: 14px; box-shadow: 0 2px 6px rgba(60, 50, 30, .25); pointer-events: none; }
+/* Пыль на клетке и спринт (вторая серия, круг 3; план эксперта №7, п. 1.4) */
+.cell.dust { background: radial-gradient(circle at 30% 35%, rgba(255,255,255,.35) 0 18%, transparent 19%),
+  radial-gradient(circle at 70% 65%, rgba(255,255,255,.25) 0 14%, transparent 15%), #CDBF9F; border-color: #B5A47E; }
+.cell.dust::after { content: ''; width: 34%; height: 34%; border-radius: 50%; background: rgba(120,100,60,.18); }
+.cell.swept { animation: swept .8s ease-out both; }
+@keyframes swept { 0% { box-shadow: 0 0 0 0 rgba(205,191,159,.95); background: #E9DFC8; } 100% { box-shadow: 0 0 0 16px rgba(205,191,159,0); } }
+.sprint { position: absolute; z-index: 4; top: 6px; left: 6px; display: inline-flex; align-items: center; gap: 6px; min-height: 40px;
+  padding: 4px 12px; border: 0; border-radius: 20px; background: #2F6B53; color: #fff; font: inherit; font-size: 15px; cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0,0,0,.18); }
+.sprint .i { width: 18px; height: 18px; }
+.sprint.run { background: linear-gradient(90deg, #C9962B calc(var(--left, 1) * 100%), #8A7A55 0); opacity: 1; cursor: default; }
+.sprint:disabled { color: #fff; }
+.sprint .sp-t { font-variant-numeric: tabular-nums; opacity: .9; }
+/* низкая сцена (320×568, 360×640 — 52–57 px): спринт и «Нить» не помещаются рядом — пока виден спринт, «Нить» скрыта */
+.scene.sprint-tight .scene-thread { display: none; }
 #streak.out { opacity: 0; transform: scale(.8); transition: opacity .35s, transform .35s; }
 #chip-bonus .of { font-weight: 600; color: var(--muted); font-size: 14px; }
 #chip-bonus .i { color: var(--amber); }

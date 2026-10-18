@@ -1,44 +1,52 @@
-# Тестовый стенд браузерных игр
+# games-dev — тестовый стенд браузерных игр
 
-Здесь можно попробовать тестовые сборки перед публикацией на площадках.
-[Открыть каталог](https://fanatat.github.io/games-dev/).
+Тестовые сборки игр студии перед выпуском. [Открыть каталог](https://fanatat.github.io/games-dev/).
 
-| Игра | Тестовая сборка | Репозиторий игры | Снимок Git на 28.09.2026 |
-|---|---|---|---|
-| Словоход | [Открыть](https://fanatat.github.io/games-dev/slovokhod/) | [Код](https://github.com/Fanatat/slovokhod-vk) | `9f73050` |
-| Кот и японские кроссворды | [Открыть](https://fanatat.github.io/games-dev/catnonogram/) | [Код](https://github.com/Fanatat/catnonogram-vk) | `9f73050` |
-| Сортировка: Цвет и Форма | [Открыть](https://fanatat.github.io/games-dev/color-sort/) | [Код](https://github.com/Fanatat/Color_Sort-Vk) | `9f73050` |
-| Две крепости (Lane Battler) | [Открыть](https://fanatat.github.io/games-dev/lane-battle/) | [Код](https://github.com/Fanatat/lane-battle-vk) | `9f73050` |
-| Последний конвой (прототип форка «Двух крепостей») | [Открыть](https://fanatat.github.io/games-dev/last-convoy/) | ветка `fork1-last-convoy` локальная, не опубликована | `c28784b`, прототип от 05.10.2026 |
-| Королевская Косынка (Royal Solitaire) | [Открыть](https://fanatat.github.io/games-dev/royal-solitaire/) | [Код](https://github.com/Fanatat/Royal_solitaire) | `9f73050` |
-| Game7 (Horde), зомби-экшен на Unity WebGL | [Открыть](https://fanatat.github.io/games-dev/game7-horde/) | закрытый репозиторий | `953e638`, снимок от 30.09.2026 |
-| Police Runner, 3D-раннер на Godot 4 | [Открыть](https://fanatat.github.io/games-dev/police-runner/) | закрытый репозиторий | `a8e6244`, этап 2 (b3), 02.10.2026 |
-| Дом картинок, прототип P0 (форк «Кота и японских кроссвордов») | [Открыть](https://fanatat.github.io/games-dev/house-of-pictures/) | локальный форк, не публиковался | `dc33519` (ветка worktree-p0-hallway), сборка 001, 16.10.2026 |
-| Слова по уликам, глава 1 — черновик (форк game1) | [Открыть](https://fanatat.github.io/games-dev/word-clues/) | локальный форк, не публиковался | `eef369c` (ветка worktree-release-polish-2), сборка 023, 18.10.2026 |
-| Мастерская украшений, эксперимент на базе «Сортировки», новый облик | [Открыть](https://fanatat.github.io/games-dev/jewel-workshop/) | локальный форк, не публиковался | `7d29c69` (ветка fork/workshop-look), сборка w40, 11.10.2026 |
-| Мастерская украшений, облик w19 (для сравнения) | [Открыть](https://fanatat.github.io/games-dev/jewel-workshop-w19/) | локальный форк, не публиковался | `a76d6e3` (ветка fork/workshop-fun), сборка w19, 10.10.2026 |
-| Мастерская украшений, первый MVP (для сравнения) | [Открыть](https://fanatat.github.io/games-dev/jewel-workshop-mvp/) | локальный форк, не публиковался | `f115554` (ветка fork/workshop-mvp от `69c831b`), сборка w17, 08.10.2026 |
+Это **стенд**: боевые версии игр живут на `play.vanatat.ru` и открываются из VK Игр.
+Сборки здесь могут отличаться от боевых контентом, звуком, сохранениями и интеграциями
+площадок; реклама, покупки и облачные сохранения работают только внутри площадки.
+Наличие страницы не означает публикацию в каталоге.
 
-Идентификатор обозначает проверенный снимок репозитория, а не номер релиза игры.
-Game7 собрана как dev-сборка Unity WebGL (Gzip, с запасной распаковкой в JS — Pages не отдаёт `Content-Encoding`): показывает счётчик FPS, первая загрузка около 17 МБ.
-Police Runner — Web-экспорт Godot 4.7 без потоков: движку нужен HTTPS (по http с другого устройства не запускается), `index.wasm` около 40 МБ без сжатия. Debug-панель — F1 или 5 касаний в левый верхний угол.
-Тестовая версия может отличаться от релизной контентом, звуком, сохранениями и
-интеграциями площадок. Наличие страницы не подтверждает публикацию в каталоге VK,
-Яндекс Игр или CrazyGames. Обновление тестовой сборки — замена папки игры целиком.
+Папки названы по техническим номерам игр: `gameN` — основная игра, `gameN-forkM` —
+прототип на её базе.
+
+| Папка | Игра | Стек | Тестовая сборка | VK Игры |
+|---|---|---|---|---|
+| game1 | Словоход (филворд) | JavaScript | [открыть](https://fanatat.github.io/games-dev/game1/) | [app54674073](https://vk.com/app54674073) |
+| game2 | Кот и японские кроссворды (нонограммы) | JavaScript | [открыть](https://fanatat.github.io/games-dev/game2/) | [app54676906](https://vk.com/app54676906) |
+| game3 | Сортировка: Цвет и Форма | JavaScript | [открыть](https://fanatat.github.io/games-dev/game3/) | [app54683949](https://vk.com/app54683949) |
+| game4 | Две крепости (лейн-баттлер) | JavaScript, Canvas | [открыть](https://fanatat.github.io/games-dev/game4/) | [app54759696](https://vk.com/app54759696) |
+| game5 | Королевская Косынка | Three.js, TypeScript | [открыть](https://fanatat.github.io/games-dev/game5/) | на модерации |
+| game7 | Зомби Ленд | Unity WebGL | [открыть](https://fanatat.github.io/games-dev/game7/) · [для ВК](https://fanatat.github.io/games-dev/game7-vk/) | на модерации |
+| game9 | Коп Ленд (раннер) | Three.js | [открыть](https://fanatat.github.io/games-dev/game9/) | готовится |
+| game1-fork1 | Слова по уликам (прототип) | JavaScript | [открыть](https://fanatat.github.io/games-dev/game1-fork1/) | — |
+| game2-fork1 | Дом картинок (прототип) | JavaScript | [открыть](https://fanatat.github.io/games-dev/game2-fork1/) | — |
+| game3-fork1 | Мастерская украшений | JavaScript | [открыть](https://fanatat.github.io/games-dev/game3-fork1/) · [для ВК](https://fanatat.github.io/games-dev/game3-fork1-vk/) | на модерации |
+| game4-fork1 | Последний конвой | JavaScript, Canvas | [открыть](https://fanatat.github.io/games-dev/game4-fork1/) | на модерации |
+
+game6 (Godot, CrazyGames) и game8 (Unity, Steam) на стенде не выкладываются.
+
+Старые папки (`slovokhod/`, `catnonogram/`, `color-sort/`, `lane-battle/`, `royal-solitaire/`,
+`game7-horde/`, `police-runner-bb/`, `word-clues/`, `house-of-pictures/`, `jewel-workshop/`,
+`jewel-workshop-vk/`, `last-convoy/`) с 18.10.2026 только перенаправляют на новые адреса
+и будут удалены.
+
+Версию сборки показывает сама игра (штамп сборки в углу или в настройках).
+Обновление сборки — замена папки игры целиком.
 
 ## Локально
 
 ```bash
-git clone https://github.com/Fanatat/games-dev.git
+git clone --depth 1 https://github.com/Fanatat/games-dev.git
 cd games-dev
 python3 -m http.server 8000 --bind 127.0.0.1
 ```
 
-Откройте http://localhost:8000/. Реклама, покупки и облачные сохранения требуют
-соответствующей площадки.
+Откройте http://localhost:8000/.
 
 ## Сообщить об ошибке
 
-Напишите [@fanatat](https://t.me/fanatat): название игры, полный адрес страницы,
-устройство и браузер, шаги, ожидаемый результат и фактическое поведение.
-Добавьте снимок экрана и идентификатор сборки, если он показан в игре.
+Напишите [@fanatat](https://t.me/fanatat): игра, полный адрес страницы, устройство
+и браузер, шаги, ожидаемое и фактическое поведение, снимок экрана и штамп сборки.
+
+Автор: Валерий ([Fanatat](https://github.com/Fanatat)) · [vanatat.ru](https://vanatat.ru/)

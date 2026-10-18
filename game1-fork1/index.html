@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="g1f-build" content="0.1.0+b023 · eef369c">
+<meta name="g1f-telemetry" content="">
+<meta name="theme-color" content="#F5EEDD">
+<title>Слова по уликам</title>
+<link rel="stylesheet" href="src/styles.css?v=b57f59d03b">
+</head>
+<body>
+<div id="app">
+
+  <!-- Первый запуск: шкатулка (ТЗ §5, 0–5 с) -->
+  <section class="screen" id="scr-box" hidden>
+    <div class="box-art art" data-art="box_intro" data-icon="📦"></div>
+    <div class="box-note">
+      <p class="note-hand" id="box-note"></p>
+      <button class="btn-main" id="btn-open">Открыть</button>
+    </div>
+  </section>
+
+  <!-- Продолжение / главная -->
+  <section class="screen" id="scr-home" hidden>
+    <div class="home-scroll">
+      <header class="home-head">
+        <div>
+          <h1 id="home-town">Тихоречье</h1>
+          <p class="muted" id="home-chapter"></p>
+        </div>
+        <div class="head-btns"><button class="icon-btn" id="btn-music" role="switch" aria-label="Музыка"></button><button class="icon-btn" id="btn-sound" role="switch" aria-label="Звук"></button><button class="icon-btn" id="btn-settings" aria-label="Настройки"></button></div>
+      </header>
+      <div class="card place-card">
+        <div class="place-art art" id="home-art" data-art="bg_town" data-icon="🏞️"></div>
+        <div class="place-body">
+          <p class="place-kicker muted" id="home-kicker"></p>
+          <h2 id="home-question"></h2>
+          <p class="muted" id="home-sub"></p>
+          <button class="btn-main" id="btn-continue">Продолжить историю</button>
+        </div>
+      </div>
+      <div class="card daily" id="home-daily" hidden></div>
+      <div class="card soft diary" id="home-diary" hidden></div>
+      <button class="card tile" id="btn-atlas">
+        <span class="tile-icon" id="atlas-icon"></span>
+        <span class="tile-text"><b>Мой атлас</b><span class="muted" id="atlas-sub"></span></span>
+      </button>
+      <button class="card tile" id="btn-town">
+        <span class="tile-icon lamp art" data-art="street_lamp" data-icon="🏮"></span>
+        <span class="tile-text"><b>Фонари Тихоречья</b><span class="muted" id="town-tile-sub"></span></span>
+      </button>
+      <div class="secret-strip card soft" id="home-secret" hidden></div>
+      <div class="card soft" id="home-next" hidden>
+        <b id="home-next-title"></b>
+        <span class="muted" id="home-next-sub"></span>
+      </div>
+      <p class="save-line muted" id="home-save"></p>
+    </div>
+  </section>
+
+  <!-- Вступление к истории -->
+  <section class="screen" id="scr-intro" hidden>
+    <div class="intro-scroll">
+      <div class="intro-art art" id="intro-art" data-icon="🏞️"></div>
+      <div class="intro-body">
+        <p class="muted" id="intro-kicker"></p>
+        <h2 id="intro-title"></h2>
+        <!-- угадывание имени — над текстом: на 1366×768 варианты не уходят под «Искать улики» (план эксперта №5, п. 4.3) -->
+        <div class="intro-guess card soft" id="intro-guess" hidden></div>
+        <p class="intro-text" id="intro-text"></p>
+        <p class="intro-new" id="intro-new" hidden></p>
+        <button class="btn-link" id="btn-intro-home">На главную</button>
+      </div>
+    </div>
+    <!-- главная кнопка всегда у нижнего края, как на итоге (оценка №4, п. 5: на 1366×768 она уходила под край) -->
+    <div class="intro-foot"><button class="btn-gold" id="btn-intro-gold" type="button" hidden></button><button class="btn-main" id="btn-intro-go">Искать улики</button></div>
+  </section>
+
+  <!-- Поле -->
+  <section class="screen" id="scr-field" hidden>
+    <header class="field-head">
+      <button class="icon-btn" id="btn-back" aria-label="На главную"></button>
+      <div class="field-title">
+        <b id="field-title"></b>
+        <span class="muted" id="field-sub"></span>
+      </div>
+      <button class="chip" id="chip-atlas" aria-label="Атлас"></button>
+      <div class="dots" id="dots" aria-hidden="true"></div>
+    </header>
+    <div class="scene" id="scene">
+      <div class="scene-bg art" id="scene-bg" data-icon="🏞️"></div>
+      <div class="scene-items" id="scene-items"></div>
+      <div class="scene-thread" id="scene-thread" hidden></div>
+      <span class="streak" id="streak" hidden aria-live="polite"></span>
+      <button class="sprint" id="btn-sprint" type="button" hidden></button>
+    </div>
+    <div class="clue-card" id="clue-card" aria-live="polite">
+      <button class="clue-nav" id="clue-prev" aria-label="Предыдущая улика"></button>
+      <div class="clue-main" id="clue-main">
+        <p class="clue-text" id="clue-text"></p>
+        <p class="clue-extra" id="clue-extra" hidden></p>
+        <p class="clue-meta muted" id="clue-meta"></p>
+      </div>
+      <div class="clue-reveal" id="clue-reveal" hidden>
+        <span class="reveal-icon art" id="reveal-icon"></span>
+        <p id="reveal-text"></p>
+      </div>
+      <button class="clue-nav" id="clue-next" aria-label="Следующая улика"></button>
+    </div>
+    <div class="board-wrap" id="board-wrap">
+      <div class="board" id="board" tabindex="0" aria-label="Поле букв. Стрелки — выбор клетки, пробел — добавить, Enter — проверить, Escape — сбросить"></div>
+      <svg class="board-lines" id="board-lines" aria-hidden="true"></svg>
+      <div class="toast" id="toast" hidden></div>
+    </div>
+    <footer class="field-foot">
+      <button class="chip" id="chip-bonus" hidden aria-label="Бонусные слова"></button>
+      <button class="chip" id="chip-cache" hidden aria-label="Тайник"></button>
+      <button class="btn-hint" id="btn-hint"><span class="ico" id="hint-ico"></span><span>Подсказка</span><span class="badge" id="hint-badge" hidden></span></button>
+      <span class="loupes" id="loupes" title="Лупы"></span>
+      <button class="btn-accept" id="btn-accept" hidden>Принять ответ</button>
+    </footer>
+    <p class="save-warn" id="field-save" hidden>Сейчас прогресс не сохраняется</p>
+  </section>
+
+  <!-- Итог истории -->
+  <section class="screen" id="scr-result" hidden>
+    <div class="result-scroll">
+      <div class="scene result-scene" id="result-scene">
+        <div class="scene-bg art" id="result-bg" data-icon="🏞️"></div>
+        <div class="scene-items" id="result-items"></div>
+      </div>
+      <div class="result-body">
+        <button class="chip res-atlas-chip" id="res-atlas-chip" aria-label="Атлас"></button>
+        <p class="muted" id="result-kicker">Разгадано!</p>
+        <h2 id="result-title"></h2>
+        <!-- крючок наверху: вопрос следующей истории виден без прокрутки (оценка №4, круг 2, п. 2.1) -->
+        <div class="card question" id="result-question-card">
+          <span class="muted" id="result-question-kicker">Следующий вопрос</span>
+          <b id="result-question"></b>
+        </div>
+        <button class="btn-link ending-toggle" id="btn-ending" aria-expanded="false" aria-controls="result-ending">Развязка</button>
+        <p id="result-ending" hidden></p>
+        <div class="card keepsake" id="result-keepsake">
+          <span class="keepsake-img art" id="keepsake-img"></span>
+          <span><b id="keepsake-title"></b><span class="muted" id="keepsake-note"></span><span class="reward-line" id="reward-line"></span></span>
+        </div>
+        <!-- фонарь — выбор игрока, сразу под находкой (вторая серия, п. 1.4) -->
+        <div class="card lamp-pick" id="lamp-pick" hidden></div>
+        <button class="card btn-lantern" id="btn-lantern" hidden></button>
+        <div class="rank-bar goal-bar" id="result-goal" hidden></div>
+        <div class="reward-big" id="reward-big"></div>
+        <div class="secret-strip card soft" id="result-secret" hidden></div>
+        <div class="card soft" id="demo-end" hidden>
+          <b id="demo-end-title"></b>
+          <span id="demo-end-text"></span>
+        </div>
+      </div>
+    </div>
+    <!-- главная кнопка — под прокруткой, а не поверх наград (оценка b007, п. 21) -->
+    <div class="result-foot">
+      <button class="btn-main" id="btn-next">Следующая история</button>
+      <div class="link-row">
+        <button class="btn-link" id="btn-res-atlas">В атлас</button>
+        <button class="btn-link" id="btn-res-home">На сегодня всё</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Атлас -->
+  <section class="screen" id="scr-atlas" hidden>
+    <header class="field-head">
+      <button class="icon-btn" id="btn-atlas-back" aria-label="Назад"></button>
+      <div class="field-title"><b>Мой атлас</b><span class="muted" id="atlas-page-sub"></span></div>
+    </header>
+    <div class="atlas-scroll">
+      <div class="atlas-cover art" data-art="atlas_cover" data-icon="📔"></div>
+      <div class="wallet" id="wallet"></div>
+      <div id="atlas-rank"></div>
+      <button class="chip covers-btn" id="btn-covers"></button>
+      <div class="card soft route-secret" id="atlas-route" hidden></div>
+      <div class="atlas-tabs" id="atlas-tabs"></div>
+      <h3 class="atlas-h" id="atlas-h">Первые открытия</h3>
+      <div class="atlas-grid" id="atlas-grid"></div>
+      <button class="btn-main" id="btn-atlas-home">На главную</button>
+    </div>
+  </section>
+
+
+  <!-- Финал главы (ТЗ §6.2) -->
+  <section class="screen" id="scr-finale" hidden>
+    <div class="finale-scroll">
+      <div class="finale-bg art" data-art="bg_town" data-icon="🏞️"></div>
+      <div class="finale-body">
+        <p class="muted" id="finale-kicker">Глава 1 пройдена</p>
+        <h2 id="finale-title"></h2>
+        <p id="finale-text"></p>
+        <div class="finale-grid" id="finale-grid"></div>
+        <div class="reward-line finale-reward" id="finale-reward"></div>
+        <div class="secret-strip card soft" id="finale-secret"></div>
+        <div class="card question"><span class="muted" id="finale-q-label">Глава 2</span><b id="finale-question"></b></div>
+      </div>
+    </div>
+    <div class="result-foot">
+      <button class="btn-main" id="btn-finale-next">Глава 2</button>
+      <div class="link-row">
+        <button class="btn-link" id="btn-finale-atlas">Атлас</button>
+        <button class="btn-link" id="btn-finale-share">Открытка другу</button>
+        <button class="btn-link" id="btn-finale-home">На главную</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- На сегодня всё: дневник, завтрашний подарок, открытка (план эксперта b009, круг 2) -->
+  <section class="screen" id="scr-rest" hidden>
+    <div class="finale-scroll">
+      <div class="finale-bg art" data-art="bg_town" data-icon="🏞️"></div>
+      <div class="finale-body">
+        <h2>На сегодня всё</h2>
+        <p class="muted" id="rest-sub"></p>
+        <div class="card soft diary" id="rest-diary"></div>
+        <div class="card question"><span class="muted">Вопрос на завтра</span><b id="rest-question"></b></div>
+        <div class="card postcard" id="rest-postcard" hidden></div>
+      </div>
+    </div>
+    <div class="result-foot">
+      <button class="btn-main" id="btn-rest-home">На главную</button>
+      <div class="link-row"><button class="btn-link" id="btn-rest-share">Отправить открытку другу</button></div>
+    </div>
+  </section>
+
+  <!-- Фонари Тихоречья: на что тратить марки -->
+  <section class="screen" id="scr-town" hidden>
+    <header class="field-head">
+      <button class="icon-btn" id="btn-town-back" aria-label="Назад"></button>
+      <div class="field-title"><b>Фонари Тихоречья</b><span class="muted" id="town-sub"></span></div>
+    </header>
+    <div class="town-scroll">
+      <div class="town-map">
+        <div class="town-bg art" data-art="bg_town" data-icon="🏞️"></div>
+        <div class="town-lamps" id="town-lamps"></div>
+      </div>
+      <div class="town-list" id="town-list"></div>
+    </div>
+  </section>
+
+  <!-- Шторка: помощь / настройки / подтверждение -->
+  <div class="sheet-back" id="sheet-back" hidden></div>
+  <div class="sheet" id="sheet" role="dialog" aria-modal="true" hidden></div>
+</div>
+
+<script>window.G1F_ART={"acorn": "298ef41ada", "address": "0b0fe89d6c", "album": "ac097aff22", "arrival": "a05ebfb6d2", "atlas_cover": "bd6fa2f89a", "badge": "c237ffa77b", "bank_stone": "c4a43ad3ae", "bell": "a54ab85968", "bench": "98df98dc77", "berth": "f55866633a", "bg_s001": "938f6a02ed", "bg_s002": "ee15feae63", "bg_s003": "b287794909", "bg_s004": "d2a71f1412", "bg_s005": "7a3cfc770b", "bg_s006": "1c43bd31ac", "bg_s007": "ca275fe270", "bg_s008": "cf14e3da8c", "bg_s009": "7cd94a8457", "bg_s010": "76e4a22597", "bg_s011": "25701a6857", "bg_s012": "21e0280100", "bg_s013": "4f279b5ad7", "bg_s014": "1f9dfb811b", "bg_s015": "7b4ca66a70", "bg_s016": "0a911b78ed", "bg_s017": "95de4be63d", "bg_s018": "3c3de31130", "bg_s019": "8c2c862e12", "bg_s020": "77b40b4a5d", "bg_town": "64e40b6e8b", "blackboard": "4cfe43ebe9", "blue_shutter": "43309844e5", "boat": "4c4ed306e5", "bottle": "e34350e333", "bottle_note": "9324704d8e", "bouquet": "bb50377590", "box_intro": "49c7320f0e", "branch": "e18c15a614", "brook": "0f0f6ac1c0", "brush": "f1e0fb1e98", "bucket": "cd62f804ea", "cap": "94b96efc86", "chain": "35630f9978", "clock": "e46186b137", "clock_hand": "fa360cd6de", "clock_token": "abd0bde00e", "club_list": "6b5582abfd", "coins": "baa89f3f14", "compartment": "1748f95461", "compass": "455cf6ff49", "conductor": "a4bc5f39c5", "curtain": "ebbcce5ace", "desk": "c0bd5782fa", "envelope": "f4f8c2c5cf", "flag": "5b0c56ecf1", "flower_card": "fda8b44575", "footbridge": "30eaf8af1c", "footprint": "3a8e33463b", "frame": "ecd7cf9d35", "frog": "52d88a2964", "future_letters": "167e1c0fb2", "garden_bed": "cf2f0834a3", "gate": "8f51149364", "glass": "b768e62447", "glass_pane": "ebb070ad91", "globe": "4f8ab0cc80", "gloves": "aa1065060a", "golden_stamp": "a3e31e2817", "herbarium": "296c06a467", "herbarium_leaf": "0c6f495f63", "hive": "f536791e6a", "hollow": "36ef8cb0f1", "horn": "c23a3c2144", "house_window": "c85ceba10e", "islet": "2576971922", "ivy": "f32d9cc579", "key": "82da45ac66", "lamp": "49ef7c4921", "lamp_glass": "08095773b0", "lamp_pole": "a3bf83bccc", "lamplighter_book": "73ce50f876", "lantern": "22de97032d", "lantern_parcel": "a6246bde27", "laugh": "85be8185d3", "letter": "91a08cd99d", "linden": "82975b370a", "linden_box": "a619b5a1ab", "logbook": "401750a7ea", "lollipop": "d560597b23", "magnifier": "16c0edf6df", "mailbox": "32128e7075", "map": "0d35f23029", "matches": "c994cc1474", "meeting": "7b198051ed", "name_list": "6287c98384", "notebook": "466ec70738", "oar": "1a25f8d1b7", "oil_bottle": "1bae362478", "oil_lamp": "1ed348f4cd", "padlock": "14250c2cb7", "paint_tin": "98ed3ee7c2", "parcel": "72e10274b9", "pathfinder_badge": "3e7c06432b", "pendulum": "b1745cc54f", "pillar": "e5f911f01b", "platform_photo": "edc8319740", "pointer": "10b78625c9", "pond": "abd9e0fe04", "porch": "ec17fc037c", "postcard": "60ddef5f7d", "postmark": "3996dc6191", "pot": "ca160af546", "puddle": "7bc9041e7e", "railing": "bea7b0af69", "rails": "8698675a21", "raincoat": "080bf6dc27", "rake": "cfe6181590", "reeds": "70484f054a", "register": "3265015fbe", "reward_parcel": "b296426721", "river_letter": "cbb76f3ae7", "sack": "c3e3776d91", "saw": "2f0baa3610", "scales": "0175ccbdce", "scarecrow": "4f528d442d", "school_bell": "229f8a6d6c", "sea_suitcase": "b856628fb5", "secateurs": "b5774baa2f", "seeds": "5854a91516", "semaphore": "46a5a4d2df", "shard": "c7727d212c", "shop": "bd5c8c3d78", "shovel": "57f579f5e4", "shutters": "40b052377c", "signpost": "894b4afbd1", "spoon": "d11f7f8766", "sprout": "6a2437079d", "square_lantern": "d4215f8f8a", "squirrel": "981b2d0634", "stamp": "f9ef8a6caa", "straw_hat": "c37c8ca198", "street_lamp": "f98e2857b9", "suitcase": "5eec3ff806", "suitcase_garden": "7e2f1bc0c2", "sunset": "f8ced8de01", "threshold": "788ee9b359", "ticket": "05313bdee5", "timetable": "c5d55112d2", "tin_paint": "21781d4a47", "tower": "1143d7e143", "trail": "022ca5391d", "train": "5fe655edef", "twelfth_badge": "2091e231b9", "vera": "f27b3f27ef", "wall_clock": "6a6daf1a0a", "wardrobe": "8469047b53", "watering_can": "d48ec7f0ee", "weight": "f13b450de2", "well": "988ce9ebf2", "well_tag": "2e7a0ca081", "wheelbarrow": "15ddbcbf7e", "wick": "79fafb8e0c", "windlass": "65886f39be", "window": "bec33ad897"};</script>
+<script src="data/content.js?v=5b6bd053ec"></script>
+<script src="src/logic.js?v=5b87c230d0"></script>
+<script src="vendor/vk-bridge.min.js?v=827ba6f457"></script>
+<script src="src/platform.js?v=cd34a59168"></script>
+<script src="src/analytics.js?v=8aec4219f9"></script>
+<script src="src/state.js?v=9204961c8c"></script>
+<script src="src/sound.js?v=6a51a1e849"></script>
+<script src="src/board.js?v=152a18d134"></script>
+<script src="src/app.js?v=7564e1e194"></script>
+</body>
+</html>

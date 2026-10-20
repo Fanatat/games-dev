@@ -43,12 +43,44 @@
             } catch (e) {}
           });
         }
+        // Мягкий лимитер на выходе (аудит CrazyGames 20.10, ZL-12): в
+        // насыщенном бою сумма звуков Unity уходила за 0 dBFS и трещала, а
+        // эффекты AudioMixer в WebGL не работают. Unity подключает весь звук
+        // к context.destination — здесь это вход цепочки «компрессор → trim →
+        // выход»: выше −4 dBFS (мягкое колено 4 дБ) сжатие 20:1, потолок около
+        // −2 dBFS. Компрессор сам поднимает всё на 1.58 дБ (makeup, замер в
+        // Chromium) — trim его снимает: ниже порога громкость прежняя.
+        var LIMITER = { threshold: -4, knee: 4, ratio: 20, attack: 0.002, release: 0.2, trim: 0.834 };
+        function findDescriptor(proto, name) {
+          for (; proto; proto = Object.getPrototypeOf(proto)) {
+            var d = Object.getOwnPropertyDescriptor(proto, name);
+            if (d) return d;
+          }
+          return null;
+        }
+        var realDestination = Base ? findDescriptor(Base.prototype, "destination") : null;
         if (Base) {
           var Watched = class extends Base {
             constructor(options) {
               super(options);
               contexts.push(this);
               if (hidden()) this.suspend();
+              try {
+                var limiter = this.createDynamicsCompressor();
+                limiter.threshold.value = LIMITER.threshold;
+                limiter.knee.value = LIMITER.knee;
+                limiter.ratio.value = LIMITER.ratio;
+                limiter.attack.value = LIMITER.attack;
+                limiter.release.value = LIMITER.release;
+                var trim = this.createGain();
+                trim.gain.value = LIMITER.trim;
+                limiter.connect(trim);
+                trim.connect(realDestination.get.call(this));
+                this.game7Limiter = limiter;
+              } catch (e) {}
+            }
+            get destination() {
+              return this.game7Limiter || realDestination.get.call(this);
             }
           };
           window.AudioContext = Watched;
@@ -211,8 +243,8 @@
       // текстуры на CPU при загрузке. ASTC берём, только если DXT нет, а
       // ASTC есть: ПК с обоими форматами остаётся на основном. ?tex=astc
       // или ?tex=dxt в адресе — выбрать файл вручную (проверки).
-      var dataFile = "dev-20261011-165055.data.unityweb";
-      var astcDataFile = "dev-20261011-165055.astc.data.unityweb";
+      var dataFile = "dev-20261020-104200.data.unityweb";
+      var astcDataFile = "dev-20261020-104200.astc.data.unityweb";
       var texFormat = "dxt";
       if (astcDataFile) {
         var texForce = /[?&]tex=(astc|dxt)(&|$)/.exec(location.search);
@@ -236,16 +268,16 @@
       window.game7TexFormat = texFormat;
 
       var buildUrl = "Build";
-      var loaderUrl = buildUrl + "/dev-20261011-165055.loader.js";
+      var loaderUrl = buildUrl + "/dev-20261020-104200.loader.js";
       var config = {
         arguments: [],
         dataUrl: buildUrl + "/" + dataFile,
-        frameworkUrl: buildUrl + "/dev-20261011-165055.framework.js.unityweb",
-        codeUrl: buildUrl + "/dev-20261011-165055.wasm.unityweb",
+        frameworkUrl: buildUrl + "/dev-20261020-104200.framework.js.unityweb",
+        codeUrl: buildUrl + "/dev-20261020-104200.wasm.unityweb",
         streamingAssetsUrl: "StreamingAssets",
         companyName: "DefaultCompany",
         productName: "unity",
-        productVersion: "dev-20261011-165055",
+        productVersion: "dev-20261020-104200",
         showBanner: unityShowBanner,
         // Экраны с плотностью 3 рисовали бы в 9 раз больше пикселей, чем
         // с плотностью 1: потолок 2 держит 60 FPS на среднем телефоне.

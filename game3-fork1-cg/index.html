@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="theme-color" content="#e8b4c2">
   <title>Jewel Atelier</title>
-  <meta name="ws-build" content="w71-830453d-20261022">
+  <meta name="ws-build" content="w80-9c8805d-20261022">
   <!-- Форк game3 «Ювелир Ленд». Отдельная точка входа:
        main.js/board.js/style.css/платформенные адаптеры game3 НЕ подключены —
        ни рекламы, ни энергии, ни магазина, ни сейвов исходной игры.
@@ -91,10 +91,10 @@
     arm(30000);
   })();
   </script>
-  <link rel="preload" href="workshop_assets/gems.webp?v=71" as="image" type="image/webp">
-  <link rel="stylesheet" href="workshop.css?v=71">
-  <link rel="stylesheet" href="workshop_shop.css?v=71">
-  <link rel="stylesheet" href="workshop_case.css?v=71">
+  <link rel="preload" href="workshop_assets/gems.webp?v=80" as="image" type="image/webp">
+  <link rel="stylesheet" href="workshop.css?v=80">
+  <link rel="stylesheet" href="workshop_shop.css?v=80">
+  <link rel="stylesheet" href="workshop_case.css?v=80">
 </head>
 <body>
   <!-- Заставка загрузки и окно «Не удалось загрузить» (стиль и код — в <head>) -->
@@ -171,6 +171,7 @@
         </div>
         <div class="ws-stage">
           <canvas id="ws-piece" class="ws-piece" aria-label="Изделие: камни встают в гнёзда по мере выдачи заказов"></canvas>
+          <span id="ws-piece-dots" class="ws-piece-dots" aria-hidden="true"></span>
         </div>
         <div class="ws-head-side ws-head-right">
           <button id="ws-coins" class="ws-coins" type="button" aria-label="Монеты"><span class="ws-coin-ico" aria-hidden="true"></span><span id="ws-coins-n">0</span></button>
@@ -359,21 +360,21 @@
   </div>
   <canvas id="confetti-canvas" class="ws-confetti" aria-hidden="true"></canvas>
 
-  <script>window.WS_CONFIG={"target":"crazygames","platform":"web","build":"w71-830453d-20261022","payServer":"","vkAppId":"","metrikaId":"","timeouts":{"bridgeMs":8000,"initMs":8000,"dialogMs":60000},"ads":{"preload":true,"banner":{"enabled":true,"phoneOnly":true,"portraitOnly":true,"location":"bottom","layout":"","heightType":"","fallbackHeight":60,"maxFailures":3},"interstitial":{"enabled":true,"minLevels":6,"intervalSec":180,"afterRewardedSec":180,"waitSec":30},"rewarded":{"enabled":true,"waitSec":180,"skipForNoAds":true}},"pay":{"pollSec":30,"orderWaitSec":600},"lang":"auto","skipStart":true,"autoCloth":false};</script>
-  <script src="workshop_i18n.js?v=71"></script>
-  <script src="workshop_sfx.js?v=71"></script>
-  <script src="sound.js?v=71"></script>
-  <script src="workshop_confetti.js?v=71"></script>
-  <script src="workshop_rules.js?v=71"></script>
-  <script src="workshop_levels.js?v=71"></script>
-  <script src="workshop_board.js?v=71"></script>
-  <script src="workshop_jewelry.js?v=71"></script>
-  <script src="workshop_analytics.js?v=71"></script>
-  <script src="workshop_platform.js?v=71"></script>
-  <script src="workshop_save.js?v=71"></script>
-  <script src="workshop_shop.js?v=71"></script>
-  <script src="workshop_case.js?v=71"></script>
-  <script src="workshop_help.js?v=71"></script>
-  <script src="workshop.js?v=71"></script>
+  <script>window.WS_CONFIG={"target":"crazygames","platform":"web","build":"w80-9c8805d-20261022","payServer":"","vkAppId":"","metrikaId":"","timeouts":{"bridgeMs":8000,"initMs":8000,"dialogMs":60000},"ads":{"preload":true,"banner":{"enabled":true,"phoneOnly":true,"portraitOnly":true,"location":"bottom","layout":"","heightType":"","fallbackHeight":60,"maxFailures":3},"interstitial":{"enabled":true,"minLevels":6,"intervalSec":180,"afterRewardedSec":180,"waitSec":30},"rewarded":{"enabled":true,"waitSec":180,"skipForNoAds":true}},"pay":{"pollSec":30,"orderWaitSec":600},"lang":"auto","skipStart":true,"autoCloth":false};</script>
+  <script src="workshop_i18n.js?v=80"></script>
+  <script src="workshop_sfx.js?v=80"></script>
+  <script src="sound.js?v=80"></script>
+  <script src="workshop_confetti.js?v=80"></script>
+  <script src="workshop_rules.js?v=80"></script>
+  <script src="workshop_levels.js?v=80"></script>
+  <script src="workshop_board.js?v=80"></script>
+  <script src="workshop_jewelry.js?v=80"></script>
+  <script src="workshop_analytics.js?v=80"></script>
+  <script src="workshop_platform.js?v=80"></script>
+  <script src="workshop_save.js?v=80"></script>
+  <script src="workshop_shop.js?v=80"></script>
+  <script src="workshop_case.js?v=80"></script>
+  <script src="workshop_help.js?v=80"></script>
+  <script src="workshop.js?v=80"></script>
 </body>
 </html>

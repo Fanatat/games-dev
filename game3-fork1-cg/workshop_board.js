@@ -38,6 +38,9 @@ const WsBoard = (() => {
   const ROW_H = LIP + HEAD + CAP * PITCH + SINK + FOOT;   // ряд без подъёма
   const ROW_GAP = 0.28;   // поднятая пробирка нижнего ряда заходит на верхний — рисуется поверх
   const MAX_TW = 66;
+  // в альбоме (шире 4:3) пробирка растёт с окном: 12 % высоты, не больше 130 px (ТЗ Ж-01: на 1920×1080 было 66)
+  const wide = () => window.innerWidth * 3 >= window.innerHeight * 4;
+  const maxTw = () => (wide() ? Math.max(MAX_TW, Math.min(0.12 * window.innerHeight, 130)) : MAX_TW);
   const SPRITE = 160;      // размер ячейки атласа
   const GOLD = 'Z';        // золотой топаз
   const SEL_MS = 150;      // подъём и возврат выбранной пробирки
@@ -117,17 +120,20 @@ const WsBoard = (() => {
     if (!n) { lay = { tw: 0, slots: [], rows: [] }; keepRows = 0; return; }
     if (full || !lay || lay.slots.length !== n) keepRows = 0;
     let best = null;
+    const cap = maxTw();
     for (let rows = 1; rows <= 3; rows++) {
       const per = Math.ceil(n / rows);
       if (keepRows && rows !== keepRows) continue;
       if (!keepRows && rows > 1 && Math.ceil(n / (rows - 1)) === per) continue;
       const wu = per + (per - 1) * GAP + 2 * SIDE;
       const hu = RISE + rows * ROW_H + (rows - 1) * ROW_GAP + 0.1;
-      const tw = Math.min(W / wu, H / hu, MAX_TW);
+      const tw = Math.min(W / wu, H / hu, cap);
       if (!best || tw > best.tw * 1.04) best = { rows, per, tw };
     }
-    const { rows, tw } = best;
+    const { rows, per, tw } = best;
     keepRows = rows;
+    // в альбоме пробирку ограничила высота, а по ширине свободно — пробирки расходятся, стойка во всё поле
+    const hg = wide() && per > 1 ? Math.max(GAP, Math.min(0.8, (W / tw - per - 2 * SIDE) / (per - 1))) : GAP;
     // Ряды: первые полнее, последний — остаток (по центру).
     const counts = [];
     let left = n;
@@ -139,19 +145,19 @@ const WsBoard = (() => {
     let y = (H - totalH) / 2 + RISE * tw;
     const slots = [], rowInfo = [];
     counts.forEach((c, r) => {
-      const rowW = c * tw + (c - 1) * GAP * tw;
+      const rowW = c * tw + (c - 1) * hg * tw;
       const x0 = (W - rowW) / 2 + tw / 2;
       const rimY = y + LIP * tw;
       const baseY = rimY + (HEAD + CAP * PITCH) * tw;
       const from = slots.length;
-      for (let k = 0; k < c; k++) slots.push({ cx: x0 + k * (1 + GAP) * tw, rimY, baseY, row: r });
+      for (let k = 0; k < c; k++) slots.push({ cx: x0 + k * (1 + hg) * tw, rimY, baseY, row: r });
       rowInfo.push({
-        x0: x0 - tw / 2 - TRAY_PAD * tw, x1: x0 + (c - 1) * (1 + GAP) * tw + tw / 2 + TRAY_PAD * tw,
+        x0: x0 - tw / 2 - TRAY_PAD * tw, x1: x0 + (c - 1) * (1 + hg) * tw + tw / 2 + TRAY_PAD * tw,
         rimY, baseY, from, to: slots.length
       });
       y += ROW_H * tw + gap;
     });
-    lay = { tw, slots, rows: rowInfo };
+    lay = { tw, gap: hg, slots, rows: rowInfo };
   }
 
   function gemPos(v, j) {
@@ -997,7 +1003,7 @@ const WsBoard = (() => {
       const top = glassTop - 0.25 * tw, bot = s.baseY + (SINK + FOOT) * tw;
       if (y < top || y > bot) return;
       const dx = Math.abs(x - s.cx);
-      if (dx > tw * (0.5 + GAP / 2) + 1) return;
+      if (dx > tw * (0.5 + lay.gap / 2) + 1) return;
       const d = dx + Math.max(0, glassTop - y, y - (s.baseY + SINK * tw));
       if (d < bestD) { bestD = d; best = v; }
     });
@@ -1011,9 +1017,18 @@ const WsBoard = (() => {
     return { left: r.left + s.cx - tw / 2, top: r.top + s.rimY, width: tw, height: s.baseY - s.rimY, gem: GEM * tw };
   }
 
+  /* Стойки целиком (планки, ножки, лапки) в координатах окна — для проверок раскладки. */
+  function rackClientRect() {
+    if (!lay || !lay.rows.length) return null;
+    const r = canvas.getBoundingClientRect(), tw = lay.tw, paw = (SIDE - TRAY_PAD) * tw;
+    const l = Math.min(...lay.rows.map(o => o.x0)) - paw, rt = Math.max(...lay.rows.map(o => o.x1)) + paw;
+    const t = lay.rows[0].rimY - LIP * tw, b = lay.rows[lay.rows.length - 1].baseY + (SINK + FOOT) * tw;
+    return { left: r.left + l, top: r.top + t, width: rt - l, height: b - t };
+  }
+
   return {
     init, resize, setActive, setPaused, clock, setVials, sync, pour, flashReady, select, shake, quake, showHint, clearHint, setTutorial, setWaiting,
-    setLock, unlock, setTube, takeVial, hitTest, vialClientRect,
+    setLock, unlock, setTube, takeVial, hitTest, vialClientRect, rackClientRect,
     drawGem: (g, gem, x, y, size, alpha) => drawGem(g, gem, x, y, size, alpha),
     drawHidden: (g, x, y, size) => drawHidden(g, x, y, size),
     isAnimating: () => flights.length > 0 || flashes.size > 0,

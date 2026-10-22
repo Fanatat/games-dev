@@ -1131,9 +1131,28 @@
       const s = L && WsJewel.sockets(playLook().shape, L.orders.length, box())[i];
       return s ? { x: r.left + s.x, y: r.top + s.y, size: s.r * 2.35 } : { x: r.left + W / 2, y: r.top + H / 2, size: 20 };
     }
-    function set(i, gem) { pieceGems[i] = gem; pop = REDUCED ? null : { i, t0: WsBoard.clock.now() }; request(); }
+    /* Точки «вставлено N из M» под изделием; fresh — только что вставленный камень (ТЗ Ж-02). */
+    function dots(fresh) {
+      const el = $('ws-piece-dots');
+      if (!el || !L) return;
+      el.innerHTML = pieceGems.map((gm, k) => '<i class="' + (gm ? 'on' : '') + (k === fresh ? ' is-new' : '') + '"></i>').join('');
+    }
+    /* Камень сел в гнездо: вспышка на гнезде и подпрыгивание изделия на подушке. */
+    let bumpT = null;
+    function landFx(i) {
+      if (REDUCED || !cv) return;
+      const s = socket(i);
+      Fx.ring(s.x, s.y, s.size * 0.9);
+      const stage = cv.parentElement;
+      stage.classList.remove('is-bump');
+      void stage.offsetWidth;
+      stage.classList.add('is-bump');
+      cancelLater(bumpT);
+      bumpT = later(() => stage.classList.remove('is-bump'), 240);
+    }
+    function set(i, gem) { pieceGems[i] = gem; pop = REDUCED ? null : { i, t0: WsBoard.clock.now() }; dots(i); landFx(i); request(); }
     function shine() { if (!REDUCED) { shineAt = WsBoard.clock.now(); request(); } }
-    function reset() { pop = null; shineAt = 0; request(); }
+    function reset() { pop = null; shineAt = 0; dots(-1); request(); }
     return { init, resize, request, socket, set, shine, reset };
   })();
 
@@ -1974,7 +1993,7 @@
       Piece.set(at, ev.gem);
       sfx('gem', { semis: 12 + 2 * Math.min(k, 3) });
       if (main) b2('mainGem', s);
-    }, main ? { dur: 680, lift: 96 } : { dur: 460, lift: 36 });
+    }, main ? { dur: 680, lift: 96 } : { dur: 520, lift: 40 });
     if (pay.coins) {
       Fx.text(cx, cy - 8, '+' + pay.coins, { color: '#ffe08a', size: 22 });
       coinsTo(cx, cy, pay.coins, e);
@@ -2019,14 +2038,14 @@
     }, { dur: 560, lift: 80, step: 0 });
   }
 
-  /* Смена карточки: сразу (внутри каскада) или через 320 мс после
-     последней выдачи — чтобы печать успели увидеть. Новый ход дожидаться
+  /* Смена карточки: сразу (внутри каскада) или через 900 мс после
+     последней выдачи — чтобы печать и радость заказчицы успели увидеть. Новый ход дожидаться
      не обязан: flushCards() показывает отложенную смену немедленно. */
   function swapCard(ev, defer) {
     view.slots[ev.slot] = ev.incoming;
     if (ev.incoming >= 0) view.next = ev.incoming + 1;
     const render = () => { cardJob = null; renderOrders(ev.incoming >= 0 ? ev.slot : -1); };
-    if (defer && !REDUCED) { cancelLater(cardTimer); cardJob = render; cardTimer = later(render, 320); }
+    if (defer && !REDUCED) { cancelLater(cardTimer); cardJob = render; cardTimer = later(render, 900); }
     else render();
   }
 

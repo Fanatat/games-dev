@@ -1009,6 +1009,104 @@ body.is-owner .ws-price.is-video { background-image: url(workshop_assets/ui_crow
   .ws-round { width: 66px; height: 66px; }
 }
 
+/* ---------- точки «камней вставлено N из M» под изделием (ТЗ Ж-02) ---------- */
+.ws-piece-dots {
+  position: absolute; left: 50%; bottom: -3px; z-index: 2; transform: translateX(-50%);
+  display: flex; gap: 4px; padding: 2px 6px; border-radius: 9px; pointer-events: none;
+  background: rgba(255, 250, 241, 0.72); box-shadow: 0 1px 3px rgba(122, 52, 82, 0.2);
+}
+.ws-piece-dots:empty { display: none; }
+.ws-piece-dots i { display: block; width: 7px; height: 7px; border-radius: 50%; background: rgba(123, 63, 108, 0.25); }
+.ws-piece-dots i.on { background: radial-gradient(circle at 35% 30%, #fff6c8, #f0c55a 55%, #b98226); box-shadow: 0 0 4px rgba(255, 200, 70, 0.8); }
+.ws-piece-dots i.is-new { animation: wsDotOn 0.45s cubic-bezier(.2, 1.6, .5, 1); }
+@keyframes wsDotOn { 0% { transform: scale(2.2); filter: brightness(1.6); } 100% { transform: none; } }
+/* изделие подпрыгивает на подушке, когда камень сел в гнездо */
+.ws-stage.is-bump .ws-piece { animation: wsPieceBump 0.2s ease-out; }
+@keyframes wsPieceBump { 0% { transform: translateX(-50%) scale(1); } 45% { transform: translateX(-50%) scale(1.04) translateY(-2%); } 100% { transform: translateX(-50%) scale(1); } }
+/* заказчица радуется: подпрыгивает и отпускает сердечко */
+.ws-card.is-done .ws-face { animation: wsJoyHop 0.18s ease-out; }
+@keyframes wsJoyHop { 0% { transform: scale(1); } 50% { transform: scale(1.08) translateY(-4%); } 100% { transform: scale(1); } }
+.ws-card.is-done .ws-face::after {
+  content: ''; position: absolute; right: -8%; top: -14%; width: 38%; height: 38%; pointer-events: none;
+  background: url(workshop_assets/ui_heart.webp) center / contain no-repeat;
+  animation: wsHeartUp 0.9s ease-out forwards;
+}
+@keyframes wsHeartUp { 0% { transform: scale(0.4); opacity: 0; } 25% { transform: scale(1.1); opacity: 1; } 100% { transform: translateY(-70%) scale(0.9); opacity: 0; } }
+
+/* ---------- альбом (CrazyGames 16:9, ТЗ Ж-01): мастерская слева, поле справа ----------
+   Одна сетка от 800×450 до 1920×1080 и для телефона лёжа: размеры — от окна (--u = 1px при 907×510).
+   Шапка — по всей ширине: «назад» и номер слева, звёзды и монеты справа. Левая колонка (37 %) —
+   крупное изделие на подушке с точками «вставлено», заказчицы, очередь и кнопки; справа — поле
+   во всю высоту под шапкой. Почти квадратные и портретные окна — прежняя колонка 640 px. */
+@media (min-aspect-ratio: 4/3) {
+  :root { --u: min(calc(100vh / 510), calc(100vw / 907)); }
+  #screen-workshop {
+    background: #eab9c6 url(workshop_assets/bg_level_wide.webp) 50% 50% / cover no-repeat;
+  }
+  .ws-root {
+    max-width: none; display: grid;
+    grid-template-columns: 37% minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr) auto auto auto;
+    column-gap: calc(var(--u) * 12);
+    padding: env(safe-area-inset-top, 0px) calc(env(safe-area-inset-right, 0px) + var(--u) * 12) env(safe-area-inset-bottom, 0px) calc(env(safe-area-inset-left, 0px) + var(--u) * 12);
+  }
+  .ws-header { display: contents; }
+  .ws-head-side, .ws-head-side:not(.ws-head-right) {
+    grid-column: 1; grid-row: 1; position: relative; flex-direction: row; align-items: center;
+    gap: calc(var(--u) * 10); padding-top: calc(var(--u) * 8); min-height: calc(var(--u) * 52);
+  }
+  .ws-head-right { grid-column: 2; flex-direction: row-reverse; justify-content: flex-start; }
+  .ws-round-cream { width: calc(var(--u) * 42); height: calc(var(--u) * 42); }
+  .ws-level-pill {
+    position: static; display: flex; align-items: center; height: calc(var(--u) * 28); min-width: 0;
+    padding: 0 calc(var(--u) * 11); border-radius: calc(var(--u) * 14); font-size: calc(var(--u) * 16);
+  }
+  .ws-lv-w { position: static; width: auto; height: auto; overflow: visible; clip: auto; clip-path: none; margin-right: 0.3em; }
+  body.is-hard .ws-moves { position: static; height: calc(var(--u) * 28); font-size: calc(var(--u) * 16); border-radius: calc(var(--u) * 14); }
+  .ws-coins { --ch: calc(var(--u) * 36); padding: 0 calc(var(--u) * 14) 0 calc(var(--u) * 40); font-size: calc(var(--u) * 19); }
+  .ws-coins .ws-coin-ico { width: calc(var(--u) * 42); height: calc(var(--u) * 42); margin-top: calc(var(--u) * -21); }
+  .ws-stars { padding-bottom: calc(var(--u) * 7); }
+  .ws-stars i { width: calc(var(--u) * 24); height: calc(var(--u) * 24); }
+
+  /* изделие — главный объект колонки: всё свободное по высоте место */
+  .ws-stage {
+    grid-column: 1; grid-row: 2; height: auto; min-height: 0;
+    background-size: auto 30%; background-position: 50% calc(100% - var(--u) * 20);
+  }
+  .ws-piece { top: 3%; width: 94%; height: 74%; }
+  .ws-piece-dots { bottom: calc(var(--u) * 2); gap: calc(var(--u) * 6); padding: calc(var(--u) * 3) calc(var(--u) * 9); border-radius: calc(var(--u) * 10); }
+  .ws-piece-dots i { width: calc(var(--u) * 11); height: calc(var(--u) * 11); }
+
+  .ws-orders-panel { grid-column: 1; grid-row: 3; gap: calc(var(--u) * 4); }
+  .ws-orders, .ws-orders[data-n="2"] { --face: calc(var(--u) * 64); --bubble: calc(var(--u) * 52); gap: calc(var(--u) * 16); }
+  .ws-orders[data-n="3"] { --face: calc(var(--u) * 54); --bubble: calc(var(--u) * 44); gap: calc(var(--u) * 6); }
+  .ws-card-qty { width: calc(var(--u) * 25); height: calc(var(--u) * 25); line-height: calc(var(--u) * 21); font-size: calc(var(--u) * 15); }
+  .ws-bubble { margin-left: calc(var(--u) * 9); border-radius: calc(var(--u) * 14); }
+  .ws-queue { min-height: calc(var(--u) * 26); border-radius: calc(var(--u) * 14); }
+  .ws-queue-item { width: calc(var(--u) * 22); height: calc(var(--u) * 22); }
+  .ws-rescue { bottom: calc(var(--u) * -4); height: calc(var(--u) * 32); font-size: calc(var(--u) * 16); }
+  .ws-rescue .ws-btn { height: calc(var(--u) * 28); font-size: calc(var(--u) * 16); }
+  .ws-caption { grid-column: 1; grid-row: 4; }
+  .ws-actions { grid-column: 1; grid-row: 5; gap: calc(var(--u) * 26); padding: calc(var(--u) * 8) 0 calc(var(--u) * 12); }
+  .ws-actions .ws-round { width: calc(var(--u) * 52); height: calc(var(--u) * 52); }
+  .ws-price { height: calc(var(--u) * 24); font-size: calc(var(--u) * 14); }
+  .ws-actions .ws-help-mini { width: calc(var(--u) * 38); height: calc(var(--u) * 38); margin-top: calc(var(--u) * -19); right: 0; }
+  .ws-actions .ws-help-mini span { font-size: calc(var(--u) * 21); }
+  .ws-board-wrap { grid-column: 2; grid-row: 2 / 6; margin: 0; min-height: 0; }
+  .ws-toast { bottom: calc(env(safe-area-inset-bottom, 0px) + var(--u) * 74); }
+  /* победа: заказчица в рост у левого края, ростом в половину окна, а не 170 px телефона */
+  .ws-win-hero { --hero-h: calc(var(--u) * 250); }
+  /* карта, заставка и шкатулка — широкие залы (ТЗ Ж-07), а не верх портретной картины */
+  #screen-menu, #screen-start { background-image: url(workshop_assets/bg_map_wide.webp); background-position: 50% 50%; }
+  #screen-menu .ws-map-bg2 {
+    background: url(workshop_assets/bg_map2_wide.webp) 50% 50% / cover no-repeat;
+    background-color: #8d6ea8;
+  }
+  #case-overlay.ws-case {
+    background: linear-gradient(180deg, rgba(96, 34, 70, 0.5), rgba(70, 20, 50, 0.62)),
+      #eab9c6 url(workshop_assets/bg_map_wide.webp) 50% 50% / cover no-repeat;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }

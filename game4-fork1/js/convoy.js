@@ -593,8 +593,14 @@ const Convoy = (() => {
     const D = CONVOY.daily, i = (streak - 1) % D.length;
     return { today, streak, i, glory: D[i] };
   }
+  // Проход 4 (Q-11): награда не стоит между игроком и «В поход» — начисляется сама при входе в меню.
+  // Плашка с кругом из 7 дней всплывает над логотипом, не ловит нажатия и гаснет сама (или по нажатию на неё);
+  // «+N ★» летит в шкалу славы. От загрузки до боя — одно нажатие.
+  let dailyShown = null, dailyTimer = 0, gloryHeld = 0;   // gloryHeld — слава награды, пока звезда летит (шкала её ещё не показывает)
   function renderDaily() {
-    const o = screen === 'cmenu' ? dailyOffer() : null, el = $('cvDaily');
+    if (screen !== 'cmenu') dailyShown = null;
+    else if (dailyOffer()) takeDaily();
+    const o = screen === 'cmenu' ? dailyShown : null, el = $('cvDaily');
     if (!el) return;
     el.classList.toggle('hidden', !o);
     if (!o) return;
@@ -602,19 +608,58 @@ const Convoy = (() => {
     $('cvDailyTrack').innerHTML = D.map((g, k) =>
       `<div class="${k < o.i ? 'done' : k === o.i ? 'now' : ''}${k === D.length - 1 ? ' big' : ''}"><small>${tx(`День ${k + 1}`)}</small><b>+${g}${star}</b></div>`).join('');
     setText('cvDailyText', o.streak > 1 ? (CV_I18N.en ? `Day ${o.streak} in a row: the reward grows.` : `Ты заходишь ${o.streak} ${plural(o.streak, 'день', 'дня', 'дней')} подряд — награда растёт.`) : 'Заходи каждый день — награда растёт. Пропуск начнёт круг заново.');
-    $('cvDailyTake').innerHTML = `${tx(`Забрать +${o.glory}`)} ${star}`;
+    $('cvDailyTake').innerHTML = `+${o.glory} ${star}`;
   }
   function takeDaily() {
     const o = dailyOffer(), p = prog();
-    if (!o || !p) { renderDaily(); return; }
+    if (!o || !p) return;
     p.cvGlory = (p.cvGlory || 0) + o.glory;
     p.cvDayLast = o.today;
     p.cvDayStreak = o.streak;
     saveProgress(p);
     funnel('daily_take', { streak: o.streak });
-    SFX.coin(0.3);
-    renderDaily();
+    dailyShown = o;
+    clearTimeout(dailyTimer);
+    dailyTimer = setTimeout(hideDaily, 3600);
+    // шкала в меню сначала показывает славу до награды, звезда долетает — шкала добирает
+    gloryHeld = o.glory;
     renderMenu();
+    const total = p.cvGlory, next = CONVOY.meta.find(u => u.at > total);
+    const floor = CONVOY.meta.filter(u => u.at <= total).reduce((a, u) => Math.max(a, u.at), 0);
+    setTimeout(() => flyStar($('cvDailyTake'), () => barAt($('cvMenuGlory'), next ? clamp01((total - floor) / (next.at - floor)) : 1),
+      `+${o.glory}`, () => { gloryHeld = 0; SFX.coin(0.3); if (screen === 'cmenu') renderMenu(); }), 450);
+  }
+  function hideDaily() { clearTimeout(dailyTimer); dailyShown = null; const el = $('cvDaily'); if (el) el.classList.add('hidden'); }
+
+  // Проход 4: «+N ★» летит по дуге в шкалу славы (0,6 с) — награда ложится в шкалу на глазах. Нажатие в любом
+  // месте (finishFlight) или «уменьшить движение» — сразу на месте. to — функция: точка конца заливки шкалы.
+  let flight = null;
+  function flyStar(from, to, text, done) {
+    const a = from && from.getBoundingClientRect(), end = to();
+    if (reducedMotion() || !a || !a.width || !end || !document.body.animate) { done(); return; }
+    finishFlight();
+    const el = document.createElement('b');
+    el.className = 'cv-fly-star';
+    el.innerHTML = `${text}<svg class="ico"><use href="#i-star"/></svg>`;
+    const x0 = a.left + a.width / 2, y0 = a.top + a.height / 2, dx = end.x - x0, dy = end.y - y0;
+    el.style.left = `${x0}px`; el.style.top = `${y0}px`;
+    document.body.appendChild(el);
+    const at = (x, y, k) => `translate(-50%, -50%) translate(${x}px, ${y}px) scale(${k})`;
+    const anim = el.animate([
+      { transform: at(0, 0, 1) },
+      { transform: at(dx * 0.45, dy * 0.45 - 46, 1.18), offset: 0.45 },
+      { transform: at(dx, dy, 0.5), opacity: 0.85 },
+    ], { duration: 600, easing: 'cubic-bezier(.45,.05,.55,.95)', fill: 'forwards' });
+    flight = anim;
+    anim.onfinish = () => { el.remove(); if (flight === anim) flight = null; done(); };
+  }
+  function finishFlight() { if (flight) flight.finish(); }
+  // точка на шкале славы в доле f её длины (экранные px); шкалы нет на экране — null (звезда не летит)
+  function barAt(box, f) {
+    const bar = box && box.querySelector('.cv-glory-bar');
+    if (!bar || !bar.offsetParent) return null;
+    const b = bar.getBoundingClientRect();
+    return { x: Math.max(b.left + 8, Math.min(b.right - 8, b.left + b.width * f)), y: b.top + b.height / 2 };
   }
 
   function metaOf(total) { return CONVOY.meta.filter(u => total >= u.at).map(u => u.id); }
@@ -758,7 +803,7 @@ const Convoy = (() => {
       }
       if (headless) return;
       VFX.volleyImpact(match, x, kind);
-      if (stone) { shakeScreen(match, 3); SFX.rockHit(); } else SFX.hitRanged();
+      if (stone) { rockLanded(); SFX.rockHit(); } else SFX.hitRanged();
     };
     return m;
   }
@@ -1651,14 +1696,18 @@ const Convoy = (() => {
     if (x2) box.querySelector('#cvGloryX2').addEventListener('click', (e) => { SFX.click(); doubleGlory(); e.currentTarget.blur(); });
     const gain = box.querySelector('.cv-glory-gain span'), bar = box.querySelector('.cv-glory-bar i'), t0 = performance.now();
     const from = doubled ? g.gain / 2 : 0;
+    // проход 4: слава набежала — «+N ★» летит в шкалу (0,6 с), шкала добирает, когда звезда долетела
+    const fill = () => { if (box.contains(bar)) bar.style.width = `${frac(g.total) * 100}%`; };
     const tick = () => {
       if (!box.contains(gain)) return;
       const k = Math.min(1, (performance.now() - t0) / 700);
       gain.textContent = `+${Math.round(from + (g.gain - from) * k)}`;
-      if (k < 1) requestAnimationFrame(tick);
-      else if (g.gain > 0) gain.parentNode.classList.add('pop');
+      if (k < 1) { requestAnimationFrame(tick); return; }
+      if (g.gain <= 0) { fill(); return; }
+      gain.parentNode.classList.add('pop');
+      flyStar(gain.parentNode, () => barAt(box, frac(g.total)), `+${g.gain - from}`, fill);
     };
-    requestAnimationFrame(() => { void bar.offsetWidth; bar.style.width = `${frac(g.total) * 100}%`; tick(); });
+    requestAnimationFrame(() => { void bar.offsetWidth; tick(); });
     if (g.fresh.length) setTimeout(() => { if (box.contains(gain)) SFX.gloryUnlock(); }, 700);
   }
   function toMenu() { match = null; run = null; Sprites.setRegion(pickedLevel()); syncOverlays(); showScreen('cmenu'); }
@@ -1913,7 +1962,21 @@ const Convoy = (() => {
       });
     }
     w.volleyZone = { x, w: width, t: 0, life: R.spread + R.fall * 1.2, team: 'player' };
+    match.convoy.rockDrop = { x, w: width, hit: false };
     if (!match.convoy.headless) SFX.rockLaunch();
+  }
+  // Проход 4 (Q-09): первый камень броска лёг — пылевое кольцо по зоне и одна короткая тряска 3 ед. (≈120 мс)
+  // на бросок, не чаще раза в 2 с и без неё при «уменьшить движение». Раньше трясло от каждого камня ~1 с подряд.
+  const motionMq = typeof window !== 'undefined' && window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
+  const reducedMotion = () => !!(motionMq && motionMq.matches);
+  function rockLanded() {
+    const C = match.convoy, z = C.rockDrop;
+    if (!z || z.hit) return;
+    z.hit = true;
+    VFX.rockQuake(match, z.x, z.w * 1.2);
+    if (reducedMotion() || match.elapsed - (C.shakeAt ?? -9) < 2) return;
+    C.shakeAt = match.elapsed;
+    shakeScreen(match, 3);
   }
   // Пробел / кнопка: по самой густой толпе врагов (±70 от центра).
   function densestEnemyX() {
@@ -2287,7 +2350,7 @@ const Convoy = (() => {
     const el = $('cvMenuBest');
     if (!el) return;
     el.classList.add('hidden');   // рекорд — на плитке своего уровня
-    const total = readGlory().total, have = metaOf(total);
+    const total = readGlory().total - gloryHeld, have = metaOf(total);
     menuDeco = { skin: have.includes('skin'), banner: have.includes('banner') };
     const box = $('cvMenuGlory');
     if (!box) return;
@@ -2475,7 +2538,9 @@ const Convoy = (() => {
   function drawWagon(wx, i, s, hpFrac, t, roll, bob, deco) {
     const age = match.age;
     ctx.save();
-    ctx.translate(wx, ARENA.groundY - bob);
+    // проход 4 (Q-12): удар — кузов вздрагивает на 1,5 ед. (80 мс); прочность < 25 % — мелкая дрожь
+    const jolt = (deco.jolt || 0) * 1.5 * (i ? 1 : -1) + (deco.tremble ? Math.sin(t * 37 + i * 2.1) * 0.6 : 0);
+    ctx.translate(wx + jolt, ARENA.groundY - bob);
     ctx.scale(s, s);
     ctx.lineJoin = 'round'; ctx.lineCap = 'round';
     const ink = 'rgba(26,18,10,.85)';
@@ -2608,7 +2673,7 @@ const Convoy = (() => {
     const L = 58, r = 9.5;
     const state = i === 1 ? (hpFrac >= 0.6 ? 'whole' : hpFrac >= 0.15 ? 'damaged' : 'wreck')
       : (hpFrac >= 0.4 ? 'whole' : hpFrac > 0 ? 'damaged' : 'wreck');
-    const flash = match.world.playerCore.hitFlash || 0;
+    const flash = deco.jolt || 0;
     if (state === 'wreck') { Sprites.drawWagonBody(ctx, deco.skin, 'wreck', 0, lift, L * 0.95, flash); return state; }
     Sprites.drawWagonBody(ctx, deco.skin, state, 0, -r * 0.85, L, flash);
     for (const dx of [-L * 0.27, L * 0.27]) Sprites.drawWheel(ctx, dx, -r + lift, r, roll);
@@ -2620,8 +2685,11 @@ const Convoy = (() => {
     const hpFrac = Math.max(0, core.hp / core.maxHp);
     const t = performance.now() / 1000;
     if (C.props.length) drawProps(m.age);
-    const flash = core.hitFlash > 0 ? core.hitFlash : 0;
-    if (flash > 0) core.hitFlash = Math.max(0, flash - 0.06);
+    // Проход 4 (Q-12): вспышка удара 80 мс и не чаще 4 раз в секунду. Раньше каждый удар заново ставил
+    // вспышку на ~0,3 с, и под частыми ударами повозки держались почти белыми.
+    const nowS = performance.now() / 1000;
+    if (core.hitFlash > 0) { if (nowS - (C.wFlashAt ?? -9) >= 0.25) C.wFlashAt = nowS; core.hitFlash = 0; }
+    const flash = Math.max(0, 1 - (nowS - (C.wFlashAt ?? -9)) / 0.08);
     layoutWagons();
     const s = wagonDrawScale();
     const marching = C.phase === 'march' && C.speed > 5;
@@ -2630,6 +2698,7 @@ const Convoy = (() => {
       sacks: run && run.mods.income > 0, morale: run && run.cards.includes('morale'), marching,
       skin: hasMeta('skin'), banner: hasMeta('banner'),
       ballista: run && run.syn.ballista, ballReady: C.ballT <= 0.4,
+      jolt: flash, tremble: core.hp > 0 && hpFrac < 0.25 && !reducedMotion(),
     };
     WAGON_X.forEach((wx, i) => {
       const bob = marching ? Math.abs(Math.sin(t * 11 + i * 1.7)) * 1.6 * (C.speed / CONVOY.marchSpeed) : 0;
@@ -3266,7 +3335,8 @@ const Convoy = (() => {
     $('cvPause').addEventListener('click', () => { SFX.click(); togglePause(); });
     $('cvResume').addEventListener('click', () => { SFX.click(); togglePause(); });
     $('cvPauseHome').addEventListener('click', () => { SFX.click(); $('btnToMenuFromPause').click(); });
-    $('cvDailyTake').addEventListener('click', (e) => { SFX.click(); takeDaily(); e.currentTarget.blur(); });
+    $('cvDaily').addEventListener('click', hideDaily);
+    document.addEventListener('pointerdown', finishFlight, true); // нажатие — звезда сразу на месте
     const share = $('cvShare');
     share.classList.toggle('hidden', !PLATFORM.canShare());
     share.addEventListener('click', (e) => { SFX.click(); e.currentTarget.blur(); PLATFORM.share(); });

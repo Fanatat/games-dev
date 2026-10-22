@@ -69,6 +69,31 @@ const Sprites = (() => {
     return (tints[key] = c);
   }
 
+  // Проход 4 (Q-10): строй — разные люди одного отряда, а не наклейки. Всё от id бойца, без Math.random и rnd():
+  // сид боя не трогаем. Рост ±3 %, один из трёх тонов (чуть темнее и теплее / как есть / чуть светлее),
+  // тон — копия атласа с полупрозрачной заливкой поверх рисунка, строится один раз (3 копии на вид).
+  const TONES = [null, 'rgba(70,40,10,.09)', 'rgba(255,248,232,.09)'];
+  function vary(id, salt) {
+    let h = Math.imul((id | 0) + salt * 7919, 0x9E3779B1);
+    h ^= h >>> 15; h = Math.imul(h, 0x85EBCA6B); h ^= h >>> 13;
+    return (h >>> 0) / 4294967296;
+  }
+  function look(id) { return { k: 1 + (vary(id, 1) - 0.5) * 0.06, tone: Math.floor(vary(id, 4) * 3) }; }
+  function toned(src, tone) {
+    if (!TONES[tone]) return null;
+    const key = src + '@' + tone;
+    if (tints[key]) return tints[key];
+    const im = image(src);
+    if (!ok(im)) return null;
+    const c = document.createElement('canvas');
+    c.width = im.naturalWidth; c.height = im.naturalHeight;
+    const g = c.getContext('2d');
+    g.drawImage(im, 0, 0);
+    g.globalCompositeOperation = 'source-atop';
+    g.fillStyle = TONES[tone]; g.fillRect(0, 0, c.width, c.height);
+    return (tints[key] = c);
+  }
+
   function regionOf(id) {
     for (const [r, map] of Object.entries(REGION_ENEMY)) if (Object.values(map).includes(id)) return Number(r);
     return 1;
@@ -143,7 +168,12 @@ const Sprites = (() => {
       r.dy = -Math.abs(Math.sin(ph * Math.PI / 2)) * 1.2;
       return r;
     }
-    r.sy = 1 + Math.sin(o.time * 2.3) * 0.014; // дыхание в покое
+    // покой (Q-10): дыхание заметнее (было 1,4 %) и раз в 3–6 с боец переступает — кадр «пауза шага» на 0,25 с
+    r.sy = 1 + Math.sin(o.time * 2.3) * 0.03;
+    if (o.id !== undefined && a.f.pass) {
+      const per = 3 + vary(o.id, 2) * 3;
+      if ((o.time + vary(o.id, 3) * per) % per < 0.25) r.f = 'pass';
+    }
     return r;
   }
 
@@ -154,7 +184,8 @@ const Sprites = (() => {
     const P = pickPose(o, a);
     const fr = a.f[P.f] || a.f.idle;
     const [fx, fy, fw, fh, ax] = fr;
-    const k = PX * o.k;
+    const lk = o.id !== undefined ? look(o.id) : null;
+    const k = PX * o.k * (lk ? lk.k : 1);
     const dead = P.lying || (o.deathSec !== null && o.deathSec !== undefined);
     ctx.save();
     ctx.translate(o.x, o.y);
@@ -192,7 +223,8 @@ const Sprites = (() => {
         }
       }
     }
-    ctx.drawImage(im, fx, fy, fw, fh, dx, dy, fw, fh);
+    const tone = lk && !o.elite ? toned(a.src, lk.tone) : null;
+    ctx.drawImage(tone || im, fx, fy, fw, fh, dx, dy, fw, fh);
     if (o.hitFlash > 0 && !dead) {
       const white = silhouette(a.src, '#ffffff');
       if (white) { ctx.globalAlpha *= Math.min(1, o.hitFlash) * 0.7; ctx.drawImage(white, fx, fy, fw, fh, dx, dy, fw, fh); }
@@ -241,6 +273,31 @@ const Sprites = (() => {
 
   // Повозка: кузов (целый / битый / обломки) + колёса отдельным рисунком (крутятся при ходе).
   function wagonSet(painted) { const s = D && (painted ? D.wagon_painted : D.wagon); return s && ok(image(s.src)) ? s : null; }
+  // Проход 4 (Q-12): «битая» повозка читалась выцветшей, а не повреждённой — тент такой же светлый, как у целой.
+  // Копия кадра с копотью: тёмные пятна по тенту и подпалина снизу кузова (только поверх рисунка), один раз.
+  const SOOT = [[0.22, 0.30, 0.16], [0.47, 0.18, 0.13], [0.70, 0.36, 0.15], [0.86, 0.22, 0.10], [0.36, 0.52, 0.12], [0.60, 0.58, 0.11]];
+  function sooty(s) {
+    const key = s.src + '#soot';
+    if (tints[key]) return tints[key];
+    const im = image(s.src);
+    if (!ok(im)) return null;
+    const [fx, fy, fw, fh] = s.f.damaged;
+    const c = document.createElement('canvas');
+    c.width = fw; c.height = fh;
+    const g = c.getContext('2d');
+    g.drawImage(im, fx, fy, fw, fh, 0, 0, fw, fh);
+    g.globalCompositeOperation = 'source-atop';
+    g.fillStyle = 'rgba(92,62,30,.2)'; g.fillRect(0, 0, fw, fh);   // тент в дорожной грязи — не светлее целого
+    for (const [px, py, pr] of SOOT) {
+      const r = pr * fw * 1.15, gr = g.createRadialGradient(px * fw, py * fh, 0, px * fw, py * fh, r);
+      gr.addColorStop(0, 'rgba(32,20,10,.72)'); gr.addColorStop(0.55, 'rgba(50,32,16,.34)'); gr.addColorStop(1, 'rgba(60,38,18,0)');
+      g.fillStyle = gr; g.fillRect(0, 0, fw, fh);
+    }
+    const low = g.createLinearGradient(0, fh * 0.55, 0, fh);
+    low.addColorStop(0, 'rgba(40,24,10,0)'); low.addColorStop(1, 'rgba(40,24,10,.3)');
+    g.fillStyle = low; g.fillRect(0, 0, fw, fh);
+    return (tints[key] = c);
+  }
   function drawWagonBody(ctx, painted, state, x, y, len, flash = 0) {
     const s = wagonSet(painted);
     if (!s) return false;
@@ -251,7 +308,9 @@ const Sprites = (() => {
     ctx.save();
     ctx.translate(x, y); ctx.scale(k, k);
     ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
-    ctx.drawImage(image(s.src), fx, fy, fw, fh, -fw / 2, -fh, fw, fh);
+    const soot = state === 'damaged' && s.f.damaged ? sooty(s) : null;
+    if (soot) ctx.drawImage(soot, -fw / 2, -fh, fw, fh);
+    else ctx.drawImage(image(s.src), fx, fy, fw, fh, -fw / 2, -fh, fw, fh);
     if (flash > 0) {
       const white = silhouette(s.src, '#ffffff');
       if (white) { ctx.globalAlpha *= Math.min(1, flash) * 0.55; ctx.drawImage(white, fx, fy, fw, fh, -fw / 2, -fh, fw, fh); }
@@ -337,5 +396,6 @@ const Sprites = (() => {
   function onPortrait(cb) { if (D && D.portraits) image(D.portraits.src).addEventListener('load', cb, { once: true }); }
 
   if (typeof window !== 'undefined' && window.CONVOY_PROTOTYPE) load();
-  return { load, setRegion, preload, bgId, drawBgThumb, onBg, get region() { return region; }, hasUnit, drawUnit, drawProp, prop, drawBg, bg, wagonSet, drawWagonBody, drawWheel, drawFlag, drawIcon, onReady, drawPortrait, onPortrait, image, artId };
+  // look и pickPose — и для проверок (tests/test_juice.py)
+  return { look, pickPose, load, setRegion, preload, bgId, drawBgThumb, onBg, get region() { return region; }, hasUnit, drawUnit, drawProp, prop, drawBg, bg, wagonSet, drawWagonBody, drawWheel, drawFlag, drawIcon, onReady, drawPortrait, onPortrait, image, artId };
 })();

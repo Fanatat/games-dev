@@ -4253,6 +4253,7 @@ function render() {
       // «Последний конвой», новый облик: боец — рисунок (js/sprites.js); рост атласа уже учитывает тяжёлых
       Sprites.drawUnit(ctx, u.typeId, {
         ...commonPose, k: (u.elite ? 1.35 : 1) * (t.heightMult || 1) * UNIT_LANES.scale[lane] * VIEW.fig,
+        id: u.id, // проход 4 (Q-10): рост, тон и «переступил» — по id бойца
         special: dead ? null : Convoy.bossPose(u, poseTime),
       });
     } else if (t.role === 'rider') {

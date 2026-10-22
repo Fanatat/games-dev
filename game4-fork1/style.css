@@ -2270,7 +2270,21 @@ body.convoy #screenPause .popup-card { min-width: 0; gap: max(10px, 1em); paddin
 .cv-daily-track > div.done { opacity: .55; }
 .cv-daily-track > div.now { border-color: #ffd35c; background: rgba(120,82,20,.85); box-shadow: 0 0 .6em rgba(255,211,92,.55); transform: scale(1.08); }
 .cv-daily-track > div.big b { color: #ffb14a; }
-#cvDailyTake { min-width: 8em; }
+/* проход 4 (Q-11): награда начисляется сама — плашка над логотипом, а не окно поверх «В поход»; нажатия проходят
+   сквозь неё (кроме самой плашки: нажатие прячет её), гаснет через 3,6 с */
+#cvDaily { background: none; pointer-events: none; justify-content: flex-start; padding-top: max(6px, 1.4vh); }
+#cvDaily .cv-daily-card { pointer-events: auto; cursor: pointer; width: min(24em, calc(100vw - 230px)); gap: .25em; padding: .35em .8em .45em; font-size: .78em; }
+#cvDaily .cv-daily-card p, #cvDaily .cv-daily-track > div small { display: none; }   /* плашка в две строки — не дотягивается до «В поход» */
+#cvDaily .cv-daily-track > div { padding: .15em .1em; }
+.cv-daily-head { display: flex; align-items: center; justify-content: center; gap: .5em; }
+.cv-daily-card .cv-daily-head h2 { font-size: 1.2em; white-space: nowrap; }
+.cv-daily-gain { display: inline-flex; align-items: center; gap: .12em; font-family: 'Lilita One', sans-serif; font-weight: 400; font-size: 1.45em; line-height: 1; color: #ffd35c; text-shadow: var(--cv-outline), 0 0 12px rgba(255,211,92,.45); }
+.cv-daily-gain svg.ico { width: .9em; height: .9em; vertical-align: 0; color: #ffd35c; }
+/* «+N ★» в полёте к шкале славы (flyStar в convoy.js) */
+.cv-fly-star { position: fixed; z-index: 60; pointer-events: none; display: inline-flex; align-items: center; gap: .12em; white-space: nowrap;
+  font-family: 'Lilita One', sans-serif; font-weight: 400; font-size: clamp(20px, 4.2vh, 34px); line-height: 1; color: #ffd35c;
+  text-shadow: 0 2px 0 #3a2208, 0 0 14px rgba(255,211,92,.75); will-change: transform; }
+.cv-fly-star svg.ico { width: .95em; height: .95em; color: #ffd35c; filter: drop-shadow(0 0 6px rgba(255,211,92,.9)); }
 .cv-menu-share { position: absolute; top: max(10px, 1.6vh); left: max(10px, 1.2vw); z-index: 2; }
 body:not(.convoy) .cv-menu-share, .cv-share.hidden { display: none; }
 

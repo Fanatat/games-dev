@@ -24,7 +24,7 @@ const VFX = (() => {
       size: o.size || 3, color: o.color || '#ffd77a',
       rot: o.rot || 0, vrot: o.vrot || 0,
       gravity: o.gravity !== undefined ? o.gravity : 220,
-      width: o.width || 3, glow: o.glow || null,
+      width: o.width || 3, glow: o.glow || null, ratio: o.ratio || 0.42,
     };
     push(m, p);
     return p;
@@ -105,10 +105,10 @@ const VFX = (() => {
           const r = p.size * (0.15 + 0.85 * (1 - Math.pow(1 - t, 2)));
           if (p.glow) {
             ctx.strokeStyle = p.glow; ctx.lineWidth = p.width * 3.2;
-            ctx.beginPath(); ctx.ellipse(px, py, r, r * 0.42, 0, 0, Math.PI * 2); ctx.stroke();
+            ctx.beginPath(); ctx.ellipse(px, py, r, r * p.ratio, 0, 0, Math.PI * 2); ctx.stroke();
           }
           ctx.strokeStyle = p.color; ctx.lineWidth = Math.max(0.5, p.width * (1 - t));
-          ctx.beginPath(); ctx.ellipse(px, py, r, r * 0.42, 0, 0, Math.PI * 2); ctx.stroke();
+          ctx.beginPath(); ctx.ellipse(px, py, r, r * p.ratio, 0, 0, Math.PI * 2); ctx.stroke();
           break;
         }
         case 'flash': {
@@ -464,7 +464,7 @@ const VFX = (() => {
       if (s.delay > 0.25) continue;
       const p = s.delay > 0 ? 0 : Math.min(1, s.t / s.fall);
       ctx.globalAlpha = 0.25 + 0.75 * p;
-      const r = 3 + p * (s.kind === 'ball' ? 9 : 7);
+      const r = 3 + p * (s.kind === 'ball' ? 9 : s.kind === 'stone' && convoyArt() ? 13 : 7);
       ctx.beginPath(); ctx.ellipse(s.x, groundY + 1, r, r * 0.35, 0, 0, Math.PI * 2); ctx.fill();
     }
     const pts = [];
@@ -517,8 +517,10 @@ const VFX = (() => {
         ctx.beginPath(); ctx.arc(-Math.cos(ang) * 6.5, -Math.sin(ang) * 6.5, 2.6 * fl, 0, Math.PI * 2); ctx.fill();
         ctx.globalAlpha = 1;
       } else if (convoyArt() && Sprites.prop('rock1')) {
-        // камнепад конвоя: валун-рисунок (один из четырёх), катится в полёте
-        Sprites.drawProp(ctx, 'rock' + (1 + (Math.floor(s.x * 7.3) & 3)), 0, 0, 11, p * Math.PI * 3);
+        // камнепад конвоя: валун-рисунок (один из четырёх), катится в полёте. Проход 4 (Q-09): камень —
+        // 0,36–0,45 роста бойца (было ≈0,25: на 821×462 читался как искры), размер по камню разный
+        // (в масштабе крупного плана бойцов VIEW.fig — на 16:9 он ≈1,44)
+        Sprites.drawProp(ctx, 'rock' + (1 + (Math.floor(s.x * 7.3) & 3)), 0, 0, (16 + (Math.floor(s.x * 3.1) & 3) * 1.4) * VIEW.fig, p * Math.PI * 3);
       } else {
         // огненный камень: пламя-корона, сам камень, светлая сердцевина
         // пламя «кометой» назад по траектории + ореол вокруг камня
@@ -560,10 +562,25 @@ const VFX = (() => {
     } else if (arrow) {
       burst(m, 'spark', x, -4, 4, { speed: 140, spread: Math.PI * 0.8, dir: -Math.PI / 2, life: 0.35, size: 2.4, colors: [pal.fireHi, pal.fire], gravity: 300 });
       burst(m, 'ember', x, -6, 2, { speed: 40, spread: Math.PI * 0.6, dir: -Math.PI / 2, life: 0.7, size: 2, colors: [pal.fire, pal.fireHi], gravity: 0, jitter: 6 });
+    } else if (convoyArt()) {
+      // камнепад конвоя (Q-09): вместо искр — каменные осколки и пыль, огня у рисованного валуна нет
+      burst(m, 'chip', x, -5, 5, { speed: 170, spread: Math.PI * 0.85, dir: -Math.PI / 2, life: 0.55, size: 3.6, colors: [pal.core, pal.rim, '#8f7a63'], gravity: 420 });
+      burst(m, 'dust', x, -4, 3, { speed: 110, spread: Math.PI * 0.5, dir: -Math.PI / 2, life: 0.7, size: 7, color: ART.dust, gravity: 30, jitter: 12 });
     } else {
       burst(m, 'chip', x, -4, 3, { speed: 150, spread: Math.PI * 0.8, dir: -Math.PI / 2, life: 0.5, size: 2.6, colors: [pal.core, pal.rim], gravity: 320 });
       burst(m, 'ember', x, -6, 3, { speed: 70, spread: Math.PI * 0.8, dir: -Math.PI / 2, life: 0.7, size: 2.2, colors: [pal.fire, pal.fireHi], gravity: 0, jitter: 6 });
     }
+  }
+  // Проход 4 (Q-09): камнепад — главный эффект боя. Первый камень лёг — по земле расходится пылевое
+  // кольцо шириной 1,2 зоны, вдоль зоны встаёт пыль и разлетаются крупные осколки (≈20 частиц на бросок).
+  function rockQuake(m, x, w) {
+    spawn(m, 'ring', x, -1, { size: w / 2, width: 7, life: 0.55, color: 'rgba(170,130,90,.75)', glow: 'rgba(214,170,120,.28)', gravity: 0, ratio: 0.16 });
+    spawn(m, 'ring', x, -1, { size: w * 0.32, width: 4, life: 0.4, color: 'rgba(120,90,60,.7)', gravity: 0, ratio: 0.16 });
+    for (let i = 0; i < 8; i++) {
+      const px = x + ((i + 0.5) / 8 - 0.5) * w;
+      burst(m, 'dust', px, -3, 1, { speed: 70, spread: Math.PI * 0.6, dir: -Math.PI / 2 + (px - x) / w, life: 0.9, size: 10, color: ART.dust, gravity: 10, jitter: 8 });
+    }
+    burst(m, 'chip', x, -8, 6, { speed: 230, spread: Math.PI * 0.9, dir: -Math.PI / 2, life: 0.7, size: 4.6, colors: [ART.volley.stone.core, '#8f7a63', ART.volley.stone.rim], gravity: 520, jitter: w * 0.5 });
   }
   // Смена эпохи: ударная волна от крепости — два кольца, вспышка, искры и
   // угли вверх. gold=true — своя сторона (золото героя), иначе тёмно-красная.
@@ -598,6 +615,7 @@ const VFX = (() => {
     // Раунд 17: защита по производительности (game.js, PERF) — потолок частиц.
     setCap(n) { CAP = Math.max(20, n | 0); },
     capDefault: CAP,
+    rockQuake, // проход 4 (Q-09)
     spawn, burst, update, draw, floater, drawProjectile, heroSpecial, cry, pickaxe, meleeHit, coreHit, unitDeath, heroKill, impact, structureDown, drawVolley, volleyImpact, ageUp,
     damageNumber, heroHit, fortressDestroyed, fortressAftershock, smokePuff, // раунд 15 (И4)
   };

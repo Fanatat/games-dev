@@ -85,7 +85,8 @@
         (pick && pick.kind === kind && pick.id === d.id ? ' is-pick' : '');
       const sw = document.createElement('span');
       sw.className = 'ws-swatch';
-      if (d.img) { sw.classList.add('is-pic'); sw.style.backgroundImage = h.decorPic(d); } else sw.style.background = d.swatch;
+      if (d.img) { sw.classList.add('is-pic'); sw.style.backgroundImage = h.decorPic(d); } else sw.style.backgroundColor = d.swatch;
+      if (d.velvet) sw.classList.add('is-velvet');   // образец бархата — с фактурой ткани
       b.appendChild(sw);
       if (on) b.insertAdjacentHTML('beforeend', '<span class="ws-decor-check" aria-hidden="true"></span>');
       else if (!own && d.set) b.insertAdjacentHTML('beforeend', '<span class="ws-decor-crown" aria-hidden="true"></span>');

@@ -57,7 +57,7 @@
     var decor = {};
     Object.keys(ctx.decor).forEach(function (k) { decor[k] = ctx.decor[k][0].id; });
     return {
-      v: VERSION, coins: 0, muted: false, novibe: false, best: {}, stars: {}, cur: null, seen: {}, chests: {}, sessions: 0,
+      v: VERSION, coins: 0, muted: false, novibe: false, nomusic: false, best: {}, stars: {}, cur: null, seen: {}, chests: {}, sessions: 0,
       decor: decor, owned: {}, pieces: {}, choice: {}, fav: null,
       pay: { cursor: 0, noadsUntil: 0, royal: false },
       install: intIn(ctx.today, 1, 1e6) ? ctx.today : 0,
@@ -102,6 +102,7 @@
     field(function () { if (intIn(d.coins, 0, 1e7)) out.coins = d.coins; });
     field(function () { out.muted = d.muted === true; });
     field(function () { out.novibe = d.novibe === true; });   // вибрация выключена (поле с 12.10.2026, без смены версии)
+    field(function () { out.nomusic = d.nomusic === true; });   // музыка выключена (поле с 22.10.2026, без смены версии)
     field(function () { if (intIn(d.sessions, 0, 1e7)) out.sessions = d.sessions; });
     field(function () {      // звёзды — прогресс: битые «лучшие ходы» его не отнимают
       if (!isObj(d.stars)) return;

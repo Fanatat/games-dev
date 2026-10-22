@@ -59,6 +59,7 @@ const WsBoard = (() => {
   let canvas = null, ctx = null, dpr = 1, W = 0, H = 0;
   let atlas = null, atlasReady = false;
   let handImg = null, lockImg = null;   // рука-подсказка и замок с листа (ui_hand, ui_lock); до загрузки — рисунок кодом
+  let velvetImg = null, cloth = null;   // бархат под стойками (ТЗ Ж-05): серая фактура velvet.webp, перекраска кодом
   let spriteOf = () => 0, colorOf = () => '#c33';
   let vials = [];
   let hid = [];                   // сколько нижних камней каждой пробирки под бархатом
@@ -286,6 +287,82 @@ const WsBoard = (() => {
   /* Муфта стойки вокруг пробирки: короткий золотой цилиндр. Верх — кольцо
      (наружный край R, внутренний — по стеклу), бок — полоса высотой COL_H. */
   const COL_R = 0.63, COL_RY = 0.12, COL_IN = 0.52, COL_INY = 0.09, COL_H = 0.17;
+
+  /* Бархатный коврик ряда (убранство «бархат»): серая фактура, перекрашенная в цвет ткани, свет сверху,
+     тень снизу и золотой кант. Лежит на столе под нижней половиной пробирок — стойка стоит на нём. */
+  const clothPats = new Map();   // цвет ткани → перекрашенная фактура (холст)
+  function velvetCanvas(c) {
+    if (!velvetImg || !velvetImg.complete || !velvetImg.naturalWidth) return null;
+    if (clothPats.has(c.velvet[0])) return clothPats.get(c.velvet[0]);
+    const cv = document.createElement('canvas');
+    cv.width = velvetImg.naturalWidth; cv.height = velvetImg.naturalHeight;
+    const x = cv.getContext('2d');
+    x.fillStyle = c.velvet[0];
+    x.fillRect(0, 0, cv.width, cv.height);
+    x.globalCompositeOperation = 'multiply';
+    x.drawImage(velvetImg, 0, 0);
+    x.globalCompositeOperation = 'soft-light';   // фактура светлее середины — ворс, темнее — примятые места
+    x.drawImage(velvetImg, 0, 0);
+    clothPats.set(c.velvet[0], cv);
+    return cv;
+  }
+  /* Коврик в прямоугольнике l..r × top..bot на холсте g; tw — масштаб (ширина пробирки). */
+  function paintCloth(g, c, l, top, r, bot, tw) {
+    const rad = 0.32 * tw;
+    g.save();
+    // тень коврика на столе
+    g.shadowColor = 'rgba(90, 30, 55, 0.35)'; g.shadowBlur = tw * 0.3; g.shadowOffsetY = tw * 0.08;
+    roundRect(g, l, top, r - l, bot - top, rad);
+    g.fillStyle = c.velvet[1];
+    g.fill();
+    g.shadowColor = 'transparent';
+    g.clip();
+    const tex = velvetCanvas(c);
+    if (tex) {
+      const pat = g.createPattern(tex, 'repeat');
+      const k = Math.max(0.25, tw / 180);   // ворс крупнее на больших пробирках, но не мельче четверти фактуры
+      if (pat.setTransform && typeof DOMMatrix === 'function') pat.setTransform(new DOMMatrix([k, 0, 0, k, l, top]));
+      g.fillStyle = pat;
+      g.fillRect(l, top, r - l, bot - top);
+    }
+    // свет сверху и тень к переднему краю: ткань с объёмом, а не плоская заливка
+    const sh = g.createLinearGradient(0, top, 0, bot);
+    sh.addColorStop(0, 'rgba(255, 245, 235, 0.28)');
+    sh.addColorStop(0.35, 'rgba(255, 245, 235, 0.06)');
+    sh.addColorStop(0.8, 'rgba(0, 0, 0, 0.1)');
+    sh.addColorStop(1, 'rgba(0, 0, 0, 0.32)');
+    g.fillStyle = sh;
+    g.fillRect(l, top, r - l, bot - top);
+    const side = g.createLinearGradient(l, 0, r, 0);
+    side.addColorStop(0, 'rgba(0, 0, 0, 0.18)'); side.addColorStop(0.12, 'rgba(0, 0, 0, 0)');
+    side.addColorStop(0.88, 'rgba(0, 0, 0, 0)'); side.addColorStop(1, 'rgba(0, 0, 0, 0.18)');
+    g.fillStyle = side;
+    g.fillRect(l, top, r - l, bot - top);
+    g.restore();
+    // золотой кант и строчка
+    roundRect(g, l + 1, top + 1, r - l - 2, bot - top - 2, rad);
+    g.strokeStyle = c.rim || 'rgba(255, 214, 120, 0.85)';
+    g.lineWidth = Math.max(1.5, tw * 0.045);
+    g.stroke();
+    roundRect(g, l + tw * 0.09, top + tw * 0.09, r - l - tw * 0.18, bot - top - tw * 0.18, rad * 0.7);
+    g.strokeStyle = 'rgba(255, 230, 160, 0.35)';
+    g.lineWidth = 1;
+    g.setLineDash([tw * 0.06, tw * 0.07]);
+    g.stroke();
+    g.setLineDash([]);
+  }
+  function drawCloth(row) {
+    if (!cloth) return;
+    const tw = lay.tw;
+    paintCloth(ctx, cloth, row.x0 - 0.62 * tw, row.rimY + (BAR - 0.35) * tw, row.x1 + 0.62 * tw, row.baseY + (SINK + FOOT + 0.45) * tw, tw);
+  }
+  /* Образец ткани для окна шкатулки и лавки: коврик на весь холст и три камня на нём («так теперь выглядит стол»). */
+  function clothPreview(g, w, h, c, gems) {
+    if (!c || !c.velvet) return;
+    const tw = h * 0.5;
+    paintCloth(g, c, tw * 0.2, h * 0.12, w - tw * 0.2, h * 0.86, tw);
+    (gems || []).forEach((gem, i, a) => drawGem(g, gem, w * (i + 1) / (a.length + 1), h * 0.48, h * 0.42));
+  }
 
   /* Стойка ряда, задняя часть: тень на столе, ножки, планка между муфтами
      и дальняя половина верха муфт (видна сквозь стекло). */
@@ -779,6 +856,7 @@ const WsBoard = (() => {
     };
     // ряды: стойка, стоящие пробирки, передний край колец; вынутые — поверх всего
     const out = [];
+    lay.rows.forEach(drawCloth);   // коврики всех рядов — под стойками (верхний ряд не ложится на нижний коврик)
     lay.rows.forEach(row => {
       drawRackBack(row);
       for (let v = row.from; v < row.to; v++) {
@@ -846,6 +924,7 @@ const WsBoard = (() => {
     const pic = (name) => { const im = new Image(); im.onload = request; im.src = opts.atlasUrl.replace(/[^/]*$/, '') + name + '.webp'; return im; };
     handImg = pic('ui_hand');
     lockImg = pic('ui_lock');
+    velvetImg = pic('velvet');
     resize();
     // Область поля может измениться и без resize окна (баннер появился позже старта уровня). Холст подстраивается
     // сам, иначе он вылезает на кнопки, но ряды держит прежними (полный пересчёт — resize(true) от окна и уровня).
@@ -906,7 +985,8 @@ const WsBoard = (() => {
     if (opts.hid) hid = opts.hid.slice();
     if (opts.reveal && src.length) flips.set(from, t + (reduceMotion ? 0 : 120));
     const base = vials[to].length;
-    const step = reduceMotion ? 0 : 80, dur = reduceMotion ? 120 : 330;
+    // fast — игрок касается быстрее, чем летят камни: перелив вдвое короче, чтобы поле догоняло касания
+    const step = reduceMotion ? 0 : opts.fast ? 40 : 80, dur = reduceMotion ? 120 : opts.fast ? 180 : 330;
     let left = moving.length;
     moving.forEach((gem, k) => {
       const g0 = gemPos(from, src.length + k);
@@ -917,7 +997,7 @@ const WsBoard = (() => {
         x0: p0.x, y0: p0.y, x1: p1.x, y1: p1.y,
         onLand: () => {
           opts.onGem && opts.onGem(k);
-          if (--left === 0 && cb) clock.later(cb, reduceMotion ? 0 : 90);
+          if (--left === 0 && cb) clock.later(cb, reduceMotion || opts.fast ? 0 : 90);
         }
       });
     });
@@ -964,6 +1044,11 @@ const WsBoard = (() => {
   function setWaiting(list) { waiting = list.slice(); request(); }
   function setLock(v) { locked = v; request(); }
   function unlock(v) { if (locked === v) locked = -1; unlockAt = { v, t0: now() }; request(); }
+  // бархат под стойками: { velvet: [светлый, средний, тёмный], rim } из DECOR.cloth или null (орех — без коврика)
+  function setCloth(c) {
+    cloth = c && c.velvet ? { velvet: c.velvet.slice(), rim: c.rim || '' } : null;
+    request();
+  }
   // name — имя из TUBES или готовый вид { tint, rim } из таблицы убранства игры (DECOR.tube)
   function setTube(name) {
     if (name && typeof name === 'object' && typeof name.tint === 'string' && typeof name.rim === 'string') tube = { tint: name.tint, rim: name.rim };
@@ -1028,7 +1113,7 @@ const WsBoard = (() => {
 
   return {
     init, resize, setActive, setPaused, clock, setVials, sync, pour, flashReady, select, shake, quake, showHint, clearHint, setTutorial, setWaiting,
-    setLock, unlock, setTube, takeVial, hitTest, vialClientRect, rackClientRect,
+    setLock, unlock, setTube, setCloth, clothPreview, takeVial, hitTest, vialClientRect, rackClientRect,
     drawGem: (g, gem, x, y, size, alpha) => drawGem(g, gem, x, y, size, alpha),
     drawHidden: (g, x, y, size) => drawHidden(g, x, y, size),
     isAnimating: () => flights.length > 0 || flashes.size > 0,

@@ -339,7 +339,7 @@
   let jobs = [];           // очередь выдач по ходам: { e, evs: [{ ev, pay, k, state, onArrive }] }
   let jobOn = false;       // работа из очереди сейчас доигрывает
   const pend = new Map();  // пробирка → выдача, чьи камни ещё на поле (state 'wait')
-  let tapQueue = [];       // касания во время перелива (до двух — один ход), повторяются после приземления
+  let tapQueue = [];       // касания во время перелива (до 16 — восемь ходов вперёд, ТЗ Ж-10), повторяются после приземления
   let won = false;
   let lost = false;        // «Сложный заказ»: ходы кончились
   let winCount = 0;        // побед за сессию (для проверок)
@@ -580,6 +580,7 @@
     WsBoard.setPaused(true);
     try { Confetti.stop(); } catch (e) { /* без конфетти */ }
     try { Sound.suspend('pause'); } catch (e) { /* без звука */ }
+    WsMusic.setPaused('pause', true);
     document.body.classList.add('ws-paused');
     clearInterval(winShineTimer);
   }
@@ -590,6 +591,7 @@
     WsBoard.setPaused(false);
     Fx.request(); Piece.request();
     try { Sound.resume('pause'); } catch (e) { /* без звука */ }
+    WsMusic.setPaused('pause', false);
     document.body.classList.remove('ws-paused');
     if (winShineRun && !$('win-overlay').classList.contains('hidden')) winShineRun();
     if (recheck) { recheck = false; if (L && st && screen === 'game' && !won) checkWinnable(); }
@@ -808,6 +810,14 @@
       el.style.bottom = 'auto'; el.style.marginBottom = '0';
       el.style.top = Math.round(op.bottom + 8) + 'px'; el.style.left = Math.round((op.left + op.right) / 2) + 'px';
       el.style.maxWidth = Math.round(op.width) + 'px'; el.style.whiteSpace = 'normal'; el.style.width = 'max-content';
+      return;
+    }
+    const rack = window.matchMedia && matchMedia('(min-aspect-ratio: 4/3)').matches && WsBoard.rackClientRect();
+    if (rack) {                                                   // альбом: верхний ряд узкий (левая колонка) — тост над стойкой
+      el.style.bottom = 'auto'; el.style.marginBottom = '0';
+      el.style.left = Math.round(rack.left + rack.width / 2) + 'px';
+      el.style.maxWidth = Math.round(Math.min(rack.width, 560)) + 'px';
+      el.style.top = Math.round(Math.max(hr.bottom + 8, rack.top - el.offsetHeight - 14)) + 'px';
       return;
     }
     // верхний ряд между кнопкой «назад» с подписью и монетами со звёздами; высота тоста зависит от ширины ряда,
@@ -1690,6 +1700,11 @@
     const e = epoch;
     const hard = () => {
       if (e !== epoch || !L.hard || isPassed(levelIdx)) return;
+      // CrazyGames (ТЗ Ж-11): окно — только перед первым сложным заказом, дальше — подсказка на поле
+      if (CFG.choiceInline && LEVELS.some((l, k) => l.hard && isPassed(k))) {
+        toast(T('Сложный заказ · ходов: {n} · награда ×2', { n: limitNow() }), 2200);
+        return;
+      }
       showModal({
         kicker: T('Уровень {n}', { n: L.id }), title: T('Сложный заказ'),
         text: T('Награда вдвое больше.'),
@@ -1751,8 +1766,8 @@
 
   function tapVial(idx) {
     if (!L || won || lost || modalOpen || screen !== 'game' || pauseAt) return;
-    // камни ещё летят в пробирку: касание ждёт приземления (одного хода хватает)
-    if (pouring) { if (tapQueue.length < 2) tapQueue.push(idx); return; }
+    // камни ещё летят в пробирку: касание ждёт приземления, ходы доигрываются по порядку
+    if (pouring) { if (tapQueue.length < 16) tapQueue.push(idx); return; }
     // ход победный или последний на «Сложном заказе»: окно — когда доиграют выдачи
     if (R.isWon(st) || overLimit()) return;
     if (idx < 0 || idx >= st.vials.length) {
@@ -1817,6 +1832,7 @@
     if (!res) { hist.pop(); return; }
     cancelSearch();
     moves++;
+    if (moves === 1) b2('move');   // B2: первый ход фиксирует выбор оправы на экране уровня (choiceInline)
     sel = -1;
     hintMv = null;
     WsBoard.clearHint();
@@ -1861,7 +1877,8 @@
     }, {
       onGem: (k) => { if (e === epoch) sfx('gem', { semis: PENTA[Math.min(5, before + k)] }); },
       hid: boardHid,
-      reveal: res.revealed
+      reveal: res.revealed,
+      fast: tapQueue.length + backlog > 0   // ход из очереди быстрых касаний: перелив короче, анимация догоняет игрока (Ж-10)
     });
     if (res.revealed) later(() => { if (e === epoch) sfx('reveal'); }, REDUCED ? 0 : 160);
   }
@@ -1942,10 +1959,13 @@
     if (jobs.length) nextJob(); else settle();
   }
 
+  let backlog = 0;   // сколько касаний очереди ещё ждут повтора (ход из очереди переливается быстрее)
   function replayTaps() {
     const q = tapQueue;
     tapQueue = [];
-    q.forEach(i => tapVial(i));
+    backlog = q.length;
+    q.forEach(i => { backlog--; tapVial(i); });
+    backlog = 0;
   }
 
   function resetFlow() {
@@ -2803,7 +2823,9 @@
     if (gap) mapChapterLine((at(ch2 - 1).y + at(ch2).y) / 2);
     draws.forEach(d => d());
     justWon = 0;
-    map.scrollTop = Math.max(0, at(curSlot).y - map.clientHeight * 0.58);
+    // в альбоме текущий значок — ближе к середине: под ним видны пройденные уровни и шкатулка, кнопка «▶» — в углу (Ж-11)
+    const wideMap = window.matchMedia && window.matchMedia('(min-aspect-ratio: 4/3)').matches;
+    map.scrollTop = Math.max(0, at(curSlot).y - map.clientHeight * (wideMap ? 0.5 : 0.58));
     mapChapterBg();
     b2('mapDrawn');   // B2: цель над шкатулкой живёт в дорожке — после перерисовки ставится заново
   }
@@ -2865,8 +2887,7 @@
     const [kind, id] = c.decor || [null, null];   // decor: null — в шкатулке только монеты
     Store.data.chests[ci] = true;
     Store.data.coins += c.coins;
-    // новое убранство сразу на столе; ткань — кроме площадок с autoCloth: false (CrazyGames, ТЗ Ж-05:
-    // пока ткань — плоский градиент, она не заливает поле сама, её выбирают в лавке)
+    // новое убранство сразу на столе; ткань — кроме площадок с autoCloth: false (её тогда выбирают в лавке)
     if (kind && (kind !== 'cloth' || CFG.autoCloth !== false)) Store.data.decor[kind] = id;
     Store.save();
     applyDecor();
@@ -2878,7 +2899,9 @@
     showModal({
       kicker: T('«{name}»', { name: T(c.name) }), title: T('Шкатулка открыта!'), coins: c.coins,
       sr: coinsWord(c.coins) + (kind ? T(' и новое убранство «{decor}»', { decor: decorName(kind, id) }) : ''),
-      pic: chestPic(kind, id), ok: T('Красота!'), okIcon: true
+      pic: chestPic(kind, id), ok: T('Красота!'), okIcon: true,
+      // бархат: под шкатулкой — образец стола с новой тканью и камнями на ней (ТЗ Ж-05: видно, что получено)
+      art: kind === 'cloth' ? (g, w, h) => WsBoard.clothPreview(g, w, h, decorItem(kind, id), ['R', 'D', 'S']) : null
     });
     bump($('ws-menu-coins'));
   }
@@ -2917,6 +2940,7 @@
       if (cloth.velvet) b.style.setProperty('--ws-cloth-' + k, cloth.velvet[i]); else b.style.removeProperty('--ws-cloth-' + k);
     });
     if (cloth.rim) b.style.setProperty('--ws-cloth-rim', cloth.rim); else b.style.removeProperty('--ws-cloth-rim');
+    WsBoard.setCloth(cloth.velvet ? cloth : null);   // бархатный коврик под стойками рисует поле (ТЗ Ж-05)
     const tube = decorItem('tube', Store.data.decor.tube) || DECOR.tube[0];
     WsBoard.setTube({ tint: tube.tint, rim: tube.rim });
     ['cushion', 'pedestal'].forEach(kind => {
@@ -2938,6 +2962,10 @@
     v.classList.toggle('hidden', !canVibrate);
     v.setAttribute('aria-pressed', Store.data.novibe ? 'true' : 'false');
     v.setAttribute('aria-label', Store.data.novibe ? T('Вибрация выключена') : T('Вибрация включена'));
+    const m = $('btn-music');   // музыка (ТЗ Ж-08): своя кнопка; без звука молчит и она
+    m.setAttribute('aria-pressed', Store.data.nomusic ? 'true' : 'false');
+    m.setAttribute('aria-label', Store.data.nomusic ? T('Музыка выключена') : T('Музыка включена'));
+    WsMusic.sync();
   }
 
   /* ---------- B2: выбор оправы, шкатулка, первые минуты ----------
@@ -2975,7 +3003,7 @@
       Store, LEVELS, COLLECTIONS, PER_COLL, REDUCED, Fx,
       collLevels, collDone, collCount, isPassed, isOpen, track, ftueStep, sfx, toast, bump,
       gemItem, drawGem: (g, gem, x, y, s, a) => WsBoard.drawGem(g, gem, x, y, s, a), look, playLook,
-      sizeCanvas, introduce, decorItem, decorName, chestPic, seqGems, syncBanner, startLevel,
+      sizeCanvas, introduce, decorItem, decorName, chestPic, seqGems, syncBanner, startLevel, cfg: CFG,
       socket: (i) => Piece.socket(i), redrawPiece: () => Piece.request(), drawWinJewel, renderMenu,
       levelName: (lv) => T(lv.name)
     };
@@ -3091,6 +3119,13 @@
       applyMute();
       sfx('click');
     }));
+    $('btn-music').addEventListener('click', () => {
+      Store.data.nomusic = !Store.data.nomusic;
+      Store.save();
+      applyMute();
+      sfx('click');
+    });
+    WsMusic.attach(() => !Store.data.muted && !Store.data.nomusic);
     $('btn-vibro').addEventListener('click', () => {
       Store.data.novibe = !Store.data.novibe;
       Store.save();
@@ -3251,7 +3286,8 @@
         banner: (() => { try { return WSPlatform.state().bannerHeight; } catch (e) { return 0; } })(),
         bannerWanted, rewardBusy: Object.keys(rewardBusy).filter(k => rewardBusy[k]),
         rewardLate: Object.keys(rewardLate), paySyncs, payPending,
-        b2: b2('state') || null
+        b2: b2('state') || null,
+        music: WsMusic.state()
       };
     },
     vialCenter(i) {

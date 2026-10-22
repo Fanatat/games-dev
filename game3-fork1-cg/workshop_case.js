@@ -8,6 +8,8 @@
    S1  Выбор: перед первым запуском уровня, начиная с 4-го, — окно «Выберите
        оправу», две карточки одного изделия (металл, иногда и форма). Выбор —
        Store.data.choice[id] = { metal, shape }; при повторном запуске окна нет.
+       С WS_CONFIG.choiceInline (CrazyGames, ТЗ Ж-11) окна нет: левая карточка
+       надета сразу, а две кнопки-образца под изделием меняют её до первого хода.
        Главный камень: пустое главное гнездо пульсирует, на заказчицах — корона,
        выдача в главное место — кольцо, искры и свой звук.
    S2  Шкатулка: 12 коллекций × 5 изделий; несобранные — силуэтами. Касание —
@@ -46,6 +48,7 @@ window.WsCase = (function () {
 
   let api = null;
   let choice = null;        // открытое окно выбора: { id, level, kind, cards, t0, resume, epoch, tries }
+  let mini = null;          // выбор на экране уровня (choiceInline): { id, level, kind, cards, slot, t0, picked }
   let caseFrom = null;      // шкатулка открыта: 'map' | 'win'
   let viewLv = null;        // крупный показ: уровень
   let viewRaf = 0, viewT0 = 0, viewTries = 0;
@@ -92,7 +95,8 @@ window.WsCase = (function () {
       '<button id="btn-win-case" class="ws-round ws-pic ws-win-case" type="button" aria-label="Шкатулка"></button>');
     // главное гнездо изделия в шапке уровня
     const stage = document.querySelector('#screen-workshop .ws-stage');
-    if (stage) stage.insertAdjacentHTML('beforeend', '<span id="ws-main-pulse" class="ws-main-pulse hidden" aria-hidden="true"></span>');
+    if (stage) stage.insertAdjacentHTML('beforeend', '<span id="ws-main-pulse" class="ws-main-pulse hidden" aria-hidden="true"></span>' +
+      '<span id="ws-choice-mini" class="ws-choice-mini hidden" role="group" aria-label="Выберите оправу"></span>');
 
     const on = (id, fn) => { const el = $(id); if (el) el.addEventListener('click', (ev) => { if (api) fn(ev); }); };
     on('btn-case', () => openCase('map'));
@@ -218,6 +222,78 @@ window.WsCase = (function () {
     requestAnimationFrame(updatePulse);
   }
 
+  /* ---------- S1 на экране уровня (choiceInline, ТЗ Ж-11): без окна ----------
+     Левая карточка надевается сразу (изделие видно с первого кадра), две кнопки-образца под изделием
+     меняют оправу до первого хода; первый ход фиксирует выбор и убирает кнопки. */
+  function openMini() {
+    const L = api.L, c = choiceCards(L, api.levelIdx);
+    mini = { id: String(L.id), level: L.id, kind: c.kind, cards: c.cards, slot: 0, t0: Date.now(), picked: false };
+    api.Store.data.choice[mini.id] = { metal: c.cards[0].metal, shape: c.cards[0].shape };
+    api.Store.save();
+    const box = $('ws-choice-mini');
+    if (!box) return;
+    box.innerHTML = '';
+    c.cards.forEach((cd, slot) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'ws-choice-chip' + (slot === 0 ? ' is-on' : '');
+      b.dataset.slot = String(slot);
+      b.setAttribute('aria-label', cardName(L, c.kind, cd));
+      b.setAttribute('aria-pressed', slot === 0 ? 'true' : 'false');
+      b.innerHTML = '<canvas aria-hidden="true"></canvas>';
+      b.style.setProperty('--sw', METAL[cd.metal].sw);
+      b.addEventListener('click', () => pickMini(slot));
+      box.appendChild(b);
+    });
+    box.classList.remove('hidden');
+    api.track('choice_shown', { level: L.id, kind: c.kind, inline: true });
+    drawMini(0);
+  }
+  function drawMini(tries) {
+    if (!mini || !api.L) return;
+    let ready = true;
+    $('ws-choice-mini').querySelectorAll('canvas').forEach((cv, i) => {
+      const cd = mini.cards[i], { g, w, h } = canvasOf(cv, 40, 40);
+      WsJewel.draw(g, cd.shape, api.L.orders.length, [], { x: 1, y: 1, w: w - 2, h: h - 2 }, { drawGem: api.drawGem, closeup: true, metal: cd.metal });
+      if (!WsJewel.ready(cd.shape)) ready = false;
+    });
+    if (!ready && tries < 20) setTimeout(() => drawMini(tries + 1), 250);
+  }
+  function pickMini(slot) {
+    if (!mini || slot === mini.slot) return;
+    const cd = mini.cards[slot];
+    mini.slot = slot;
+    mini.picked = true;
+    api.Store.data.choice[mini.id] = { metal: cd.metal, shape: cd.shape };
+    api.Store.save();
+    $('ws-choice-mini').querySelectorAll('button').forEach((b, i) => {
+      b.classList.toggle('is-on', i === slot);
+      b.setAttribute('aria-pressed', i === slot ? 'true' : 'false');
+    });
+    api.sfx('reveal');
+    api.redrawPiece();
+    const cv = $('ws-piece');
+    if (cv) {
+      const r = cv.getBoundingClientRect();
+      api.Fx.sparkle(r.left + r.width / 2, r.top + r.height / 2, Math.min(r.width, r.height) * 0.5);
+    }
+    requestAnimationFrame(updatePulse);
+  }
+  // первый ход: выбор зафиксирован (choice_pick — с номером карточки и тем, трогал ли игрок кнопки)
+  function move() {
+    if (!mini) return;
+    const m = mini, cd = m.cards[m.slot], lv = api.LEVELS[idxById(m.level)];
+    api.track('choice_pick', { level: m.level, metal: cd.metal, shape: lv ? formOf(lv, cd.shape) : 1, slot: m.slot,
+      ms: Math.min(3600000, Date.now() - m.t0), inline: true, touched: m.picked });
+    api.ftueStep(6, 'first_choice');
+    hideMini();
+  }
+  function hideMini() {
+    mini = null;
+    const box = $('ws-choice-mini');
+    if (box) { box.classList.add('hidden'); box.innerHTML = ''; }
+  }
+
   /* главное гнездо: пульсирует, пока главный камень не выдан */
   function hidePulse() {
     const el = $('ws-main-pulse');
@@ -272,7 +348,9 @@ window.WsCase = (function () {
     hidePulse();
     if (choice) { choice = null; hide('choice-overlay'); }
     const L = api.L, i = api.levelIdx;
+    hideMini();
     if (L && i >= CHOICE_FROM && !api.isPassed(i) && !api.Store.data.choice[String(L.id)]) {
+      if (api.cfg.choiceInline) { openMini(); requestAnimationFrame(updatePulse); return false; }
       openChoice(!!resume);
       return true;
     }
@@ -282,6 +360,7 @@ window.WsCase = (function () {
   function leave() {
     clearWinTimers();
     hidePulse();
+    hideMini();
     if (choice) { choice = null; hide('choice-overlay'); api.syncBanner(); }
     const j = $('ws-win-jewel');
     if (j) j.classList.remove('is-flown');
@@ -626,6 +705,7 @@ window.WsCase = (function () {
     const goal = document.querySelector('#ws-map-track .ws-goal');
     return {
       choiceOpen: vis('choice-overlay'),
+      choiceMini: !!mini,
       choiceKind: choice ? choice.kind : null,
       choiceCards: choice ? choice.cards.map(c => c.metal + ':' + c.shape) : [],
       caseOpen: vis('case-overlay'),
@@ -646,5 +726,5 @@ window.WsCase = (function () {
   function attach(a) { api = a; }
 
   build();
-  return { OVERLAYS, attach, levelStart, piece, orders, mainGem, win, menu, mapDrawn, leave, key, state };
+  return { OVERLAYS, attach, levelStart, piece, orders, mainGem, move, win, menu, mapDrawn, leave, key, state };
 })();

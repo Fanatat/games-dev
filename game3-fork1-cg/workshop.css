@@ -317,8 +317,8 @@ button:focus-visible { outline: 3px solid rgba(240, 97, 143, 0.9); outline-offse
 .ws-map-knobs { display: flex; gap: 10px; }
 /* звук, под ним вибрация (только сенсорный экран): столбик не теснит ряд кнопок */
 .ws-knob-stack { display: flex; flex-direction: column; gap: 10px; }
-#btn-vibro .v-off { display: none; }
-#btn-vibro[aria-pressed="true"] .v-off { display: inline; }
+#btn-vibro .v-off, #btn-music .v-off { display: none; }
+#btn-vibro[aria-pressed="true"] .v-off, #btn-music[aria-pressed="true"] .v-off { display: inline; }
 .ws-map-top .ws-map-knob { width: 54px; height: 54px; }
 .ws-map-top .ws-map-knob svg { width: 62%; height: 62%; }
 .ws-map-foot {
@@ -671,9 +671,9 @@ body.is-hard .ws-moves.is-low { animation: wsBump 0.5s ease-out; background: lin
   filter: drop-shadow(0 4px 8px rgba(90, 30, 50, 0.3));
   transform-origin: 50% 100%; animation: wsCheer 1.8s ease-in-out infinite;
 }
-.ws-win-hero.h-curly { --hero: url(workshop_assets/hero_curly.webp); --hero-k: 0.428; }
-.ws-win-hero.h-bride { --hero: url(workshop_assets/hero_bride.webp); --hero-k: 0.545; }
-.ws-win-hero.h-grandma { --hero: url(workshop_assets/hero_grandma.webp); --hero-k: 0.735; --hero-s: 0.66; }   /* по пояс */
+.ws-win-hero.h-curly { --hero: url(workshop_assets/hero_curly.webp); --hero-k: 0.430; }
+.ws-win-hero.h-bride { --hero: url(workshop_assets/hero_bride.webp); --hero-k: 0.614; }
+.ws-win-hero.h-grandma { --hero: url(workshop_assets/hero_grandma.webp); --hero-k: 0.762; --hero-s: 0.66; }   /* по пояс */
 .ws-win-jewel, .ws-coll { position: relative; z-index: 1; }
 .ws-heart {
   position: absolute; right: -6px; top: 2px; width: 34px; height: 34px;
@@ -773,13 +773,10 @@ body.is-hard .ws-moves.is-low { animation: wsBump 0.5s ease-out; background: lin
   font: 9px/1 ui-monospace, monospace; color: rgba(91, 51, 38, 0.45);
 }
 
-/* ---------- убранство: бархатный коврик под стойками ----------
-   Цвета — из таблицы DECOR (workshop.js, applyDecor): --ws-cloth-1..3 и кант --ws-cloth-rim. */
-body.has-cloth .ws-board-wrap {
-  border-radius: 26px;
-  background: radial-gradient(ellipse 80% 72% at 50% 42%, var(--ws-cloth-1) 0%, var(--ws-cloth-2) 55%, var(--ws-cloth-3) 100%);
-  box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.4), inset 0 0 0 3px var(--ws-cloth-rim, rgba(255, 220, 130, 0.55)), 0 6px 16px rgba(122, 52, 82, 0.3);
-}
+/* ---------- убранство: бархат ----------
+   Коврик под каждой стойкой рисует поле (workshop_board.js, paintCloth: фактура velvet.webp, перекрашенная в цвет
+   ткани из DECOR, ТЗ Ж-05); поле больше не заливается целиком. Образец в лавке — та же фактура. */
+.ws-swatch.is-velvet { background-image: url(workshop_assets/velvet.webp); background-size: 260%; background-blend-mode: multiply; }
 
 /* ---------- пауза площадки (вкладка скрыта, реклама, окно оплаты): анимации стоят ---------- */
 body.ws-paused .screen *, body.ws-paused .ws-win *, body.ws-paused .ws-win { animation-play-state: paused !important; }
@@ -1020,6 +1017,18 @@ body.is-owner .ws-price.is-video { background-image: url(workshop_assets/ui_crow
 .ws-piece-dots i.on { background: radial-gradient(circle at 35% 30%, #fff6c8, #f0c55a 55%, #b98226); box-shadow: 0 0 4px rgba(255, 200, 70, 0.8); }
 .ws-piece-dots i.is-new { animation: wsDotOn 0.45s cubic-bezier(.2, 1.6, .5, 1); }
 @keyframes wsDotOn { 0% { transform: scale(2.2); filter: brightness(1.6); } 100% { transform: none; } }
+/* выбор оправы на экране уровня (choiceInline, ТЗ Ж-11): два образца у правого края изделия до первого хода */
+.ws-choice-mini {
+  position: absolute; right: 0; top: 50%; z-index: 3; transform: translateY(-50%);
+  display: flex; flex-direction: column; gap: 6px;
+}
+.ws-choice-chip {
+  width: 36px; height: 36px; padding: 2px; border-radius: 50%; cursor: pointer;
+  border: 2.5px solid transparent; background: #fff8ee padding-box, var(--sw) border-box;
+  box-shadow: 0 2px 5px rgba(122, 52, 82, 0.3); opacity: 0.72; transition: transform 0.15s, opacity 0.15s;
+}
+.ws-choice-chip canvas { display: block; width: 100%; height: 100%; }
+.ws-choice-chip.is-on { opacity: 1; transform: scale(1.12); box-shadow: 0 0 0 2px #fff6d8, 0 0 10px 3px rgba(255, 210, 110, 0.85); }
 /* изделие подпрыгивает на подушке, когда камень сел в гнездо */
 .ws-stage.is-bump .ws-piece { animation: wsPieceBump 0.2s ease-out; }
 @keyframes wsPieceBump { 0% { transform: translateX(-50%) scale(1); } 45% { transform: translateX(-50%) scale(1.04) translateY(-2%); } 100% { transform: translateX(-50%) scale(1); } }
@@ -1075,6 +1084,8 @@ body.is-owner .ws-price.is-video { background-image: url(workshop_assets/ui_crow
   .ws-piece { top: 3%; width: 94%; height: 74%; }
   .ws-piece-dots { bottom: calc(var(--u) * 2); gap: calc(var(--u) * 6); padding: calc(var(--u) * 3) calc(var(--u) * 9); border-radius: calc(var(--u) * 10); }
   .ws-piece-dots i { width: calc(var(--u) * 11); height: calc(var(--u) * 11); }
+  .ws-choice-mini { gap: calc(var(--u) * 10); right: calc(var(--u) * 2); }
+  .ws-choice-chip { width: calc(var(--u) * 54); height: calc(var(--u) * 54); }
 
   .ws-orders-panel { grid-column: 1; grid-row: 3; gap: calc(var(--u) * 4); }
   .ws-orders, .ws-orders[data-n="2"] { --face: calc(var(--u) * 64); --bubble: calc(var(--u) * 52); gap: calc(var(--u) * 16); }
@@ -1091,6 +1102,10 @@ body.is-owner .ws-price.is-video { background-image: url(workshop_assets/ui_crow
   .ws-price { height: calc(var(--u) * 24); font-size: calc(var(--u) * 14); }
   .ws-actions .ws-help-mini { width: calc(var(--u) * 38); height: calc(var(--u) * 38); margin-top: calc(var(--u) * -19); right: 0; }
   .ws-actions .ws-help-mini span { font-size: calc(var(--u) * 21); }
+  /* карта: «▶ N» в правом нижнем углу, а не поверх дорожки и шкатулки (ТЗ Ж-11) */
+  .ws-map-foot { justify-content: flex-end; padding-right: calc(env(safe-area-inset-right, 0px) + var(--u) * 22); bottom: calc(env(safe-area-inset-bottom, 0px) + var(--u) * 16); }
+  .ws-map-foot .ws-map-play { --ph: calc(var(--u) * 62); width: calc(var(--u) * 210); font-size: calc(var(--u) * 30); }
+  .ws-map-foot .ws-map-play > svg { width: calc(var(--u) * 36); height: calc(var(--u) * 36); }
   .ws-board-wrap { grid-column: 2; grid-row: 2 / 6; margin: 0; min-height: 0; }
   .ws-toast { bottom: calc(env(safe-area-inset-bottom, 0px) + var(--u) * 74); }
   /* победа: заказчица в рост у левого края, ростом в половину окна, а не 170 px телефона */

@@ -27,6 +27,7 @@
     // карта
     'Карта уровней': 'Level map', 'Монеты': 'Coins', 'Как играть': 'How to play', 'Без рекламы': 'No ads', 'Лавка': 'Shop',
     'Звук': 'Sound', 'Вибрация включена': 'Vibration on', 'Вибрация выключена': 'Vibration off',
+    'Музыка включена': 'Music on', 'Музыка выключена': 'Music off',
     'Монеты — за заказы': 'Coins come from orders',
     '{word}: уровень {n}': '{word}: level {n}',
     'Все изделия готовы — соберите три звезды: уровень {n}': 'All jewels done. Get three stars: level {n}',
@@ -61,6 +62,7 @@
     'Видео сейчас нет': 'No video right now', 'Перезапустите игру': 'Restart the game', 'Покупка зачислена': 'Purchase added',
     // новинки и «Сложный заказ»
     'Новое!': 'New!', 'Понятно': 'Got it', 'Сложный заказ': 'Hard order', 'Награда вдвое больше.': 'Double reward.', 'Берусь!': "I'm in!",
+    'Сложный заказ · ходов: {n} · награда ×2': 'Hard order · {n} moves · reward ×2',
     'Тайные камни': 'Hidden gems', 'Снимите верхний камень — нижний откроется.': 'Move the top gem to reveal the one below.',
     'Срочный заказ': 'Rush order', 'Успейте за отмеченные ходы — заплатят втрое.': 'Finish within the marked moves for triple pay.',
     'Запертая пробирка': 'Locked tube', 'Откроется, когда выдадите заказ с ключом.': 'Opens when you deliver the order with the key.',

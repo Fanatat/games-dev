@@ -13,10 +13,15 @@
   (tools/platform/metrica_head.html), если он включён для цели сборки;
   ход загрузки уходит в него целями load_* (docs/ANALYTICS.md).
   Экран загрузки (аудит CrazyGames 20.10, ZL-18: «чёрный экран с
-  оранжевой полоской — как будто сломалось»): кадр игры loading.jpg
-  (113 КБ), название из game.json шрифтом интерфейса (Russo One целиком,
-  loading.woff2, лицензия — loading-font-OFL.txt) и полоса в стиле кнопок
-  игры; виден с первого кадра страницы, тает, когда игра запустилась.
+  оранжевой полоской — как будто сломалось»): рисованная заставка
+  (Codex, 22.10.2026; исходники и промт — ref/original/loading/), две
+  сцены: A — loading.jpg, B — loading-b.jpg, у каждой портрет для
+  телефона и -wide для широкого экрана (ПК, iframe 16:9), до 150 КБ.
+  Сцену страница берёт наугад, качает одну картинку под форму экрана. Сверху
+  название из game.json шрифтом интерфейса (Russo One целиком,
+  loading.woff2, лицензия — loading-font-OFL.txt), снизу полоса в стиле
+  кнопок игры; на арте место под них оставлено пустым. Виден с первого
+  кадра страницы, тает, когда игра запустилась.
 -->
 <html lang="en">
   <head>
@@ -149,7 +154,19 @@
   })();
 </script>
     <!-- platform-head -->
-    <link rel="preload" href="loading.jpg" as="image">
+    <script>
+      // Заставка: сцена A или B наугад; качается одна картинка — под форму экрана.
+      (function () {
+        var b = Math.random() < 0.5;
+        var wide = window.matchMedia && window.matchMedia("(min-aspect-ratio: 1/1)").matches;
+        if (b) document.documentElement.classList.add("loading-b");
+        var link = document.createElement("link");
+        link.rel = "preload";
+        link.as = "image";
+        link.href = (b ? "loading-b" : "loading") + (wide ? "-wide" : "") + ".jpg";
+        document.head.appendChild(link);
+      })();
+    </script>
     <style>
       @font-face {
         font-family: "Game7Title";
@@ -185,16 +202,32 @@
         display: flex;
         flex-direction: column;
         align-items: center;
-        justify-content: center;
-        gap: 5vmin;
+        justify-content: space-between;
+        box-sizing: border-box;
+        padding: max(6vh, calc(env(safe-area-inset-top) + 16px)) 0 max(7vh, calc(env(safe-area-inset-bottom) + 16px));
         background: #1b1420 url("loading.jpg") center / cover no-repeat;
         transition: opacity 0.35s;
       }
+      .loading-b #game7-loading { background-image: url("loading-b.jpg"); }
+      /* Широкий кадр 16:9 из арта 3:2: срез больше снизу (там пустая земля),
+         название выше и мельче — не на каске босса. */
+      @media (min-aspect-ratio: 1/1) {
+        #game7-loading {
+          background-image: url("loading-wide.jpg");
+          background-position: center 15%;
+          padding-top: max(2.5vh, calc(env(safe-area-inset-top) + 8px));
+          padding-bottom: max(3.5vh, calc(env(safe-area-inset-bottom) + 8px));
+        }
+        .loading-b #game7-loading { background-image: url("loading-b-wide.jpg"); }
+        #game7-loading #game7-loading-title { font-size: clamp(30px, 8vmin, 80px); }
+      }
+      /* Тень только сверху и снизу — под названием и полосой, арт в середине не тускнеет. */
       #game7-loading::before {
         content: "";
         position: absolute;
         inset: 0;
-        background: radial-gradient(ellipse at center, rgba(27, 20, 32, 0.35) 0%, rgba(27, 20, 32, 0.8) 100%);
+        background: linear-gradient(rgba(27, 20, 32, 0.55) 0%, rgba(27, 20, 32, 0) 24%,
+                                    rgba(27, 20, 32, 0) 80%, rgba(27, 20, 32, 0.6) 100%);
       }
       #game7-loading.done {
         opacity: 0;
@@ -204,7 +237,7 @@
         position: relative;
         padding: 0 16px;
         font-family: "Game7Title", "Arial Black", Impact, sans-serif;
-        font-size: clamp(34px, 10vmin, 92px);
+        font-size: clamp(34px, 12vmin, 92px);
         line-height: 1.1;
         text-align: center;
         color: #ffd23d;
@@ -290,8 +323,8 @@
       // текстуры на CPU при загрузке. ASTC берём, только если DXT нет, а
       // ASTC есть: ПК с обоими форматами остаётся на основном. ?tex=astc
       // или ?tex=dxt в адресе — выбрать файл вручную (проверки).
-      var dataFile = "dev-20261021-213436.data.unityweb";
-      var astcDataFile = "dev-20261021-213436.astc.data.unityweb";
+      var dataFile = "dev-20261022-045242.data.unityweb";
+      var astcDataFile = "dev-20261022-045242.astc.data.unityweb";
       var texFormat = "dxt";
       if (astcDataFile) {
         var texForce = /[?&]tex=(astc|dxt)(&|$)/.exec(location.search);
@@ -315,16 +348,16 @@
       window.game7TexFormat = texFormat;
 
       var buildUrl = "Build";
-      var loaderUrl = buildUrl + "/dev-20261021-213436.loader.js";
+      var loaderUrl = buildUrl + "/dev-20261022-045242.loader.js";
       var config = {
         arguments: [],
         dataUrl: buildUrl + "/" + dataFile,
-        frameworkUrl: buildUrl + "/dev-20261021-213436.framework.js.unityweb",
-        codeUrl: buildUrl + "/dev-20261021-213436.wasm.unityweb",
+        frameworkUrl: buildUrl + "/dev-20261022-045242.framework.js.unityweb",
+        codeUrl: buildUrl + "/dev-20261022-045242.wasm.unityweb",
         streamingAssetsUrl: "StreamingAssets",
         companyName: "Vanatat",
         productName: "Zomboland",
-        productVersion: "dev-20261021-213436",
+        productVersion: "dev-20261022-045242",
         showBanner: unityShowBanner,
         // Экраны с плотностью 3 рисовали бы в 9 раз больше пикселей, чем
         // с плотностью 1: потолок 2 держит 60 FPS на среднем телефоне.

@@ -1,0 +1,131 @@
+/* workshop_shop.css — релиз 1.0, волна B3: лавка, глава 2 на карте, новые заказчицы.
+   Подключается после workshop.css; код окна — workshop_shop.js. */
+
+/* ---------- лавка: окно убранства и покупки ---------- */
+.ws-shop .ws-win-box { width: min(100%, 340px); gap: 12px; padding: 34px 14px 16px; }
+.ws-shop-coins {   /* сколько монет: та же пилюля, что на карте */
+  --ch: 36px;
+  position: relative; display: inline-flex; align-items: center; gap: 6px; flex: none;
+  height: var(--ch); padding: 0 14px 0 40px;
+  border: 0 solid transparent; border-image: url(workshop_assets/ui_pill.webp) 0 64 fill / 0 calc(var(--ch) / 2) stretch;
+  color: var(--ink); font-size: 1.2rem; font-weight: 900; font-variant-numeric: tabular-nums;
+  filter: drop-shadow(0 3px 4px rgba(122, 52, 82, 0.25));
+}
+.ws-shop-coins .ws-coin-ico { position: absolute; left: -4px; top: 50%; width: 40px; height: 40px; margin-top: -20px; }
+.ws-shop-coins.bump { animation: wsCoinBump 0.32s ease-out; }
+
+/* вкладки: стол, стекло, подушка, тумба — только значки */
+.ws-shop-tabs { display: flex; justify-content: center; gap: 8px; }
+.ws-shop-tab {
+  position: relative; width: 56px; height: 56px; padding: 7px; border-radius: 18px;
+  border: 3px solid rgba(232, 182, 74, 0.35); background: linear-gradient(180deg, #ffffff, #f6e7cf);
+  box-shadow: 0 2px 4px rgba(122, 52, 82, 0.18);
+  transition: transform 0.1s ease;
+}
+.ws-shop-tab .ws-decor-ico { width: 100%; height: 100%; }
+.ws-shop-tab:not(.is-on) .ws-decor-ico { opacity: 0.72; filter: saturate(0.7); }
+.ws-shop-tab.is-on {
+  border-color: #e8b64a; transform: translateY(-3px);
+  background: linear-gradient(180deg, #fffaf0, #ffe6a8);
+  box-shadow: 0 0 10px rgba(255, 190, 70, 0.75), 0 4px 6px rgba(122, 52, 82, 0.22);
+}
+.ws-shop-tab:active { transform: scale(0.95); }
+.ws-shop-dot {   /* в вкладке есть то, на что хватает монет */
+  position: absolute; right: -5px; top: -5px; width: 14px; height: 14px; border-radius: 50%;
+  background: radial-gradient(circle at 40% 35%, #ff9fb8, #e8336b 70%); box-shadow: 0 0 0 2px #fff;
+}
+
+/* сетка вещей: четыре в ряд, под ценой — место */
+.ws-shop .ws-decor { gap: 0; min-height: 152px; justify-content: center; }
+.ws-decor-row.ws-shop-grid { display: grid; grid-template-columns: repeat(4, 60px); gap: 22px 12px; padding: 6px 0 12px; justify-content: center; }
+.ws-decor-row.ws-shop-grid[hidden] { display: none; }
+.ws-shop-grid .ws-decor-chip { width: 60px; height: 60px; transition: transform 0.12s ease; }
+.ws-shop-grid .ws-decor-chip:active { transform: scale(0.94); }
+.ws-shop-grid .ws-decor-chip.is-pick {
+  border-color: #f0618f; transform: translateY(-3px) scale(1.06);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.95), 0 0 14px rgba(240, 97, 143, 0.75);
+}
+.ws-decor-chip.is-shop .ws-swatch { filter: saturate(0.85); }
+.ws-decor-chip.is-poor .ws-swatch { filter: saturate(0.5); opacity: 0.6; }
+.ws-decor-check {   /* надето сейчас */
+  position: absolute; right: -7px; bottom: -7px; width: 26px; height: 26px;
+  background: url(workshop_assets/ui_check.webp) center / contain no-repeat;
+  filter: drop-shadow(0 0 1.5px #fff) drop-shadow(0 2px 2px rgba(30, 90, 30, 0.35));
+}
+.ws-decor-price {   /* цена в монетах под образцом */
+  position: absolute; left: 50%; bottom: -15px; transform: translateX(-50%);
+  display: inline-flex; align-items: center; gap: 2px; height: 22px; padding: 0 7px 0 3px; border-radius: 999px;
+  font-size: 0.86rem; font-weight: 900; line-height: 1; color: var(--ink); white-space: nowrap; font-variant-numeric: tabular-nums;
+  background: linear-gradient(180deg, #ffffff, #fbeeda); box-shadow: inset 0 0 0 2px rgba(232, 182, 74, 0.9), 0 2px 3px rgba(122, 52, 82, 0.2);
+}
+.ws-decor-price .ws-coin-ico { width: 17px; height: 17px; }
+.ws-decor-chip.is-poor .ws-decor-price { color: #b04a5e; }
+.ws-shop-grid .ws-decor-lock { right: -5px; bottom: -7px; }
+.ws-shop-grid .ws-decor-crown { right: -7px; bottom: -7px; width: 28px; height: 24px; }
+
+/* главная кнопка: «готово» или «купить за N» */
+.ws-shop .ws-decor-ok { width: 170px; }
+.ws-shop-buy { display: none; align-items: center; gap: 6px; font-size: 1.8rem; }
+.ws-shop-buy .ws-coin-ico { width: 38px; height: 38px; filter: drop-shadow(0 2px 0 rgba(30, 100, 30, 0.5)); }
+.ws-decor-ok.is-buy .ws-shop-buy { display: inline-flex; }
+.ws-decor-ok.is-buy .ws-shop-ok { display: none; }
+.ws-decor-ok[disabled] { filter: grayscale(0.75) brightness(0.95); cursor: default; }
+
+/* приз шкатулки — картинка (подушка, тумба), а не цветной кружок */
+.ws-chest-prize.is-pic { border-radius: 14px; background: #fffaf0 center / 86% no-repeat; }
+
+/* ---------- глава 2 на карте ----------
+   Под дорожкой — второй зал (bg_map2) выше границы глав; слой стоит, как и комната главы 1,
+   а его нижний край ходит за границей при прокрутке (--cut, workshop.js renderMap).
+   Нет картинки — комната главы 1 с вечерним оттенком. */
+.ws-map-bg2 {
+  --cut: 0px;
+  position: absolute; inset: 0; pointer-events: none;
+  background:
+    url(workshop_assets/bg_map2.webp) 50% 0 / cover no-repeat,
+    linear-gradient(180deg, rgba(58, 36, 110, 0.5), rgba(120, 60, 120, 0.32) 60%, rgba(60, 30, 80, 0.4)),
+    url(workshop_assets/bg_map.webp) 50% 0 / cover no-repeat;
+  background-color: #8d6ea8;
+  -webkit-mask-image: linear-gradient(180deg, #000 0, #000 calc(var(--cut) - 26px), transparent calc(var(--cut) + 26px));
+  mask-image: linear-gradient(180deg, #000 0, #000 calc(var(--cut) - 26px), transparent calc(var(--cut) + 26px));
+}
+.ws-map-bg2.is-off { display: none; }
+.ws-map-ch {   /* граница глав: золотая нить через всю ширину и лента «Глава 2» */
+  position: absolute; left: -40px; right: -40px; z-index: 2; height: 0; pointer-events: none;
+}
+.ws-map-ch::before {
+  content: ''; position: absolute; left: 0; right: 0; top: -2px; height: 4px; border-radius: 2px;
+  background: linear-gradient(90deg, transparent, #f6d27a 18%, #fff1c0 50%, #f6d27a 82%, transparent);
+  box-shadow: 0 0 10px rgba(255, 220, 130, 0.9);
+}
+.ws-map-ch-label {
+  position: absolute; left: 50%; top: -22px; width: 190px; height: 46px; margin-left: -95px;
+  display: flex; align-items: center; justify-content: center; padding-bottom: 5px;
+  font-size: 1.15rem; font-weight: 900; color: #fff; letter-spacing: 0.02em; white-space: nowrap;
+  text-shadow: 0 2px 0 rgba(150, 30, 70, 0.7);
+  background: url(workshop_assets/ui_ribbon.webp) center / 100% 100% no-repeat;
+  filter: drop-shadow(0 3px 4px rgba(90, 30, 60, 0.35));
+}
+
+/* ---------- новые заказчицы (только глава 2) ---------- */
+.ws-face.f-jade { --img: url(workshop_assets/face_jade.webp); --joy: url(workshop_assets/face_jade_joy.webp); }
+.ws-face.f-silver { --img: url(workshop_assets/face_silver.webp); --joy: url(workshop_assets/face_silver_joy.webp); }
+
+/* ---------- низкий телефон и телефон лёжа ---------- */
+@media (max-height: 700px) and (orientation: portrait) {
+  .ws-shop .ws-win-box { gap: 10px; padding-top: 30px; }
+  .ws-shop-tab { width: 50px; height: 50px; padding: 6px; }
+  .ws-decor-row.ws-shop-grid { grid-template-columns: repeat(4, 56px); gap: 20px 10px; }
+  .ws-shop-grid .ws-decor-chip { width: 56px; height: 56px; }
+}
+@media (orientation: landscape) and (max-height: 520px) {
+  .ws-map-bg2 { background-position: 50% 58%, 0 0, 50% 58%; }
+  .ws-shop .ws-win-box { width: min(100%, 420px); gap: 6px; padding: 26px 12px 10px; }
+  .ws-shop .ws-decor { min-height: 0; }
+  .ws-shop-tab { width: 44px; height: 44px; padding: 5px; border-radius: 14px; }
+  .ws-decor-row.ws-shop-grid { grid-template-columns: repeat(7, 46px); gap: 18px 8px; padding: 4px 0 12px; }   /* лёжа — один ряд */
+  .ws-shop-grid .ws-decor-chip { width: 46px; height: 46px; padding: 3px; }
+  .ws-shop .ws-decor-ok { --ph: 54px; }
+  .ws-shop-buy { font-size: 1.5rem; }
+  .ws-shop-buy .ws-coin-ico { width: 32px; height: 32px; }
+}

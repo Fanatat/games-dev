@@ -21,7 +21,7 @@
 | game9 | Коп Ленд (раннер) | Three.js | [открыть](https://fanatat.github.io/games-dev/game9/) | готовится |
 | game1-fork1 | Слова по уликам (прототип) | JavaScript | [открыть](https://fanatat.github.io/games-dev/game1-fork1/) | — |
 | game2-fork1 | Дом картинок (прототип) | JavaScript | [открыть](https://fanatat.github.io/games-dev/game2-fork1/) | — |
-| game3-fork1 | Мастерская украшений | JavaScript | [открыть](https://fanatat.github.io/games-dev/game3-fork1/) · [для ВК](https://fanatat.github.io/games-dev/game3-fork1-vk/) | на модерации |
+| game3-fork1 | Мастерская украшений | JavaScript | [открыть](https://fanatat.github.io/games-dev/game3-fork1/) · [для ВК](https://fanatat.github.io/games-dev/game3-fork1-vk/) · [для CrazyGames](https://fanatat.github.io/games-dev/game3-fork1-cg/) | на модерации |
 | game4-fork1 | Последний конвой | JavaScript, Canvas | [открыть](https://fanatat.github.io/games-dev/game4-fork1/) | на модерации |
 
 game6 (Godot, CrazyGames) и game8 (Unity, Steam) на стенде не выкладываются.

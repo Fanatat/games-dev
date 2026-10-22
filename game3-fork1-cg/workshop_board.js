@@ -550,6 +550,21 @@ const WsBoard = (() => {
     body.addColorStop(1, 'rgba(200,160,200,0.42)');
     ctx.fillStyle = body;
     ctx.fill();
+    // объём (ТЗ CrazyGames, раздел 9): к дну стекло толще и темнее, на дне — светлая линза
+    ctx.save();
+    tubePath(cx, s.rimY, s.baseY, tw);
+    ctx.closePath();
+    ctx.clip();
+    const deep = ctx.createLinearGradient(0, bot - tw * 1.3, 0, bot);
+    deep.addColorStop(0, 'rgba(120,70,120,0)');
+    deep.addColorStop(1, 'rgba(120,70,120,0.2)');
+    ctx.fillStyle = deep;
+    ctx.fillRect(cx - tw / 2, bot - tw * 1.3, tw, tw * 1.3);
+    ctx.beginPath();
+    ctx.ellipse(cx, bot - tw * 0.13, tw * 0.3, tw * 0.07, 0, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(${tube.rim},0.42)`;
+    ctx.fill();
+    ctx.restore();
     if (fl) {
       // готовая четвёрка: золотое сияние изнутри
       const kk = Math.min(1, (t - fl.t0) / fl.dur);
@@ -601,10 +616,27 @@ const WsBoard = (() => {
     ctx.fillStyle = 'rgba(255,255,255,0.4)';
     roundRect(ctx, cx + tw * 0.27, s.rimY + tw * 0.35, tw * 0.05, (bot - s.rimY) * 0.5, tw * 0.025);
     ctx.fill();
-    // кромка: толстое кольцо
+    // тонкий блик вдоль правого края и по закруглению дна — стекло читается толстым
+    ctx.lineCap = 'round';
+    ctx.lineWidth = Math.max(1, tw * 0.022);
+    ctx.strokeStyle = 'rgba(255,255,255,0.6)';
     ctx.beginPath();
-    ctx.ellipse(cx, s.rimY - LIP * tw * 0.4, tw * 0.55, tw * 0.13, 0, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(190,150,185,0.3)';
+    ctx.moveTo(cx + tw * 0.41, s.rimY + tw * 0.25);
+    ctx.lineTo(cx + tw * 0.41, bot - tw * 0.62);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(cx, bot - tw / 2, tw * 0.4, Math.PI * 0.62, Math.PI * 0.9);
+    ctx.strokeStyle = 'rgba(255,255,255,0.75)';
+    ctx.stroke();
+    ctx.lineCap = 'butt';
+    // кромка: толстое кольцо с объёмом — светлый верх, тень снизу, искра блика
+    const ry = s.rimY - LIP * tw * 0.4;
+    ctx.beginPath();
+    ctx.ellipse(cx, ry, tw * 0.55, tw * 0.13, 0, 0, Math.PI * 2);
+    const rimFill = ctx.createLinearGradient(0, ry - tw * 0.13, 0, ry + tw * 0.13);
+    rimFill.addColorStop(0, 'rgba(255,255,255,0.5)');
+    rimFill.addColorStop(1, 'rgba(150,100,145,0.35)');
+    ctx.fillStyle = rimFill;
     ctx.fill();
     ctx.lineWidth = Math.max(1.5, tw * 0.09);
     ctx.strokeStyle = 'rgba(140,96,132,0.8)';
@@ -612,6 +644,10 @@ const WsBoard = (() => {
     ctx.lineWidth = Math.max(1, tw * 0.055);
     ctx.strokeStyle = k ? '#fff2c4' : `rgba(${tube.rim},0.95)`;
     ctx.stroke();
+    ctx.beginPath();
+    ctx.ellipse(cx - tw * 0.3, ry + tw * 0.085, tw * 0.09, tw * 0.03, -0.25, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    ctx.fill();
     if (v === locked || (unlockAt && unlockAt.v === v)) drawLock(v, cx, t);
     ctx.restore();
   }

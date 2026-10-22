@@ -14,10 +14,10 @@
   ход загрузки уходит в него целями load_* (docs/ANALYTICS.md).
   Экран загрузки (аудит CrazyGames 20.10, ZL-18: «чёрный экран с
   оранжевой полоской — как будто сломалось»): рисованная заставка
-  (Codex, 22.10.2026; исходники и промт — ref/original/loading/), две
-  сцены: A — loading.jpg, B — loading-b.jpg, у каждой портрет для
-  телефона и -wide для широкого экрана (ПК, iframe 16:9), до 150 КБ.
-  Сцену страница берёт наугад, качает одну картинку под форму экрана. Сверху
+  (Codex, 22.10.2026; исходники и промт — ref/original/loading/, сцена A
+  — выбор основателя): loading.jpg — портрет для телефона,
+  loading-wide.jpg — широкий экран (ПК, iframe 16:9), до 150 КБ, качается
+  одна — под форму экрана. Сверху
   название из game.json шрифтом интерфейса (Russo One целиком,
   loading.woff2, лицензия — loading-font-OFL.txt), снизу полоса в стиле
   кнопок игры; на арте место под них оставлено пустым. Виден с первого
@@ -154,19 +154,8 @@
   })();
 </script>
     <!-- platform-head -->
-    <script>
-      // Заставка: сцена A или B наугад; качается одна картинка — под форму экрана.
-      (function () {
-        var b = Math.random() < 0.5;
-        var wide = window.matchMedia && window.matchMedia("(min-aspect-ratio: 1/1)").matches;
-        if (b) document.documentElement.classList.add("loading-b");
-        var link = document.createElement("link");
-        link.rel = "preload";
-        link.as = "image";
-        link.href = (b ? "loading-b" : "loading") + (wide ? "-wide" : "") + ".jpg";
-        document.head.appendChild(link);
-      })();
-    </script>
+    <link rel="preload" href="loading.jpg" as="image" media="(max-aspect-ratio: 1/1)">
+    <link rel="preload" href="loading-wide.jpg" as="image" media="(min-aspect-ratio: 1/1)">
     <style>
       @font-face {
         font-family: "Game7Title";
@@ -208,7 +197,6 @@
         background: #1b1420 url("loading.jpg") center / cover no-repeat;
         transition: opacity 0.35s;
       }
-      .loading-b #game7-loading { background-image: url("loading-b.jpg"); }
       /* Широкий кадр 16:9 из арта 3:2: срез больше снизу (там пустая земля),
          название выше и мельче — не на каске босса. */
       @media (min-aspect-ratio: 1/1) {
@@ -218,7 +206,6 @@
           padding-top: max(2.5vh, calc(env(safe-area-inset-top) + 8px));
           padding-bottom: max(3.5vh, calc(env(safe-area-inset-bottom) + 8px));
         }
-        .loading-b #game7-loading { background-image: url("loading-b-wide.jpg"); }
         #game7-loading #game7-loading-title { font-size: clamp(30px, 8vmin, 80px); }
       }
       /* Тень только сверху и снизу — под названием и полосой, арт в середине не тускнеет. */
@@ -323,8 +310,8 @@
       // текстуры на CPU при загрузке. ASTC берём, только если DXT нет, а
       // ASTC есть: ПК с обоими форматами остаётся на основном. ?tex=astc
       // или ?tex=dxt в адресе — выбрать файл вручную (проверки).
-      var dataFile = "dev-20261022-045242.data.unityweb";
-      var astcDataFile = "dev-20261022-045242.astc.data.unityweb";
+      var dataFile = "dev-20261022-052134.data.unityweb";
+      var astcDataFile = "dev-20261022-052134.astc.data.unityweb";
       var texFormat = "dxt";
       if (astcDataFile) {
         var texForce = /[?&]tex=(astc|dxt)(&|$)/.exec(location.search);
@@ -348,16 +335,16 @@
       window.game7TexFormat = texFormat;
 
       var buildUrl = "Build";
-      var loaderUrl = buildUrl + "/dev-20261022-045242.loader.js";
+      var loaderUrl = buildUrl + "/dev-20261022-052134.loader.js";
       var config = {
         arguments: [],
         dataUrl: buildUrl + "/" + dataFile,
-        frameworkUrl: buildUrl + "/dev-20261022-045242.framework.js.unityweb",
-        codeUrl: buildUrl + "/dev-20261022-045242.wasm.unityweb",
+        frameworkUrl: buildUrl + "/dev-20261022-052134.framework.js.unityweb",
+        codeUrl: buildUrl + "/dev-20261022-052134.wasm.unityweb",
         streamingAssetsUrl: "StreamingAssets",
         companyName: "Vanatat",
         productName: "Zomboland",
-        productVersion: "dev-20261022-045242",
+        productVersion: "dev-20261022-052134",
         showBanner: unityShowBanner,
         // Экраны с плотностью 3 рисовали бы в 9 раз больше пикселей, чем
         // с плотностью 1: потолок 2 держит 60 FPS на среднем телефоне.

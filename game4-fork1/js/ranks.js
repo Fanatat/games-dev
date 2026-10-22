@@ -19,7 +19,8 @@ const RANKS = (() => {
     runs: { name: 'Походы', hint: 'Сколько раз конвой доставлен до конца пути.', unit: 'runs' },
   };
   const $ = (id) => document.getElementById(id);
-  const mode = () => (typeof PLATFORM !== 'undefined' && PLATFORM.ranksMode) ? PLATFORM.ranksMode() : null;
+  // Рейтинг — только по-русски (настоящий есть лишь в ВК); в английской версии кнопки и строки итога нет.
+  const mode = () => (typeof CV_I18N !== 'undefined' && CV_I18N.en) ? null : (typeof PLATFORM !== 'undefined' && PLATFORM.ranksMode) ? PLATFORM.ranksMode() : null;
   const devQ = () => (typeof PLATFORM !== 'undefined' && PLATFORM.devQuery && PLATFORM.devQuery()) || null;
   const prog = () => (typeof progress !== 'undefined' ? progress : null);
   let board = 'gold', flushing = null, opened = false, seq = 0;

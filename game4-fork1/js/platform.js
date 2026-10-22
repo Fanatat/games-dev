@@ -78,6 +78,11 @@ const PLATFORM = (() => {
   // §1), не наша эвристика. На "disabled" все вызовы SDK бросают исключение
   // (чужой домен вне whitelist игры) — дальше SDK вообще не дёргается.
   let crazygamesEnv = null;
+  // «Последний конвой» на CrazyGames: на Basic Launch реклама выключена площадкой — кнопок «Второй шанс» и
+  // «Слава ×2» нет (иначе игрок жмёт и ничего не получает). После Full Launch — CRAZYGAMES_CONVOY_REWARDED = true.
+  // cgAdsOff — площадка ответила adsDisabledBasicLaunch: до перезапуска кнопок рекламы больше не показываем.
+  const CRAZYGAMES_CONVOY_REWARDED = false;
+  let cgAdsOff = false;
   let gameplayActive = false;
   let pauseHook = () => {};
   let resumeHook = () => {};
@@ -217,7 +222,6 @@ const PLATFORM = (() => {
   function applyDetectedLanguage() {
     const params = new URLSearchParams(location.search);
     const qaLang = params.get('lang');
-    if (window.CONVOY_PROTOTYPE) { I18N.setLang('ru'); return; } // тексты прототипа — только русские
     if (kind === 'yandex' && ysdk && ysdk.environment && ysdk.environment.i18n) {
       // ysdk.environment.i18n.lang — может прийти с региональным суффиксом
       // (напр. "en-US"); I18N.setLang() сам сводит код к базовому языку
@@ -250,6 +254,10 @@ const PLATFORM = (() => {
       I18N.setLang(I18N.isSupported(navBase) ? navBase : 'ru');
     }
     if (qaLang) { I18N.setLang(qaLang); }
+    // «Последний конвой» (проход 1 к CrazyGames, 22.10.2026): свои тексты конвоя есть только на русском и
+    // английском (js/convoy_i18n.js) — любой другой язык площадки или браузера ведёт на английский,
+    // чтобы меню паузы родителя и тексты конвоя были на одном языке. ВК по-прежнему только русский (выше).
+    if (window.CONVOY_PROTOTYPE && I18N.getLang() !== 'ru') I18N.setLang('en');
   }
 
   // Панель отладки Яндекса, "ready" called on timeout (2026-09-09): площадка
@@ -518,6 +526,7 @@ const PLATFORM = (() => {
           // adsDisabledBasicLaunch — штатный случай на Basic Launch
           // (методичка §4/§10, ГДД «Basic Launch первым шагом»), не баг —
           // не шумим в консоль на него, в отличие от прочих кодов ошибки.
+          if (error && error.code === 'adsDisabledBasicLaunch') cgAdsOff = true;
           if (!error || error.code !== 'adsDisabledBasicLaunch') {
             console.warn('[platform] CrazyGames rewarded ad error:', error && error.code);
           }
@@ -802,7 +811,8 @@ const PLATFORM = (() => {
     },
     // «Рассказать друзьям» («Последний конвой», сборка 11): окно «Поделиться» ВК со ссылкой на игру
     // (без link ВК подставляет ссылку на само приложение). Вне ВК кнопки нет; на стенде — заглушка.
-    canShare() { return kind === 'vk' || DEV_ADS; },
+    // CrazyGames-сборка (и её проверка на localhost) — без заглушек стенда: окна «Поделиться» там нет.
+    canShare() { return kind === 'vk' || (DEV_ADS && kind !== 'crazygames'); },
     share() {
       if (kind === 'vk' && vkBridge) return vkBridge.send('VKWebAppShare', {}).then(() => true).catch(() => false);
       if (!DEV_ADS) return Promise.resolve(false);
@@ -816,8 +826,11 @@ const PLATFORM = (() => {
     },
     // Есть ли вообще чем показать ролик за награду: SDK площадки или заглушка стенда/локалки.
     // Без этого кнопку рекламы не показываем (бесплатной награды нет).
-    rewardedPossible() { return kind === 'vk' || kind === 'yandex' || kind === 'crazygames' || DEV_ADS; },
-    supportsInterstitial() { return kind === 'vk' || kind === 'yandex' || (DEV_ADS && !!window.CONVOY_PROTOTYPE); },
+    rewardedPossible() {
+      if (kind === 'crazygames') return !cgAdsOff && (!window.CONVOY_PROTOTYPE || CRAZYGAMES_CONVOY_REWARDED);
+      return kind === 'vk' || kind === 'yandex' || DEV_ADS;
+    },
+    supportsInterstitial() { return kind === 'vk' || kind === 'yandex' || (DEV_ADS && !!window.CONVOY_PROTOTYPE && kind !== 'crazygames'); },
     devQuery() { return DEV_QUERY; },
     // Рейтинг «Последнего конвоя» (сборка 15, js/ranks.js): 'live' — в ВК (сервер студии узнаёт игрока
     // по подписанной строке запуска), 'demo' — локально и на стенде вне ВК (выдуманный топ), null — кнопки нет.

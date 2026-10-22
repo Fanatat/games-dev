@@ -205,8 +205,10 @@ const CONVOY_CARDS = (() => {
     cond: (run) => (run.tags[tag] || 0) >= CONVOY.synergyNeed,
     apply: (run) => { run.syn[flag] = true; },
   });
+  // Новый боец: описание + что карта даст сейчас (бойцы в отряд или золото за полный отряд — как freeUnit).
   const newUnit = (id, unit, name, desc, n = 1) => ({
-    id, rarity: 'rare', name, max: 1, icon: { unit }, big: '', desc: () => desc,
+    id, rarity: 'rare', name, max: 1, icon: { unit }, big: '',
+    desc: (run, m, api) => `${unitReward(api, unit, n).desc} · ${desc}`,
     cond: (run) => !owned(run, unit),
     apply: (run, api) => { run.unlocked.push(unit); if (unit === 'spear') run.mods.spear = true; for (let i = 0; i < n; i++) api.freeUnit(unit); },
   });
@@ -221,6 +223,18 @@ const CONVOY_CARDS = (() => {
     cond: (run) => owned(run, unit),
     apply: (run) => { cls(run, unit)[stat === 'hp' ? 'hp' : 'dmg'] *= mult; },
   });
+  // Показываем ту же компенсацию за заполненный отряд, которую выдаёт freeUnit.
+  // Смешанная награда тоже видна до выбора: бойцы + золото за оставшиеся места.
+  const unitReward = (api, unit, n) => {
+    const units = Math.min(n, Math.max(0, CONVOY.unitCap - api.alive('player')));
+    const gold = (n - units) * api.unitCost(unit);
+    return {
+      units, gold,
+      big: `+${units || gold}`,
+      desc: [units ? `{squad}+${units}` : '', gold ? `{gold}+${gold}` : ''].filter(Boolean).join(' · '),
+    };
+  };
+  const reinforcementReward = (run, m, api) => unitReward(api, 'infantry', 3);
   const cards = [
     classCard('tough', 'common', 'infantry', 'hp', 1.45, 'Закалка', 3),
     classCard('blades', 'common', 'infantry', 'dmg', 1.4, 'Острые клинки', 3),
@@ -249,8 +263,11 @@ const CONVOY_CARDS = (() => {
       apply: (run) => { run.mods.rockDmg *= 1.5; },
     },
     {
-      id: 'reinforce', rarity: 'common', name: 'Подкрепление', max: 99, icon: { unit: 'infantry', badge: 'x3' }, big: '+3',
-      desc: () => '{squad}+3 бойца',
+      id: 'reinforce', rarity: 'common', name: 'Подкрепление', max: 99, icon: { unit: 'infantry' },
+      big: (run, m, api) => reinforcementReward(run, m, api).big,
+      desc: (run, m, api) => reinforcementReward(run, m, api).desc,
+      // отряд полон — вместо бойца монета: крупное число на карте — золото, а не бойцы
+      iconNow: (run, m, api) => (reinforcementReward(run, m, api).units ? null : 'gold'),
       apply: (run, api) => { for (let i = 0; i < 3; i++) api.freeUnit('infantry'); },
     },
     {
@@ -339,6 +356,7 @@ const CONVOY_CARDS = (() => {
 
 const Convoy = (() => {
   const $ = (id) => document.getElementById(id);
+  const tx = (v) => CV_I18N.t(v);   // текст на языке конвоя (js/convoy_i18n.js)
   const RUNS_KEY = 'lastconvoy_runs_v2';     // журнал попыток (index.html?journal)
   const PLAYER_KEY = 'lastconvoy_player_v1'; // номер игрока плейтеста
   const BEST_KEY = 'lastconvoy_best_v1';     // рекорд: { stop, wins, runs }
@@ -502,15 +520,16 @@ const Convoy = (() => {
   // «через 5 ч» / «завтра» / «через 3 дня» до открытия уровня календарём (дни — по полуночам Москвы)
   function untilText(id) {
     const at = levelOpenAt(id), ms = at - nowMs();
-    if (ms < HOUR) return 'совсем скоро';
-    if (ms < 8 * HOUR) return `через ${Math.ceil(ms / HOUR)} ч`;
+    const en = CV_I18N.en;
+    if (ms < HOUR) return en ? 'very soon' : 'совсем скоро';
+    if (ms < 8 * HOUR) return en ? `in ${Math.ceil(ms / HOUR)} h` : `через ${Math.ceil(ms / HOUR)} ч`;
     const tz = CONVOY.calendar.tz * HOUR;
     const n = Math.round((Math.floor((at + tz) / DAY) - Math.floor((nowMs() + tz) / DAY)));
-    if (n <= 1) return 'завтра';
-    return `через ${n} ${plural(n, 'день', 'дня', 'дней')}`;
+    if (n <= 1) return en ? 'tomorrow' : 'завтра';
+    return en ? `in ${n} days` : `через ${n} ${plural(n, 'день', 'дня', 'дней')}`;
   }
   const openDate = (id) => new Date(levelOpenAt(id) + CONVOY.calendar.tz * HOUR)
-    .toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', timeZone: 'UTC' });
+    .toLocaleDateString(CV_I18N.en ? 'en-US' : 'ru-RU', { day: 'numeric', month: 'long', timeZone: 'UTC' });
   // Открыто уровней: первый всегда, каждый следующий — после доставки на предыдущем, если его открыл календарь.
   function levelsOpen() {
     let n = 1;
@@ -580,9 +599,9 @@ const Convoy = (() => {
     if (!o) return;
     const D = CONVOY.daily, star = '<svg class="ico"><use href="#i-star"/></svg>';
     $('cvDailyTrack').innerHTML = D.map((g, k) =>
-      `<div class="${k < o.i ? 'done' : k === o.i ? 'now' : ''}${k === D.length - 1 ? ' big' : ''}"><small>День ${k + 1}</small><b>+${g}${star}</b></div>`).join('');
-    setText('cvDailyText', o.streak > 1 ? `Ты заходишь ${o.streak} ${plural(o.streak, 'день', 'дня', 'дней')} подряд — награда растёт.` : 'Заходи каждый день — награда растёт. Пропуск начнёт круг заново.');
-    $('cvDailyTake').innerHTML = `Забрать +${o.glory} ${star}`;
+      `<div class="${k < o.i ? 'done' : k === o.i ? 'now' : ''}${k === D.length - 1 ? ' big' : ''}"><small>${tx(`День ${k + 1}`)}</small><b>+${g}${star}</b></div>`).join('');
+    setText('cvDailyText', o.streak > 1 ? (CV_I18N.en ? `Day ${o.streak} in a row: the reward grows.` : `Ты заходишь ${o.streak} ${plural(o.streak, 'день', 'дня', 'дней')} подряд — награда растёт.`) : 'Заходи каждый день — награда растёт. Пропуск начнёт круг заново.');
+    $('cvDailyTake').innerHTML = `${tx(`Забрать +${o.glory}`)} ${star}`;
   }
   function takeDaily() {
     const o = dailyOffer(), p = prog();
@@ -659,7 +678,7 @@ const Convoy = (() => {
 
   function setupMatch() {
     const age = 'stone';
-    const mission = { id: 1, chapterId: 1, age, title: 'Последний конвой' };
+    const mission = { id: 1, chapterId: 1, age, title: tx('Последний конвой') };
     const world = {
       units: [], projectiles: [],
       playerCore: makeCore('player', ARENA.playerCoreX + ARENA.coreWidth, Math.round(CONVOY.hp * ((hasMeta('hull') ? 1 + META.hull.v : 1) + (run.assist ? CONVOY.assist.hp : 0)))),
@@ -1032,7 +1051,7 @@ const Convoy = (() => {
     const m = match, C = m.convoy;
     if (C.headless || m.elapsed - C.tipAt < 1.2) return;
     C.tipAt = m.elapsed;
-    VFX.floater(m, u.x, -92 * VIEW.fig, text, color);
+    VFX.floater(m, u.x, -92 * VIEW.fig, tx(text), color);
   }
   // Удар врага дошёл (entities.js world.onStrike): свойство края.
   function onStrike(a, ref, kind) {
@@ -1399,7 +1418,7 @@ const Convoy = (() => {
     const C = match && match.convoy, r = C && C.revive, btn = $('cvReviveAd');
     if (!r || !btn) return;
     btn.disabled = r.state !== 'offer';
-    btn.querySelector('span').textContent = r.state === 'check' ? 'Готовим…' : r.state === 'ad' ? 'Реклама…' : r.state === 'none' ? 'Реклама недоступна' : 'Второй шанс';
+    btn.querySelector('span').textContent = tx(r.state === 'check' ? 'Готовим…' : r.state === 'ad' ? 'Реклама…' : r.state === 'none' ? 'Реклама недоступна' : 'Второй шанс');
   }
   function declineRevive() {
     const C = match && match.convoy;
@@ -1457,12 +1476,12 @@ const Convoy = (() => {
     const g = run && run.glory, btn = $('cvGloryX2');
     if (!g || run.doubled || !btn || btn.disabled) return;
     btn.disabled = true;
-    btn.querySelector('span').textContent = 'Реклама…';
+    btn.querySelector('span').textContent = tx('Реклама…');
     PLATFORM.showBonusAd('glory_x2').then((r) => {
       if (!run || run.glory !== g) return;
       if (!r.shown) {
-        btn.querySelector('span').textContent = 'Реклама недоступна';
-        setTimeout(() => { btn.disabled = false; btn.querySelector('span').textContent = 'Слава ×2'; }, 1600);
+        btn.querySelector('span').textContent = tx('Реклама недоступна');
+        setTimeout(() => { btn.disabled = false; btn.querySelector('span').textContent = tx('Слава ×2'); }, 1600);
         return;
       }
       adShown();
@@ -1504,7 +1523,7 @@ const Convoy = (() => {
   // Совет на итоге поражения (сборка 14): первые hints.tipRuns походов до первой доставки, одна строка.
   // Сначала то, чего в этом походе не хватило, иначе по кругу.
   const TIPS = {
-    rock: { icon: 'rock', text: 'Тапни по толпе — камнепад' },
+    rock: { icon: 'rock', get text() { return coarsePointer() ? 'Тапни по толпе — камнепад' : 'Кликни по толпе — камнепад'; } },
     mix: { icon: { unit: 'archer' }, text: 'Бойцы впереди, стрелки за ними' },
     repair: { icon: 'repair', text: 'Чини повозки между стоянками' },
   };
@@ -1515,24 +1534,25 @@ const Convoy = (() => {
     if (s.rocks < run.stop) need.push('rock');
     if (Object.keys(s.types).length < 2) need.push('mix');
     if (!s.repairs && run.stop > 1) need.push('repair');
-    const keys = need.length ? need : Object.keys(TIPS);
-    return TIPS[keys[(n - 1 + keys.length) % keys.length]];
+    // всё это игрок уже делал (бросал камни, смешивал отряд, чинил) — совет не нужен, а не «по кругу»
+    if (!need.length) return null;
+    return TIPS[need[(n - 1 + need.length) % need.length]];
   }
   // Итог похода: маршрут с отметкой, три значка-цифры, иконки взятых карт, слава до следующей награды.
   function showResult() {
     const win = run.win, reached = win ? STOPS : run.stop;
-    $('cvResultTitle').textContent = win ? 'Конвой доставлен!' : 'Конвой пал';
+    $('cvResultTitle').textContent = tx(win ? 'Конвой доставлен!' : 'Конвой пал');
     $('cvResultTitle').className = win ? 'win' : 'lose';
     $('cvResult').classList.toggle('celebrate', win);
     const track = $('cvResultTrack');
     track.innerHTML = Array.from({ length: STOPS }, (_, i) =>
       `<i class="${win || i < reached - 1 ? 'done' : i === reached - 1 ? 'fail' : ''}${i === STOPS - 1 ? ' last' : ''}"></i>`).join('');
-    track.title = `Стоянка ${reached} из ${STOPS}`;
+    track.title = tx(`Стоянка ${reached} из ${STOPS}`);
     const s = run.stats;
     $('cvResultStats').innerHTML =
-      `<span class="cv-res-stat kills" title="Врагов повержено"><svg class="ico"><use href="#i-foe"/></svg><b data-n="${s.kills}">0</b></span>` +
-      `<span class="cv-res-stat gold" title="Золота добыто"><i class="gold-dot"></i><b data-n="${Math.floor(s.gold)}">0</b></span>` +
-      (s.bestStreak > 1 ? `<span class="cv-res-stat streak" title="Лучшая серия"><svg class="ico"><use href="#i-burst"/></svg><b>×${s.bestStreak}</b></span>` : '') +
+      `<span class="cv-res-stat kills" title="${tx('Врагов повержено')}"><svg class="ico"><use href="#i-foe"/></svg><b data-n="${s.kills}">0</b></span>` +
+      `<span class="cv-res-stat gold" title="${tx('Золота добыто')}"><i class="gold-dot"></i><b data-n="${Math.floor(s.gold)}">0</b></span>` +
+      (s.bestStreak > 1 ? `<span class="cv-res-stat streak" title="${tx('Лучшая серия')}"><svg class="ico"><use href="#i-burst"/></svg><b>×${s.bestStreak}</b></span>` : '') +
       (win && run.treasury && RANKS.mode() ? `<span class="cv-res-stat treasury" id="cvResultRank" title="Довезено в казну — рейтинг «Казна»"><svg class="ico"><use href="#i-cup"/></svg>` +
         `<em>+</em><b data-n="${run.treasury.gold}">0</b><small class="hidden"></small></span>` : '');
     const counts = {};
@@ -1543,18 +1563,18 @@ const Convoy = (() => {
     cardsBox.querySelectorAll('canvas').forEach((cv, i) => drawCardIcon(cv, CARD_BY_ID[ids[i]]));
     const rec = run.record || { prev: 0, isNew: false };
     const best = $('cvResultBest');
-    best.textContent = 'Новый рекорд!';
+    best.textContent = tx('Новый рекорд!');
     best.classList.toggle('hidden', !rec.isNew);
     renderResultGlory();
     // доставили, и следующий уровень открыт — главная кнопка ведёт туда
     const next = win && LEVELS[run.level] && levelsOpen() > run.level ? LEVELS[run.level] : null;
     run.next = next ? next.id : run.level;
-    $('cvResultAgain').textContent = next ? next.go : 'Ещё поход';
+    $('cvResultAgain').textContent = next ? next.go : tx('Ещё поход');
     if (run.unlock) {
       const row = document.createElement('div');
       row.className = 'cv-unlock cv-unlock-level';
       row.style.animationDelay = '0.4s';
-      row.innerHTML = `<canvas width="170" height="110"></canvas><div><b>Открыт уровень ${run.unlock.id}</b><span>${run.unlock.name}</span></div>`;
+      row.innerHTML = `<canvas width="170" height="110"></canvas><div><b>${tx(`Открыт уровень ${run.unlock.id}`)}</b><span>${run.unlock.name}</span></div>`;
       $('cvResultGlory').prepend(row);
       drawLevelThumb(row.querySelector('canvas'), run.unlock.id);
       Sprites.preload(run.unlock.id);
@@ -1562,8 +1582,8 @@ const Convoy = (() => {
       const row = document.createElement('div');
       row.className = 'cv-unlock cv-unlock-level soon';
       row.style.animationDelay = '0.4s';
-      row.innerHTML = `<canvas width="170" height="110"></canvas><div><b>Уровень ${run.soon.id} — ${untilText(run.soon.id)}</b>` +
-        `<span>${run.soon.name} откроется ${openDate(run.soon.id)}</span></div>`;
+      row.innerHTML = `<canvas width="170" height="110"></canvas><div><b>${tx(`Уровень ${run.soon.id} — ${untilText(run.soon.id)}`)}</b>` +
+        `<span>${tx(`${run.soon.name} откроется ${openDate(run.soon.id)}`)}</span></div>`;
       $('cvResultGlory').prepend(row);
       drawLevelThumb(row.querySelector('canvas'), run.soon.id);
     }
@@ -1573,7 +1593,7 @@ const Convoy = (() => {
       const row = document.createElement('div');
       row.className = 'cv-unlock cv-tip';
       row.style.animationDelay = '0.4s';
-      row.innerHTML = `<canvas width="64" height="64"></canvas><div><b>Совет</b><span>${tip.text}</span></div>`;
+      row.innerHTML = `<canvas width="64" height="64"></canvas><div><b>${tx('Совет')}</b><span>${tx(tip.text)}</span></div>`;
       $('cvResultGlory').prepend(row);
       drawCardIcon(row.querySelector('canvas'), tip);
     }
@@ -1587,9 +1607,9 @@ const Convoy = (() => {
     const el = $('cvResultRank'), rk = run && run.treasury && run.treasury.rank;
     if (!el || !rk || !rk.place || !rk.place.gold) return;
     const sm = el.querySelector('small');
-    sm.textContent = `${rk.place.gold}-е место`;
+    sm.textContent = tx(`${rk.place.gold}-е место`);
     sm.classList.remove('hidden');
-    el.title = `Казна: ${Math.floor(rk.gold || 0).toLocaleString('ru-RU')} — ${rk.place.gold}-е место в рейтинге`;
+    el.title = `Казна: ${Math.floor(rk.gold || 0).toLocaleString(CV_I18N.en ? 'en-US' : 'ru-RU')} — ${rk.place.gold}-е место в рейтинге`;
   }
   // Числа итога набегают от нуля за 0,6 с (как слава) — итог «засчитывается» на глазах.
   function countUp(box) {
@@ -1613,13 +1633,13 @@ const Convoy = (() => {
     const frac = (x) => clamp01((x - floor) / (top - floor));
     const x2 = g.gain > 0 && !run.doubled && PLATFORM.rewardedPossible();
     box.innerHTML =
-      '<div class="cv-glory-top"><b class="cv-glory-gain" title="Слава за поход"><span>+0</span><svg class="ico"><use href="#i-star"/></svg></b>' +
-      (x2 ? '<button class="cv-ad-btn" id="cvGloryX2" title="Посмотреть рекламу — слава за поход ещё раз"><svg class="ico"><use href="#i-play"/></svg><span>Слава ×2</span></button>' : '') + '</div>' +
+      `<div class="cv-glory-top"><b class="cv-glory-gain" title="${tx('Слава за поход')}"><span>+0</span><svg class="ico"><use href="#i-star"/></svg></b>` +
+      (x2 ? `<button class="cv-ad-btn" id="cvGloryX2" title="${tx('Посмотреть рекламу — слава за поход ещё раз')}"><svg class="ico"><use href="#i-play"/></svg><span>${tx('Слава ×2')}</span></button>` : '') + '</div>' +
       `<div class="cv-glory-row"><div class="cv-glory-bar"><i style="width:${frac(g.prev) * 100}%"></i>` +
       `<span>${g.total} / ${top}</span></div>` +
       (next ? `<canvas class="cv-glory-next" width="64" height="64" title="${next.name}: ${plainDesc(next.desc)}"></canvas>` : '') + '</div>' +
       g.fresh.map((u, i) => `<div class="cv-unlock" style="animation-delay:${0.7 + i * 0.25}s"><canvas width="64" height="64"></canvas>` +
-        `<div><b>Открыто: ${u.name}</b><span>${fmtDesc(u.desc)}</span></div></div>`).join('');
+        `<div><b>${tx(`Открыто: ${u.name}`)}</b><span>${fmtDesc(u.desc)}</span></div></div>`).join('');
     if (next) drawCardIcon(box.querySelector('.cv-glory-next'), next);
     box.querySelectorAll('.cv-unlock canvas').forEach((cv, i) => drawCardIcon(cv, g.fresh[i]));
     if (x2) box.querySelector('#cvGloryX2').addEventListener('click', (e) => { SFX.click(); doubleGlory(); e.currentTarget.blur(); });
@@ -1653,7 +1673,7 @@ const Convoy = (() => {
     const y = ARENA.groundY - 52 * VIEW.fig;
     if (!C.headless) {
       if (vein) {
-        VFX.floater(m, u.x, -80 * VIEW.fig, `Жила! +${reward}`, '#ffe066');
+        VFX.floater(m, u.x, -80 * VIEW.fig, tx(`Жила! +${reward}`), '#ffe066');
         VFX.burst(m, 'spark', u.x, -40 * VIEW.fig, 14, { speed: 190, life: 0.6, size: 3.2, colors: ['#ffe066', '#fff6c0', '#f6c94a'], lift: 60 });
         SFX.vein();
       } else VFX.floater(m, u.x, -66 * VIEW.fig, `+${reward}`, ART.hero.gold);
@@ -1767,7 +1787,7 @@ const Convoy = (() => {
   }
   // coin — перед подписью рисуется монета (подпись — сумма золота)
   function banner(text, sub, color, life, coin) {
-    match.convoy.banner = { text, sub, color, t: 0, life: life || 1.8, coin: !!coin };
+    match.convoy.banner = { text: tx(text), sub: tx(sub), color, t: 0, life: life || 1.8, coin: !!coin };
   }
 
   // ------------------------------------------------------------ сочетания в бою
@@ -1861,7 +1881,7 @@ const Convoy = (() => {
       if (!C.headless && m.elapsed - C.deniedAt > 0.6) {
         C.deniedAt = m.elapsed;
         SFX.buyDenied();
-        VFX.floater(m, Math.max(140, Math.min(860, x)), -120, `${Math.ceil(C.rockCd)} с`, '#ffb08a');
+        VFX.floater(m, Math.max(140, Math.min(860, x)), -120, tx(`${Math.ceil(C.rockCd)} с`), '#ffb08a');
         shake('cvRock');
       }
       return false;
@@ -1975,7 +1995,7 @@ const Convoy = (() => {
   function setText(id, v) {
     if (hudCache[id] === v) return;
     hudCache[id] = v;
-    const el = $(id); if (el) el.textContent = v;
+    const el = $(id); if (el) el.textContent = tx(v);
   }
   function setCls(el, cls, on, cacheKey) {
     if (hudCache[cacheKey] === on) return;
@@ -2000,7 +2020,7 @@ const Convoy = (() => {
       btn.className = 'cv-card';
       btn.dataset.unit = id;
       btn.title = `${L.name} — ${L.role.toLowerCase()}`;
-      btn.setAttribute('aria-label', `${L.name}, цена ${cost}`);
+      btn.setAttribute('aria-label', tx(`${L.name}, цена ${cost}`));
       btn.innerHTML =
         `<canvas class="cv-card-icon" width="88" height="88"></canvas>` +
         (up ? '<span class="cv-card-up" aria-hidden="true">▲</span>' : '') +
@@ -2143,7 +2163,7 @@ const Convoy = (() => {
       hudCache.lesson = sig;
       if (cardEls) for (const [id, el] of Object.entries(cardEls)) el.classList.toggle('hint', !!target && id === L.unit);
       $('cvRock').classList.toggle('hint', !!(L && L.rock));
-      pointEl.querySelector('.cv-point-bubble').textContent = target ? L.text : '';
+      pointEl.querySelector('.cv-point-bubble').textContent = target ? tx(L.text) : '';
       pointEl.classList.toggle('hidden', !target);
       delete hudCache.pointAt;
     }
@@ -2165,23 +2185,25 @@ const Convoy = (() => {
     box.innerHTML = '';
     C.offer.forEach((card, i) => {
       const have = run.cards.filter(id => id === card.id).length;
+      const big = typeof card.big === 'function' ? card.big(run, match, api) : card.big;
       const btn = document.createElement('button');
       btn.className = `cv-pick-card r-${card.rarity}`;
       btn.dataset.card = card.id;
       btn.style.animationDelay = `${i * 0.07}s`;
       btn.innerHTML =
         '<span class="cv-pick-shine"></span>' +
-        (card.rarity === 'synergy' ? '<span class="cv-pick-ribbon">Сочетание</span>' : '<i class="cv-gem" aria-hidden="true"></i>') +
+        (card.rarity === 'synergy' ? `<span class="cv-pick-ribbon">${tx('Сочетание')}</span>` : '<i class="cv-gem" aria-hidden="true"></i>') +
         '<span class="cv-pick-art"><canvas class="cv-pick-icon" width="120" height="120"></canvas>' +
-        (card.big ? `<b class="cv-pick-big">${card.big}</b>` : '') + '</span>' +
+        (big ? `<b class="cv-pick-big">${tx(big)}</b>` : '') + '</span>' +
         `<span class="cv-pick-name">${card.name}</span>` +
         `<span class="cv-pick-desc">${fmtDesc(card.desc(run, match, api))}</span>` +
         tagLine(card) +
-        (have ? `<span class="cv-pick-have" title="Уже взято: ${have}">Ур. ${have + 1}</span>` : '') +
+        (have ? `<span class="cv-pick-have" title="${tx(`Уже взято: ${have}`)}">${tx(`Ур. ${have + 1}`)}</span>` : '') +
         `<span class="tool-key">${i + 1}</span>`;
       btn.addEventListener('click', () => choose(card.id));
       box.appendChild(btn);
-      drawCardIcon(btn.querySelector('canvas'), card);
+      const iconNow = card.iconNow && card.iconNow(run, match, api);
+      drawCardIcon(btn.querySelector('canvas'), iconNow ? { icon: iconNow } : card);
     });
     for (const k of ['pkRepair', 'pkRepairHide', 'pkReroll', 'pkRepairOff', 'pkRerollOff', 'pkRerollFree']) delete hudCache[k];
     updatePickButtons();
@@ -2191,8 +2213,8 @@ const Convoy = (() => {
     gold: '<i class="gold-dot"></i>', cd: '<svg class="ico"><use href="#i-clock"/></svg>', hull: '<svg class="ico"><use href="#i-wagon"/></svg>',
     squad: '<svg class="ico"><use href="#i-squad"/></svg>', rock: '<svg class="ico"><use href="#i-rock"/></svg>',
   };
-  function fmtDesc(s) { return s.replace(/\{(\w+)\}/g, (all, k) => DESC_ICON[k] || all); }
-  function plainDesc(s) { return s.replace(/\{\w+\}/g, ''); }   // для title: без значков
+  function fmtDesc(s) { return tx(s).replace(/\{(\w+)\}/g, (all, k) => DESC_ICON[k] || all); }
+  function plainDesc(s) { return tx(s).replace(/\{\w+\}/g, ''); }   // для title: без значков
   // Знак карты: «Толпа ●●○» — сколько будет после этой карты; третья открывает сочетание.
   function tagLine(card) {
     const tag = card.syn || card.tag;
@@ -2263,13 +2285,13 @@ const Convoy = (() => {
     const pips = CONVOY.meta.map(u => `<i class="${have.includes(u.id) ? 'on' : u === next ? 'next' : ''}" title="${u.name}"></i>`).join('');
     const shown = next || CONVOY.meta[CONVOY.meta.length - 1];
     box.innerHTML =
-      `<div class="cv-next"${next ? ' title="Следующая награда за славу"' : ''}><canvas class="cv-next-ico" width="96" height="96"></canvas><div class="cv-next-body">` +
+      `<div class="cv-next"${next ? ` title="${tx('Следующая награда за славу')}"` : ''}><canvas class="cv-next-ico" width="96" height="96"></canvas><div class="cv-next-body">` +
       (next
         ? `<b class="cv-next-name">${next.name}</b><span class="cv-next-desc">${fmtDesc(next.desc)}</span>` +
           `<div class="cv-glory-bar"><i style="width:${clamp01((total - floor) / (next.at - floor)) * 100}%"></i>` +
           `<span>${total} / ${next.at} <svg class="ico"><use href="#i-star"/></svg></span></div>`
         : valorRow(total)) +
-      `<div class="cv-pips" aria-label="Открыто наград: ${have.length} из ${CONVOY.meta.length}">${pips}</div></div></div>`;
+      `<div class="cv-pips" aria-label="${tx(`Открыто наград: ${have.length} из ${CONVOY.meta.length}`)}">${pips}</div></div></div>`;
     drawCardIcon(box.querySelector('canvas'), shown);
   }
 
@@ -2283,10 +2305,10 @@ const Convoy = (() => {
   // После всех наград — «Доблесть»: ступень, прибавка отряду и шкала до следующей ступени.
   function valorRow(total) {
     const v = valorOf(total), V = CONVOY.valor;
-    const name = v.n ? `Доблесть ${v.n}` : 'Доблесть', pct = Math.round(valorBonus(v.n) * 100);
+    const name = tx(v.n ? `Доблесть ${v.n}` : 'Доблесть'), pct = Math.round(valorBonus(v.n) * 100);
     const top = Math.round(valorBonus(Infinity) * 100), first = Math.round(V.tiers[0][1] * 100);
     return `<b class="cv-next-name">${name}</b><span class="cv-next-desc">` +
-      (v.n ? `${fmtDesc('{dmg}')}+${pct}%${pct >= top ? ' — предел' : ''} урона и здоровья отряду`
+      fmtDesc(v.n ? `{dmg}+${pct}%${pct >= top ? ' — предел' : ''} урона и здоровья отряду`
         : `Каждая ступень: +${first}% урона и здоровья отряду, до +${top}%`) + '</span>' +
       `<div class="cv-glory-bar"><i style="width:${clamp01((total - v.floor) / (v.next - v.floor)) * 100}%"></i>` +
       `<span>${total} / ${v.next} <svg class="ico"><use href="#i-star"/></svg></span></div>`;
@@ -2303,9 +2325,9 @@ const Convoy = (() => {
       const fresh = !locked && L.id > 1 && !b.runs;
       const rec = soon ? `<svg class="ico"><use href="#i-lock"/></svg><small>${untilText(L.id)}</small>`
         : locked ? '<svg class="ico"><use href="#i-lock"/></svg>'
-          : b.wins ? `<svg class="ico"><use href="#i-wagon"/></svg>×${b.wins}` : b.runs ? `${b.stop}/${STOPS}` : fresh ? 'Новый!' : '';
-      const title = soon ? `${L.name} — откроется ${untilText(L.id)}, ${openDate(L.id)}`
-        : locked ? `${L.name} — доставь конвой: уровень ${L.id - 1}` : CONVOY.lands[L.id] ? `${L.name} — ${CONVOY.lands[L.id].trait.desc}` : L.name;
+          : b.wins ? `<svg class="ico"><use href="#i-wagon"/></svg>×${b.wins}` : b.runs ? `${b.stop}/${STOPS}` : fresh ? tx('Новый!') : '';
+      const title = soon ? tx(`${L.name} — откроется ${untilText(L.id)}, ${openDate(L.id)}`)
+        : locked ? tx(`${L.name} — доставь конвой: уровень ${L.id - 1}`) : CONVOY.lands[L.id] ? `${L.name} — ${CONVOY.lands[L.id].trait.desc}` : L.name;
       return `<button class="cv-level${L.id === cur ? ' on' : ''}${locked ? ' locked' : ''}${soon ? ' soon' : ''}${fresh ? ' fresh' : ''}" data-l="${L.id}" title="${title}" aria-label="${title}"` +
         `${locked ? ' aria-disabled="true"' : ''}><canvas width="168" height="96"></canvas><b class="cv-level-n">${L.id}</b>` +
         `${rec ? `<span class="cv-level-rec">${rec}</span>` : ''}</button>`;
@@ -2621,6 +2643,7 @@ const Convoy = (() => {
     ctx.restore();
   }
   function drawText(text, x, y, size, fill, stroke, lw) {
+    text = tx(text);
     ctx.font = `${size}px 'Lilita One', 'Fredoka', sans-serif`;
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
     ctx.lineWidth = lw; ctx.strokeStyle = stroke;
@@ -2659,7 +2682,7 @@ const Convoy = (() => {
     }
     ctx.save();
     // обучение камнепаду: кольцо и стрелка над самой густой толпой, «Тапни!» / «Кликни!»
-    if (C.lesson === 'rock' && screen === 'match') {
+    if (C.lesson === 'rock' && screen === 'match' && !C.revive && C.phase !== 'end' && !match.resolved) {
       const x = densestEnemyX();
       if (x !== null) {
         const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 160), gy = ARENA.groundY;
@@ -3171,6 +3194,17 @@ const Convoy = (() => {
   }
   function boot() {
     document.body.classList.add('convoy');
+    // язык уже выбран площадкой (platform.js applyDetectedLanguage): ru или en
+    CV_I18N.setLang(I18N.getLang());
+    if (CV_I18N.en) {
+      CV_I18N.localizeData(CONVOY);
+      CV_I18N.localizeData(CONVOY_TAGS);
+      CV_I18N.localizeData(CONVOY_CARDS);
+      UNIT_TYPES.chief.name = tx(UNIT_TYPES.chief.name);
+      CV_I18N.localizeDOM(document.body);
+      document.title = tx('Последний конвой');   // I18N.applyToDOM родителя уже поставил «Twin Forts»
+      document.documentElement.lang = 'en';
+    }
     for (const id of ['joyBase', 'touchAttack', 'touchSpecial', 'touchPickaxe', 'touchCry', 'btnBuyback', 'heroMini', 'heroReviveBox']) {
       const el = $(id); if (el) el.remove();
     }

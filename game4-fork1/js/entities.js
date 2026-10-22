@@ -441,6 +441,10 @@ function updateUnits(world, dt, onKillTeamGold) {
       // тем, кто остановился в пределах holdLine.chase за линией), не бегут к точке появления врагов.
       // Врага, который уже бьёт (стрелок за линией погони расстреливает передних), — атакуют (ТЗ_КОНВОЙ_MVP1).
       u.state = 'idle';
+    } else if (world.enemyHoldX != null && u.team === 'enemy' && u.x <= world.enemyHoldX + (u.waitOff || 0)) {
+      // «Последний конвой» (проход 2, Q-04): в самом первом походе первая волна ждёт на рубеже, пока
+      // новичок не наймёт первого бойца (convoy.js startWave/buy) — не проигрывает, пока осматривается.
+      u.state = 'idle';
     } else {
       u.state = 'walk';
       u.walkPhase += dt * (t.speed * crySpeed * (u.speedMult || 1) / 12);

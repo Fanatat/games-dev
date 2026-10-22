@@ -1768,6 +1768,15 @@ body.convoy #heroDownFlash, body.convoy #fortEdge { display: none !important; }
   font-family: 'Lilita One', sans-serif; font-size: max(11px, .7em); line-height: 1; color: #bfeaff; text-shadow: var(--cv-outline);
 }
 .cv-wind svg.ico { width: 1.35em; height: 1.35em; vertical-align: 0; color: #bfeaff; }
+/* сборка 16 (Q-04): в первом походе на марше под значком — подпись «Помощь новичку» */
+.cv-wind-tip {
+  align-self: flex-end; margin-right: .2em; padding: .25em .55em; border-radius: .6em; white-space: nowrap;
+  font-family: 'Lilita One', sans-serif; font-style: normal; font-size: max(11px, .7em); line-height: 1.1; color: #fff;
+  background: rgba(30,60,80,.92); box-shadow: 0 0 0 2px #7fc6e8; pointer-events: none; animation: popIn .25s ease-out;
+}
+/* сборка 16 (Q-04): маршрут пульсирует в начале самого первого похода — путь повозок 1 → 10 */
+.cv-track.intro { animation: cvTrackIntro .75s ease-in-out 2; border-radius: 1em; }
+@keyframes cvTrackIntro { 50% { box-shadow: 0 0 0 3px rgba(255,214,90,.9), 0 0 18px rgba(255,214,90,.7); } }
 /* совет на итоге поражения (сборка 14) */
 .cv-unlock.cv-tip { border-color: #7fc6e8; box-shadow: 0 0 12px rgba(127,198,232,.45); background: linear-gradient(#2c4252, #1a2a36); }
 .cv-unlock.cv-tip b { color: #bfeaff; }

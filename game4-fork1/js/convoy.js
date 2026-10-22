@@ -98,7 +98,8 @@ const CONVOY = {
   // Подсказки новичку (сборка 14): кольцо камнепада ещё раз, если камень готов дольше rockSec, а у повозок
   // (ближе crowdR) не меньше crowd врагов — до первой доставки, раз за стоянку; совет на итоге поражения
   // в первых tipRuns походах.
-  hints: { rockSec: 10, crowd: 3, crowdR: 450, tipRuns: 5 },
+  hints: { rockSec: 10, crowd: 3, crowdR: 450, tipRuns: 5, holdAt: 0.6 },
+  // Проход 2 (Q-04): в самом первом походе первая волна стоит на рубеже holdAt × ширина поля, пока нет найма.
   // Уровни похода: доставка конвоя на уровне открывает следующий. Те же 10 стоянок и роли врагов,
   // другой край (фон bg_rN, враги — js/sprites.js REGION_ENEMY), враги крепче (stat × к волне), слава × glory.
   // tint — цвет плитки, пока фона края нет или он грузится.
@@ -664,6 +665,8 @@ const Convoy = (() => {
       // «Попутный ветер»: симулятор передаёт assist, игроку — пока на уровне 1 нет доставки
       assist: opts.assist != null ? !!opts.assist : !opts.headless && (opts.level || 1) === 1 && readBest(1).wins === 0,
       novice: !opts.headless && readBest(1).wins === 0,   // подсказки — до первой доставки
+      // самый первый поход (проход 2, Q-04): первая волна ждёт первого найма, «Защити повозки!» над конвоем
+      first: !opts.headless && readBest(1).runs === 0 && (opts.level || 1) === 1,
     };
     if (hasMeta('rockCd')) run.mods.rockCd *= META.rockCd.v;
     if (hasMeta('banner')) run.mods.allDmg *= META.banner.v;
@@ -911,6 +914,7 @@ const Convoy = (() => {
     m.world.enemyStatMult = C.def.stat * level().stat;
     C.waveHp = m.world.playerCore.hp;
     if (C.headless) return;
+    m.world.enemyHoldX = intro() ? ARENA.width * CONVOY.hints.holdAt : null;
     const last = run.stop === STOPS;
     const sub = last ? `${level().boss}!` : run.stop === 1 && land() ? `${level().name}: ${land().trait.desc}` : run.stop === 1 && run.level > 1 ? level().name : '';
     banner(last ? 'Последняя стоянка!' : `Стоянка ${run.stop}`, sub, last ? 'red' : 'gold', 2.2);
@@ -984,6 +988,8 @@ const Convoy = (() => {
       }
     } else u = spawnUnit(w, 'enemy', q.type);
     if (u) u.speedMult = CONVOY.enemySpeed * traitSpeed(u);
+    // ждущая волна первого похода (Q-04) встаёт не в одну точку, а лесенкой
+    if (u && w.enemyHoldX != null) u.waitOff = ((C.waitSeq = (C.waitSeq || 0) + 1) % 4) * 22;
   }
   // Вождь: удар по земле с замахом (круг на земле), на половине здоровья — подмога.
   function updateBoss(dt) {
@@ -1812,7 +1818,7 @@ const Convoy = (() => {
     if (S.ballista) {
       C.ballT -= dt;
       if (C.ballT <= 0) {
-        const B = CONVOY.ballista, x0 = WAGON_X[1] + 24 * wagonScale();
+        const B = CONVOY.ballista, x0 = BALLISTA_X + 24 * wagonScale();
         let near = null;
         for (const u of w.units) if (u.team === 'enemy' && u.state !== 'dead' && u.x - x0 < B.range && (!near || u.x < near.x)) near = u;
         if (near) {
@@ -1945,6 +1951,7 @@ const Convoy = (() => {
     if (!m.convoy.headless) firstMove();
     run.stats.bought++;
     run.stats.types[typeId] = (run.stats.types[typeId] || 0) + 1;
+    m.world.enemyHoldX = null;   // первый найм — первая волна первого похода идёт в бой (Q-04)
     pulseCard(typeId, 'bought');
     return true;
   }
@@ -2052,6 +2059,10 @@ const Convoy = (() => {
     setCls(fill, 'low', frac < 0.35, 'hplow');
     setText('cvHpText', String(Math.max(0, Math.ceil(core.hp))));
     setCls($('cvWind'), 'hidden', !run.assist, 'windhide');
+    // первый поход: маршрут пульсирует первые 3 с марша, у «+35 %» подпись «Помощь новичку» на марше
+    const first = intro() && C.phase === 'march';
+    setCls($('cvWindTip'), 'hidden', !(first && run.assist), 'windtip');
+    setCls($('cvTrack'), 'intro', first && C.phaseT < 3, 'trintro');
     setText('cvStop', `Стоянка ${run.stop} из ${STOPS}`);
     buildTrack();
     const track = $('cvTrack');
@@ -2406,7 +2417,19 @@ const Convoy = (() => {
   }
 
   // ------------------------------------------------------------ отрисовка: конвой и дорога
-  const WAGON_X = [52, 140];   // повозки крупнее бойцов: конвой — то, что защищаем
+  // Повозки крупнее бойцов: конвой — то, что защищаем. Сборка 16 (Q-06): обе целиком в кадре — задняя
+  // в 2 % ширины кадра от края, между ними зазор 7 % длины; пересчёт каждый кадр (layoutWagons), только
+  // рисунок. Логика боя на места повозок не опирается (баллиста — от BALLISTA_X, как в сборке 15).
+  const WAGON_X = [52, 140];
+  const BALLISTA_X = 140;
+  const WAGON_LEN = 58 * 1.1;   // длина рисунка повозки в единицах поля при масштабе 1 (drawWagonArt L × 1,1)
+  function wagonDrawScale() { return Math.min(1.75, wagonScale()); }
+  function layoutWagons() {
+    const w = WAGON_LEN * wagonDrawScale();
+    WAGON_X[0] = Math.max(0, VIEW.x0) + VIEW.w * 0.02 + w / 2;
+    WAGON_X[1] = WAGON_X[0] + w * 1.07;
+    return { xs: WAGON_X.slice(), len: w };
+  }
   let menuDeco = {};           // вид повозок в меню: открытые за славу полог и знамя (renderMenu)
   function newProp(x) {
     const r = Math.random();
@@ -2599,7 +2622,8 @@ const Convoy = (() => {
     if (C.props.length) drawProps(m.age);
     const flash = core.hitFlash > 0 ? core.hitFlash : 0;
     if (flash > 0) core.hitFlash = Math.max(0, flash - 0.06);
-    const s = wagonScale();
+    layoutWagons();
+    const s = wagonDrawScale();
     const marching = C.phase === 'march' && C.speed > 5;
     const deco = {
       plating: run && run.cards.includes('plating'), shields: run && run.mods.rangedTaken < 1,
@@ -2621,7 +2645,8 @@ const Convoy = (() => {
     const fake = { world: { playerCore: { hp: 1, maxHp: 1, hitFlash: 0 } }, age: menuSceneAge() };
     const saved = match;
     match = fake;
-    try { WAGON_X.forEach((wx, i) => drawWagon(wx, i, wagonScale(), 1, t, 0, 0, menuDeco)); }
+    layoutWagons();
+    try { WAGON_X.forEach((wx, i) => drawWagon(wx, i, wagonDrawScale(), 1, t, 0, 0, menuDeco)); }
     finally { match = saved; }
   }
 
@@ -2655,6 +2680,7 @@ const Convoy = (() => {
     const m = match, C = m.convoy;
     if (!C) return;
     drawBattleFx(m, C);
+    drawIntro(m, C);
     // прицел камнепада под курсором мыши
     if (aim.mouse && rockReady() && performance.now() - aim.at < 1500 && screen === 'match') {
       const width = CONVOY.rock.width * run.mods.rockWidth;
@@ -2733,6 +2759,32 @@ const Convoy = (() => {
     const r = size * 0.36, gap = size * 0.22, tw = ctx.measureText(text).width, x0 = -(2 * r + gap + tw) / 2;
     drawCoin(x0 + r, y, r, 0);
     drawText(text, x0 + 2 * r + gap + tw / 2, y, size, fill, 'rgba(30,18,8,.92)', Math.max(4, size * 0.22));
+  }
+  // Самый первый поход, пока нет найма (Q-04): «Защити повозки!» над конвоем и «!» над ждущими врагами.
+  function intro() {
+    return !!(run && run.first && run.stop === 1 && run.stats.bought === 0 && match && match.convoy &&
+      (match.convoy.phase === 'march' || match.convoy.phase === 'wave') && !match.resolved);
+  }
+  function drawIntro(m, C) {
+    if (!intro() || screen !== 'match' || C.revive) return;
+    const t = performance.now() / 1000, s = wagonDrawScale();
+    const bob = Math.sin(t * 3) * 3;
+    // над серединой колонны, но целиком в кадре (русская строка шире английской)
+    const label = tx('Защити повозки!');
+    ctx.font = "30px 'Lilita One', 'Fredoka', sans-serif";
+    const half = ctx.measureText(label).width / 2 + 10;
+    const lx = Math.max(Math.max(0, VIEW.x0) + half, (WAGON_X[0] + WAGON_X[1]) / 2);
+    drawText(label, lx, ARENA.groundY - 78 * s - 22 + bob, 30, '#fff4dc', 'rgba(30,18,8,.92)', 7);
+    if (m.world.enemyHoldX == null) return;
+    for (const u of m.world.units) {
+      if (u.team !== 'enemy' || u.state !== 'idle') continue;
+      const k = 0.85 + 0.15 * Math.sin(t * 6 + u.x * 0.05);
+      ctx.save();
+      ctx.translate(u.x, ARENA.groundY - 100 * VIEW.fig - 14);
+      ctx.scale(k, k);
+      drawText('!', 0, 0, 40, '#ffd35c', 'rgba(60,10,0,.95)', 8);
+      ctx.restore();
+    }
   }
   let coarseMq = null;
   function coarsePointer() {
@@ -3209,6 +3261,8 @@ const Convoy = (() => {
       const el = $(id); if (el) el.remove();
     }
     drawCardIcon($('cvRockIco'), { icon: 'rock' });
+    // под полосой прочности (у .cv-hp overflow: hidden — внутрь подпись не помещается)
+    $('cvWind').parentElement.insertAdjacentHTML('afterend', `<em class="cv-wind-tip hidden" id="cvWindTip">${tx('Помощь новичку')}</em>`);
     $('cvPause').addEventListener('click', () => { SFX.click(); togglePause(); });
     $('cvResume').addEventListener('click', () => { SFX.click(); togglePause(); });
     $('cvPauseHome').addEventListener('click', () => { SFX.click(); $('btnToMenuFromPause').click(); });
@@ -3273,7 +3327,7 @@ const Convoy = (() => {
   return {
     boot, startRun, newRun, setupMatch, update, updateHud, buy, buyIndex, key, choose, repair, reroll,
     rockAt, rockAuto, rockReady, toMenu, onScreen, canPause, drawStructures, drawMenuWagons, drawOverlay, dayT,
-    showJournal, readLog, readBest, simulate, api, waveText, drawCardIcon, bossPose,
+    showJournal, readLog, readBest, simulate, api, waveText, drawCardIcon, bossPose, layoutWagons, intro,
     refreshMenu, metaOf, valorOf, valorBonus, levelOpenAt, levelsOpen,
     get run() { return run; },
   };

@@ -35,12 +35,13 @@ const CONVOY = {
   enemySpeed: 1.3,         // враги быстрее, чем в game4: волна доходит за ~8 с
   classes: ['infantry', 'archer', 'heavy'], // порядок карточек = клавиши 1–3; новые бойцы с карт встают следом (4, 5, 6)
   labels: {
-    infantry: { name: 'Боец', role: 'Ближний бой' },
-    spear: { name: 'Копейщик', role: 'Крепкий удар' },
-    archer: { name: 'Стрелок', role: 'Дальний бой' },
-    heavy: { name: 'Защитник', role: 'Прочный' },
-    shieldbearer: { name: 'Щитоносец', role: 'Держит удар' },
-    bomber: { name: 'Бомбометатель', role: 'Бьёт по толпе' },
+    // ico — значок роли на плитке найма (отчёт модерации 23.10: роль видна без наведения, и на телефоне)
+    infantry: { name: 'Боец', role: 'Ближний бой', ico: 'i-sword' },
+    spear: { name: 'Копейщик', role: 'Крепкий удар', ico: 'i-dmg' },
+    archer: { name: 'Стрелок', role: 'Дальний бой', ico: 'i-bow' },
+    heavy: { name: 'Защитник', role: 'Прочный', ico: 'i-heart' },
+    shieldbearer: { name: 'Щитоносец', role: 'Держит удар', ico: 'i-shield' },
+    bomber: { name: 'Бомбометатель', role: 'Бьёт по толпе', ico: 'i-burst' },
   },
   // Свои держат линию перед конвоем (entities.js, 'idle'); chase — насколько выходят навстречу.
   holdLine: { melee: 230, spear: 240, ranged: 170, heavy: 250, default: 230, chase: 260 },
@@ -454,12 +455,12 @@ const Convoy = (() => {
   // ------------------------------------------------------------ журнал и рекорд
   function readLog() {
     try {
-      const v = JSON.parse(localStorage.getItem(RUNS_KEY) || '[]');
+      const v = CG_BUILD ? [] : JSON.parse(localStorage.getItem(RUNS_KEY) || '[]'); // журнал плейтеста — не на CrazyGames
       return Array.isArray(v) ? v : [];
     } catch (e) { return []; }
   }
   function playerNo() {
-    try { return Number(localStorage.getItem(PLAYER_KEY)) || 1; } catch (e) { return 1; }
+    try { return Number(localGetKey(PLAYER_KEY)) || 1; } catch (e) { return 1; }
   }
   // Рекорд уровня и слава (сборка 9) — в общем сейве progress (save.js): он
   // уходит в облако ВК и сливается с другими устройствами (max по полям).
@@ -473,7 +474,7 @@ const Convoy = (() => {
   }
   function migrateLegacy() {
     const p = prog();
-    if (!p) return;
+    if (!p || CG_BUILD) return; // старые ключи были только в плейтесте ВК; на CrazyGames localStorage не читаем
     let moved = false;
     try {
       const g = JSON.parse(localStorage.getItem(GLORY_KEY) || 'null');
@@ -539,12 +540,12 @@ const Convoy = (() => {
   }
   function pickedLevel() {
     let v = 0;
-    try { v = Number(localStorage.getItem(LEVEL_KEY)) || 0; } catch (e) { /* без хранилища — последний открытый */ }
+    try { v = Number(localGetKey(LEVEL_KEY)) || 0; } catch (e) { /* без хранилища — последний открытый */ }
     const open = levelsOpen();
     return v >= 1 && v <= open ? v : open;
   }
   function pickLevel(n) {
-    try { localStorage.setItem(LEVEL_KEY, String(n)); } catch (e) { /* выбор живёт до перезагрузки */ }
+    try { localSetKey(LEVEL_KEY, String(n)); } catch (e) { /* выбор живёт до перезагрузки */ }
     Sprites.setRegion(n);
   }
   const level = () => LEVELS[(run ? run.level : 1) - 1] || LEVELS[0];
@@ -567,14 +568,14 @@ const Convoy = (() => {
       saveProgress(p);
     }
     try {
-      if (run.unlock) localStorage.setItem(LEVEL_KEY, String(run.unlock.id));
+      if (run.unlock) localSetKey(LEVEL_KEY, String(run.unlock.id));
       const log = readLog();
       log.push({
         ts: Date.now(), player: playerNo(), stop: reached, win: run.win, cards: run.cards.slice(),
         kills: run.stats.kills, gold: Math.round(run.stats.gold), sec: Math.round(match.elapsed), streak: run.stats.bestStreak,
         rocks: run.stats.rocks, hp: Math.max(0, Math.ceil(match.world.playerCore.hp)), glory: g.gain, level: run.level,
       });
-      localStorage.setItem(RUNS_KEY, JSON.stringify(log.slice(-JOURNAL_MAX)));
+      if (!CG_BUILD) localStorage.setItem(RUNS_KEY, JSON.stringify(log.slice(-JOURNAL_MAX)));
     } catch (e) { /* без хранилища игра работает, только без рекорда и журнала */ }
   }
 
@@ -599,7 +600,7 @@ const Convoy = (() => {
   let dailyShown = null, dailyTimer = 0, gloryHeld = 0;   // gloryHeld — слава награды, пока звезда летит (шкала её ещё не показывает)
   function renderDaily() {
     if (screen !== 'cmenu') dailyShown = null;
-    else if (dailyOffer()) takeDaily();
+    else if (dailyOffer() && !PLATFORM.saveWaiting()) takeDaily(); // B1: сейв площадки ещё не прочитан — награда после слияния
     const o = screen === 'cmenu' ? dailyShown : null, el = $('cvDaily');
     if (!el) return;
     el.classList.toggle('hidden', !o);
@@ -2090,9 +2091,10 @@ const Convoy = (() => {
       btn.className = 'cv-card';
       btn.dataset.unit = id;
       btn.title = `${L.name} — ${L.role.toLowerCase()}`;
-      btn.setAttribute('aria-label', tx(`${L.name}, цена ${cost}`));
+      btn.setAttribute('aria-label', tx(`${L.name}, ${L.role.toLowerCase()}, цена ${cost}`));
       btn.innerHTML =
         `<canvas class="cv-card-icon" width="88" height="88"></canvas>` +
+        `<span class="cv-card-role r-${id}" aria-hidden="true"><svg class="ico"><use href="#${L.ico}"/></svg></span>` +
         (up ? '<span class="cv-card-up" aria-hidden="true">▲</span>' : '') +
         `<span class="cv-card-cost${cm.cost < 1 ? ' cheap' : ''}"><i class="gold-dot"></i>${cost}</span>` +
         `<span class="tool-key">${i + 1}</span>`;
@@ -2341,6 +2343,12 @@ const Convoy = (() => {
     $('cvHud').classList.toggle('picking', live && C.phase === 'pick');   // низкий экран: место под карты (style.css)
     $('cvResult').classList.toggle('hidden', !(live && C.phase === 'end' && C.shown));
     $('cvRevive').classList.toggle('hidden', !(live && C.revive));
+    syncGameplay(); // B2: окна выбора, второго шанса и итога — не активная игра для CrazyGames
+  }
+  // Идёт ли сам бой (волна, зачистка, марш) — без окон выбора карты, второго шанса и итога.
+  function gameplayOn() {
+    const C = match && match.convoy;
+    return !!C && C.phase !== 'pick' && C.phase !== 'end' && !C.revive;
   }
   function canPause() { return !(match && match.convoy && (match.convoy.phase === 'end' || match.convoy.revive)); }
   // Меню: рекорд одной плашкой и следующая награда за славу — иконка, имя, шкала, точки всех наград.
@@ -2458,8 +2466,8 @@ const Convoy = (() => {
     $('cvJournalNext').addEventListener('click', () => {
       // новый игрок плейтеста начинает с нуля: без славы, наград и рекорда прошлого (журнал остаётся)
       try {
-        localStorage.setItem(PLAYER_KEY, String(p + 1));
-        localStorage.removeItem(LEVEL_KEY);
+        localSetKey(PLAYER_KEY, String(p + 1));
+        localSetKey(LEVEL_KEY, '0');
       } catch (e) { /* без хранилища — один игрок */ }
       // слава, рекорды и открытые уровни (на стенде без облака; в ВК облако вернёт их при слиянии)
       const pr = prog();
@@ -3384,8 +3392,8 @@ const Convoy = (() => {
       aim.x = worldX(e); aim.at = performance.now(); aim.mouse = true;
     });
     // Потеря фокуса и уход со вкладки ставят бой на паузу; продолжить — только игроку.
-    window.addEventListener('blur', () => { if (screen === 'match' && canPause()) showScreen('paused'); });
-    document.addEventListener('visibilitychange', () => { if (document.hidden && screen === 'match' && canPause()) showScreen('paused'); });
+    window.addEventListener('blur', () => { if (screen === 'match' && canPause()) showScreen('paused', { focus: true }); });
+    document.addEventListener('visibilitychange', () => { if (document.hidden && screen === 'match' && canPause()) showScreen('paused', { focus: true }); });
     migrateLegacy();
     applyDevQuery();
     showScreen('cmenu');
@@ -3398,7 +3406,7 @@ const Convoy = (() => {
     boot, startRun, newRun, setupMatch, update, updateHud, buy, buyIndex, key, choose, repair, reroll,
     rockAt, rockAuto, rockReady, toMenu, onScreen, canPause, drawStructures, drawMenuWagons, drawOverlay, dayT,
     showJournal, readLog, readBest, simulate, api, waveText, drawCardIcon, bossPose, layoutWagons, intro,
-    refreshMenu, metaOf, valorOf, valorBonus, levelOpenAt, levelsOpen,
+    refreshMenu, metaOf, valorOf, valorBonus, levelOpenAt, levelsOpen, gameplayOn,
     get run() { return run; },
   };
 })();

@@ -1711,6 +1711,8 @@ body.convoy #heroDownFlash, body.convoy #fortEdge { display: none !important; }
   position: absolute; inset: 0; pointer-events: none;
   display: flex; flex-direction: column; justify-content: space-between;
   font-size: clamp(13px, 2.6vh, 24px);
+  /* отчёт модерации 23.10: кнопки и сводка боя — внутри безопасной зоны (вырез, полоса «домой») */
+  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
 }
 .sr-only { position: absolute !important; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 
@@ -1852,6 +1854,16 @@ body.convoy #heroDownFlash, body.convoy #fortEdge { display: none !important; }
 }
 .cv-card-cost .gold-dot { width: .78em; height: .78em; border-width: 1.5px; }
 .cv-card-cost.cheap { color: var(--cv-up); }
+/* роль бойца — значок в правом нижнем углу портрета (отчёт модерации 23.10) */
+.cv-card-role {
+  position: absolute; right: .1em; top: 1.9em; width: 1.3em; height: 1.3em; border-radius: 50%;
+  display: grid; place-items: center; background: #f2e6cf; box-shadow: 0 0 0 1.5px #1a120a, 0 1px 2px rgba(0,0,0,.5);
+  pointer-events: none;
+}
+.cv-card-role svg.ico { width: .98em; height: .98em; vertical-align: 0; color: #7f8b98; }
+.cv-card-role.r-archer svg.ico { color: #9a6532; }
+.cv-card-role.r-shieldbearer svg.ico { color: #3f78b8; }
+.cv-card-role.r-bomber svg.ico { color: #e9862f; }
 .cv-card-up { position: absolute; top: .12em; right: .22em; font-size: .8em; line-height: 1; color: var(--cv-up); text-shadow: var(--cv-outline); }
 .cv-card.poor .cv-card-cost { color: var(--cv-bad); }
 .cv-card.poor .cv-card-icon { opacity: .55; filter: grayscale(.5); }
@@ -2189,7 +2201,7 @@ body:not(.convoy) .cv-pause-snd, body:not(.convoy) .cv-pause-btns, body:not(.con
 body.convoy #screenPause .popup-card { min-width: 0; gap: max(10px, 1em); padding: 1.1em 1.8em 1.4em; }
 .cv-pause-snd, .cv-menu-snd { display: flex; justify-content: center; gap: .8em; }
 .cv-pause-snd .cv-snd { font-size: 1.15em; }
-.cv-menu-snd { position: absolute; top: max(10px, 1.6vh); right: max(10px, 1.2vw); z-index: 2; gap: .55em; }
+.cv-menu-snd { position: absolute; top: max(10px, 1.6vh, env(safe-area-inset-top, 0px)); right: max(10px, 1.2vw, env(safe-area-inset-right, 0px)); z-index: 2; gap: .55em; }
 .cv-snd { position: relative; }
 .cv-snd.off svg.ico { opacity: .7; }
 .cv-snd.off::after {
@@ -2285,7 +2297,7 @@ body.convoy #screenPause .popup-card { min-width: 0; gap: max(10px, 1em); paddin
   font-family: 'Lilita One', sans-serif; font-weight: 400; font-size: clamp(20px, 4.2vh, 34px); line-height: 1; color: #ffd35c;
   text-shadow: 0 2px 0 #3a2208, 0 0 14px rgba(255,211,92,.75); will-change: transform; }
 .cv-fly-star svg.ico { width: .95em; height: .95em; color: #ffd35c; filter: drop-shadow(0 0 6px rgba(255,211,92,.9)); }
-.cv-menu-share { position: absolute; top: max(10px, 1.6vh); left: max(10px, 1.2vw); z-index: 2; }
+.cv-menu-share { position: absolute; top: max(10px, 1.6vh, env(safe-area-inset-top, 0px)); left: max(10px, 1.2vw, env(safe-area-inset-left, 0px)); z-index: 2; }
 body:not(.convoy) .cv-menu-share, .cv-share.hidden { display: none; }
 
 /* ---------------------------------------------------------------- сборка 15: рейтинг «Казна» и «Походы» */

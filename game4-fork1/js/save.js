@@ -121,12 +121,16 @@ function mergeMaxMap(a, b) {
 // вернёт null вместо реальных данных СrazyGames-игрока; не проблема, эта
 // ранняя провизорная загрузка всё равно перезаписывается позже реальным
 // syncProgress() (см. game.js, вызывается после PLATFORM.ready).
+// Отчёт модерации 23.10 (B1): на CrazyGames-сборке, пока SDK не ответил (kind ещё 'none'), прямой
+// localStorage тоже запрещён — прогресс живёт в памяти и сливается с SDK.data в adoptPlatformSave().
+const CG_BUILD = window.GAME_PLATFORM === 'crazygames';
 function localGetKey(key) {
-  return PLATFORM.kind() === 'crazygames' ? PLATFORM.crazyGamesDataGet(key) : localStorage.getItem(key);
+  if (PLATFORM.kind() === 'crazygames') return PLATFORM.crazyGamesDataGet(key);
+  return CG_BUILD ? null : localStorage.getItem(key);
 }
 function localSetKey(key, json) {
   if (PLATFORM.kind() === 'crazygames') { PLATFORM.crazyGamesDataSet(key, json); return; }
-  localStorage.setItem(key, json);
+  if (!CG_BUILD) localStorage.setItem(key, json);
 }
 function localGet() { return localGetKey(SAVE_KEY); }
 function localSet(json) { localSetKey(SAVE_KEY, json); }
@@ -407,6 +411,18 @@ async function resyncFromCloud(progress) {
   cloudReadOk = true;
   try { if (saveHooks.replaced) saveHooks.replaced(); } catch (e) { /* UI подтянется при следующем показе */ }
   return true;
+}
+
+// B1: SDK площадки ответил после старта игры (PLATFORM.onLateReady). Зовётся синхронно в момент смены
+// kind — до любой новой записи: накопленное в памяти сливается с сейвом площадки, а не затирает его.
+function adoptPlatformSave(progress) {
+  const merged = mergeProgress(progress, readLocalRaw());
+  replaceProgressInPlace(progress, merged);
+  resetStampBase(progress);
+  deviceIdCache = null; // номер устройства — уже из хранилища площадки
+  cloudReadOk = true;
+  writeLocalRaw(progress);
+  try { if (saveHooks.replaced) saveHooks.replaced(); } catch (e) { /* UI подтянется при следующем показе */ }
 }
 
 async function pushCloud(progress) {

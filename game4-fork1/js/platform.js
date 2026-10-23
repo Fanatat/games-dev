@@ -84,6 +84,13 @@ const PLATFORM = (() => {
   const CRAZYGAMES_CONVOY_REWARDED = false;
   let cgAdsOff = false;
   let gameplayActive = false;
+  // Отчёт модерации 23.10 (B1): SDK.init() ответил позже таймаута detect() — игра уже стартовала на 'none'
+  // с пустым прогрессом. cgLate — ждём поздний ответ; lateHook (game.js) сливает прогресс с SDK.data
+  // в тот же синхронный момент, когда kind становится 'crazygames', иначе первая запись затрёт сейв.
+  let cgLate = false;
+  let cgLateDone = false;
+  let lateHook = null;
+  let loadingReadyAsked = false;
   let pauseHook = () => {};
   let resumeHook = () => {};
   let readyResolve;
@@ -185,7 +192,12 @@ const PLATFORM = (() => {
     crazygamesEnv = window.CrazyGames.SDK.environment; // "local" | "crazygames" | "disabled"
     if (crazygamesEnv === 'disabled') return; // §1/§12 — вне local/crazygames вызовы SDK бросают исключение, дальше не дёргаем
     const sdkGame = window.CrazyGames.SDK.game;
-    sdkGame.loadingStart();
+    // Поздний ответ: экран игры уже открыт — loadingStart не шлём, только loadingStop, если игра его уже просила.
+    if (cgLate) {
+      cgLateDone = true;
+      if (lateHook) lateHook();
+      if (loadingReadyAsked) notifyLoadingReady();
+    } else sdkGame.loadingStart();
     // muteAudio должен иметь приоритет над собственным тумблером звука игры
     // (§2) — слушатель применяется сразу к текущему значению И на каждое
     // изменение, SFX/MUSIC.setPlatformMuted() см. js/audio.js.
@@ -270,6 +282,7 @@ const PLATFORM = (() => {
   // а не сразу после YaGames.init() — иначе площадка снимет свой лоадер
   // раньше, чем у игрока успеет отрисоваться меню.
   function notifyLoadingReady() {
+    loadingReadyAsked = true;
     if (loadingReadyCalled) return;
     // ВАЖНО (2026-09-14, регрессия п.2.14 — см. detect() ниже): флаг
     // ставим ТОЛЬКО когда реально вызвали ysdk.features.LoadingAPI.ready(),
@@ -306,11 +319,20 @@ const PLATFORM = (() => {
       } else if (forced === 'vk' || (!forced && override === 'vk')) {
         await withTimeout(initVk(), 4000);
       } else if (forced === 'crazygames' || (!forced && override === 'crazygames')) {
-        // Таймаут-страховка тем же числом, что у VK выше — на реальной
-        // CrazyGames-сборке SDK уже загружен синхронным тегом (см.
-        // initCrazyGames()), init() резолвится быстро; страховка на случай
-        // сетевого сбоя того же SDK-скрипта.
-        await withTimeout(initCrazyGames(), 4000);
+        // На реальной CrazyGames-сборке SDK уже загружен синхронным тегом (см.
+        // initCrazyGames()), init() обычно резолвится быстро; таймаут — страховка
+        // на случай сбоя сети. Отчёт модерации 23.10 (B1): опоздавший ответ больше
+        // не отбрасывается (как у Яндекса ниже) — initCrazyGames() сам сольёт
+        // прогресс через lateHook. Пока ждём, save.js не пишет в localStorage.
+        const cgAttempt = initCrazyGames();
+        try {
+          await withTimeout(cgAttempt, 8000);
+        } catch (e) {
+          if (!e || e.message !== 'timeout') throw e;
+          cgLate = true;
+          cgAttempt.catch(() => {});
+          throw e;
+        }
       } else if (forced === 'none' || (!forced && override === 'none')) {
         kind = 'none';
       } else if (/yandex/i.test(document.referrer)) {
@@ -743,11 +765,16 @@ const PLATFORM = (() => {
     crazyGamesDataGet,
     crazyGamesDataSet,
     setPauseHooks(pause, resume) { pauseHook = pause; resumeHook = resume; },
-    // Вызывается из game.js, showScreen() — гейминг-lifecycle CrazyGames
+    // B1 (отчёт модерации 23.10): fn() зовётся синхронно в момент позднего перехода на 'crazygames'
+    // (или сразу, если переход уже был до подписки).
+    onLateReady(fn) { lateHook = fn; if (cgLateDone) fn(); },
+    // true — SDK CrazyGames ещё не ответил, сейв площадки не прочитан (награду дня не выдаём: её съест слияние).
+    saveWaiting: () => cgLate && !cgLateDone,
+    // Вызывается из game.js, syncGameplay() — гейминг-lifecycle CrazyGames
     // (методичка §2) шире прежних pauseHook/resumeHook (те — только вокруг
-    // рекламы): активный геймплей — это экран 'match', всё остальное (меню,
-    // пауза, итог, магазин) — не активный геймплей. На остальных площадках
-    // no-op (см. проверку kind внутри).
+    // рекламы): активный геймплей — экран 'match' без окон выбора/итога
+    // конвоя; меню, пауза игроком, итог, магазин — не активный геймплей.
+    // На остальных площадках no-op (см. проверку kind внутри).
     setGameplayActive(active) {
       if (kind !== 'crazygames' || crazygamesEnv === 'disabled') return;
       if (active === gameplayActive) return;

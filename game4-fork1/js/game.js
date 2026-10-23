@@ -1118,16 +1118,26 @@ window.addEventListener('orientationchange', () => setTimeout(layoutHudBottomRow
 // никогда — только явным действием игрока (кнопка/хоткей), даже если
 // ориентация тем временем вернулась в альбомную.
 const PORTRAIT_TOUCH_MQ = window.matchMedia('(pointer: coarse) and (orientation: portrait)');
-function showScreen(name) {
+// CrazyGames gameplayStart/Stop (методичка §2) — шире pauseHook/resumeHook
+// (те — только вокруг рекламы, см. PLATFORM.setPauseHooks() ниже), no-op на
+// других площадках (проверка kind — внутри PLATFORM.setGameplayActive()).
+// Отчёт модерации 23.10 (B2): активная игра — экран боя без окон выбора карты,
+// второго шанса и итога конвоя (Convoy.gameplayOn). Пауза из-за ухода фокуса
+// событий не шлёт: документация SDK — «Don't call this event when the user
+// switches focus or leaves the game area (we handle this on our side)».
+let focusPaused = false;
+function syncGameplay() {
+  if (focusPaused) return;
+  PLATFORM.setGameplayActive(screen === 'match' && (!window.CONVOY_PROTOTYPE || Convoy.gameplayOn()));
+}
+// opts.focus — пауза из-за потери фокуса/скрытия вкладки (convoy.js).
+function showScreen(name, opts) {
   if (window.CONVOY_PROTOTYPE && name === 'menu') name = 'cmenu'; // «Последний конвой»: своё меню
   if (name === 'match' && PORTRAIT_TOUCH_MQ.matches) name = 'paused';
   Analytics.screenShown(name, screen); // воронка: menu_shown / shop_open (js/analytics.js)
   screen = name;
-  // CrazyGames gameplayStart/Stop (методичка §2) — шире pauseHook/resumeHook
-  // (те — только вокруг рекламы, см. PLATFORM.setPauseHooks() ниже): любой
-  // переход на/с экрана боя, включая паузу/меню/итог, no-op на других
-  // площадках (проверка kind — внутри PLATFORM.setGameplayActive()).
-  PLATFORM.setGameplayActive(name === 'match');
+  focusPaused = name === 'paused' && !!(opts && opts.focus);
+  syncGameplay();
   // Раунд 17: пульс боя для журнала сбоев (js/crashlog.js) — пауза/справка
   // посреди боя пульс не останавливают, выход в меню/итог — останавливают.
   if (name === 'match') CRASHLOG.startHeartbeat();
@@ -5023,6 +5033,8 @@ PLATFORM.ready.then(async () => {
   BOOT.mark('чтение облачного сейва…');
   progress = await syncProgress();
   BOOT.mark('облачный сейв прочитан');
+  // B1 (отчёт модерации 23.10): SDK CrazyGames ответил позже таймаута — слить его сейв с тем, что в памяти.
+  PLATFORM.onLateReady(() => { BOOT.mark('площадка ответила поздно: crazygames'); adoptPlatformSave(progress); syncGameplay(); });
   applyTheme();
   SFX.setMuted(!!progress.muted);
   MUSIC.setMusicMuted(!!progress.musicMuted);

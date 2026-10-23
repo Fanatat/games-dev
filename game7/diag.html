@@ -311,8 +311,8 @@
       // текстуры на CPU при загрузке. ASTC берём, только если DXT нет, а
       // ASTC есть: ПК с обоими форматами остаётся на основном. ?tex=astc
       // или ?tex=dxt в адресе — выбрать файл вручную (проверки).
-      var dataFile = "dev-20261022-154349.data.unityweb";
-      var astcDataFile = "dev-20261022-154349.astc.data.unityweb";
+      var dataFile = "dev-20261023-132213.data.unityweb";
+      var astcDataFile = "dev-20261023-132213.astc.data.unityweb";
       var texFormat = "dxt";
       if (astcDataFile) {
         var texForce = /[?&]tex=(astc|dxt)(&|$)/.exec(location.search);
@@ -336,16 +336,16 @@
       window.game7TexFormat = texFormat;
 
       var buildUrl = "Build";
-      var loaderUrl = buildUrl + "/dev-20261022-154349.loader.js";
+      var loaderUrl = buildUrl + "/dev-20261023-132213.loader.js";
       var config = {
         arguments: [],
         dataUrl: buildUrl + "/" + dataFile,
-        frameworkUrl: buildUrl + "/dev-20261022-154349.framework.js.unityweb",
-        codeUrl: buildUrl + "/dev-20261022-154349.wasm.unityweb",
+        frameworkUrl: buildUrl + "/dev-20261023-132213.framework.js.unityweb",
+        codeUrl: buildUrl + "/dev-20261023-132213.wasm.unityweb",
         streamingAssetsUrl: "StreamingAssets",
         companyName: "Vanatat",
         productName: "Zomboland",
-        productVersion: "dev-20261022-154349",
+        productVersion: "dev-20261023-132213",
         showBanner: unityShowBanner,
         // Экраны с плотностью 3 рисовали бы в 9 раз больше пикселей, чем
         // с плотностью 1: потолок 2 держит 60 FPS на среднем телефоне.

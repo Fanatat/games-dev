@@ -1,7 +1,7 @@
 /* ============================================================
    workshop_board.js — поле «Ювелир Ленд»: стеклянные пробирки
    в золотых стойках (образ ref/workshop/concept/01_level), камни —
-   спрайты из атласа workshop_assets/gems.webp (tools/ws_cut_gems.py).
+   спрайты из атласа workshop_assets/gems.webp (tools/ws_hd_art.py, клетка 256 px).
    Только рисование, анимация и попадание по касанию; правил здесь нет
    (workshop_rules.js).
 
@@ -41,7 +41,6 @@ const WsBoard = (() => {
   // в альбоме (шире 4:3) пробирка растёт с окном: 12 % высоты, не больше 130 px (ТЗ Ж-01: на 1920×1080 было 66)
   const wide = () => window.innerWidth * 3 >= window.innerHeight * 4;
   const maxTw = () => (wide() ? Math.max(MAX_TW, Math.min(0.12 * window.innerHeight, 130)) : MAX_TW);
-  const SPRITE = 160;      // размер ячейки атласа
   const GOLD = 'Z';        // золотой топаз
   const SEL_MS = 150;      // подъём и возврат выбранной пробирки
 
@@ -209,7 +208,8 @@ const WsBoard = (() => {
   function drawGem(g, gem, x, y, size, alpha) {
     if (alpha !== undefined) g.globalAlpha = alpha;
     if (atlasReady) {
-      g.drawImage(atlas, spriteOf(gem) * SPRITE, 0, SPRITE, SPRITE, x - size / 2, y - size / 2, size, size);
+      const cs = atlas.naturalHeight;   // клетка атласа квадратная: 256 px (tools/ws_hd_art.py), прежний — 160
+      g.drawImage(atlas, spriteOf(gem) * cs, 0, cs, cs, x - size / 2, y - size / 2, size, size);
     } else {
       const r = size * 0.4;
       const grd = g.createRadialGradient(x - r * 0.35, y - r * 0.35, r * 0.1, x, y, r);

@@ -133,7 +133,12 @@ function localSetKey(key, json) {
   if (!CG_BUILD) localStorage.setItem(key, json);
 }
 function localGet() { return localGetKey(SAVE_KEY); }
-function localSet(json) { localSetKey(SAVE_KEY, json); }
+// На CrazyGames локальная копия и «облако» — одно хранилище (SDK.data). Пока его не удалось прочитать
+// (сбой getItem), сейв не пишем: прогресс копится в памяти, pushCloud перечитает и сольёт (отчёт по сб.19).
+function localSet(json) {
+  if (PLATFORM.kind() === 'crazygames' && cloudReadOk !== true) return;
+  localSetKey(SAVE_KEY, json);
+}
 
 // ---- Проверка структуры и диапазонов (аудит 05.10, A05) -----------------
 // Сейв приходит из localStorage / облака площадки и может быть битым или
@@ -407,19 +412,35 @@ async function resyncFromCloud(progress) {
   const merged = mergeProgress(progress, cloud.data);
   replaceProgressInPlace(progress, merged);
   resetStampBase(progress);
+  cloudReadOk = true; // до записи: на CrazyGames localSet пишет только после удачного чтения
   writeLocalRaw(progress);
-  cloudReadOk = true;
   try { if (saveHooks.replaced) saveHooks.replaced(); } catch (e) { /* UI подтянется при следующем показе */ }
   return true;
 }
 
 // B1: SDK площадки ответил после старта игры (PLATFORM.onLateReady). Зовётся синхронно в момент смены
 // kind — до любой новой записи: накопленное в памяти сливается с сейвом площадки, а не затирает его.
+// Чтение не удалось (сбой SDK.data) — ничего не пишем: cloudReadOk=false, прогресс остаётся в памяти,
+// pushCloud повторит чтение с паузами и сольёт (resyncFromCloud).
+// false — сейв площадки ещё не прочитан (SDK не ответил или чтение упало): то, что зависит от прежнего
+// прогресса (награда за вход), ждёт слияния — иначе max-слияние его съест.
+function saveSettled() {
+  return !PLATFORM.saveWaiting() && !(PLATFORM.kind() === 'crazygames' && cloudReadOk !== true);
+}
+
 function adoptPlatformSave(progress) {
-  const merged = mergeProgress(progress, readLocalRaw());
+  deviceIdCache = null; // номер устройства — уже из хранилища площадки
+  const r = PLATFORM.crazyGamesDataRead(SAVE_KEY);
+  let raw = null;
+  try { raw = r.ok && r.value ? JSON.parse(r.value) : null; } catch (e) { r.ok = false; }
+  if (!r.ok) {
+    cloudReadOk = false;
+    scheduleCloudPush(progress);
+    return;
+  }
+  const merged = mergeProgress(progress, raw);
   replaceProgressInPlace(progress, merged);
   resetStampBase(progress);
-  deviceIdCache = null; // номер устройства — уже из хранилища площадки
   cloudReadOk = true;
   writeLocalRaw(progress);
   try { if (saveHooks.replaced) saveHooks.replaced(); } catch (e) { /* UI подтянется при следующем показе */ }

@@ -600,7 +600,7 @@ const Convoy = (() => {
   let dailyShown = null, dailyTimer = 0, gloryHeld = 0;   // gloryHeld — слава награды, пока звезда летит (шкала её ещё не показывает)
   function renderDaily() {
     if (screen !== 'cmenu') dailyShown = null;
-    else if (dailyOffer() && !PLATFORM.saveWaiting()) takeDaily(); // B1: сейв площадки ещё не прочитан — награда после слияния
+    else if (dailyOffer() && saveSettled()) takeDaily(); // сейв площадки ещё не прочитан — награда после слияния
     const o = screen === 'cmenu' ? dailyShown : null, el = $('cvDaily');
     if (!el) return;
     el.classList.toggle('hidden', !o);

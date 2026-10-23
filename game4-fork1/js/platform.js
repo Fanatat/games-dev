@@ -258,6 +258,12 @@ const PLATFORM = (() => {
       const locale = (crazygamesEnv !== 'disabled' && window.CrazyGames && window.CrazyGames.SDK.user
         && window.CrazyGames.SDK.user.systemInfo) ? window.CrazyGames.SDK.user.systemInfo.locale : null;
       I18N.setLang(locale);
+    } else if (window.GAME_PLATFORM === 'crazygames') {
+      // CrazyGames-сборка, SDK не ответил к старту (отчёт по сборке 19): язык конвоя фиксируется на всю
+      // сессию при старте, поэтому берём locale SDK, если он уже доступен, иначе язык браузера (фолбэк EN).
+      let locale = null;
+      try { locale = window.CrazyGames.SDK.user.systemInfo.locale; } catch (e) { /* SDK ещё не готов */ }
+      I18N.setLang(locale || navigator.language || null);
     } else {
       // Локальный тест ('none') — язык через Yandex SDK не определяется и
       // ВК-ограничение тоже не при чём (это просто удобство разработки):
@@ -675,6 +681,13 @@ const PLATFORM = (() => {
     try { return window.CrazyGames.SDK.data.getItem(key); }
     catch (e) { console.warn('[platform] CrazyGames data.getItem failed:', e); return null; }
   }
+  // Отчёт по сборке 19: crazyGamesDataGet() выше прячет ошибку SDK за null — для сейва нужно отличать
+  // «ключа нет» ({ok:true, value:null}) от «чтение не удалось» ({ok:false}): поверх неизвестного не пишем.
+  function crazyGamesDataRead(key) {
+    if (!crazyGamesDataAvailable()) return { ok: false, value: null };
+    try { return { ok: true, value: window.CrazyGames.SDK.data.getItem(key) }; }
+    catch (e) { console.warn('[platform] CrazyGames data.getItem failed:', e); return { ok: false, value: null }; }
+  }
   function crazyGamesDataSet(key, value) {
     if (!crazyGamesDataAvailable()) return;
     try { window.CrazyGames.SDK.data.setItem(key, value); }
@@ -763,6 +776,7 @@ const PLATFORM = (() => {
     // на ветке crazygames (см. ТЗ_CRAZYGAMES_ИНТЕГРАЦИЯ.md, п.4) — на других
     // площадках crazyGamesDataAvailable() внутри всегда false, вызовы no-op.
     crazyGamesDataGet,
+    crazyGamesDataRead,
     crazyGamesDataSet,
     setPauseHooks(pause, resume) { pauseHook = pause; resumeHook = resume; },
     // B1 (отчёт модерации 23.10): fn() зовётся синхронно в момент позднего перехода на 'crazygames'

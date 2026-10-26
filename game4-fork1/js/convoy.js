@@ -1555,7 +1555,8 @@ const Convoy = (() => {
       if (!run || run.glory !== g) return;
       if (!r.shown) {
         btn.querySelector('span').textContent = tx('Реклама недоступна');
-        setTimeout(() => { if (!run.doubled) { btn.disabled = false; btn.querySelector('span').textContent = tx('Слава ×2'); } }, 1600);
+        // Игрок мог за 1.6 с уйти в меню (toMenu обнуляет run) или в новый поход — кнопка уже не его.
+        setTimeout(() => { if (run && run.glory === g && !run.doubled) { btn.disabled = false; btn.querySelector('span').textContent = tx('Слава ×2'); } }, 1600);
         return;
       }
       grantDouble();

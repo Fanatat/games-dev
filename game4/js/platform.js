@@ -386,16 +386,33 @@ const PLATFORM = (() => {
   // 'blocked' (onError / нет SDK / исключение / молчание SDK до открытия —
   // adblock, сбой) и 'closed' (ролик открылся, игрок закрыл без награды —
   // уведомления не нужно).
-  function showYandexRewardedResult() {
+  // Аудит 19.10 (G-01): после onOpen без onClose/onError (немой SDK) через
+  // VK_AD_HANG_GUARD_MS снимаем паузу и отдаём UI конечный исход 'timeout'
+  // (без награды). Если SDK всё же закроет ролик с наградой позже — onLate
+  // вызывается ровно один раз; повторный показ до ответа SDK не стартует.
+  // rewardedPendingUntil — «ответ SDK ещё не пришёл»; 10 мин — страховка от
+  // вечной блокировки кнопки, если ответ не придёт никогда.
+  const REWARDED_PENDING_MAX_MS = 600000;
+  let rewardedPendingUntil = 0;
+  function rewardedPending() { return Date.now() < rewardedPendingUntil; }
+  function showYandexRewardedResult(onLate) {
     return new Promise((resolve) => {
       if (!ysdk || !ysdk.adv) { resolve({ shown: false, reason: 'blocked' }); return; }
-      let rewarded = false, opened = false, settled = false;
-      const finish = (shown, reason) => { if (settled) return; settled = true; clearTimeout(guard); resumeHook(); resolve({ shown, reason }); };
+      if (rewardedPending()) { resolve({ shown: false, reason: 'cooldown' }); return; }
+      rewardedPendingUntil = Date.now() + REWARDED_PENDING_MAX_MS;
+      let rewarded = false, opened = false, settled = false, answered = false, hang = null;
+      const timeoutOut = () => { if (settled) return; settled = true; resumeHook(); resolve({ shown: false, reason: 'timeout' }); };
+      const finish = (shown, reason) => {
+        if (answered) return;
+        answered = true; clearTimeout(guard); clearTimeout(hang); rewardedPendingUntil = 0;
+        if (settled) { if (shown && typeof onLate === 'function') { try { onLate(); } catch (e) { console.warn('[platform] late reward:', e); } } return; }
+        settled = true; resumeHook(); resolve({ shown, reason });
+      };
       const guard = setTimeout(() => { if (!opened) finish(false, 'blocked'); }, INTERSTITIAL_TIMEOUT_MS * 4);
       try {
         ysdk.adv.showRewardedVideo({
           callbacks: {
-            onOpen: () => { opened = true; pauseHook(); },
+            onOpen: () => { opened = true; pauseHook(); if (!settled) { clearTimeout(hang); hang = setTimeout(timeoutOut, VK_AD_HANG_GUARD_MS); } },
             onRewarded: () => { rewarded = true; },
             onClose: () => { rewarded ? finish(true, 'ok') : finish(false, opened ? 'closed' : 'blocked'); },
             onError: () => { finish(false, 'blocked'); },
@@ -415,15 +432,26 @@ const PLATFORM = (() => {
   // отвечает на ShowNativeAds только после закрытия рекламы, поэтому ответ
   // ждём сколько угодно. Предохранитель ниже — только от немого моста:
   // через 3 мин снимает паузу игры/звука, но ответ ВК по-прежнему ждёт.
+  // Аудит 19.10 (G-01): тогда же Promise получает конечный исход 'timeout'
+  // (UI разблокирован, награды нет), а поздний result:true от ВК вызывает onLate
+  // ровно один раз — решение 25.09 «поздний ответ не терять» сохранено.
   const VK_AD_HANG_GUARD_MS = 180000;
-  function showVkRewarded() {
+  function showVkRewarded(onLate) {
     return new Promise((resolve) => {
-      if (!vkBridge) { resolve(false); return; }
+      if (!vkBridge) { resolve({ shown: false, reason: 'blocked' }); return; }
+      if (rewardedPending()) { resolve({ shown: false, reason: 'cooldown' }); return; }
+      rewardedPendingUntil = Date.now() + REWARDED_PENDING_MAX_MS;
       pauseHook();
-      let resumed = false;
+      let resumed = false, settled = false, answered = false;
       const resumeOnce = () => { if (!resumed) { resumed = true; resumeHook(); } };
-      const guard = setTimeout(resumeOnce, VK_AD_HANG_GUARD_MS);
-      const finish = (rewarded) => { clearTimeout(guard); resumeOnce(); resolve(rewarded); };
+      const settle = (r) => { if (!settled) { settled = true; resolve(r); } };
+      const guard = setTimeout(() => { resumeOnce(); settle({ shown: false, reason: 'timeout' }); }, VK_AD_HANG_GUARD_MS);
+      const finish = (rewarded) => {
+        if (answered) return;
+        answered = true; clearTimeout(guard); resumeOnce(); rewardedPendingUntil = 0;
+        if (!settled) settle({ shown: rewarded, reason: rewarded ? 'ok' : 'blocked' });
+        else if (rewarded && typeof onLate === 'function') { try { onLate(); } catch (e) { console.warn('[platform] late reward:', e); } }
+      };
       vkBridge.send('VKWebAppShowNativeAds', VK_REWARD_PARAMS)
         .then((res) => finish(!!(res && res.result)))
         .catch(() => finish(false));
@@ -732,11 +760,12 @@ const PLATFORM = (() => {
     // Бесплатной ветки нет: без SDK (kind 'none': adblock убил sdk.js, чужой
     // домен, стенд вне iframe ВК) бонус не выдаётся. Заглушка showTestAd —
     // только для локальной разработки (DEV_ADS: localhost/127.0.0.1/file:).
-    showBonusAd() {
+    // onLate — необязательный колбэк: SDK подтвердил награду ПОСЛЕ исхода 'timeout' (не больше одного раза).
+    showBonusAd(onLate) {
       try { if (typeof Analytics !== 'undefined') Analytics.adRewardClick(); } catch (e) { /* аналитика не ломает рекламу */ }
       let p;
-      if (kind === 'yandex') p = bonusAdFormat() === 'interstitial' ? showYandexFullscreen() : showYandexRewardedResult();
-      else if (kind === 'vk') p = showVkRewarded().then((ok) => ({ shown: ok, reason: ok ? 'ok' : 'blocked' }));
+      if (kind === 'yandex') p = bonusAdFormat() === 'interstitial' ? showYandexFullscreen() : showYandexRewardedResult(onLate);
+      else if (kind === 'vk') p = showVkRewarded(onLate);
       else if (kind === 'crazygames') p = showCrazyGamesRewarded().then((ok) => ({ shown: ok, reason: ok ? 'ok' : 'blocked' }));
       else if (DEV_ADS) p = showTestAd().then((ok) => ({ shown: ok, reason: ok ? 'ok' : 'blocked' }));
       else p = Promise.resolve({ shown: false, reason: 'blocked' });

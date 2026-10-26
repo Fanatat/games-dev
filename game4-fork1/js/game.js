@@ -3485,18 +3485,27 @@ function renderResultAdRow(earnedDiamonds, isChapterFinal) {
         // adblock/ошибка SDK — «отключите блокировщик», бонус не выдан;
         // пауза между показами/нет объявления — мягкое сообщение и короткая
         // блокировка кнопки (AD_COOLDOWN_LOCK_MS), чтобы не спамить SDK.
-        PLATFORM.showBonusAd().then((res) => {
+        // Аудит 19.10 (G-01): grantOnce — единая точка выдачи; её же зовёт
+        // платформа, если SDK подтвердил награду ПОСЛЕ исхода 'timeout'.
+        let granted = false;
+        const grantOnce = () => {
+          if (granted) return;
+          granted = true;
+          lastAdShownAt = Date.now();
+          onGranted();
+          saveProgress(progress);
+          if (btn.isConnected) { btn.disabled = true; btn.textContent = I18N.t('result.adGranted', { amount }); }
+        };
+        PLATFORM.showBonusAd(undefined, grantOnce).then((res) => {
           if (res && res.shown === true) {
-            lastAdShownAt = Date.now();
-            onGranted();
-            saveProgress(progress);
-            btn.textContent = I18N.t('result.adGranted', { amount });
+            grantOnce();
           } else if (res && res.reason === 'cooldown') {
             showLoudNotice(I18N.t('result.adCooldownNotice'));
             setTimeout(() => { if (btn.isConnected) { btn.disabled = false; setLabel(); } }, AD_COOLDOWN_LOCK_MS);
             btn.textContent = plainLabel(I18N.t('result.adLoading'));
-          } else if (res && res.reason === 'closed') {
-            // ролик открылся, игрок закрыл без награды — бонуса нет, ругаться не за что
+          } else if (res && (res.reason === 'closed' || res.reason === 'timeout')) {
+            // ролик открылся, игрок закрыл без награды (или SDK молчит дольше предохранителя —
+            // кнопка свободна, награда придёт сама, если SDK подтвердит позже) — ругаться не за что
             btn.disabled = false;
             setLabel();
           } else {

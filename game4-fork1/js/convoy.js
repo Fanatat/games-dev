@@ -1484,7 +1484,14 @@ const Convoy = (() => {
     if (!C || !C.revive || C.revive.state !== 'offer') return;
     C.revive.state = 'ad';
     renderRevive();
-    PLATFORM.showBonusAd('revive').then((r) => {
+    // G-01: SDK мог подтвердить награду ПОСЛЕ исхода 'timeout'. Второй шанс принадлежит этой попытке:
+    // пока оффер жив — выдаём, после finish(false) (попытка закрыта) — поздний ответ игнорируем.
+    const onLate = () => {
+      if (!match || match.convoy !== C || !C.revive || C.revive.state === 'offer') return;
+      adShown();
+      revive();
+    };
+    PLATFORM.showBonusAd('revive', onLate).then((r) => {
       if (!match || match.convoy !== C || !C.revive) return;
       if (!r.shown) {
         C.revive.state = 'none';
@@ -1529,13 +1536,10 @@ const Convoy = (() => {
     if (!g || run.doubled || !btn || btn.disabled) return;
     btn.disabled = true;
     btn.querySelector('span').textContent = tx('Реклама…');
-    PLATFORM.showBonusAd('glory_x2').then((r) => {
-      if (!run || run.glory !== g) return;
-      if (!r.shown) {
-        btn.querySelector('span').textContent = tx('Реклама недоступна');
-        setTimeout(() => { btn.disabled = false; btn.querySelector('span').textContent = tx('Слава ×2'); }, 1600);
-        return;
-      }
+    // grantDouble — единая точка выдачи (обычной и поздней, G-01): run.doubled гарантирует «раз за поход»,
+    // run.glory !== g — награда принадлежит именно этому итогу, к новому походу не относится.
+    const grantDouble = () => {
+      if (!run || run.glory !== g || run.doubled) return;
       adShown();
       run.doubled = true;
       const was = g.total;
@@ -1546,6 +1550,15 @@ const Convoy = (() => {
       const p = prog();
       if (p) { p.cvGlory = Math.max(p.cvGlory || 0, g.total); saveProgress(p); }
       renderResultGlory(true);
+    };
+    PLATFORM.showBonusAd('glory_x2', grantDouble).then((r) => {
+      if (!run || run.glory !== g) return;
+      if (!r.shown) {
+        btn.querySelector('span').textContent = tx('Реклама недоступна');
+        setTimeout(() => { if (!run.doubled) { btn.disabled = false; btn.querySelector('span').textContent = tx('Слава ×2'); } }, 1600);
+        return;
+      }
+      grantDouble();
     });
   }
 

@@ -266,9 +266,19 @@
   <body>
     <canvas id="unity-canvas" tabindex="-1"></canvas>
     <div id="game7-loading">
-      <div id="game7-loading-title">&#1047;&#1086;&#1084;&#1073;&#1080; &#1051;&#1077;&#1085;&#1076;</div>
+      <div id="game7-loading-title" data-en="Zomboland">&#1047;&#1086;&#1084;&#1073;&#1080; &#1051;&#1077;&#1085;&#1076;</div>
       <div id="unity-loading-bar"><div id="unity-progress-bar-full"></div></div>
     </div>
+    <script>
+      // Название на заставке — на языке игрока (отказ CrazyGames 26.10: в
+      // ?lang=en стояло «Зомби Ленд»): русское — при ?lang=ru или русском
+      // браузере, иначе английское (title_crazygames из game.json).
+      (function () {
+        var title = document.getElementById("game7-loading-title");
+        var lang = (new URLSearchParams(location.search).get("lang") || navigator.language || "").toLowerCase();
+        if (title && title.dataset.en && lang.indexOf("ru") !== 0) title.textContent = title.dataset.en;
+      })();
+    </script>
     <div id="unity-warning"></div>
     <script>
       var canvas = document.querySelector("#unity-canvas");
@@ -311,8 +321,8 @@
       // текстуры на CPU при загрузке. ASTC берём, только если DXT нет, а
       // ASTC есть: ПК с обоими форматами остаётся на основном. ?tex=astc
       // или ?tex=dxt в адресе — выбрать файл вручную (проверки).
-      var dataFile = "dev-20261024-130912.data.unityweb";
-      var astcDataFile = "dev-20261024-130912.astc.data.unityweb";
+      var dataFile = "dev-20261026-164058.data.unityweb";
+      var astcDataFile = "dev-20261026-164058.astc.data.unityweb";
       var texFormat = "dxt";
       if (astcDataFile) {
         var texForce = /[?&]tex=(astc|dxt)(&|$)/.exec(location.search);
@@ -336,16 +346,16 @@
       window.game7TexFormat = texFormat;
 
       var buildUrl = "Build";
-      var loaderUrl = buildUrl + "/dev-20261024-130912.loader.js";
+      var loaderUrl = buildUrl + "/dev-20261026-164058.loader.js";
       var config = {
         arguments: [],
         dataUrl: buildUrl + "/" + dataFile,
-        frameworkUrl: buildUrl + "/dev-20261024-130912.framework.js.unityweb",
-        codeUrl: buildUrl + "/dev-20261024-130912.wasm.unityweb",
+        frameworkUrl: buildUrl + "/dev-20261026-164058.framework.js.unityweb",
+        codeUrl: buildUrl + "/dev-20261026-164058.wasm.unityweb",
         streamingAssetsUrl: "StreamingAssets",
         companyName: "Vanatat",
         productName: "Zomboland",
-        productVersion: "dev-20261024-130912",
+        productVersion: "dev-20261026-164058",
         showBanner: unityShowBanner,
         // Экраны с плотностью 3 рисовали бы в 9 раз больше пикселей, чем
         // с плотностью 1: потолок 2 держит 60 FPS на среднем телефоне.

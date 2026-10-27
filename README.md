@@ -19,6 +19,7 @@
 | game5 | Королевская Косынка | Three.js, TypeScript | [открыть](https://fanatat.github.io/games-dev/game5/) | на модерации |
 | game7 | Зомби Ленд | Unity WebGL | [открыть](https://fanatat.github.io/games-dev/game7/) · [для ВК](https://fanatat.github.io/games-dev/game7-vk/) | на модерации |
 | game9 | Коп Ленд (раннер) | Three.js | [открыть](https://fanatat.github.io/games-dev/game9/) | готовится |
+| game10 | Планетки: космическая гармония (физическая головоломка) | TypeScript, PixiJS | [открыть](https://fanatat.github.io/games-dev/game10/) | готовится |
 | game1-fork1 | Слова по уликам (прототип) | JavaScript | [открыть](https://fanatat.github.io/games-dev/game1-fork1/) | — |
 | game2-fork1 | Дом картинок (прототип) | JavaScript | [открыть](https://fanatat.github.io/games-dev/game2-fork1/) | — |
 | game3-fork1 | Мастерская украшений | JavaScript | [открыть](https://fanatat.github.io/games-dev/game3-fork1/) · [для ВК](https://fanatat.github.io/games-dev/game3-fork1-vk/) · [для CrazyGames](https://fanatat.github.io/games-dev/game3-fork1-cg/) | на модерации |

@@ -5,7 +5,9 @@
    закрывает линии подряд (окно 2,5 с). Тихая музыка на три четверти — из тех
    же нот маримбы (свой выключатель), среда комнаты — синтезом, под «Звуками».
    Шкатулка звучит своим тембром (металлический язычок) и своей мелодией;
-   сундучок, редкая находка и готовая комната — каждый своим звуком. */
+   сундучок, редкая находка и готовая комната — каждый своим звуком.
+   Звуки и музыка — на разных шинах: звуки тише музыки и без резких верхов
+   (фильтр 4 кГц), музыка мимо фильтра (жалоба основателя 27.10: «режут уши»). */
 window.Sound = (function () {
   'use strict';
 
@@ -15,30 +17,31 @@ window.Sound = (function () {
     cross: { files: ['cross_tick_1', 'cross_tick_2'], vol: 0.4, gap: 35 },
     erase: { files: ['erase_slide_1'], vol: 0.35, gap: 50 },
     line: { files: ['line_marimba_D5', 'line_marimba_E5', 'line_marimba_G5', 'line_marimba_A5', 'line_marimba_B5', 'line_marimba_D6'], vol: 0.55, gap: 40 },
-    win: { files: ['win_marimba'], vol: 0.7 },
-    reward: { files: ['reward_bell'], vol: 0.65 },
-    chord: { files: ['reward_chord'], vol: 0.7 },
-    unlock: { files: ['unlock_glock'], vol: 0.6 },
+    win: { files: ['win_marimba'], vol: 0.55 },
+    reward: { files: ['reward_bell'], vol: 0.5 },
+    chord: { files: ['reward_chord'], vol: 0.5 },
+    unlock: { files: ['unlock_glock'], vol: 0.45 },
     tap: { files: ['ui_tap_1'], vol: 0.45, gap: 40 },
     toggle: { files: ['ui_toggle'], vol: 0.45 },
     back: { files: ['ui_back'], vol: 0.45 },
-    hint: { files: ['hint_sparkle'], vol: 0.55 },
+    hint: { files: ['hint_sparkle'], vol: 0.45 },
     coin: { files: ['reward_bell'], vol: 0.4, gap: 120 },
     note: { files: ['line_marimba_D5', 'line_marimba_E5', 'line_marimba_G5', 'line_marimba_A5', 'line_marimba_B5', 'line_marimba_D6'], vol: 0.5 }
   };
-  // Вальс шкатулки: своя мелодия на октаву выше музыки, [доля, midi]; бас — на раз.
-  var WALTZ = [[0, 86], [1, 90], [2, 93], [3, 95], [5, 93], [6, 91], [7, 90], [8, 88], [9, 90],
-    [12, 86], [13, 88], [14, 90], [15, 91], [16, 90], [17, 88], [18, 90], [19, 86], [20, 81], [21, 86]];
-  var WALTZ_BASS = [[0, 74], [3, 79], [6, 76], [9, 81], [12, 74], [15, 79], [18, 81], [21, 74]];
+  // Вальс шкатулки: своя мелодия в октаве музыки, [доля, midi]; бас — на раз.
+  var WALTZ = [[0, 74], [1, 78], [2, 81], [3, 83], [5, 81], [6, 79], [7, 78], [8, 76], [9, 78],
+    [12, 74], [13, 76], [14, 78], [15, 79], [16, 78], [17, 76], [18, 78], [19, 74], [20, 69], [21, 74]];
+  var WALTZ_BASS = [[0, 62], [3, 67], [6, 64], [9, 69], [12, 62], [15, 67], [18, 69], [21, 62]];
   var BEAT = 0.3;
   var COMBO_MS = 2500;
   // Музыка: соль мажор, G–Em–C–D, бас на раз и аккорд на два-три; мелодия — через круг.
   var SAMPLE_MIDI = [74, 76, 79, 81, 83, 86]; // D5 E5 G5 A5 B5 D6 — файлы EVENTS.line
-  var M_BEAT = 0.62, M_VOL = 0.3;
+  var M_BEAT = 0.62, M_VOL = 0.3 * Math.pow(10, 1 / 20); // музыка +1 дБ к прежней
+  var SFX_VOL = 0.5; // звуки −6 дБ к прежним
   var CHORDS = [[67, [74, 79, 83]], [64, [76, 79, 83]], [72, [76, 79, 84]], [74, [78, 81, 86]]];
   var MELODY = [[0, 83], [2, 81], [3, 79], [6, 76], [7, 79], [8, 84], [9, 81], [12, 86], [14, 83], [15, 79], [17, 81], [18, 79], [20, 76], [21, 74]];
 
-  var ctx = null, master = null;
+  var ctx = null, master = null, sfx = null;
   var buffers = {};
   var enabled = true, vibration = true, music = true;
   var musicBus = null, mLevel = 1, mNext = 0, mBeat = 0, mDuck = 0;
@@ -55,6 +58,12 @@ window.Sound = (function () {
     master = ctx.createGain();
     master.gain.value = 0.9;
     master.connect(ctx.destination);
+    var soft = ctx.createBiquadFilter();
+    soft.type = 'lowpass'; soft.frequency.value = 4000; soft.Q.value = 0.5;
+    soft.connect(master);
+    sfx = ctx.createGain();
+    sfx.gain.value = SFX_VOL;
+    sfx.connect(soft);
     return ctx;
   }
 
@@ -109,7 +118,7 @@ window.Sound = (function () {
     src.playbackRate.value = 1 + (Math.random() - 0.5) * 0.04;
     var g = ctx.createGain();
     g.gain.value = spec.vol * (opts.vol || 1);
-    src.connect(g); g.connect(master);
+    src.connect(g); g.connect(sfx);
     src.start(ctx.currentTime + (opts.delay || 0));
   }
 
@@ -124,7 +133,7 @@ window.Sound = (function () {
   // Металлический язычок шкатулки: синус с быстрым спадом и неровным обертоном.
   function box(midi, at, vol) {
     var f = 440 * Math.pow(2, (midi - 69) / 12);
-    [[1, 1, 1.4], [2, 0.14, 0.5], [4.2, 0.2, 0.22]].forEach(function (p) {
+    [[1, 1, 1.4], [2, 0.14, 0.5], [4.2, 0.07, 0.22]].forEach(function (p) {
       var o = ctx.createOscillator();
       o.type = 'sine';
       o.frequency.value = f * p[0];
@@ -132,7 +141,7 @@ window.Sound = (function () {
       g.gain.setValueAtTime(0.0001, at);
       g.gain.exponentialRampToValueAtTime(vol * p[1], at + 0.004);
       g.gain.exponentialRampToValueAtTime(0.0001, at + p[2]);
-      o.connect(g); g.connect(master);
+      o.connect(g); g.connect(sfx);
       o.start(at); o.stop(at + p[2] + 0.05);
     });
   }
@@ -168,24 +177,24 @@ window.Sound = (function () {
     // сундучок: колокольчик и три ноты маримбы вверх
     chest: function (t) {
       play('reward');
-      [79, 83, 86].forEach(function (m, i) { tone(m, t + 0.12 + i * 0.09, 0.4, master); });
+      [79, 83, 86].forEach(function (m, i) { tone(m, t + 0.12 + i * 0.09, 0.4, sfx); });
     },
     // редкое: искры и быстрая лесенка шкатулки до самого верха
     rare: function (t) {
       play('hint');
-      [86, 90, 93, 98, 102].forEach(function (m, i) { box(m, t + 0.05 + i * 0.07, 0.17); });
-      box(105, t + 0.47, 0.14);
+      [74, 78, 81, 86, 90].forEach(function (m, i) { box(m, t + 0.05 + i * 0.07, 0.17); });
+      box(93, t + 0.47, 0.14);
     },
     // неверная клетка: тихое «хм» — две низкие ноты маримбы вниз, мягче закраски
     oops: function (t) {
-      tone(64, t, 0.32, master);
-      tone(59, t + 0.07, 0.28, master);
+      tone(64, t, 0.32, sfx);
+      tone(59, t + 0.07, 0.28, sfx);
     },
     // готовая комната: аккорд, фраза маримбы и созвучие в конце
     room: function (t) {
       play('chord');
       [[0, 74], [0.16, 79], [0.32, 83], [0.48, 86], [0.86, 79], [0.86, 83], [0.86, 86]].forEach(function (n) {
-        tone(n[1], t + 0.25 + n[0], 0.38, master);
+        tone(n[1], t + 0.25 + n[0], 0.38, sfx);
       });
     }
   };
@@ -226,7 +235,7 @@ window.Sound = (function () {
     var g = ctx.createGain();
     g.gain.setValueAtTime(vol, at);
     g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
-    src.connect(f); f.connect(g); g.connect(master);
+    src.connect(f); f.connect(g); g.connect(sfx);
     src.start(at, Math.random() * 0.5, dur + 0.02);
   }
   // Свист: синус скользит по высоте — птица в саду, пузырёк в чайнике.
@@ -239,13 +248,13 @@ window.Sound = (function () {
     g.gain.setValueAtTime(0.0001, at);
     g.gain.exponentialRampToValueAtTime(vol, at + dur * 0.25);
     g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
-    o.connect(g); g.connect(master);
+    o.connect(g); g.connect(sfx);
     o.start(at); o.stop(at + dur + 0.02);
   }
   // Среда комнаты: функция ставит звук и возвращает паузу до следующего, с.
   var AMBIENT = {
     // прихожая: часы, тик-так раз в секунду
-    r01: function (t, n) { burst(t, n % 2 ? 2300 : 3100, 0.035, 0.5); return 1; },
+    r01: function (t, n) { burst(t, n % 2 ? 1400 : 1800, 0.035, 0.22); return 1; },
     // чайная: чайник на огне, редкие пузырьки
     r02: function (t) {
       var k = 1 + Math.floor(Math.random() * 3);
@@ -254,7 +263,7 @@ window.Sound = (function () {
     },
     // оранжерея: птицы в саду, два-три свиста
     r03: function (t) {
-      var k = 2 + Math.floor(Math.random() * 2), f = 3000 + Math.random() * 900;
+      var k = 2 + Math.floor(Math.random() * 2), f = 1900 + Math.random() * 600;
       for (var i = 0; i < k; i++) chirp(t + i * 0.13, f, f * 1.35, 0.09, 0.035);
       return 3 + Math.random() * 6;
     }
@@ -291,6 +300,7 @@ window.Sound = (function () {
     musicLevel: function (x) { mLevel = x; },
     ambient: function (rid) { if (rid !== ambRoom) { ambRoom = rid || null; ambNext = 0; } },
     ambientRoom: function () { return ambRoom; },
-    isReady: function () { return !!ctx && ctx.state === 'running'; }
+    isReady: function () { return !!ctx && ctx.state === 'running'; },
+    levels: function () { return { sfx: SFX_VOL, music: M_VOL, soft: 4000 }; }
   };
 })();

@@ -1,14 +1,14 @@
 {
  "game": "house-of-pictures",
- "build_number": "013",
- "app_build": "0.1.0+b013",
+ "build_number": "014",
+ "app_build": "0.1.0+b014",
  "git_branch": "worktree-tz02-polish",
- "git_sha": "fc7cb26",
+ "git_sha": "00e232c",
  "dirty": false,
  "content_version": 3,
  "api": "https://api.vanatat.ru/hop",
- "built_at": "2026-10-27T03:54:26+00:00",
- "total_bytes": 7041417,
+ "built_at": "2026-10-27T04:11:08+00:00",
+ "total_bytes": 7042091,
  "files": [
   {
    "path": "assets/art/armchair_a.webp",
@@ -1018,7 +1018,7 @@
   {
    "path": "index.html",
    "bytes": 12523,
-   "sha256": "6bd7c6e9f45e0e9eefc323d0619db937f43fa4058024959d888859340ee57a0f"
+   "sha256": "8d76fead7c32e8c88fef9415f38499f89fca791d82d29b277f2a70fc0f335a7d"
   },
   {
    "path": "metrika.html",
@@ -1062,8 +1062,8 @@
   },
   {
    "path": "src/sound.js",
-   "bytes": 14169,
-   "sha256": "596a40ce4d17856a67e0372b2a0efad9a58db75fa5f2caf9cc3f11bf35bfa100"
+   "bytes": 14843,
+   "sha256": "c25bce5977c3c076e4c0a25a6d0561d261f37cac1a6282e33f02ae854f860b83"
   },
   {
    "path": "src/state.js",

@@ -228,7 +228,6 @@ button.slot.got { background: var(--surface); }
   border: 1px solid var(--line); border-radius: 12px; background: var(--bg); text-align: left; }
 .opt > span:first-child { display: flex; flex-direction: column; min-width: 0; }
 .opt .muted { font-size: 13px; }
-.opt .help-mail { font-size: 15px; color: var(--text); user-select: text; -webkit-user-select: text; overflow-wrap: anywhere; }
 .opt:disabled { opacity: .55; }
 .opt.danger b { color: var(--danger); }
 .tag { font-size: 13px; font-weight: 600; color: var(--green-d); background: var(--surface); border-radius: 8px; padding: 3px 8px; white-space: nowrap; }

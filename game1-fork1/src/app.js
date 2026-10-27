@@ -153,8 +153,6 @@
     var on = !!S.data.settings[k];
     return '<button class="tile-btn" data-set="' + k + '" role="switch" aria-checked="' + on + '">' + tileIcon(k, on) + '<span>' + title + '</span></button>';
   }
-  // Канал поддержки (чек-лист модерации ВК, п. 5; правила Mini Apps 2.4.1) — почта основателя, 27.10.2026.
-  var SUPPORT_MAIL = 'valera.valeara@inbox.ru';
   function openSettings() {
     var build = (document.querySelector('meta[name="g1f-build"]') || {}).content || 'dev';
     var html = '<h3>Настройки</h3>' +
@@ -162,8 +160,6 @@
       toggleRow('reduced_motion', 'Меньше движения') +
       toggleRow('large_text', 'Крупный текст') +
       (P.dev && P.params.has('journal') ? '<button class="opt" id="opt-journal"><span><b>Журнал событий</b><span class="muted">Скачать JSON для разбора плейтеста</span></span></button>' : '') +
-      '<button class="opt" id="opt-help"><span><b>Помощь и вопросы</b><span class="muted help-mail">' + esc(SUPPORT_MAIL) + '</span>' +
-      '<span class="muted" id="opt-help-note">Нажмите, чтобы скопировать адрес почты</span></span></button>' +
       '<button class="opt danger" id="opt-reset"><span><b>Начать заново</b><span class="muted">Сотрёт весь прогресс</span></span></button>' +
       '<p class="muted small">Версия ' + esc(build) + '</p>' +
       '<button class="btn-link" data-close>Закрыть</button>';
@@ -180,12 +176,6 @@
       });
       var j = el.querySelector('#opt-journal');
       if (j) j.addEventListener('click', function () { A.exportJson(); });
-      el.querySelector('#opt-help').addEventListener('click', function () {
-        var note = el.querySelector('#opt-help-note');
-        A.event('support_open', {});
-        P.copyText(SUPPORT_MAIL).then(function () { note.textContent = 'Адрес скопирован — напишите нам на почту'; },
-          function () { note.textContent = 'Напишите нам на этот адрес'; });
-      });
       el.querySelector('#opt-reset').addEventListener('click', confirmReset);
     });
   }

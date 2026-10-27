@@ -101,6 +101,8 @@
     if (saveTimer) return;
     saveTimer = setTimeout(saveNow, SAVE_DELAY);
   }
+  // клиент ВК свернул игру (VKWebAppViewHide) — сейв сразу, как при скрытой вкладке
+  window.addEventListener('hop-view', function (e) { if (e.detail && e.detail.hidden) saveNow(); });
   document.addEventListener('visibilitychange', function () {
     if (document.hidden) saveNow();
     else {
@@ -3202,7 +3204,8 @@
     screen: function () { return screen; },
     currentPuzzle: function () { return cur ? cur.pid : null; },
     today: function () { return St.today(); },
-    setDay: function (n) { St.setDayOffset(n); onNewDay(); return St.today(); },
+    // сдвиг дня — только вне ВК (стенд, автотесты), как ?day=N
+    setDay: function (n) { if (Platform.name === 'vk') return St.today(); St.setDayOffset(n); onNewDay(); return St.today(); },
     playLetter: function (id) { startLetter(id); }, // для проверок: открыть поле письма дня
     cloud: function () { return { enabled: HopCloud.enabled, ready: cloud.ready, rev: cloud.rev, pending: !!cloud.pending }; }
   };

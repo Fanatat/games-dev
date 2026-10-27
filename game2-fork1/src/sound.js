@@ -86,7 +86,7 @@ window.Sound = (function () {
   // Первый жест создаёт и будит контекст (политика автоплея, iOS).
   function unlock() {
     if (!ensureCtx()) return;
-    if (ctx.state === 'suspended' && !document.hidden) ctx.resume();
+    if (ctx.state === 'suspended' && !document.hidden && !viewHidden) ctx.resume();
     loadAll();
   }
   ['pointerdown', 'touchend', 'keydown'].forEach(function (t) {
@@ -94,7 +94,15 @@ window.Sound = (function () {
   });
   document.addEventListener('visibilitychange', function () {
     if (!ctx) return;
-    if (document.hidden) ctx.suspend(); else ctx.resume();
+    if (document.hidden) ctx.suspend(); else if (!viewHidden) ctx.resume();
+  });
+  // Клиент ВК свернул или закрыл игру (VKWebAppViewHide, правила ВК 2.2.5): в мобильном
+  // клиенте visibilitychange приходит не всегда, звук глушим и по событию моста.
+  var viewHidden = false;
+  window.addEventListener('hop-view', function (e) {
+    viewHidden = !!(e.detail && e.detail.hidden);
+    if (!ctx) return;
+    if (viewHidden) ctx.suspend(); else if (!document.hidden) ctx.resume();
   });
 
   function play(ev, opts) {

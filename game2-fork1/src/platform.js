@@ -24,7 +24,16 @@ window.Platform = (function () {
         bridge = window.vkBridge || null;
         // isEmbedded() — до send(): вне клиента ВК промис send() не завершается (урок game2).
         if (bridge && bridge.isEmbedded && !bridge.isEmbedded()) bridge = null;
-        if (bridge) bridge.send('VKWebAppInit').catch(function () { /* вне клиента ВК */ });
+        if (bridge) {
+          // Свернули/вернули игру в клиенте ВК → событие hop-view {hidden} (звук, сейв).
+          if (bridge.subscribe) bridge.subscribe(function (e) {
+            var type = e && e.detail && e.detail.type;
+            if (type === 'VKWebAppViewHide' || type === 'VKWebAppViewRestore') {
+              window.dispatchEvent(new CustomEvent('hop-view', { detail: { hidden: type === 'VKWebAppViewHide' } }));
+            }
+          });
+          bridge.send('VKWebAppInit').catch(function () { /* вне клиента ВК */ });
+        }
         resolve(bridge);
       };
       s.onerror = function () { resolve(null); };
@@ -139,8 +148,9 @@ window.Platform = (function () {
     // уже в избранном / уведомления уже разрешены (параметры запуска ВК)
     isFavorite: params.get('vk_is_favorite') === '1',
     notifyOn: params.get('vk_are_notifications_enabled') === '1',
-    journal: params.has('journal'),
-    dayShift: parseInt(params.get('day') || '0', 10) || 0,
+    // Инструменты проверки (?journal, ?day=N) — только на стенде: в ВК сейв уходит в облако.
+    journal: !inVk && params.has('journal'),
+    dayShift: inVk ? 0 : parseInt(params.get('day') || '0', 10) || 0,
     reducedMotionQuery: window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null
   };
 })();

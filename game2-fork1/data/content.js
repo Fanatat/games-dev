@@ -662,7 +662,7 @@ window.HOP_CONTENT = {
   skus: {
     starter_warm_home: {
       title: 'Тёплый дом', votes: 19, one_time: true, only_if_none_owned: true, icon: 'gift',
-      text: 'Мозаичная лампа, звёздный коврик, вечерняя рамка и 3 карандаша',
+      text: 'Мозаичный абажур, коврик «Звёздный индиго», вечерняя рамка и 3 карандаша',
       grants: { variants: ['r01_lamp_c', 'r01_rug_c', 'r02_photo_c'], pencils: 3 }
     },
     theme_tea_evening: {
@@ -827,7 +827,7 @@ window.HOP_CONTENT = {
       },
       {
         id: "d020", title: "Лейка", from: "Вера",
-        text: "Посеяла астры к вечеру фонарей. Финик проверяет каждую лунку.",
+        text: "Посеяла астры к Вечеру фонариков. Финик проверяет каждую лунку.",
         palette: { a: "#7d9466", b: "#5f7d8c" },
         pic: ['...aaa....', '..a...a...', '..a...a..b', 'aaaaaaa.b.', 'aaaaaaabb.', 'aaaaaaab..', 'aaaaaaa..b', 'aaaaaaa...', '.aaaaa...b']
       },
@@ -851,13 +851,13 @@ window.HOP_CONTENT = {
       },
       {
         id: "d024", title: "Колосок", from: "Дядя Коля",
-        text: "Отец возил на вечер фонарей муку. Привезу и я.",
+        text: "Отец возил на Вечер фонариков муку. Привезу и я.",
         palette: { a: "#c79a3a", b: "#9aa77c" },
         pic: ['....a....', '..a.a.a..', '.aa.a.aa.', '..aaaaa..', '.aa.a.aa.', '..aaaaa..', '.aa.a.aa.', '..aaaaa..', '....b....', '....b.bb.', '....bbb..', '....b....']
       },
       {
         id: "d025", title: "Кружка какао", from: "Нина",
-        text: "Какао, мёд, корица, зефир — так грелись на вечере фонарей.",
+        text: "Какао, мёд, корица, зефир — так грелись на Вечере фонариков.",
         palette: { a: "#c8643c", b: "#8a5a3b", c: "#e8d9b0", d: "#d9a441" },
         pic: ['...c...c....', '....c...c...', '...c...c....', '.aaaaaaaa...', '.abbcbbba...', '.aaaaaaaaaa.', '.aaaaaaaa..a', '.aadadaaa..a', '.aaaaaaaa.a.', '.aaaaaaaaa..', '..aaaaaa....', 'bbbbbbbbbbbb']
       },
@@ -953,13 +953,13 @@ window.HOP_CONTENT = {
       },
       {
         id: "d041", title: "Валенок", from: "Внучка Соня",
-        text: "Бабушка сказала: «Поеду»! Двадцать лет никуда не ездила.",
+        text: "Бабушка сказала: «Поеду!» Двадцать лет никуда не ездила.",
         palette: { a: "#5f6b73", b: "#a8452e", c: "#e8d9b0" },
         pic: ['.aaaaaa....', '.aaaaaa....', '.abcbca....', '.aaaaaa....', '.aaaaaa....', '.aaaaaa....', '.aaaaaa....', '.aaaaaaa...', '.aaaaaaaaa.', 'aaaaaaaaaaa', 'aaaaaaaaaaa', '.aaaaaaaaa.']
       },
       {
         id: "d042", title: "Письмо с сургучом", from: "Почтальон Тимофей",
-        text: "В архиве — конверт с птицей: «Открыть в вечер фонарей».",
+        text: "В архиве — конверт с птицей: «Открыть в Вечер фонариков».",
         palette: { a: "#e8d9b0", b: "#c8a878", c: "#a8452e", d: "#3b2c22" },
         pic: ['aaaaaaaaaaaaaa', '.aaaaaaaaaaaa.', 'a.aaaaaaaaaa.a', 'aa.aaaaaaaa.aa', 'aaa.aaaaaa.aaa', 'aaaa.cccc.aaaa', 'aaaaccdcccaaaa', 'aaaaccccccaaaa', 'aaaaaccccaaaaa', 'bbbbbbbbbbbbbb']
       },
@@ -971,7 +971,7 @@ window.HOP_CONTENT = {
       },
       {
         id: "d044", title: "Гирлянда фонариков", from: "Вера",
-        text: "Вечер фонарей — в первую субботу заморозков. Приходи и ты!",
+        text: "Вечер фонариков — в первую субботу заморозков. Приходи и ты!",
         palette: { a: "#3b2c22", b: "#8a5a3b", c: "#c8643c", d: "#d9a441" },
         pic: ['aaa........aaa', '..aaa....aaa..', '..b.aaaaaa.b..', '.bbb..b...bbb.', '.cdc.bbb..cdc.', '.cdc.cdc..cdc.', '.bbb.cdc..bbb.', '..b..cdc...b..', '.....bbb......', '......b.......']
       }

@@ -266,6 +266,12 @@ window.Sound = (function () {
       var k = 2 + Math.floor(Math.random() * 2), f = 1900 + Math.random() * 600;
       for (var i = 0; i < k; i++) chirp(t + i * 0.13, f, f * 1.35, 0.09, 0.035);
       return 3 + Math.random() * 6;
+    },
+    // швейная: машинка где-то за стеной — короткая тихая строчка, потом долгая тишина
+    r04: function (t) {
+      var k = 6 + Math.floor(Math.random() * 6);
+      for (var i = 0; i < k; i++) burst(t + i * 0.085, i % 2 ? 700 : 900, 0.03, 0.12);
+      return 6 + Math.random() * 8;
     }
   };
   function ambientTick() {

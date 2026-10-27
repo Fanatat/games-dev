@@ -1,14 +1,14 @@
 {
  "game": "house-of-pictures",
- "build_number": "014",
- "app_build": "0.1.0+b014",
- "git_branch": "worktree-tz02-polish",
- "git_sha": "00e232c",
+ "build_number": "015",
+ "app_build": "0.1.0+b015",
+ "git_branch": "room-r04",
+ "git_sha": "a726aef",
  "dirty": false,
- "content_version": 3,
+ "content_version": 4,
  "api": "https://api.vanatat.ru/hop",
- "built_at": "2026-10-27T04:11:08+00:00",
- "total_bytes": 7042091,
+ "built_at": "2026-10-27T05:23:08+00:00",
+ "total_bytes": 9096208,
  "files": [
   {
    "path": "assets/art/armchair_a.webp",
@@ -81,6 +81,11 @@
    "sha256": "b08966f2a5725f1628e344e810fcdd1351c3b13b80ed4c47f18a9ddcd770f091"
   },
   {
+   "path": "assets/art/bg_sewing.webp",
+   "bytes": 130582,
+   "sha256": "a95c0e14bcae9f1453368fcf18e551abec65630ba5cea14c3ce516ce5f6d1634"
+  },
+  {
    "path": "assets/art/bg_tearoom.webp",
    "bytes": 131480,
    "sha256": "65f3160e259709e928086d5e1e1a5a456989f5779f1dc1541ccb4837dfbcd286"
@@ -119,6 +124,11 @@
    "path": "assets/art/birdhouse_s3.webp",
    "bytes": 13524,
    "sha256": "d3614cba1cffcd7ac45fad71589059922a735b5f8ba2d80ddeea79acd9fa9b33"
+  },
+  {
+   "path": "assets/art/button_tin.webp",
+   "bytes": 40198,
+   "sha256": "bb61cbbf13a3e664acc4c7278b5b58ac7e5f3cc6c41fdca4e222178792bf5a76"
   },
   {
    "path": "assets/art/cat.webp",
@@ -181,6 +191,11 @@
    "sha256": "7a33e2d97b365c6d3d5effc90548db6e724b8d09d8b38c9123db3ef690b07f95"
   },
   {
+   "path": "assets/art/cozy_desklamp.webp",
+   "bytes": 39202,
+   "sha256": "f7fbe47ef14df2896b2ebe7a9052e008d962f7eedec80e51e989477b93008648"
+  },
+  {
    "path": "assets/art/cozy_floorlamp.webp",
    "bytes": 22406,
    "sha256": "6a4e2b9d1ae97e2356a513d14e5f64dd30da38f71d2705b20f7eab6e25c8d3ea"
@@ -201,6 +216,16 @@
    "sha256": "47dea7b33ff9cd342d97767e3c3cec79d1062cd3962f7e08953473b7d1b30e5a"
   },
   {
+   "path": "assets/art/cozy_mimosa.webp",
+   "bytes": 96176,
+   "sha256": "3d451457655b3bb56c0638003cd1e69a6c27b23fc11910f15a0909799386b4f3"
+  },
+  {
+   "path": "assets/art/cozy_pincushion.webp",
+   "bytes": 37534,
+   "sha256": "1cdbc838a3c2ce8fc45946f7f69e7da94f2cb25da739ceb5ed4038502dea5f10"
+  },
+  {
    "path": "assets/art/cozy_pouf.webp",
    "bytes": 36800,
    "sha256": "b8416a2bcb44dadad542e3bf8a88e3b720a1c2548956d1d16cff7180cad50621"
@@ -216,9 +241,109 @@
    "sha256": "20faccf0c713ac8081d4c96b603028c9e7716a3f140d49a8588d5a57aed06f76"
   },
   {
+   "path": "assets/art/cozy_yarn.webp",
+   "bytes": 60384,
+   "sha256": "f2c1752e75578a8e82c64c284cc37f338c261ee8431eaa524be6e1fbe33616f5"
+  },
+  {
+   "path": "assets/art/curtain_a.webp",
+   "bytes": 32694,
+   "sha256": "a96a3faed00bfc52ed63d4668636d7846a7a0d495fc630301967c0f8aafac1ad"
+  },
+  {
+   "path": "assets/art/curtain_b.webp",
+   "bytes": 33858,
+   "sha256": "1f67e6da06724f56f8120ea0e1af1c45859eebcb3253fce2064ed58eb128b44d"
+  },
+  {
+   "path": "assets/art/curtain_c.webp",
+   "bytes": 36184,
+   "sha256": "7146e8492d33496fe03bb05bfd95f36a8cf0dd54b934ee6f848636426cc63cb8"
+  },
+  {
+   "path": "assets/art/curtain_s1.webp",
+   "bytes": 13976,
+   "sha256": "ae8b0e17828d65d32f8e040cf7ed53605648a0c9e1ac650d7f773b1181c2fd20"
+  },
+  {
+   "path": "assets/art/curtain_s2.webp",
+   "bytes": 16294,
+   "sha256": "ab8429139a7dbc3d54adfd005485a6e9f23e04a2cc37e2684e8a2da8e6aafd84"
+  },
+  {
+   "path": "assets/art/curtain_s3.webp",
+   "bytes": 23830,
+   "sha256": "6f28869022d88fc5f320a631ec2246d99546875dcc86c489e1c9c17e5850377b"
+  },
+  {
    "path": "assets/art/envelope.webp",
    "bytes": 8498,
    "sha256": "aad96249e3f4bd1386865d436069132d8e3fdf96456a0151870c8fc2bd6b3b0b"
+  },
+  {
+   "path": "assets/art/fabric_basket_a.webp",
+   "bytes": 46908,
+   "sha256": "757f4474b39b818f286fddb48763925f8e5e81cc5c348204e31544a65fbd7a6e"
+  },
+  {
+   "path": "assets/art/fabric_basket_b.webp",
+   "bytes": 44790,
+   "sha256": "347b2aae9a2ac30968d2962111a19e0f64541d21aa0d583c2cb2fd862193c6df"
+  },
+  {
+   "path": "assets/art/fabric_basket_c.webp",
+   "bytes": 41890,
+   "sha256": "c2256a0d3adbd9d4da406c99a0bbb90e8a4c5fd754d7d31b6a4be4f3dc70b3a3"
+  },
+  {
+   "path": "assets/art/fabric_basket_s1.webp",
+   "bytes": 35778,
+   "sha256": "56cbaa6a1c6bab88a861051c7a3066d519c9934c3081d22e9d822c22203aba4b"
+  },
+  {
+   "path": "assets/art/fabric_basket_s2.webp",
+   "bytes": 34024,
+   "sha256": "7a172991bc55a91893531f17bf626d119cf780021fad33888a15400b28def92e"
+  },
+  {
+   "path": "assets/art/fabric_basket_s3.webp",
+   "bytes": 41468,
+   "sha256": "8d798ab9b4c2a9dbc43527db496406f7aac5bb8fd61fe6c5ded86a2162afb111"
+  },
+  {
+   "path": "assets/art/festival_flag_a.webp",
+   "bytes": 12456,
+   "sha256": "7c15a70863e400cbc1c7f19bc27fd5b377afcca56f4ed1fbeaf72c09b688c191"
+  },
+  {
+   "path": "assets/art/festival_flag_b.webp",
+   "bytes": 12368,
+   "sha256": "5a9ffaaaa2ff2fed0b6f1eded3c8e37e6dc8202b906f23e9700b9b76399e52cc"
+  },
+  {
+   "path": "assets/art/festival_flag_c.webp",
+   "bytes": 16614,
+   "sha256": "6bdecef223e1f10c8816c4cd9d6443b5df03552aaecf6defe8a8153b7ff2fd8a"
+  },
+  {
+   "path": "assets/art/festival_flag_pic.webp",
+   "bytes": 27814,
+   "sha256": "acc9548e717e53124efef9a14ab21521f2c51390b33c6eab873059556a09e2ba"
+  },
+  {
+   "path": "assets/art/festival_flag_s1.webp",
+   "bytes": 5310,
+   "sha256": "52713c282762ce0ae993bd11a903397b240f72459be092cac80067dbf5291b81"
+  },
+  {
+   "path": "assets/art/festival_flag_s2.webp",
+   "bytes": 8524,
+   "sha256": "6c57732f712c63fcaa7a14e8d7e9e773a3e49dcb645b62d00806320921b33bdd"
+  },
+  {
+   "path": "assets/art/festival_flag_s3.webp",
+   "bytes": 10696,
+   "sha256": "cc49725e582111a89e4c9608f62bc5fb26d4089df4f8eab1ba744aa9b0ecf488"
   },
   {
    "path": "assets/art/flower_a.webp",
@@ -274,6 +399,11 @@
    "path": "assets/art/grandma_photo.webp",
    "bytes": 36518,
    "sha256": "64a62ae3afdbd3bae616b2e8fbb91086d8245a5115be6cf5abf0630a6168de91"
+  },
+  {
+   "path": "assets/art/guest_list.webp",
+   "bytes": 30582,
+   "sha256": "40605b1b852e4c8fa29ba5826fb2745347c6b9da45bf973adcbffdad7b6a1ba4"
   },
   {
    "path": "assets/art/hanging_pot_a.webp",
@@ -376,6 +506,36 @@
    "sha256": "31f21ecafe35329cac39df763143edf2a0e6f478be310ee47e3298284fe8360d"
   },
   {
+   "path": "assets/art/mannequin_a.webp",
+   "bytes": 23478,
+   "sha256": "2107e9ab1ec719c51b3a1a8fa6442effb712fb4c304856ae358c2544519f5977"
+  },
+  {
+   "path": "assets/art/mannequin_b.webp",
+   "bytes": 25366,
+   "sha256": "efc7348493d32cfb3286976c94c51284939c1ecfe5d5b012ba6918e85482f929"
+  },
+  {
+   "path": "assets/art/mannequin_c.webp",
+   "bytes": 25932,
+   "sha256": "1c559fa86657e2ea70c4bbbfecdc845960592c832a1263ba77fe0e4a0ea32ef7"
+  },
+  {
+   "path": "assets/art/mannequin_s1.webp",
+   "bytes": 7244,
+   "sha256": "f6353c92686dddd0018d3af5cf45ef3ba639c59b2d8f81be14c15881d3169439"
+  },
+  {
+   "path": "assets/art/mannequin_s2.webp",
+   "bytes": 14006,
+   "sha256": "8740bead06818e8d5fa27130a9cc3fbe85c17198f449f4cef9d60f4a95ee5c37"
+  },
+  {
+   "path": "assets/art/mannequin_s3.webp",
+   "bytes": 15406,
+   "sha256": "e7e2ca9ce7f0abc10d5c16a2c86400508843ec1792250d87b948adf6fc8088ed"
+  },
+  {
    "path": "assets/art/musicbox_a.webp",
    "bytes": 62022,
    "sha256": "3fe32f3db0efd084fde5994a40a48d794372b5b75137b17f1f52cf2f5d7b593b"
@@ -399,6 +559,41 @@
    "path": "assets/art/musicbox_s2.webp",
    "bytes": 51948,
    "sha256": "3458c647fc3f2504e3cb0214b98dd6c5146713aa34717c702b550516ba5ec76a"
+  },
+  {
+   "path": "assets/art/patchwork_a.webp",
+   "bytes": 62808,
+   "sha256": "6c9ff6c262e020473dc08de45d6e2023d75a7265a3e312a4fddc98902eed9023"
+  },
+  {
+   "path": "assets/art/patchwork_b.webp",
+   "bytes": 60850,
+   "sha256": "f36858f07aa613fb7fdb246856f098089ca409d91bd3618d9fd2343d21114bf7"
+  },
+  {
+   "path": "assets/art/patchwork_c.webp",
+   "bytes": 67778,
+   "sha256": "3bc9b014980c5c0ab0f07b5fc85fabb571b539e84c848591427f4f88dcb12bc3"
+  },
+  {
+   "path": "assets/art/patchwork_s1.webp",
+   "bytes": 7536,
+   "sha256": "f583065e62d4bc2747d20f28afa9792205e1078917db96d12b9bab5c8f3fabeb"
+  },
+  {
+   "path": "assets/art/patchwork_s2.webp",
+   "bytes": 40542,
+   "sha256": "826267309f998185b25ff5981be0d50739e33e85022a02bcc959fdb90b931810"
+  },
+  {
+   "path": "assets/art/patchwork_s3.webp",
+   "bytes": 45796,
+   "sha256": "d80c5878d1b71447e9cb53f6685209746871784e37bf610247c98c11dc1471f1"
+  },
+  {
+   "path": "assets/art/pattern_bird.webp",
+   "bytes": 53974,
+   "sha256": "efc815c4a399757bade573e0d1354bb843122bb979ae78b10d1890e748d21599"
   },
   {
    "path": "assets/art/pencil.webp",
@@ -726,6 +921,36 @@
    "sha256": "df3980bdf9372f37360f0a3646b4e25667cfacf12fee84b6ecf399c1e782161f"
   },
   {
+   "path": "assets/art/scissors_a.webp",
+   "bytes": 21786,
+   "sha256": "ab49303eb45b99d999d6aca0027728dfacda96233672124c1ad2c7260987ad6c"
+  },
+  {
+   "path": "assets/art/scissors_b.webp",
+   "bytes": 20870,
+   "sha256": "dba1a53c3a3af428b5b0dc7b9c3cf0210d5f24d1bc50d4e7efdebde233069701"
+  },
+  {
+   "path": "assets/art/scissors_c.webp",
+   "bytes": 23516,
+   "sha256": "5e86b15a39ff55151d741224162ade101279333782876e179d705ef901d3a7e7"
+  },
+  {
+   "path": "assets/art/scissors_s1.webp",
+   "bytes": 4576,
+   "sha256": "fb8583ec4c03feccb5c88454411ff0afa4b47c5d0276055ed22fe1f2dca47d0f"
+  },
+  {
+   "path": "assets/art/scissors_s2.webp",
+   "bytes": 15130,
+   "sha256": "fe404ecdcb3408dcd458b5ae8c1e2a29a0b45706c4ad7d454364894fc62c3b14"
+  },
+  {
+   "path": "assets/art/scissors_s3.webp",
+   "bytes": 17840,
+   "sha256": "8cf20926c8baa3c1a9a9a0963d9d6ba3079fc650a9194d9bb8f2abe0b5822ee5"
+  },
+  {
    "path": "assets/art/seed_table_a.webp",
    "bytes": 38668,
    "sha256": "2d361a3758f6b567a0b77b45197f4587c213ef88654367dd7683ee96a45701f8"
@@ -754,6 +979,66 @@
    "path": "assets/art/seed_table_s3.webp",
    "bytes": 30922,
    "sha256": "5e6cfd90c9947030241d8d0366379ceaeb0f8c70cd169f14341bb5c8901984df"
+  },
+  {
+   "path": "assets/art/sewing_machine_a.webp",
+   "bytes": 41042,
+   "sha256": "d856aca7ffec1b72897e14539b6fd3e960b1fdf456286956dcdddb6995e646f7"
+  },
+  {
+   "path": "assets/art/sewing_machine_b.webp",
+   "bytes": 41622,
+   "sha256": "a26127341b2db3b6312e19ec5a44720f97a25ac5c4db4d737f14c44406a11698"
+  },
+  {
+   "path": "assets/art/sewing_machine_c.webp",
+   "bytes": 46420,
+   "sha256": "3c43d94dabb8f2e05febe0386a68e468c85c083d71440439907a361f214f0314"
+  },
+  {
+   "path": "assets/art/sewing_machine_s1.webp",
+   "bytes": 16912,
+   "sha256": "42f7ad6128c74f674ed073210d6c31d30703c9bea11207fde56774cf88216a94"
+  },
+  {
+   "path": "assets/art/sewing_machine_s2.webp",
+   "bytes": 30322,
+   "sha256": "1d7290fe037f5f846348c71e35b4b192a12b5b0ff38d51ea210b8a68b256a778"
+  },
+  {
+   "path": "assets/art/sewing_machine_s3.webp",
+   "bytes": 35532,
+   "sha256": "bbeb110d8e2260caa58c0aeb7aaa5acf057c1d84172e9b4526cfaad07ae373ad"
+  },
+  {
+   "path": "assets/art/sewing_table_a.webp",
+   "bytes": 31382,
+   "sha256": "7fe9839c87e73959155b3e530404fab7a9aa6d3fb6be30e51fbb6707c548072b"
+  },
+  {
+   "path": "assets/art/sewing_table_b.webp",
+   "bytes": 29020,
+   "sha256": "42d69fd34a3bb6a059fad00dcd87ca9a43918642be3d3c8980ef7e7b7fa5cabc"
+  },
+  {
+   "path": "assets/art/sewing_table_c.webp",
+   "bytes": 31288,
+   "sha256": "64155976c5f08ee5582d9964ae30ef42daf596d870e2b3d1599acdd254d1b7db"
+  },
+  {
+   "path": "assets/art/sewing_table_s1.webp",
+   "bytes": 18964,
+   "sha256": "b3ef68023a6328b6ec010cd69170379eaa7ddfc19715b92cb465bc14cb4684af"
+  },
+  {
+   "path": "assets/art/sewing_table_s2.webp",
+   "bytes": 19234,
+   "sha256": "2920052fd522a8d33da30f18d66aa0006ecf2f3facb51210c72c75ca118dce2d"
+  },
+  {
+   "path": "assets/art/sewing_table_s3.webp",
+   "bytes": 22228,
+   "sha256": "f604ef6dfff9dc51efe7081eeebbd47ac2651aaf46d0f545acd36ac39f8cce00"
   },
   {
    "path": "assets/art/shelf_a.webp",
@@ -849,6 +1134,36 @@
    "path": "assets/art/tea_set_s2.webp",
    "bytes": 15310,
    "sha256": "1b4482d16e5990a58b7b84335800aaa379fc3fdb604a97bb6bdcc4041e82cfbd"
+  },
+  {
+   "path": "assets/art/thread_box_a.webp",
+   "bytes": 35556,
+   "sha256": "1ef6fc3b4a50fe9f8a5ef313f53ea707f7f8f258765a2b474765effca0ee00f0"
+  },
+  {
+   "path": "assets/art/thread_box_b.webp",
+   "bytes": 39270,
+   "sha256": "dc40cfe04eea31f964d126c07263de99435610e764fc701bf0ffee38597711d8"
+  },
+  {
+   "path": "assets/art/thread_box_c.webp",
+   "bytes": 41368,
+   "sha256": "873ddec38a7149a4b9697ec8d696177705f54c1d35f21adbcb905890bc5d2739"
+  },
+  {
+   "path": "assets/art/thread_box_s1.webp",
+   "bytes": 14556,
+   "sha256": "50a6faeb129692b3f63a866dadbac27e70d60a2515e0495da60eb1d7d84ba384"
+  },
+  {
+   "path": "assets/art/thread_box_s2.webp",
+   "bytes": 19476,
+   "sha256": "4e3ddbda9488aa3fc180c0d3a5a0fef2a59726dc69765b04af34f73fb5cf01b6"
+  },
+  {
+   "path": "assets/art/thread_box_s3.webp",
+   "bytes": 36772,
+   "sha256": "b35741ba9b33c1435ecbf556b020b03d21d74dfa00ccb3710067a96efe8d72ce"
   },
   {
    "path": "assets/art/watering_can_a.webp",
@@ -1012,13 +1327,13 @@
   },
   {
    "path": "data/content.js",
-   "bytes": 62034,
-   "sha256": "92d3be6cce78e5079809e69d4f89534a7fa416cd102d6179afae4b091f1c126f"
+   "bytes": 80237,
+   "sha256": "2a1cf80b02772e297435dbb9565a8314490307b502a34a03a836462bafbcc77b"
   },
   {
    "path": "index.html",
    "bytes": 12523,
-   "sha256": "8d76fead7c32e8c88fef9415f38499f89fca791d82d29b277f2a70fc0f335a7d"
+   "sha256": "d4552752bdbce4e5ff8d99217e84d6b5e59dacc7c5cbee7f0c3e89c90df20766"
   },
   {
    "path": "metrika.html",
@@ -1057,13 +1372,13 @@
   },
   {
    "path": "src/scene.js",
-   "bytes": 20343,
-   "sha256": "c8e50d1d2d7ee23cd132d821391b80ca022401c0e2082ec4465487ea877d5055"
+   "bytes": 20369,
+   "sha256": "58678daa1a059c3f62f54872104f3bd4e095305558d7a596d9fc1442da43b6c1"
   },
   {
    "path": "src/sound.js",
-   "bytes": 14843,
-   "sha256": "c25bce5977c3c076e4c0a25a6d0561d261f37cac1a6282e33f02ae854f860b83"
+   "bytes": 15199,
+   "sha256": "53b7c137d05a7fb40aa8e227e74eb21683146e95c2055aa66bd1bf5a48831290"
   },
   {
    "path": "src/state.js",

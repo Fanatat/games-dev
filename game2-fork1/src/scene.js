@@ -14,7 +14,7 @@ window.Scene = (function () {
   // На каком предмете сидит кот в каждой комнате (кот рисуется сразу за ним).
   // Место кота в комнате. Кот живёт в последней комнате, где его место готово
   // (в прихожей — вся комната), и уходит туда сам, когда место появляется.
-  var CAT_ON = { r01: 'r01_rug', r02: 'r02_armchair', r03: 'r03_bench' };
+  var CAT_ON = { r01: 'r01_rug', r02: 'r02_armchair', r03: 'r03_bench', r04: 'r04_fabric_basket' };
 
   function el(tag, cls, attrs) {
     var e = document.createElement(tag);

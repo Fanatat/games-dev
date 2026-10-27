@@ -3,9 +3,9 @@
    `node tools/validate_content.js` (единственность и решаемость без угадывания).
    Позиции предметов в сцене — доли ширины/высоты квадратной сцены. */
 window.HOP_CONTENT = {
-  content_version: 3,
+  content_version: 4,
 
-  room_order: ['r01', 'r02', 'r03'],
+  room_order: ['r01', 'r02', 'r03', 'r04'],
 
   rooms: {
     r01: {
@@ -90,13 +90,13 @@ window.HOP_CONTENT = {
       intro_sign: 'Вера',
       // Сада в игре пока нет — финал его не обещает (01_GAME_DESIGN.md:79), а ведёт к фонарикам.
       final_text: 'Оранжерея ожила!',
+      next_room: 'r04',
       invitation: {
         title: 'Вечер фонариков',
-        text: 'Вера ждала тебя к Вечеру фонариков. Зажги их!',
+        text: 'Вера готовит Вечер фонариков. Флажки — в швейной!',
         sign: 'Вера',
-        button: 'Хорошо'
+        button: 'В швейную'
       },
-      next_visit_note: 'Новые комнаты скоро откроются. А пока каждый день приходит новое письмо.',
       layout: {
         r03_herbarium: { x: 0.215, y: 0.43, w: 0.115 },
         r03_glass_door: { x: 0.82, y: 0.59, w: 0.28 },
@@ -125,6 +125,51 @@ window.HOP_CONTENT = {
         { after: 6, flag: 'clue2_r03', title: 'Старый фонарик', sprite: 'lantern_pic',
           text: 'Финик нашёл фонарик. Ярлык: «К вечеру».',
           question: 'Какой вечер ждёт Вера?' }
+      ]
+    },
+    r04: {
+      title: 'Швейная',
+      requires: 'r03',
+      objects: ['r04_sewing_table', 'r04_thread_box', 'r04_scissors', 'r04_curtain', 'r04_fabric_basket', 'r04_sewing_machine', 'r04_mannequin', 'r04_patchwork', 'r04_festival_flag'],
+      background: 'assets/art/bg_sewing.webp',
+      intro: 'Здесь бабушка шила флажки к Вечеру фонариков. Начнём со стола.',
+      intro_sign: 'Вера',
+      final_text: 'Швейная ожила!',
+      invitation: {
+        title: 'Флажок готов',
+        text: 'Флажок с птицей готов. Вечер фонариков ждёт!',
+        sign: 'Вера',
+        button: 'Хорошо'
+      },
+      next_visit_note: 'Новые комнаты скоро откроются. А пока каждый день приходит новое письмо.',
+      layout: {
+        r04_festival_flag: { x: 0.50, y: 0.335, w: 0.66 },
+        r04_patchwork: { x: 0.30, y: 0.47, w: 0.22 },
+        r04_scissors: { x: 0.53, y: 0.45, w: 0.07 },
+        r04_curtain: { x: 0.75, y: 0.56, w: 0.30 },
+        r04_mannequin: { x: 0.12, y: 0.86, w: 0.20 },
+        r04_sewing_table: { x: 0.50, y: 0.84, w: 0.42 },
+        r04_thread_box: { x: 0.65, y: 0.60, w: 0.11 },
+        r04_sewing_machine: { x: 0.48, y: 0.63, w: 0.22 },
+        r04_fabric_basket: { x: 0.82, y: 0.97, w: 0.26 },
+        cat: { x: 0.82, y: 0.86, w: 0.16 }
+      },
+      z: ['r04_festival_flag', 'r04_patchwork', 'r04_scissors', 'r04_curtain', 'r04_mannequin', 'r04_sewing_table', 'r04_thread_box', 'r04_sewing_machine', 'r04_fabric_basket'],
+      // Сюжет швейной: выкройка с той же птицей, пуговицы «Для Веры», список гостей —
+      // ответ в приглашении: флажок готов, Вечер фонариков ждёт.
+      twist: {
+        after: 2, flag: 'twist_r04', title: 'Выкройка с птицей', sprite: 'pattern_bird',
+        text: 'В ящике стола — выкройка с птицей.',
+        question: 'Кто её вырезал?',
+        place: { x: 0.26, y: 0.99, w: 0.11 }
+      },
+      clues: [
+        { after: 4, flag: 'clue_r04', title: 'Коробка пуговиц', sprite: 'button_tin',
+          text: 'На крышке коробки надпись: «Для Веры».',
+          question: 'Вера шила здесь?' },
+        { after: 7, flag: 'clue2_r04', title: 'Список гостей', sprite: 'guest_list',
+          text: 'В кармане платья — список. Твоё имя первое!',
+          question: 'Кто ещё придёт?' }
       ]
     }
   },
@@ -391,6 +436,131 @@ window.HOP_CONTENT = {
         { id: 'r03_glass_door_c', title: 'Полночная с цветами', sprite: 'glass_door_c', premium: true, price_coins: 1100 }
       ],
       tap_secret: 'За стеклом мелькнула птица с печати.'
+    },
+    r04_sewing_table: {
+      room: 'r04', title: 'Швейный стол', verb: 'Починить',
+      life: { kind: 'bloom' },
+      puzzles: ['r04_sewing_table_06'], unlock_after: 0,
+      pitch: 'Стол, за которым шили',
+      done_text: 'Стол готов. Ящик скрипит.',
+      variants: [
+        { id: 'r04_sewing_table_a', title: 'Медовый', sprite: 'sewing_table_a' },
+        { id: 'r04_sewing_table_b', title: 'Шалфейный', sprite: 'sewing_table_b' },
+        { id: 'r04_sewing_table_c', title: 'Ореховый с золотом', sprite: 'sewing_table_c', premium: true, price_coins: 1100 }
+      ],
+      tap_secret: 'В ящике звякнули пуговицы.'
+    },
+    r04_thread_box: {
+      room: 'r04', title: 'Коробка ниток', verb: 'Разобрать',
+      life: { kind: 'bloom' },
+      puzzles: ['r04_thread_box_07', 'r04_thread_box_09', 'r04_thread_box_08'], unlock_after: 1,
+      stage_sprites: ['thread_box_s1', 'thread_box_s2'],
+      pitch: 'Нитки всех цветов',
+      done_text: 'Нитки по цветам. Как радуга!',
+      variants: [
+        { id: 'r04_thread_box_a', title: 'Медовая', sprite: 'thread_box_a' },
+        { id: 'r04_thread_box_b', title: 'Расписная', sprite: 'thread_box_b' },
+        { id: 'r04_thread_box_c', title: 'Самоцветная', sprite: 'thread_box_c', premium: true, price_coins: 1150 }
+      ],
+      tap_secret: 'Катушка покатилась к Финику.'
+    },
+    r04_scissors: {
+      room: 'r04', title: 'Ножницы в чехле', verb: 'Наточить',
+      life: { kind: 'bloom' },
+      puzzles: ['r04_scissors_07', 'r04_scissors_08', 'r04_scissors_10'], unlock_after: 1,
+      stage_sprites: ['scissors_s1', 'scissors_s2'],
+      pitch: 'Острые ножницы для выкроек',
+      done_text: 'Ножницы блестят.',
+      variants: [
+        { id: 'r04_scissors_a', title: 'Кожаный', sprite: 'scissors_a' },
+        { id: 'r04_scissors_b', title: 'Шалфейный', sprite: 'scissors_b' },
+        { id: 'r04_scissors_c', title: 'Синий с золотом', sprite: 'scissors_c', premium: true, price_coins: 1150 }
+      ],
+      tap_secret: 'Ножницы тихо щёлкнули.'
+    },
+    r04_curtain: {
+      room: 'r04', title: 'Занавески', verb: 'Повесить',
+      life: { kind: 'bloom' },
+      puzzles: ['r04_curtain_07', 'r04_curtain_09', 'r04_curtain_10'], unlock_after: 2,
+      stage_sprites: ['curtain_s1', 'curtain_s2'],
+      pitch: 'Свет станет мягким',
+      done_text: 'В швейной мягкий свет.',
+      variants: [
+        { id: 'r04_curtain_a', title: 'Кремовые', sprite: 'curtain_a' },
+        { id: 'r04_curtain_b', title: 'Шалфейные', sprite: 'curtain_b' },
+        { id: 'r04_curtain_c', title: 'Звёздные', sprite: 'curtain_c', premium: true, price_coins: 1200 }
+      ],
+      tap_secret: 'Занавеска качнулась от ветра.'
+    },
+    r04_fabric_basket: {
+      room: 'r04', title: 'Корзина тканей', verb: 'Собрать',
+      life: { kind: 'bloom' },
+      puzzles: ['r04_fabric_basket_07', 'r04_fabric_basket_08', 'r04_fabric_basket_11', 'r04_fabric_basket_10'], unlock_after: 2,
+      stage_sprites: ['fabric_basket_s1', 'fabric_basket_s2', 'fabric_basket_s3'],
+      pitch: 'Ткани для флажков',
+      done_text: 'Ткани на месте. Финик в корзине.',
+      variants: [
+        { id: 'r04_fabric_basket_a', title: 'Медовая', sprite: 'fabric_basket_a' },
+        { id: 'r04_fabric_basket_b', title: 'Белёная', sprite: 'fabric_basket_b' },
+        { id: 'r04_fabric_basket_c', title: 'Бархатная', sprite: 'fabric_basket_c', premium: true, price_coins: 1200 }
+      ],
+      tap_secret: 'Финик зарылся в лоскутки.'
+    },
+    r04_sewing_machine: {
+      room: 'r04', title: 'Швейная машинка', verb: 'Смазать',
+      life: { kind: 'bloom' },
+      puzzles: ['r04_sewing_machine_07', 'r04_sewing_machine_09', 'r04_sewing_machine_10', 'r04_sewing_machine_12'], unlock_after: 4,
+      stage_sprites: ['sewing_machine_s1', 'sewing_machine_s2', 'sewing_machine_s3'],
+      pitch: 'Машинка снова застрочит',
+      done_text: 'Машинка стрекочет!',
+      variants: [
+        { id: 'r04_sewing_machine_a', title: 'Чёрная с золотом', sprite: 'sewing_machine_a' },
+        { id: 'r04_sewing_machine_b', title: 'Кремовая', sprite: 'sewing_machine_b' },
+        { id: 'r04_sewing_machine_c', title: 'Полночная', sprite: 'sewing_machine_c', premium: true, price_coins: 1300 }
+      ],
+      tap_secret: 'Колесо сделало один оборот.'
+    },
+    r04_mannequin: {
+      room: 'r04', title: 'Манекен', verb: 'Нарядить',
+      life: { kind: 'bloom' },
+      puzzles: ['r04_mannequin_07', 'r04_mannequin_08', 'r04_mannequin_10', 'r04_mannequin_12'], unlock_after: 4,
+      stage_sprites: ['mannequin_s1', 'mannequin_s2', 'mannequin_s3'],
+      pitch: 'Платье к Вечеру фонариков',
+      done_text: 'Платье почти готово.',
+      variants: [
+        { id: 'r04_mannequin_a', title: 'Терракотовое', sprite: 'mannequin_a' },
+        { id: 'r04_mannequin_b', title: 'В горошек', sprite: 'mannequin_b' },
+        { id: 'r04_mannequin_c', title: 'Звёздное', sprite: 'mannequin_c', premium: true, price_coins: 1300 }
+      ],
+      tap_secret: 'Сантиметр соскользнул с плеча.'
+    },
+    r04_patchwork: {
+      room: 'r04', title: 'Лоскутное панно', verb: 'Сшить',
+      life: { kind: 'bloom' },
+      puzzles: ['r04_patchwork_08', 'r04_patchwork_10', 'r04_patchwork_12'], unlock_after: 5,
+      stage_sprites: ['patchwork_s1', 'patchwork_s2'],
+      pitch: 'Панно из бабушкиных лоскутов',
+      done_text: 'Панно сшито. В центре — птица.',
+      variants: [
+        { id: 'r04_patchwork_a', title: 'Терракотовое', sprite: 'patchwork_a' },
+        { id: 'r04_patchwork_b', title: 'Шалфейное', sprite: 'patchwork_b' },
+        { id: 'r04_patchwork_c', title: 'Бархатное', sprite: 'patchwork_c', premium: true, price_coins: 1350 }
+      ],
+      tap_secret: 'Лоскуток с птицей тёплый.'
+    },
+    r04_festival_flag: {
+      room: 'r04', title: 'Праздничные флажки', verb: 'Развесить',
+      life: { kind: 'bloom' },
+      puzzles: ['r04_festival_flag_10', 'r04_festival_flag_12', 'r04_festival_flag_15'], unlock_after: 7,
+      stage_sprites: ['festival_flag_s1', 'festival_flag_s2'],
+      pitch: 'Флажки к Вечеру фонариков',
+      done_text: 'Флажки висят. Пора на праздник!',
+      variants: [
+        { id: 'r04_festival_flag_a', title: 'Терракотовые', sprite: 'festival_flag_a' },
+        { id: 'r04_festival_flag_b', title: 'Шалфейные', sprite: 'festival_flag_b' },
+        { id: 'r04_festival_flag_c', title: 'С фонариками', sprite: 'festival_flag_c', premium: true, price_coins: 1400 }
+      ],
+      tap_secret: 'Флажки зашуршали.'
     }
   },
 
@@ -435,7 +605,13 @@ window.HOP_CONTENT = {
     r03_cathouse: { room: 'r03', title: 'Домик Финика', sprite: 'cozy_cathouse', price: 900, back: true,
       place: { x: 0.10, y: 0.72, w: 0.14 }, text: 'Свой домик для кота.', done: 'Финик в домике!' },
     r03_lemon: { room: 'r03', title: 'Лимон бабушки', sprite: 'cozy_lemon', price: 900,
-      place: { x: 0.88, y: 0.99, w: 0.17 }, text: 'Тот самый лимон с фото.', done: 'Лимон вернулся!' }
+      place: { x: 0.88, y: 0.99, w: 0.17 }, text: 'Тот самый лимон с фото.', done: 'Лимон вернулся!' },
+    r04_desklamp: { room: 'r04', title: 'Настольная лампа', sprite: 'cozy_desklamp', price: 1200,
+      place: { x: 0.33, y: 0.635, w: 0.07 }, text: 'Свет для мелкой строчки.', done: 'Светло шить!' },
+    r04_yarn: { room: 'r04', title: 'Клубки Финику', sprite: 'cozy_yarn', price: 1200,
+      place: { x: 0.62, y: 0.99, w: 0.12 }, text: 'Клубки — лучшая игрушка.', done: 'Финик играет!' },
+    r04_mimosa: { room: 'r04', title: 'Мимоза', sprite: 'cozy_mimosa', price: 1200,
+      place: { x: 0.80, y: 0.525, w: 0.05 }, text: 'Букет на подоконник.', done: 'Пахнет весной!' }
   },
 
   /* Экономика (ТЗ 03). Монеты — за игру, голоса ВК — только за наборы. */
@@ -445,7 +621,7 @@ window.HOP_CONTENT = {
     coins_by_area: [[25, 10], [36, 15], [49, 20], [64, 25], [81, 30], [100, 40], [144, 50], [1e9, 60]],
     // Дальше комната — щедрее поле (круг 7г): множитель к цене по площади, округление
     // до 5 и коридор. Чайная 20…40, оранжерея 40…80 (передышка 6×6 — 40, 15×15 — 80).
-    room_coins: { r02: { mult: 1.6, min: 20, max: 40 }, r03: { mult: 1.4, min: 40, max: 80 } },
+    room_coins: { r02: { mult: 1.6, min: 20, max: 40 }, r03: { mult: 1.4, min: 40, max: 80 }, r04: { mult: 1.3, min: 50, max: 100 } },
     // Монетки в клетках поля: находятся, когда клетку закрасят.
     field_coins: { coins: 5, by_area: [[25, 0], [49, 1], [81, 2]], max: 3 },
     // «Сияние» не реже раза в 4 минуты игры: через field_after_s без него в незакрашенной
@@ -931,6 +1107,118 @@ window.HOP_CONTENT = {
     r03_glass_door_15: {
       object: 'r03_glass_door', stage: 2, title: "Лимонное дерево", difficulty: 'normal',
       rows: ['.....#####.....', '...#########...', '..####.######..', '.#####..######.', '.##.####.#####.', '#####.##..#####', '.#######.#####.', '..###.###.###..', '....#######....', '......###......', '.......#.......', '.......#.......', '...#########...', '....#######....', '.....#####.....']
+    },
+    r04_sewing_table_06: {
+      object: 'r04_sewing_table', stage: 1, title: "Напёрсток", difficulty: 'normal',
+      rows: ['..##..', '.####.', '#.#.##', '##.#.#', '#.#.##', '######']
+    },
+    r04_thread_box_07: {
+      object: 'r04_thread_box', stage: 1, title: "Катушка", difficulty: 'normal',
+      rows: ['#######', '.#...#.', '.#####.', '.#####.', '.#####.', '.#...#.', '#######']
+    },
+    r04_thread_box_09: {
+      object: 'r04_thread_box', stage: 2, title: "Клубок", difficulty: 'normal',
+      rows: ['...###...', '.##...##.', '.#.###.#.', '#.#...#.#', '#.#.#.#.#', '#.#...#.#', '.#.###.#.', '.##...###', '...###..#']
+    },
+    r04_thread_box_08: {
+      object: 'r04_thread_box', stage: 3, title: "Иголка с ниткой", difficulty: 'normal',
+      rows: ['...##...', '..#..#..', '..#..#..', '...##...', '...###.#', '...##.#.', '...###..', '....#...']
+    },
+    r04_scissors_07: {
+      object: 'r04_scissors', stage: 1, title: "Пуговица", difficulty: 'normal',
+      rows: ['.#####.', '#######', '##.#.##', '#######', '##.#.##', '#######', '.#####.']
+    },
+    r04_scissors_08: {
+      object: 'r04_scissors', stage: 2, title: "Ножницы", difficulty: 'normal',
+      rows: ['.##..##.', '#..##..#', '#.###..#', '.##..##.', '...##...', '..#..#..', '.#....#.', '#.#..#.#']
+    },
+    r04_scissors_10: {
+      object: 'r04_scissors', stage: 3, title: "Кожаный чехол", difficulty: 'normal',
+      rows: ['.######.', '########', '##....##', '##....##', '.##..##.', '.##..##.', '..####..', '..####..', '...##...', '...##...']
+    },
+    r04_curtain_07: {
+      object: 'r04_curtain', stage: 1, title: "Солнышко", difficulty: 'normal',
+      rows: ['...#...', '.#.#.#.', '..###..', '#######', '..###..', '.#.#.#.', '...#...']
+    },
+    r04_curtain_09: {
+      object: 'r04_curtain', stage: 2, title: "Окошко", difficulty: 'normal',
+      rows: ['#########', '#...#...#', '#...#...#', '#...#...#', '#########', '#...#...#', '#...#...#', '#########', '.#######.']
+    },
+    r04_curtain_10: {
+      object: 'r04_curtain', stage: 3, title: "Шторы с подхватом", difficulty: 'normal',
+      rows: ['##########', '##########', '###....###', '##......##', '##......##', '#........#', '##......##', '###....###', '##......##', '##......##']
+    },
+    r04_fabric_basket_07: {
+      object: 'r04_fabric_basket', stage: 1, title: "Бантик", difficulty: 'normal',
+      rows: ['#.....#', '##...##', '###.###', '#######', '###.###', '##.#.##', '#..#..#']
+    },
+    r04_fabric_basket_08: {
+      object: 'r04_fabric_basket', stage: 2, title: "Стопка ткани", difficulty: 'normal',
+      rows: ['.######.', '########', '#......#', '########', '.######.', '########', '#.#..#.#', '########']
+    },
+    r04_fabric_basket_11: {
+      object: 'r04_fabric_basket', stage: 3, title: "Корзинка", difficulty: 'normal',
+      rows: ['.#.####...', '..#....#..', '.#......#.', '##########', '#.#.#.#.##', '##.#.#.#.#', '#.#.#.#.##', '##.#.#.#.#', '.########.', '..######..']
+    },
+    r04_fabric_basket_10: {
+      object: 'r04_fabric_basket', stage: 4, title: "Рулон ткани", difficulty: 'normal',
+      rows: ['.#####....', '.#....#...', '#..##..#..', '#.#..#.#..', '#.#.##.#..', '#..#...###', '.#....#..#', '..#####..#', '.....#####']
+    },
+    r04_sewing_machine_07: {
+      object: 'r04_sewing_machine', stage: 1, title: "Шпулька", difficulty: 'normal',
+      rows: ['#######', '.#####.', '..#.#..', '..###..', '..#.#..', '.#####.', '#######']
+    },
+    r04_sewing_machine_09: {
+      object: 'r04_sewing_machine', stage: 2, title: "Лапка", difficulty: 'normal',
+      rows: ['....##...', '....##...', '....##...', '...####..', '...####..', '..######.', '.#######.', '#########', '##.#.#.##']
+    },
+    r04_sewing_machine_10: {
+      object: 'r04_sewing_machine', stage: 3, title: "Колесо", difficulty: 'normal',
+      rows: ['...####...', '.##....##.', '.#.#..#.#.', '#...##...#', '#..####..#', '#..####..#', '#...##...#', '.#.#..#.#.', '.##....##.', '...####...']
+    },
+    r04_sewing_machine_12: {
+      object: 'r04_sewing_machine', stage: 4, title: "Швейная машинка", difficulty: 'normal',
+      rows: ['..#########.', '.###########', '.##......###', '.##......###', '.##.....####', '..#.....#..#', '..#.....#..#', '..#.....####', '..#......##.', '############', '############', '.##......##.']
+    },
+    r04_mannequin_07: {
+      object: 'r04_mannequin', stage: 1, title: "Игольница", difficulty: 'normal',
+      rows: ['.#.#.#.', '..###..', '.#####.', '#######', '#.#.#.#', '#######', '.#####.']
+    },
+    r04_mannequin_08: {
+      object: 'r04_mannequin', stage: 2, title: "Вешалка", difficulty: 'normal',
+      rows: ['....#...', '..#..#..', '.....#..', '....#...', '...##...', '..##.#..', '.#....#.', '########']
+    },
+    r04_mannequin_10: {
+      object: 'r04_mannequin', stage: 3, title: "Платье", difficulty: 'normal',
+      rows: ['...#..#...', '...####...', '..######..', '...####...', '...####...', '..######..', '..######..', '.########.', '.########.', '##########', '##########', '##########']
+    },
+    r04_mannequin_12: {
+      object: 'r04_mannequin', stage: 4, title: "Манекен", difficulty: 'normal',
+      rows: ['.....##.....', '....####....', '..########..', '.##########.', '.##########.', '..########..', '...######...', '..########..', '.##########.', '.##########.', '.....##.....', '...######...']
+    },
+    r04_patchwork_08: {
+      object: 'r04_patchwork', stage: 1, title: "Сердце из лоскута", difficulty: 'normal',
+      rows: ['.##..##.', '########', '##.#.###', '###.#.##', '.######.', '..####..', '...##...', '...#....']
+    },
+    r04_patchwork_10: {
+      object: 'r04_patchwork', stage: 2, title: "Птичка", difficulty: 'normal',
+      rows: ['....##....', '...####...', '.###.###..', '..#######.', '#.######..', '.#######..', '..#####...', '...###....', '...#.#....', '..##.##...']
+    },
+    r04_patchwork_12: {
+      object: 'r04_patchwork', stage: 3, title: "Лоскутное панно", difficulty: 'normal',
+      rows: ['############', '#..#..#..###', '#..#..#..#.#', '############', '###..#..#..#', '#.#..#..#..#', '############', '#..###..#..#', '#..#.#..#..#', '############', '.#.#.#.#.#.#', '#.#.#.#.#.#.']
+    },
+    r04_festival_flag_10: {
+      object: 'r04_festival_flag', stage: 1, title: "Флажок", difficulty: 'normal',
+      rows: ['##########', '.########.', '.########.', '..######..', '..##..##..', '...####...', '...####...', '....##....', '....##....']
+    },
+    r04_festival_flag_12: {
+      object: 'r04_festival_flag', stage: 2, title: "Фонарик", difficulty: 'normal',
+      rows: ['.....##.....', '....####....', '...######...', '..##.##.##..', '..#.####.#..', '..##.##.##..', '..#.####.#..', '..##.##.##..', '...######...', '....####....', '.....##.....', '.....##.....']
+    },
+    r04_festival_flag_15: {
+      object: 'r04_festival_flag', stage: 3, title: "Праздничный флаг", difficulty: 'normal',
+      rows: ['#..............', '###............', '#####..........', '###.###........', '##...####......', '###.#######....', '##########.##..', '###########....', '#########......', '#######........', '#####..........', '###............', '#..............', '#..............', '###............']
     },
   }
 };

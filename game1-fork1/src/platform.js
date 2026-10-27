@@ -137,50 +137,44 @@
     bridge.subscribe(function (e) { if (e && e.detail && e.detail.type === 'VKWebAppViewHide') f(); });
   }
 
-  /* Поделиться открыткой-загадкой: ВК — окно записи на стене, иначе системное «Поделиться»,
-     иначе копия в буфер. Отдаёт способ ('vk' | 'native' | 'copy') или null, если не вышло/отменили. */
-  /* Поделиться (оценка эксперта №7, п. 25: уходил только текст). image — функция, отдающая data:image/png карточки:
-     в ВК на телефоне — история с картинкой (VKWebAppShowStoryBox), не вышло или компьютер — запись на стене текстом;
-     в браузере — системное «Поделиться» с файлом, если умеет, иначе текстом, иначе копия в буфер. */
-  function dataFile(png) {
-    try {
-      var bin = atob(png.split(',')[1]), arr = new Uint8Array(bin.length);
-      for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
-      return new File([arr], 'ulika-dnya.png', { type: 'image/png' });
-    } catch (e) { return null; }
-  }
-  function wall(text) {
-    try {
-      return bridge.send('VKWebAppShowWallPostBox', { message: text })
-        .then(function () { return 'vk'; }, function () { return null; });
-    } catch (e) { return Promise.resolve(null); }
-  }
-  function share(text, image) {
-    var url = location.origin + location.pathname;
-    var png = null;
-    if (image) { try { png = image(); } catch (e) { png = null; } }
-    if (vk) {
-      var mobile = /^mobile_/.test(params.get('vk_platform') || '');
-      if (png && mobile) {
-        var box = { background_type: 'image', blob: png };
-        if (params.get('vk_app_id')) box.attachment = { text: 'go_to', type: 'url', url: 'https://vk.com/app' + params.get('vk_app_id') };
-        try {
-          return bridge.send('VKWebAppShowStoryBox', box).then(function () { return 'vk_story'; }, function () { return wall(text); });
-        } catch (e) { return wall(text); }
+  /* Ролик за награду (VKWebAppShowNativeAds, ad_format reward) — только по нажатию игрока, только в ВК.
+     Образец — game2-fork1/src/platform.js. → {ok, reason}: watched | busy | unavailable | timeout | skipped.
+     - проверка (CheckNativeAds) ждёт AD_CHECK_MS; опоздавший ответ отбрасывается, показ после него не начинается;
+     - показ ждёт AD_SHOW_MS с запасом на длинный ролик. «Досмотрен» после срока — onLate() ровно один раз;
+     - второй вызов, пока идёт первый, — сразу busy: двойной награды не бывает.
+     Сроки можно сократить для автотестов (window.G1F_AD_MS = {check, show}). */
+  var AD_CHECK_MS = 8000, AD_SHOW_MS = 120000;
+  var adActive = false;
+  function showRewarded(onLate) {
+    if (!vk) return Promise.resolve({ ok: false, reason: 'unavailable' });
+    if (adActive) return Promise.resolve({ ok: false, reason: 'busy' });
+    adActive = true;
+    var ms = root.G1F_AD_MS || {};
+    return new Promise(function (resolve) {
+      var settled = false;
+      var timer = setTimeout(function () { finish(false, 'unavailable'); }, ms.check || AD_CHECK_MS);
+      function finish(ok, reason) {
+        if (settled) return false;
+        settled = true;
+        adActive = false;
+        clearTimeout(timer);
+        resolve({ ok: ok, reason: reason });
+        return true;
       }
-      return wall(text);
-    }
-    var file = png && navigator.share && navigator.canShare ? dataFile(png) : null;
-    if (file && navigator.canShare({ files: [file] })) {
-      return navigator.share({ files: [file], text: text + ' ' + url }).then(function () { return 'native_image'; }, function () { return null; });
-    }
-    if (navigator.share) {
-      return navigator.share({ text: text, url: url }).then(function () { return 'native'; }, function () { return null; });
-    }
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      return navigator.clipboard.writeText(text + ' ' + url).then(function () { return 'copy'; }, function () { return null; });
-    }
-    return Promise.resolve(null);
+      function call(method) {
+        try { return Promise.resolve(bridge.send(method, { ad_format: 'reward' })); } catch (e) { return Promise.reject(e); }
+      }
+      call('VKWebAppCheckNativeAds').then(function (c) {
+        if (settled) return;
+        if (!c || !c.result) { finish(false, 'unavailable'); return; }
+        clearTimeout(timer);
+        timer = setTimeout(function () { finish(false, 'timeout'); }, ms.show || AD_SHOW_MS);
+        call('VKWebAppShowNativeAds').then(function (d) {
+          var ok = !!(d && d.result);
+          if (!finish(ok, ok ? 'watched' : 'skipped') && ok && onLate) onLate();
+        }, function () { finish(false, 'skipped'); });
+      }, function () { finish(false, 'unavailable'); });
+    });
   }
 
   root.Platform = {
@@ -194,7 +188,8 @@
     ready: ready,
     flush: flush,
     onHide: onHide,
-    share: share,
+    canAds: vk,
+    showRewarded: showRewarded,
     params: params,
   };
 })(this);

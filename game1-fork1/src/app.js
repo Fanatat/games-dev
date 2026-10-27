@@ -1,19 +1,20 @@
-/* Экраны P0 (ТЗ §5–§8, G1F-001…005): шкатулка → поле первой истории → итог → атлас.
-   Здесь только порядок экранов и тексты; правила поля — logic.js, сохранение — state.js,
-   ввод — board.js. Картинки берутся из assets/art/<имя>.webp, пока их нет — значок. */
+/* Экраны (ТЗ §5–§8): шкатулка → поле → итог → главная, атлас, фонари, финал главы.
+   Здесь только порядок экранов и отклик; правила поля — logic.js, сохранение — state.js, ввод — board.js.
+   Упрощение 2026-10 (docs/УПРОЩЕНИЕ_2026-10.md): на поле две цифры (марки и цена помощи) и четыре кнопки,
+   помощь — одна кнопка-лупа, отказ — вздрагивание, обучение — палец, жест поворота и стрелка над лупой. */
 (function () {
   'use strict';
   var C = window.G1F_CONTENT, L = window.WordLogic, A = window.Analytics, P = window.Platform;
   var S = window.GameState.create(C, P.storage);
   var $ = function (id) { return document.getElementById(id); };
-  var IDLE_MS = 120000, GHOST_MS = 3000, REVEAL_MS = 2600, RESULT_DELAY = 1500;
-  // Подталкивание (план эксперта №4, круг 1): 12 с над уликой — пульс «Подсказки»;
-  // 15 с без луп — палец бесплатно показывает первую букву, один раз на улику.
-  var NUDGE_MS = 12000, BROKE_GHOST_MS = 15000;
-  var NEW_BONUS_AT = 8; // после 8-го найденного слова главы — знакомство с бонусными словами
+  var IDLE_MS = 120000, REVEAL_MS = 2600, RESULT_DELAY = 1500;
+  /* Палец ведёт всё первое слово: в первый раз — почти сразу, потом после паузы и после одиночного тапа. */
+  var GHOST_FIRST_MS = 900, GHOST_MS = 3000;
+  var NUDGE_MS = 12000; // столько активного времени на улике — лупа подпрыгивает, первый раз со стрелкой
 
   var ICONS = {
     back: '<path d="M15 5l-7 7 7 7"/>',
+    home: '<path d="M4 11l8-7 8 7"/><path d="M6 10v10h12V10"/><path d="M10 20v-6h4v6"/>',
     music: '<path d="M9 18V5l11-2v13"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="17.5" cy="16" r="2.5"/>',
     nomusic: '<path d="M9 18V5l11-2v13"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="17.5" cy="16" r="2.5"/><path d="M3 3l18 18"/>',
     sound: '<path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/>',
@@ -21,20 +22,9 @@
     gear: '<path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/>',
     left: '<path d="M14 6l-6 6 6 6"/>',
     right: '<path d="M10 6l6 6-6 6"/>',
-    loupe: '<circle cx="10.5" cy="10.5" r="5.5"/><path d="M15 15l5 5"/>',
     lock: '<rect x="6" y="11" width="12" height="9" rx="2"/><path d="M9 11V8a3 3 0 0 1 6 0v3"/>',
-    book: '<path d="M4 5.5C6.5 4.5 9.5 4.5 12 6c2.5-1.5 5.5-1.5 8-.5V19c-2.5-1-5.5-1-8 .5-2.5-1.5-5.5-1.5-8-.5z"/><path d="M12 6v13.5"/>',
-    stamp: '<rect x="5" y="5" width="14" height="14" rx="1" stroke-dasharray="2 2"/><path d="M9 14l2-3 2 2 2-3"/>',
-    star: '<path d="M12 4l2.4 5 5.4.6-4 3.7 1.1 5.3L12 16l-4.9 2.6 1.1-5.3-4-3.7 5.4-.6z"/>',
-    bulb: '<path d="M9 17h6M10 20h4"/><path d="M12 4a5 5 0 0 0-3 9c.6.5 1 1.3 1 2h4c0-.7.4-1.5 1-2a5 5 0 0 0-3-9z"/>',
     check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
-    bolt: '<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>',
-    route: '<path d="M5 19c3.5 0 3.5-6 7-6s3.5-6 7-6"/><circle cx="5" cy="19" r="1.8"/><circle cx="19" cy="7" r="1.8"/>',
-    share: '<circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.2 10.8l7.6-3.6M8.2 13.2l7.6 3.6"/>',
-    chest: '<path d="M4 11h16v8a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z"/><path d="M4 11V9a4 4 0 0 1 4-4h8a4 4 0 0 1 4 4v2"/><path d="M11 11v3h2v-3"/>',
-    gift: '<rect x="4" y="10" width="16" height="10" rx="1"/><path d="M3 7h18v3H3zM12 7v13M12 7c-2-3-5-3-5-1s3 1 5 1c2 0 5 1 5-1s-3-2-5 1"/>',
-    lamp: '<path d="M9 3h6l1 3H8zM8 6h8l-1 8H9zM12 14v7M9 21h6"/>',
-    chat: '<path d="M5 5h14a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1h-8l-4 3.5V16H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z"/><path d="M8 9.5h8M8 12.5h5"/>',
+    play: '<path d="M8 5l11 7-11 7z"/>',
   };
   function icon(name) {
     return '<svg class="i" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + ICONS[name] + '</svg>';
@@ -43,7 +33,6 @@
     var a = Math.abs(n) % 100, b = a % 10;
     return a > 10 && a < 20 ? many : b === 1 ? one : b >= 2 && b <= 4 ? few : many;
   }
-  function nLoupes(n) { return n + ' ' + plural(n, 'лупа', 'лупы', 'луп'); }
   function nStamps(n) { return n + ' ' + plural(n, 'марка', 'марки', 'марок'); }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
 
@@ -58,7 +47,7 @@
     // В сборке tools/build.py кладёт список готовых картинок (имя → хеш): лишних запросов нет, кэш сбрасывается по хешу.
     var list = window.G1F_ART;
     if (!name || missing[name] || (list && !list[name])) return;
-    // пока грузится картинка — пустая бумажная плашка, а значок-эмодзи только если картинки нет (план эксперта №5, п. 4.2)
+    // пока грузится картинка — пустая бумажная плашка, а значок-эмодзи только если картинки нет
     el.classList.add('art-wait');
     var img = new Image();
     img.alt = ''; img.decoding = 'async'; img.draggable = false;
@@ -68,6 +57,8 @@
     el.appendChild(img);
   }
   function artUrl(name) { var list = window.G1F_ART; return 'assets/art/' + name + '.webp' + (list ? '?v=' + list[name] : ''); }
+  // Марка — одна валюта игры, везде один значок.
+  function stampIco() { return '<img class="st-ico" src="' + artUrl('golden_stamp') + '" alt="" aria-hidden="true">'; }
   // картинки следующей истории — заранее, пока открыт итог
   var preloaded = {};
   function preloadStory(s) {
@@ -113,19 +104,6 @@
     sheetReturn = null;
   }
 
-  var toastTimer = null, toastSeen = {};
-  // Одинаковое сообщение не чаще раза в 5 с (ТЗ §4.2).
-  function toast(msg) {
-    var t = Date.now();
-    if (toastSeen[msg] && t - toastSeen[msg] < 5000) return;
-    toastSeen[msg] = t;
-    var el = $('toast');
-    el.textContent = msg; el.hidden = false;
-    el.classList.remove('new', 'on'); void el.offsetWidth; el.classList.add('on');
-    clearTimeout(toastTimer);
-    toastTimer = setTimeout(function () { el.hidden = true; }, 2200);
-  }
-
   /* Надпись о сохранении (P.sync): «в профиле ВК» — только после ответа ВК;
      обычное ожидание сети не пугает, отказ ВК виден. */
   var SYNC_TEXT = {
@@ -133,15 +111,6 @@
     pending: 'Прогресс отправляется в профиль ВК…',
     cloud: 'Прогресс сохранён в профиле ВК',
   };
-  function newTip(msg) {
-    var el = $('toast');
-    el.textContent = msg; el.hidden = false;
-    el.classList.add('new');
-    el.classList.remove('on'); void el.offsetWidth; el.classList.add('on');
-    clearTimeout(toastTimer);
-    toastTimer = setTimeout(function () { el.hidden = true; el.classList.remove('new'); }, 4200);
-  }
-
   function saveLine(el) {
     var sync = P.sync, ok = S.saveOk && P.persistent;
     if (sync === 'failed') el.textContent = ok ? 'В профиль ВК не сохранилось — прогресс есть на этом устройстве' : 'Не получилось сохранить в профиле ВК, пробуем ещё';
@@ -174,9 +143,9 @@
     if (screen === 'scr-field') requestAnimationFrame(function () { sizeClueCard(); window.Board.fit(); });
   }
   window.addEventListener('resize', function () { if (screen === 'scr-field') { sizeClueCard(); window.Board.fit(); } });
-  function toggleRow(key, title, sub) {
+  function toggleRow(key, title) {
     var on = !!S.data.settings[key];
-    return '<button class="opt toggle" data-set="' + key + '" role="switch" aria-checked="' + on + '"><span><b>' + title + '</b>' + (sub ? '<span class="muted">' + sub + '</span>' : '') + '</span><span class="sw"></span></button>';
+    return '<button class="opt toggle" data-set="' + key + '" role="switch" aria-checked="' + on + '"><span><b>' + title + '</b></span><span class="sw"></span></button>';
   }
   var TILE_ICONS = { sound: ['sound', 'mute'], music: ['music', 'nomusic'] };
   function tileIcon(k, on) { return icon(TILE_ICONS[k][on ? 0 : 1]); }
@@ -188,8 +157,8 @@
     var build = (document.querySelector('meta[name="g1f-build"]') || {}).content || 'dev';
     var html = '<h3>Настройки</h3>' +
       '<div class="tile-row">' + tile('sound', 'Звук') + tile('music', 'Музыка') + '</div>' +
-      toggleRow('reduced_motion', 'Меньше движения', '') +
-      toggleRow('large_text', 'Крупный текст', '') +
+      toggleRow('reduced_motion', 'Меньше движения') +
+      toggleRow('large_text', 'Крупный текст') +
       (P.params.has('journal') ? '<button class="opt" id="opt-journal"><span><b>Журнал событий</b><span class="muted">Скачать JSON для разбора плейтеста</span></span></button>' : '') +
       '<button class="opt danger" id="opt-reset"><span><b>Начать заново</b><span class="muted">Сотрёт весь прогресс</span></span></button>' +
       '<p class="muted small">Сборка ' + esc(build) + ' · ' + esc(C.content_version) + '</p>' +
@@ -211,7 +180,7 @@
     });
   }
   function confirmReset() {
-    openSheet('confirm', '<h3>Начать заново?</h3><p>Найденные слова, атлас, марки и лупы будут стёрты на этом устройстве.</p>' +
+    openSheet('confirm', '<h3>Начать заново?</h3><p>Найденные слова, атлас, марки и фонари будут стёрты на этом устройстве.</p>' +
       '<button class="btn-main danger" id="opt-reset-yes">Стереть и начать</button><button class="btn-link" data-close>Отмена</button>', function (el) {
       el.querySelector('#opt-reset-yes').addEventListener('click', function () {
         A.event('progress_reset', {});
@@ -228,9 +197,8 @@
     show('scr-box');
   }
 
-  /* ---------- главы (план эксперта b009, круг 2): атлас и счёт историй — внутри главы ---------- */
+  /* ---------- главы: атлас и счёт историй — внутри главы ---------- */
   function chTitle(num) { return 'Глава ' + num + ' · ' + S.chapter(num).title; }
-  function chCount(num) { return S.chapterGot(num) + '/' + S.chapter(num).slots; }
   function storyKicker(s) {
     var n = S.chapterFull(s.chapter) ? S.chapter(s.chapter).slots : S.chapterStories(s.chapter).length;
     return 'История ' + (s.pos + 1) + ' из ' + n + ' · ' + s.place;
@@ -238,228 +206,84 @@
   function lastChapter() { return S.stories[S.stories.length - 1].chapter; }
   function curChapter() { var t = homeTarget(); return t.story ? t.story.chapter : lastChapter(); }
   function atlasChip(el, num, got) {
-    el.innerHTML = icon('book') + '<b>' + (got === undefined ? S.chapterGot(num) : got) + '/' + S.chapter(num).slots + '</b>';
-    el.setAttribute('aria-label', 'Атлас главы ' + num + ': ' + (got === undefined ? S.chapterGot(num) : got) + ' из ' + S.chapter(num).slots);
-  }
-
-  /* ---------- дневник маршрута: зачем вернуться завтра ---------- */
-  var visitInfo = { first: true, back: false, away: 0 };
-  function giftText(g) {
-    if (g.cover) return (C.covers[g.cover] || 'Рамка') + ' для атласа';
-    var out = [];
-    if (g.stamps) out.push('+' + nStamps(g.stamps));
-    if (g.loupes) out.push('+' + nLoupes(g.loupes));
-    return out.join(' · ');
-  }
-  function renderDiary(el, opts) {
-    var d = S.diary();
-    var dots = '';
-    for (var i = 0; i < d.of; i++) {
-      var on = d.days >= d.of ? true : i < d.days;
-      dots += '<span class="dd' + (on ? ' on' : '') + '">' + (on ? icon('check') : (i + 1)) + '</span>';
-    }
-    var line = d.today ? 'Сегодня штамп стоит. Завтра: ' + giftText(d.gift) : 'Первая история сегодня: ' + giftText(d.gift);
-    el.innerHTML = '<b>' + (opts && opts.back ? 'С возвращением!' : 'Дневник') + '</b>' +
-      '<span class="diary-days">' + dots + '</span><span class="muted">' + esc(line) + '</span>';
-    el.hidden = false;
-  }
-
-  /* ---------- улика дня (план эксперта №4, круг 2, п. 2.2): загадка на сегодня, плитки букв, серия «🔥 N» ---------- */
-  var dailyPick = { day: null, picks: [], shown: null };
-  function renderDaily() {
-    var el = $('home-daily'), x = S.data.completed_story_ids.length ? S.daily() : null;
-    if (!x) { el.hidden = true; return; }
-    if (dailyPick.day !== x.day) dailyPick = { day: x.day, picks: [], shown: dailyPick.shown };
-    if (dailyPick.shown !== x.day) {
-      dailyPick.shown = x.day;
-      A.event('daily_shown', { day: x.day, done: x.done, streak: x.streak, lost: x.lost });
-    }
-    var fire = x.streak ? '<span class="day-streak" aria-label="Дней подряд: ' + x.streak + '">🔥 ' + x.streak + '</span>' : '';
-    var html = '<div class="daily-head"><b>Улика дня</b>' + fire + '</div><p class="daily-clue">' + esc(x.clue) + '</p>';
-    if (x.done) {
-      html += '<div class="daily-share"><span class="daily-marks" aria-label="Попыток: ' + (x.misses + 1) + '">' + dailyMarks(x) + '</span>' +
-        '<button class="chip" id="btn-daily-share">' + icon('share') + 'Поделиться</button></div>' +
-        '<p class="daily-done">' + icon('check') + ' <b>' + esc(x.answer) + '</b> · завтра новая</p>';
-    } else {
-      var p = dailyPick.picks, slots = '', tiles = '';
-      for (var i = 0; i < x.answer.length; i++) {
-        slots += p[i] != null ? '<button class="ds on" data-ds="' + i + '" aria-label="Убрать букву ' + x.tiles[p[i]] + '">' + x.tiles[p[i]] + '</button>'
-          : '<span class="ds"></span>';
-      }
-      x.tiles.forEach(function (ch, j) {
-        tiles += '<button class="dt" data-dt="' + j + '"' + (p.indexOf(j) >= 0 ? ' disabled' : '') + '>' + ch + '</button>';
-      });
-      html += '<div class="daily-slots" id="daily-slots">' + slots + '</div><div class="daily-tiles">' + tiles + '</div>' +
-        '<p class="muted small daily-gain">+' + x.loupes + ' ' + icon('loupe') + (x.lost ? ' · серия начнётся заново' : x.streak ? ' · серия станет ' + (x.streak + 1) : '') + streakHint(x) + '</p>';
-    }
-    el.innerHTML = html;
-    el.hidden = false;
-  }
-  // Что даст серия дней (Ж10): сундук на 3-й день, рамка «Огонёк» на 7-й — видно заранее.
-  function streakHint(x) {
-    var n = x.next;
-    if (!n) return '';
-    var what = n.kind === 'cover' ? (x.ember ? 'большой сундук' : 'рамка «' + (C.covers.ember || 'Огонёк') + '»') : 'сундук';
-    // главная ≤ 35 слов (ROUND9): до обычного сундука — значок вместо слова
-    return n.in === 0 ? ' · сегодня ' + what + '!' : ' · ' + (n.kind === 'chest' ? '🎁' : what) + ' через ' + n.in + ' ' + plural(n.in, 'день', 'дня', 'дней');
-  }
-  // Карточка без ответа, как строка кружков Strands: промахи — ⬜, разгадка — 🟩
-  function dailyMarks(x) { return new Array(Math.min(x.misses, 8) + 1).join('⬜') + '🟩'; }
-  function shareDaily() {
-    var x = S.daily();
-    if (!x || !x.done || !C.share || !C.share.daily) return;
-    var dm = x.day.split('-');
-    var text = C.share.daily.replace('{date}', dm[2] + '.' + dm[1]).replace('{fire}', x.streak ? '🔥 ' + x.streak : '')
-      .replace('{marks}', dailyMarks(x)).replace('{clue}', x.clue.replace(/\n/g, ' ')).replace('{letters}', L.lettersLabel(x.answer.length));
-    window.Sound.play('tap');
-    A.event('share_open', { from: 'daily', day: x.day, streak: x.streak, tries: x.misses + 1 });
-    P.share(text, function () { return dailyCard(x); }).then(function (how) {
-      A.event('share_done', { from: 'daily', method: how || 'cancel' });
-      if (how === 'copy') toast('Скопировано — отправьте другу');
-    });
-  }
-  /* Карточка улики дня для «Поделиться»: загадка, число букв пустыми клетками, попытки квадратиками, серия — без ответа. */
-  function dailyCard(x) {
-    var W = 1080, H = 1350, cv = document.createElement('canvas');
-    cv.width = W; cv.height = H;
-    var g = cv.getContext('2d'), serif = 'Georgia, "PT Serif", "Times New Roman", serif';
-    g.fillStyle = '#F5EEDD'; g.fillRect(0, 0, W, H);
-    g.fillStyle = '#FFFDF7'; g.strokeStyle = '#E2C68E'; g.lineWidth = 4;
-    rr(g, 60, 60, W - 120, H - 120, 40); g.fill(); g.stroke();
-    var dm = x.day.split('-');
-    g.textAlign = 'center'; g.fillStyle = '#8A5A12';
-    g.font = '600 44px ' + serif; g.fillText('Улика дня · ' + dm[2] + '.' + dm[1], W / 2, 190);
-    if (x.streak) { g.fillStyle = '#D4652B'; g.font = '600 40px ' + serif; g.fillText('Серия ' + x.streak + ' ' + plural(x.streak, 'день', 'дня', 'дней') + ' подряд', W / 2, 260); }
-    // загадка — по строкам
-    g.fillStyle = '#2B2A27'; g.font = 'italic 64px ' + serif;
-    var words = ('«' + x.clue.replace(/\n/g, ' ') + '»').split(' '), lines = [], line = '';
-    words.forEach(function (w) { var t = line ? line + ' ' + w : w; if (g.measureText(t).width > W - 240 && line) { lines.push(line); line = w; } else line = t; });
-    lines.push(line);
-    var y = 470 - (lines.length - 1) * 40;
-    lines.slice(0, 5).forEach(function (l) { g.fillText(l, W / 2, y); y += 84; });
-    // клетки ответа — пустые
-    var n = x.answer.length, cs = Math.min(120, (W - 240 - (n - 1) * 16) / n), x0 = (W - (n * cs + (n - 1) * 16)) / 2;
-    g.lineWidth = 5; g.strokeStyle = '#B5A47E'; g.fillStyle = '#F5EEDD';
-    for (var i = 0; i < n; i++) { rr(g, x0 + i * (cs + 16), 820, cs, cs, 18); g.fill(); g.stroke(); }
-    g.fillStyle = '#6B6457'; g.font = '40px ' + serif; g.fillText(L.lettersLabel(n), W / 2, 820 + cs + 70);
-    // попытки: серые — промахи, зелёный — разгадка
-    var m = Math.min(x.misses, 8) + 1, ms = 44, mx = (W - (m * ms + (m - 1) * 12)) / 2;
-    for (var k = 0; k < m; k++) { g.fillStyle = k < m - 1 ? '#C9C2B2' : '#4E8B5F'; rr(g, mx + k * (ms + 12), 1080, ms, ms, 8); g.fill(); }
-    g.fillStyle = '#2F6B53'; g.font = '700 52px ' + serif; g.fillText('Слова по уликам', W / 2, 1230);
-    return cv.toDataURL('image/png');
-  }
-  function rr(g, x, y, w, h, r) {
-    g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r);
-    g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath();
-  }
-  function onDailyClick(e) {
-    if (e.target.closest('#btn-daily-share')) { shareDaily(); return; }
-    var x = S.daily();
-    if (!x || x.done) return;
-    var t = e.target.closest('[data-dt],[data-ds]');
-    if (!t) return;
-    var p = dailyPick.picks;
-    if (t.dataset.ds != null) { p.splice(+t.dataset.ds, 1); window.Sound.play('tap'); renderDaily(); return; }
-    if (p.length >= x.answer.length) return;
-    p.push(+t.dataset.dt);
-    window.Sound.play('tap');
-    if (p.length < x.answer.length) { renderDaily(); return; }
-    var word = p.map(function (j) { return x.tiles[j]; }).join('');
-    var r = S.dailySolve(word);
-    if (!r.ok) {
-      A.event('daily_wrong', { day: x.day, len: word.length });
-      renderDaily();
-      var sl = $('daily-slots');
-      if (sl) sl.classList.add('shake');
-      window.Sound.play('wrong');
-      setTimeout(function () { dailyPick.picks = []; renderDaily(); }, 650);
-      return;
-    }
-    A.event('daily_solved', { day: x.day, streak: r.streak, loupes: S.data.wallet.loupes, diary: r.diary ? r.diary.day : null });
-    window.Sound.play('found');
-    renderDaily();
-    renderDiary($('home-diary'), { back: visitInfo.back });
-    pulse($('home-daily'));
-    var gift = '+' + nLoupes(r.loupes) + (r.diary ? ' · дневник: ' + giftText(r.diary) : '');
-    toast('Разгадано! ' + gift + (r.streak > 1 ? ' · 🔥 ' + r.streak : ''));
-    if (r.gift) {
-      A.event('streak_gift', { day: x.day, streak: r.streak, kind: r.gift.cover ? 'cover' : r.gift.big ? 'big' : 'chest', value: r.gift.loupes, stamps: r.gift.stamps });
-      setTimeout(function () {
-        toast('🔥 ' + r.streak + ' ' + plural(r.streak, 'день', 'дня', 'дней') + ' подряд: ' + (r.gift.cover ? 'рамка «' + (C.covers[r.gift.cover] || r.gift.cover) + '» в оформлении атласа'
-          : (r.gift.big ? 'большой сундук ' : 'сундук ') + giftText(r.gift)));
-        window.Sound.play('reward');
-      }, 2600);
-    }
+    var n = got === undefined ? S.chapterGot(num) : got;
+    el.innerHTML = '<span class="chip-img art"></span><b>' + n + '/' + S.chapter(num).slots + '</b>';
+    art(el.querySelector('.chip-img'), 'atlas_cover', '📔');
+    el.setAttribute('aria-label', 'Атлас главы ' + num + ': ' + n + ' из ' + S.chapter(num).slots);
   }
 
   /* ---------- напоминание при возвращении (п. 2.3): одна картинка, что узнали, висящий вопрос ---------- */
+  var visitInfo = { first: true, back: false, away: 0 };
   var recapOn = false, recapSent = false;
   function homeRecap(t) {
-    var L = recapOn && t.mode !== 'done' && S.lastLearned();
-    if (!L) return false;
-    art($('home-art'), L.story.scene, '🏞️');
-    $('home-kicker').textContent = 'В прошлый раз · ' + L.story.title;
-    $('home-question').textContent = L.question;
+    var R = recapOn && t.mode !== 'done' && S.lastLearned();
+    if (!R) return false;
+    art($('home-art'), R.story.scene, '🏞️');
+    $('home-kicker').textContent = 'В прошлый раз · ' + R.story.title;
+    $('home-question').textContent = R.question;
     $('home-sub').textContent = '';
     $('btn-continue').textContent = 'Продолжить';
-    if (!recapSent) { recapSent = true; A.event('recap_shown', { story_id: L.story.id, away_days: visitInfo.away }); }
+    if (!recapSent) { recapSent = true; A.event('recap_shown', { story_id: R.story.id, away_days: visitInfo.away }); }
     return true;
   }
 
-  /* ---------- главная ---------- */
+  /* ---------- главная: место, одна главная кнопка, фонарь и атлас плитками ---------- */
   function homeTarget() {
     var cur = S.curStory();
     if (cur) return { story: cur, mode: 'continue' };
     var id = S.nextStoryId();
     return id ? { story: S.story(id), mode: 'start' } : { story: null, mode: 'done' };
   }
+  function bar(el, have, of) { el.style.width = Math.min(100, Math.round(100 * have / Math.max(1, of))) + '%'; }
   function showHome() {
     var t = homeTarget();
     $('home-town').textContent = C.town;
     $('home-chapter').textContent = 'Глава ' + (t.story ? t.story.chapter : lastChapter());
     var btn = $('btn-continue');
     if (t.mode === 'continue') {
-      $('home-kicker').textContent = 'Продолжить · ' + t.story.place;
+      $('home-kicker').textContent = storyKicker(t.story);
       $('home-question').textContent = t.story.teaser;
-      $('home-sub').textContent = 'Найдено ' + S.foundCount() + ' из ' + t.story.clues.length;
-      btn.textContent = 'Продолжить историю';
+      $('home-sub').textContent = '';
+      btn.textContent = 'Продолжить';
       art($('home-art'), t.story.scene, '🏞️');
     } else if (t.mode === 'start') {
       $('home-kicker').textContent = storyKicker(t.story);
       $('home-question').textContent = t.story.teaser;
-      $('home-sub').textContent = t.story.title;
-      btn.textContent = 'Начать историю';
+      $('home-sub').textContent = '';
+      btn.textContent = 'История ' + (t.story.pos + 1);
       art($('home-art'), t.story.scene, '🏞️');
     } else {
       var end = S.chapter(lastChapter()).end;
       $('home-kicker').textContent = end.title;
       $('home-question').textContent = end.question;
       $('home-sub').textContent = end.text;
-      btn.textContent = 'Открыть атлас';
+      btn.textContent = 'Атлас';
       art($('home-art'), 'bg_town', '🏞️');
     }
     homeRecap(t);
     $('home-sub').hidden = !$('home-sub').textContent;
     btn.dataset.mode = t.mode;
     var ch = t.story ? t.story.chapter : lastChapter();
-    $('atlas-sub').textContent = 'Глава ' + ch + ': ' + S.chapterGot(ch) + ' из ' + S.chapter(ch).slots + ' · ' + S.rank().name;
-    var up = S.nextUpgrade();
-    $('town-tile-sub').textContent = up ? S.story(up.id).place + ': ' + TIER[up.tier].title.toLowerCase() + ' · ' + Math.min(up.have, up.cost) + ' / ' + up.cost
-      : 'Фонарей: ' + S.data.lanterns.length + ' из ' + S.stories.length;
-    $('btn-town').classList.toggle('ready', !!(up && up.can));
+    $('atlas-sub').textContent = S.chapterGot(ch) + '/' + S.chapter(ch).slots;
+    bar($('atlas-tile-bar'), S.chapterGot(ch), S.chapter(ch).slots);
+    renderTownTile();
     renderSecret($('home-secret'), ch);
-    renderDaily();
-    if (S.data.completed_story_ids.length) renderDiary($('home-diary'), { back: visitInfo.back });
-    else $('home-diary').hidden = true;
-    var nx = $('home-next');
-    var after = t.story && S.stories[t.story.index + 1];
-    if (t.mode !== 'done' && after) {
-      nx.hidden = false;
-      $('home-next-title').textContent = 'Дальше: ' + after.place;
-      $('home-next-sub').textContent = 'Откроется после истории «' + t.story.title + '»';
-    } else nx.hidden = true;
     saveLine($('home-save'));
     show('scr-home');
+  }
+  // Плитка фонаря: марки до следующего фонаря шкалой (цель между сессиями); всё горит — сколько фонарей.
+  function renderTownTile() {
+    var nx = S.nextLantern(), b = $('btn-town');
+    if (nx) {
+      $('town-tile-num').innerHTML = Math.min(nx.have, nx.cost) + '/' + nx.cost + ' ' + stampIco();
+      bar($('town-tile-bar'), nx.have, nx.cost);
+      b.setAttribute('aria-label', 'Фонари Тихоречья: ' + Math.min(nx.have, nx.cost) + ' из ' + nx.cost + ' марок до фонаря');
+    } else {
+      $('town-tile-num').textContent = S.data.lanterns.length + '/' + S.stories.length;
+      bar($('town-tile-bar'), S.data.lanterns.length, S.stories.length);
+      b.setAttribute('aria-label', 'Фонари Тихоречья: горит ' + S.data.lanterns.length + ' из ' + S.stories.length);
+    }
+    b.classList.toggle('ready', !!(nx && nx.can));
   }
   function onContinue() {
     var t = homeTarget();
@@ -476,19 +300,8 @@
     introStory = s;
     art($('intro-art'), s.scene, '🏞️');
     $('intro-kicker').textContent = (s.pos === 0 && s.chapter > 1 ? chTitle(s.chapter) + ' · ' : '') + storyKicker(s);
-    // большая история (план эксперта №7, п. 1.3): видно до начала, что за неё ×2
-    if (S.isBig(s) && S.data.completed_story_ids.indexOf(s.id) < 0) $('intro-kicker').insertAdjacentHTML('beforeend', ' <b class="new-badge big-badge">Большая · награда ×2</b>');
     $('intro-title').textContent = s.title;
     $('intro-text').textContent = s.intro;
-    var fresh = s.new_text && (S.data.completed_story_ids.indexOf(s.id) >= 0 || !S.seenNew(s.new));
-    $('intro-new').hidden = !fresh;
-    $('intro-new').innerHTML = fresh ? '<b class="new-badge">Новое</b> ' + esc(s.new_text) : '';
-    if (s.new) S.markNew(s.new);
-    $('intro-guess').classList.remove('good');
-    renderGuess(s);
-    var g = S.goldAvail(s.id);
-    $('btn-intro-gold').hidden = !g;
-    if (g) $('btn-intro-gold').innerHTML = icon('star') + '<span>Золотой след: ' + S.GOLD_RUN.cost + ' ' + icon('loupe') + ' → марки ×' + S.GOLD_RUN.mult + '</span>';
     show('scr-intro');
   }
   function beginStory(s) {
@@ -500,41 +313,20 @@
 
   /* ---------- поле ---------- */
   var F = null; // {story, locked, revealTimer, attempts, ghostTimer}
-  var turnTipShown = false;
 
-  // Сколько ответов найдено за главу: пройденные истории целиком плюс текущая.
-  function wordsFound() {
-    var n = S.foundCount();
-    S.data.completed_story_ids.forEach(function (id) { var st = S.story(id); if (st) n += st.clues.length; });
-    return n;
-  }
   function clue(id) { return F.story.clues.filter(function (c) { return c.id === id; })[0]; }
-  // «Нить 1/5 ●●○»: сколько общих секретов маршрута уже собрано и сколько историй до следующего.
-  // Считаем собранные, а не текущий: «Нить 6/6» на последнем отрезке читалась как «всё собрано».
-  function renderThread() {
-    var el = $('scene-thread'), all = C.route_secrets.length, k = S.trioCount();
-    if (!all || k >= all) { el.hidden = true; return; }
-    var inTrio = S.data.completed_story_ids.length % 3, dots = '';
-    for (var i = 0; i < 3; i++) dots += '<i class="' + (i < inTrio ? 'on' : i === inTrio ? 'cur' : '') + '"></i>';
-    el.hidden = false;
-    el.innerHTML = icon('book') + '<b>Нить ' + k + '/' + all + '</b><span class="th-dots">' + dots + '</span>';
-    el.setAttribute('aria-label', 'Нить маршрута: собрано ' + k + ' из ' + all + ', до следующей историй: ' + (3 - inTrio));
-  }
   function selId() { return S.cur() ? S.cur().selected_clue_id : null; }
   function clueIdx(id) { var i = -1; F.story.clues.forEach(function (c, k) { if (c.id === id) i = k; }); return i; }
 
   function openField() {
     var s = S.curStory();
     if (!s) { showHome(); return; }
-    if (F && F.sprint) clearInterval(F.sprint.timer);
     F = { story: s, locked: false, revealTimer: null, attempts: 0, ghostTimer: null };
     $('field-title').textContent = s.title;
-    $('field-sub').textContent = s.place && s.place !== s.title ? s.place : 'История ' + (s.pos + 1);
     art($('scene-bg'), s.scene, '');
     $('scene').dataset.story = s.id;
     $('scr-field').classList.toggle('evening', !!s.evening);
-       renderSceneItems($('scene-items'), s, function (c) { return S.isFound(c.id); }, false);
-    renderThread();
+    renderSceneItems($('scene-items'), s, function (c) { return S.isFound(c.id); }, false);
     show('scr-field');
     sizeClueCard();
     window.Board.render(s, S.cur().found, {
@@ -548,118 +340,16 @@
     if (!S.isFound(selId()) && !S.isOpen(selId())) S.select(S.firstUnfound());
     if (s.secret && !S.isFound(s.secret.clue_id)) window.Board.setGold(s.secret.cell, true);
     if (s.cache && S.cacheDone(s.id)) window.Board.markCache(s.cache.path);
-    window.Board.setDust(S.dustLeft());
-    if (S.cur().sprint === 'on') S.sprintEnd(false); // ушли с поля посреди спринта — он кончился, ничего не отнимаем
     renderClue();
     renderDots();
-    renderFoot();
-    renderChips();
-    renderSprint();
-    scheduleGhost();
-    if (S.dustLeft().length && !S.seenNew('dust') && S.markNew('dust')) {
-      A.event('feature_intro', { story_id: s.id, feature: 'dust', words: wordsFound() });
-      setTimeout(function () { if (F && F.story === s) newTip(HANDS.dust); }, 900);
-    }
-  }
-  /* Новое для рук (план эксперта №7, п. 1.4): пыль на поле и спринт «3 слова за 40 с». */
-  var HANDS = {
-    dust: 'Пыль на поле: найдите слово рядом — буква откроется',
-    sprint: 'Спринт: 3 слова за 40 секунд — сундук',
-  };
-  // Найденное слово сметает пыль рядом; сметённая клетка — деление сундука.
-  function sweep(path) {
-    var r = S.sweepDust(path);
-    if (!r) return null;
-    window.Board.sweep(r.cells);
-    A.event('dust_swept', { story_id: F.story.id, count: r.cells.length, left: r.left });
-    renderChips();
-    setTimeout(function () { pulse($('chip-bonus')); }, 400);
-    if (!r.left) setTimeout(function () { if (F) floatText('Пыль сметена', 'muted tip'); }, 600);
-    return r;
-  }
-  // Кнопка спринта в углу сцены: с 7-й истории, после первого слова, один раз за историю.
-  function renderSprint() {
-    sprintBody();
-    var sc = $('scene');
-    sc.classList.toggle('sprint-tight', !$('btn-sprint').hidden && sc.clientHeight < 120);
-  }
-  function sprintBody() {
-    var b = $('btn-sprint');
-    if (!F || !S.cur()) { b.hidden = true; return; }
-    if (F.sprint) {
-      var left = Math.max(0, Math.ceil((F.sprint.end - Date.now()) / 1000));
-      b.hidden = false; b.disabled = true; b.classList.add('run');
-      b.innerHTML = icon('bolt') + '<b>' + F.sprint.got + '/' + S.SPRINT.words + '</b><span class="sp-t">' + left + ' с</span>';
-      b.style.setProperty('--left', Math.max(0, (F.sprint.end - Date.now()) / S.SPRINT.ms).toFixed(3));
-      return;
-    }
-    var on = S.sprintAvail() && S.foundCount() >= 1;
-    b.hidden = !on; b.disabled = false; b.classList.remove('run');
-    if (on) {
-      b.innerHTML = icon('bolt') + '<b>Спринт</b>';
-      b.setAttribute('aria-label', 'Спринт: ' + S.SPRINT.words + ' слова за ' + S.SPRINT.ms / 1000 + ' секунд — сундук');
-      if (!S.seenNew('sprint') && S.markNew('sprint')) {
-        A.event('feature_intro', { story_id: F.story.id, feature: 'sprint', words: wordsFound() });
-        pulse(b);
-        setTimeout(function () { if (F) newTip(HANDS.sprint); }, 600);
-      }
-    }
-  }
-  function startSprint() {
-    if (!F || F.sprint || F.locked) return;
-    var r = S.sprintStart();
-    if (!r) return;
-    window.Sound.play('tap');
-    F.sprint = { got: 0, end: Date.now() + r.ms, timer: null, story: F.story };
-    A.event('sprint', { story_id: F.story.id, result: 'start' });
-    F.sprint.timer = setInterval(function () {
-      if (!F || !F.sprint) return;
-      if (Date.now() >= F.sprint.end) endSprint(false); else renderSprint();
-    }, 250);
-    renderSprint();
-  }
-  // Слово в зачёт спринта (улика, бонус-слово, тайник). Третье — победа.
-  function sprintWord() {
-    if (!F || !F.sprint) return;
-    F.sprint.got++;
-    if (F.sprint.got >= S.SPRINT.words) endSprint(true); else { renderSprint(); pulse($('btn-sprint')); }
-  }
-  function endSprint(won, quiet) {
-    var sp = F && F.sprint;
-    if (!sp) return;
-    clearInterval(sp.timer);
-    F.sprint = null;
-    var r = S.sprintEnd(won);
-    A.event('sprint', { story_id: sp.story.id, result: won ? 'won' : 'lost', words: sp.got, value: r && r.chest ? r.chest.loupes : 0, stamps: r && r.chest ? r.chest.stamps : 0 });
-    $('btn-sprint').hidden = true;
-    $('scene').classList.remove('sprint-tight');
-    if (quiet) return;
-    if (won && r && r.chest) showChest(r.chest, 'sprint', 1400);
-    else floatText('Спринт: ' + sp.got + ' из ' + S.SPRINT.words + ' · в другой истории ещё раз', 'muted tip');
+    scheduleGhost(tutorialOn() && !S.tipSeen('finger') ? GHOST_FIRST_MS : GHOST_MS);
   }
 
-  /* Счётчики на поле: находки атласа, бонусные слова, тайник. */
-  function renderChips() {
-    atlasChip($('chip-atlas'), F ? F.story.chapter : curChapter());
-    if (!F || !S.cur()) return;
-    var n = S.cur().bonus.length;
-    // сундук поля наполняют и слова улик (+1), и бонус-слова (+2): новичок видит его с первого слова (план эксперта №7, п. 1.5)
-    var g = S.bonusGoal(), top = g.next || g.chests[g.chests.length - 1];
-    var showBonus = n > 0 || g.pts > 0 || F.story.index >= 1 || S.seenNew('bonus');
-    $('chip-bonus').hidden = !showBonus;
-    $('chip-bonus').innerHTML = icon('chest') + '<b>' + Math.min(g.pts, top) + '</b><span class="of">/' + top + '</span>';
-    $('chip-bonus').classList.toggle('full', !g.next);
-    $('chip-bonus').setAttribute('aria-label', 'Сундук поля: ' + g.pts + (g.next ? ' из ' + g.next : ', все открыты') + '. Бонусных слов: ' + n);
-    renderStreak();
-    var cache = F.story.cache;
-    $('chip-cache').hidden = !cache || S.cacheDone(F.story.id);
-    if (cache) $('chip-cache').innerHTML = icon('gift') + '<b>' + cache.answer.length + '</b>';
-  }
-  // Летящая надпись над полем: бонусное слово, буква, награда.
+  // Летящая надпись над полем: «+N», «Бонус!», «Почти!», буква тайного слова.
   function floatText(txt, cls, target) {
     var wrap = $('board-wrap'), el = document.createElement('div');
     el.className = 'float-word ' + (cls || '');
-    el.textContent = txt;
+    el.innerHTML = txt;
     wrap.appendChild(el);
     var t = target && target.getBoundingClientRect(), w = wrap.getBoundingClientRect();
     if (t && !document.body.classList.contains('rm')) {
@@ -667,26 +357,10 @@
       el.style.setProperty('--dy', Math.round(t.top + t.height / 2 - (w.top + 40)) + 'px');
       el.classList.add('fly');
     }
-    setTimeout(function () { el.remove(); }, / tip/.test(' ' + cls) ? 2700 : 1500);
+    setTimeout(function () { el.remove(); }, 1500);
   }
-  // «Серия ×2» над полем (вторая серия, п. 1.2): три слова подряд без ошибки и подсказки.
-  function renderStreak(fresh) {
-    var el = $('streak'), k = S.streak();
-    el.hidden = !k.on;
-    if (!k.on) return;
-    el.textContent = 'Серия ×' + k.mult;
-    el.setAttribute('aria-label', 'Серия: марки за слово ×' + k.mult);
-    if (fresh) pulse(el);
-  }
-  function breakStreak() {
-    if (!S.miss()) return;
-    A.event('streak_end', { story_id: F.story.id });
-    var el = $('streak');
-    el.classList.add('out');
-    setTimeout(function () { el.classList.remove('out'); renderStreak(); }, 400);
-  }
-  // Марки за слово (п. 1.1): буквы слетают с поля в предмет сцены, рядом «+N».
-  function flyLetters(path, id, stamps, mult) {
+  // Марки за слово: буквы слетают с поля в предмет сцены, рядом «+N», счётчик марок подпрыгивает.
+  function flyLetters(path, id, stamps) {
     var item = $('scene-items').querySelector('[data-clue="' + id + '"]'), scene = $('scene');
     if (!item) return;
     var t = item.getBoundingClientRect(), sc = scene.getBoundingClientRect();
@@ -707,31 +381,21 @@
       });
     }
     var plus = document.createElement('span');
-    plus.className = 'word-stamps' + (mult > 1 ? ' x2' : '');
-    plus.innerHTML = '+' + stamps + ' ' + icon('stamp') + (mult > 1 ? '<i>×' + mult + '</i>' : '');
+    plus.className = 'word-stamps';
+    plus.innerHTML = '+' + stamps + ' ' + stampIco();
     plus.style.left = Math.round(t.left + t.width / 2 - sc.left) + 'px';
     plus.style.bottom = Math.round(Math.max(2, Math.min(sc.bottom - t.top + 2, sc.height - 28))) + 'px';
-    setTimeout(function () { scene.appendChild(plus); }, document.body.classList.contains('rm') ? 0 : 450);
+    setTimeout(function () { scene.appendChild(plus); renderStamps(true); }, document.body.classList.contains('rm') ? 0 : 450);
     setTimeout(function () { plus.remove(); }, 2300);
   }
   function pulse(el) { el.classList.remove('pulse'); void el.offsetWidth; el.classList.add('pulse'); }
-  function openBonusSheet() {
-    if (!F || !S.cur()) return;
-    window.Sound.play('tap');
-    var c = S.cur();
-    var words = c.bonus.length ? c.bonus.map(function (w) { return '<span class="bw">' + esc(w) + '</span>'; }).join('') : '<span class="muted">Пока ни одного</span>';
-    var g = S.bonusGoal();
-    var html = '<h3>' + icon('chest') + ' Бонусные слова: ' + c.bonus.length + '</h3><div class="bonus-words">' + words + '</div>' +
-      '<p class="muted small">Сундук: улика +1, бонус +2 · ' + g.pts + ' / ' + (g.next || g.chests[g.chests.length - 1]) + '</p>' +
-      '<button class="btn-link" data-close>Закрыть</button>';
-    openSheet('bonus', html);
+  function shakeEl(el) {
+    if (!el) return;
+    el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake');
+    setTimeout(function () { el.classList.remove('shake'); }, 420);
   }
-  function openCacheSheet() {
-    if (!F || !F.story.cache) return;
-    window.Sound.play('tap');
-    openSheet('cache', '<h3>' + icon('gift') + ' Тайник</h3><p>' + 'На поле спрятано слово без улики.' +
-      '</p><p class="muted small">' + L.lettersLabel(F.story.cache.answer.length) + ' · +1 ' + icon('loupe') + ' +15 ' + icon('stamp') + '</p><button class="btn-link" data-close>Закрыть</button>');
-  }
+  // Отказ без слов: вздрагивает то, чего не хватает, и звук «нет».
+  function refuse(el) { shakeEl(el); window.Sound.play('wrong'); }
 
   // Найденные предметы встают на свободную полосу переднего плана сцены.
   function slotPos(i, n) {
@@ -782,7 +446,7 @@
     F.story.clues.forEach(function (c) {
       main.hidden = false; rev.hidden = true;
       probe.querySelector('.clue-text').textContent = c.clue;
-      meta.textContent = L.lettersLabel(c.answer.length) + ', начало «' + c.answer.charAt(0) + '» · 5 из 5';
+      meta.innerHTML = letterCells(c, {});
       max = Math.max(max, probe.getBoundingClientRect().height);
       main.hidden = true; rev.hidden = false;
       rev.querySelector('p').textContent = c.reveal;
@@ -811,6 +475,14 @@
     box.setAttribute('aria-label', 'Найдено ' + S.foundCount() + ' из ' + F.story.clues.length);
   }
 
+  // Длина ответа клетками вместо «5 букв»: первая буква — после подсказки, всё слово — после показа или находки.
+  function letterCells(c, h, found) {
+    var all = found || h.path || h.explain;
+    return c.answer.split('').map(function (ch, i) {
+      var on = all || (i === 0 && h.start);
+      return '<i' + (on ? ' class="on"' : '') + '>' + (on ? ch : '') + '</i>';
+    }).join('');
+  }
   function renderClue() {
     if (!F || !S.cur()) return;
     var c = clue(selId());
@@ -819,7 +491,7 @@
     $('clue-reveal').hidden = true;
     var h = S.hintState(c.id), found = S.isFound(c.id);
     var i = clueIdx(c.id);
-    var pic = c.picture && !found && !h.extra && !h.explain;
+    var pic = c.picture && !found && !h.extra;
     $('clue-text').textContent = pic ? '' : c.clue;
     $('clue-text').classList.toggle('pic', !!pic);
     if (pic) {
@@ -828,18 +500,16 @@
       $('clue-text').appendChild(im);
       art(im, c.img, c.icon);
       var cap = document.createElement('span');
-      cap.textContent = c.silhouette ? 'Чей это силуэт?' : 'Что на картинке?';
+      cap.textContent = '?';
+      cap.className = 'pic-q';
       $('clue-text').appendChild(cap);
     }
-    // Письмо Полины: улика её словами, с подписью (новинка 9-й и 15-й историй)
+    // Письмо Полины: улика её словами, с подписью
     var letter = c.letter && !found;
     $('clue-card').classList.toggle('letter', !!letter);
     $('clue-card').dataset.letter = letter ? (F.story.letter_label || (F.story.chapter === 1 ? 'Письмо от «П.»' : 'Письмо Полины')) : '';
-    var meta = (c.double ? 'Двойная улика · ' : '') + L.lettersLabel(c.answer.length) + ' · ' + (i + 1) + ' из ' + F.story.clues.length;
-    var ans = found || h.path || h.explain;
-    if (ans) meta = (found ? 'Найдено: ' : 'Ответ: ') + c.answer + ' · ' + meta;
-    else if (h.start) meta = L.lettersLabel(c.answer.length) + ', начало «' + c.answer.charAt(0) + '» · ' + (i + 1) + ' из ' + F.story.clues.length;
-    $('clue-meta').textContent = meta;
+    $('clue-meta').innerHTML = letterCells(c, h, found);
+    $('clue-card').setAttribute('aria-label', (c.double ? 'Двойная улика, ' : '') + L.lettersLabel(c.answer.length) + ', ' + (i + 1) + ' из ' + F.story.clues.length);
     var ex = $('clue-extra');
     ex.hidden = !(h.extra || h.explain) || found;
     $('clue-card').classList.toggle('double', !!c.double);
@@ -850,8 +520,6 @@
     $('clue-prev').disabled = $('clue-next').disabled = list.length < 2;
     // помощь на поле восстанавливается и после перезагрузки
     window.Board.clearHints();
-    $('btn-hint').classList.toggle('nudge', !found && !!(F.nudged && F.nudged[c.id]) && !(F.hintSeen && F.hintSeen[c.id]));
-    if (!found && F.nudged && F.nudged[c.id] === 2 && !h.start && !h.path && !h.explain) window.Board.pointAt(c.path[0]);
     if (!found) {
       if (h.path || h.explain) window.Board.showPath(c.id, c.path);
       else if (h.start) window.Board.showStart(c.path[0]);
@@ -875,17 +543,33 @@
     renderClue(); renderDots();
   }
 
+  /* Подвал: марки и кнопка-лупа. На лупе — цена следующего шага помощи; бесплатно — без цифры;
+     ответ показан — ✓ «принять»; марок не хватает — в ВК ▶ (ролик), иначе цена красным. */
+  function renderStamps(bump) {
+    $('stamps-n').textContent = S.data.wallet.stamps;
+    $('stamps').setAttribute('aria-label', 'Марки: ' + S.data.wallet.stamps);
+    if (bump) pulse($('stamps'));
+  }
+  function hintView(id) {
+    if (!S.cur() || S.isFound(id)) return { mode: 'off' };
+    if (S.shown(id)) return { mode: 'accept' };
+    var n = S.nextHint(id, S.activeMs(id));
+    if (!n) return { mode: 'off' };
+    if (n.price <= S.data.wallet.stamps) return { mode: n.price ? 'paid' : 'free', next: n };
+    return { mode: P.canAds ? 'ad' : 'short', next: n };
+  }
   function renderFoot() {
     if (!F || !S.cur()) return;
-    var id = selId(), h = S.hintState(id), found = S.isFound(id);
-    var drop = S.data.bonus_drop || 0, dots = '';
-    for (var k = 0; k < S.BONUS_DROP; k++) dots += '<i' + (k < drop ? ' class="on"' : '') + '></i>';
-    $('loupes').innerHTML = icon('loupe') + '<b>' + S.data.wallet.loupes + '</b><span class="drop" aria-hidden="true">' + dots + '</span>';
-    $('loupes').setAttribute('aria-label', 'Лупы: ' + S.data.wallet.loupes + '. Бонусных слов до новой лупы: ' + (S.BONUS_DROP - drop));
-    $('btn-accept').hidden = found || !(h.path || h.explain);
-    $('btn-accept').parentNode.classList.toggle('accepting', !$('btn-accept').hidden);
-    $('btn-hint').disabled = found;
-    $('hint-badge').hidden = found || h.explain || S.activeMs(id) < S.explainAfter(id);
+    renderStamps();
+    var id = selId(), v = hintView(id), b = $('btn-hint'), pr = $('hint-price');
+    b.dataset.mode = v.mode;
+    b.disabled = v.mode === 'off';
+    if (v.mode === 'accept') { pr.innerHTML = icon('check'); b.setAttribute('aria-label', 'Принять ответ'); }
+    else if (v.mode === 'free') { pr.innerHTML = ''; b.setAttribute('aria-label', 'Подсказка, бесплатно'); }
+    else if (v.mode === 'ad') { pr.innerHTML = icon('play'); b.setAttribute('aria-label', 'Подсказка за ролик'); }
+    else if (v.next) { pr.innerHTML = v.next.price + ' ' + stampIco(); b.setAttribute('aria-label', 'Подсказка: ' + nStamps(v.next.price)); }
+    else { pr.innerHTML = ''; b.setAttribute('aria-label', 'Подсказка'); }
+    b.dataset.step = v.next ? v.next.step : '';
   }
 
   /* Попытка слова. Ответ проверяется по буквам против всех улик истории (A04, A05). */
@@ -897,114 +581,71 @@
     if (!m) {
       var word = L.pathWord(s.grid, path);
       if (s.cache && (word === s.cache.answer || word.split('').reverse().join('') === s.cache.answer)) return onCache(path);
-      // другая форма ответа (СПИЧКА при ответе СПИЧКИ) — «почти», а не бонус и не тишина (круг 0.4 второй серии)
+      // другая форма ответа (СПИЧКА при ответе СПИЧКИ) — «почти», а не бонус и не тишина
       var near = s.clues.filter(function (c) { return !S.isFound(c.id) && S.isOpen(c.id) && L.nearForm(word, c.answer); })[0];
       if (near) return onNear(word, path, near);
       var b = S.bonusWord(word);
       if (b) return onBonus(word, path, b);
       A.event('word_attempt', { story_id: s.id, clue_id: sel, result: 'wrong', length: path.length, turns: L.turns(path) });
       window.Sound.play('wrong');
-      wrongFeedback(sel);
-      breakStreak();
-      scheduleGhost();
+      shakeEl($('clue-card'));
+      scheduleGhost(GHOST_MS);
       // на третьей улике первой истории поворот показываем жестом, а не словами (ТЗ §5)
-      if (!turnTipShown && s.index === 0 && clueIdx(sel) === 2 && L.turns(clue(sel).path) > 0) {
-        turnTipShown = true;
+      if (s.index === 0 && clueIdx(sel) === 2 && L.turns(clue(sel).path) > 0 && S.tip('turn')) {
+        tutor('turn');
         window.Board.demoTrace(L.demoPath(path[0], s.rows, s.cols, true), 2);
       }
       return 'wrong';
     }
     var id = m.clue.id;
-    if (S.isFound(id)) { A.event('word_attempt', { story_id: s.id, clue_id: sel, result: 'repeat' }); toast('Это слово уже найдено'); return 'tap'; }
-    if (!S.isOpen(id)) { A.event('word_attempt', { story_id: s.id, clue_id: sel, result: 'locked' }); toast('Это слово пригодится чуть позже'); return 'tap'; }
+    // уже найденное или пока закрытое слово — вздрагивает карточка, без надписи
+    if (S.isFound(id) || !S.isOpen(id)) {
+      A.event('word_attempt', { story_id: s.id, clue_id: sel, result: S.isFound(id) ? 'repeat' : 'locked' });
+      refuse($('clue-card'));
+      return 'tap';
+    }
     A.event('word_attempt', { story_id: s.id, clue_id: sel, result: 'ok', solved_clue_id: id, length: path.length });
     solve(id, m.path, 'trace');
     return 'ok';
   }
 
-  /* Отклик на ошибку (ТЗ §4.2): дрожит карточка улики; вторая ошибка подряд на той же улике —
-     одна строка, без упрёка. Ошибка ничего не отнимает. */
-  function shakeEl(el) {
-    if (!el || document.body.classList.contains('rm')) return;
-    el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake');
-    setTimeout(function () { el.classList.remove('shake'); }, 350);
-  }
-  function wrongFeedback(sel) {
-    shakeEl($('clue-card'));
-    if (F.wrongClue !== sel) { F.wrongClue = sel; F.wrongRow = 0; }
-    F.wrongRow++;
-    if (F.wrongRow === 2) {
-      A.event('wrong_tip', { story_id: F.story.id, clue_id: sel });
-      floatText('Попробуем другую цепочку', 'muted tip');
-    }
-  }
   function onNear(word, path, c) {
     A.event('word_attempt', { story_id: F.story.id, clue_id: selId(), result: 'near', near_clue_id: c.id, length: path.length });
     window.Sound.play('hint');
     window.Board.flashBonus(path);
     if (c.id !== selId()) selectClue(c.id, 'near');
     shakeEl($('clue-card'));
-    floatText('Почти! Другая форма слова', 'gold tip');
-    scheduleGhost();
+    floatText('Почти!', 'gold');
+    scheduleGhost(GHOST_MS);
     return 'tap';
   }
   function onBonus(word, path, b) {
     var s = F.story;
     if (b.repeat) {
       A.event('word_attempt', { story_id: s.id, clue_id: selId(), result: 'bonus_repeat', length: path.length });
-      window.Sound.play('tap');
-      floatText(word + ' · уже есть', 'muted');
+      window.Board.flashBonus(path);
+      refuse($('clue-card'));
       return 'tap';
     }
-    A.event('bonus_word', { story_id: s.id, clue_id: selId(), length: path.length, count: b.count, value: b.stamps, rare: b.rare, goal: b.goal, of: b.of });
+    A.event('bonus_word', { story_id: s.id, clue_id: selId(), length: path.length, count: b.count, value: b.stamps });
     window.Sound.play('found');
     window.Board.flashBonus(path);
     if (!S.data.traced) S.markTraced();
-    renderChips();
-    renderFoot();
-    floatText((b.rare ? word + ' · редкое' : b.count === 1 ? 'Бонус!' : word) + ' +' + b.stamps, 'bonus', $('chip-bonus'));
-    setTimeout(function () { pulse($('chip-bonus')); }, 700);
-    if (b.chest) showChest(b.chest, 'bonus');
-    var dw = sweep(path);
-    if (dw && dw.chest) showChest(dw.chest, 'dust', b.chest ? 2200 : 1000);
-    sprintWord();
-    if (b.loupe) {
-      A.event('bonus_loupe', { story_id: s.id, loupes: S.data.wallet.loupes });
-      setTimeout(function () { floatText('+1 лупа', 'loupe', $('loupes')); pulse($('loupes')); window.Sound.play('found'); }, 900);
-    }
-    scheduleGhost();
+    floatText('Бонус! +' + b.stamps + ' ' + stampIco(), 'bonus', $('stamps'));
+    setTimeout(function () { renderFoot(); renderStamps(true); }, 700);
+    scheduleGhost(GHOST_MS);
     return 'tap';
-  }
-  // Сундук поля открылся: случайный подарок, изредка большой (план эксперта №7, п. 1.5).
-  // Сундук на последнем слове истории виден на итоге («×n»), но в журнал идёт так же.
-  function chestEvent(ch, via) {
-    A.event('bonus_chest', { story_id: F.story.id, count: ch.n, via: via, value: ch.loupes, stamps: ch.stamps, golden: ch.golden, big: ch.big });
-  }
-  function showChest(ch, via, delay) {
-    var s = F.story;
-    var what = ch.big ? '+' + nLoupes(ch.loupes) + ' +' + ch.stamps : ch.golden ? 'золотая марка +' + ch.stamps : ch.loupes ? '+' + nLoupes(ch.loupes) : '+' + nStamps(ch.stamps);
-    chestEvent(ch, via);
-    setTimeout(function () {
-      if (!F || F.story !== s) return;
-      floatText((ch.sprint ? 'Спринт! ' : '') + (ch.big ? 'Большой сундук: ' : 'Сундук: ') + what, 'gold tip', ch.loupes ? $('loupes') : null);
-      window.Sound.play('reward');
-      pulse(ch.loupes ? $('loupes') : $('chip-bonus'));
-      renderFoot();
-    }, delay || 1000);
   }
   function onCache(path) {
     var s = F.story;
     var r = S.cacheFound();
-    if (!r) { floatText(s.cache.answer + ' · уже есть', 'muted'); return 'tap'; }
-    A.event('cache_found', { story_id: s.id, length: path.length, value: r.loupes, stamps: r.stamps });
+    if (!r) { window.Board.flashBonus(path); refuse($('clue-card')); return 'tap'; }
+    A.event('cache_found', { story_id: s.id, length: path.length, stamps: r.stamps });
     window.Sound.play('found');
+    setTimeout(function () { window.Sound.play('reward'); }, 160);
     window.Board.markCache(s.cache.path);
-    renderChips();
-    floatText('Тайник: +' + nLoupes(r.loupes) + ', +' + nStamps(r.stamps), 'loupe', $('loupes'));
-    setTimeout(function () { renderFoot(); pulse($('loupes')); }, 600);
-    var dw = sweep(path);
-    if (dw && dw.chest) showChest(dw.chest, 'dust', 1600);
-    sprintWord();
+    floatText('Тайник! +' + r.stamps + ' ' + stampIco(), 'gold', $('stamps'));
+    setTimeout(function () { renderFoot(); renderStamps(true); }, 700);
     return 'ok';
   }
 
@@ -1016,45 +657,29 @@
     if (!r || r.already) return;
     window.Board.markFound(id, path);
     window.Board.stopPointer();
+    hideArrow();
     if (r.secret) {
       window.Board.setGold(null, false);
-      var gc = window.Board.cellRect(s.secret.cell);
       A.event('secret_letter', { story_id: s.id, kind: r.secret, count: Object.keys(S.data.secret).length });
-      setTimeout(function () { floatText('Буква тайного слова: ' + r.secret, 'gold'); }, 300);
+      setTimeout(function () { floatText(r.secret, 'gold secret-float'); }, 300);
     }
     if (how === 'trace' && !S.data.traced) S.markTraced();
     clearTimeout(F.ghostTimer);
     window.Sound.play('found');
     setTimeout(function () { window.Sound.play('reward'); }, 140);
-    flyLetters(path, id, r.stamps, r.mult);
-    renderChips();
-    if (r.chest) { if (r.complete) chestEvent(r.chest, 'clue'); else showChest(r.chest, 'clue'); }
-    var dw = sweep(path);
-    if (dw && dw.chest) { if (r.complete) chestEvent(dw.chest, 'dust'); else showChest(dw.chest, 'dust', r.chest ? 2200 : 1000); }
-    if (!r.complete) sprintWord();
-    else if (F.sprint) endSprint(F.sprint.got + 1 >= S.SPRINT.words, true); // последнее слово истории: итог спринта без всплывашки, экран итога важнее
-    renderSprint();
-    if (r.series) {
-      A.event('streak_start', { story_id: s.id, clue_id: id });
-      renderStreak(true);
-      setTimeout(function () { floatText('Серия ×2: марок вдвое', 'gold tip', $('streak')); }, 500);
-    }
+    flyLetters(path, id, r.stamps);
     A.event('clue_solved', { story_id: s.id, clue_id: id, method: how, active_ms: Math.round(active), attempts: F.attempts,
-      selected_clue_id: sel, hints: Object.keys(h).filter(function (k) { return h[k]; }), value: r.stamps, mult: r.mult });
-    F.attempts = 0; F.wrongRow = 0;
-    if (!r.complete && wordsFound() >= NEW_BONUS_AT && !S.seenNew('bonus') && S.markNew('bonus')) {
-      A.event('feature_intro', { story_id: s.id, feature: 'bonus', words: wordsFound() });
-      renderChips(); pulse($('chip-bonus'));
-      setTimeout(function () { newTip(C.stories[3] && C.stories[3].new_text || ''); }, REVEAL_MS);
-    }
+      selected_clue_id: sel, hints: Object.keys(h).filter(function (k) { return h[k]; }), value: r.stamps });
+    F.attempts = 0;
     revealItem(id);
     renderDots(id !== sel ? id : null);
     showReveal(c);
     if (r.complete) {
       F.locked = true;
+      var hs = S.cur().hints, used = Object.keys(hs).some(function (k) { return hs[k].start || hs[k].path || hs[k].explain; });
       var reward = S.complete(); // награда записана до анимации (ТЗ §5, 2–4 мин)
-      A.event('story_complete', { story_id: s.id, first: reward.first, stamps: reward.stamps, xp: reward.xp, item: reward.item,
-        bonus: reward.bonus, kind: reward.golden ? 'golden' : reward.no_hints ? 'no_hints' : 'hints', value: reward.loupes, big: !!reward.big });
+      A.event('story_complete', { story_id: s.id, first: reward.first, stamps: reward.stamps, item: reward.item,
+        bonus: reward.bonus, kind: used ? 'hints' : 'no_hints', words: reward.words });
       setTimeout(function () { showResult(s, reward); }, RESULT_DELAY);
     }
   }
@@ -1066,7 +691,7 @@
     art($('reveal-icon'), c.img, c.icon);
     $('reveal-text').textContent = c.reveal;
     $('clue-card').classList.add('revealing');
-    $('btn-accept').hidden = true;
+    renderFoot();
     F.revealTimer = setTimeout(endReveal, REVEAL_MS + (document.body.classList.contains('lt') ? 600 : 0));
   }
   function stopReveal() {
@@ -1077,18 +702,22 @@
     stopReveal();
     if (!F || F.locked || !S.cur()) return;
     renderClue(); renderDots();
-    scheduleGhost();
+    scheduleGhost(GHOST_MS);
   }
 
-  /* «Палец» обучения без слов: в первой истории, пока игрок ни разу не провёл слово
-     сам, через 3 с без действий и сразу после одиночного тапа палец проводит первые
-     две буквы ответа выбранной улики и повторяет это, пока игрок не коснётся поля. */
+  /* ---------- обучение без слов: три вида, каждый игрок видит один раз (событие tutor) ----------
+     finger — палец ведёт всё первое слово первой истории, пока игрок сам не провёл слово;
+     turn   — жест поворота на третьей улике первой истории после промаха;
+     hint   — стрелка над лупой, когда игрок впервые застрял на улике. */
+  function tutor(kind) { A.event('tutor', { kind: kind, story_id: F ? F.story.id : null }); }
   function tutorialOn() { return !!F && F.story.index === 0 && !S.data.traced; }
   function answerDemo() {
     var c = clue(selId());
-    if (c && !S.isFound(c.id)) window.Board.demoTrace(c.path.slice(0, 2), 0);
+    if (!c || S.isFound(c.id)) return;
+    if (S.tip('finger')) tutor('finger');
+    window.Board.demoTrace(c.path, 0);
   }
-  function scheduleGhost() {
+  function scheduleGhost(ms) {
     if (!F) return;
     clearTimeout(F.ghostTimer);
     window.Board.stopPointer();
@@ -1096,96 +725,85 @@
     F.ghostTimer = setTimeout(function () {
       if (screen !== 'scr-field' || sheetKind || window.Board.dragging || !S.cur() || F.locked || F.revealTimer) return;
       answerDemo();
-    }, GHOST_MS);
+    }, ms || GHOST_MS);
   }
-  // Одиночный тап по букве: показать, что слово ведут, а не тыкают.
-  function onTap(p) {
+  // Одиночный тап по букве в обучении — палец сразу показывает, что слово ведут, а не тыкают.
+  function onTap() {
     if (!F || F.locked || !S.cur()) return;
     F.taps = (F.taps || 0) + 1;
     A.event('single_tap', { story_id: F.story.id, clue_id: selId(), taps: F.taps, tutorial: tutorialOn() });
     clearTimeout(F.ghostTimer);
-    if (tutorialOn()) { answerDemo(); return; }
-    // дальше — общий жест от нажатой клетки (ответ не подсказывает), не чаще трёх раз за историю
-    if (F.taps <= 3) window.Board.demoTrace(L.demoPath(p, F.story.rows, F.story.cols, false), 2);
+    if (tutorialOn()) answerDemo();
+    else shakeEl($('clue-card'));
   }
+  function showArrow() {
+    var b = $('btn-hint');
+    if (b.querySelector('.hint-arrow')) return;
+    var a = document.createElement('span');
+    a.className = 'hint-arrow';
+    a.setAttribute('aria-hidden', 'true');
+    b.appendChild(a);
+  }
+  function hideArrow() { var a = $('btn-hint').querySelector('.hint-arrow'); if (a) a.remove(); $('btn-hint').classList.remove('nudge'); }
 
-  /* ---------- помощь ---------- */
-  function mmss(ms) { var s = Math.max(0, Math.ceil(ms / 1000)); return Math.floor(s / 60) + ':' + ('0' + (s % 60)).slice(-2); }
-  function priceText(type, id) {
-    var h = S.hintState(id);
-    if (h[type]) return 'Уже открыто';
-    var p = S.hintPrice(type, id);
-    if (p === 0) return S.data.free_demo[type] ? 'Впервые бесплатно' : 'Бесплатно';
-    return p + ' ' + (p === 1 ? 'лупа' : 'лупы');
-  }
-  function openHints() {
+  /* ---------- помощь: одна кнопка-лупа, лестница «ещё улика → первая буква → слово целиком» ---------- */
+  function onHint() {
     if (!F || F.locked || !S.cur()) return;
-    var id = selId(), c = clue(id), h = S.hintState(id);
-    if (S.isFound(id)) return;
-    $('btn-hint').classList.remove('nudge');
-    F.hintSeen = F.hintSeen || {}; F.hintSeen[id] = 1;
-    window.Sound.play('tap');
-    A.event('hint_requested', { story_id: F.story.id, clue_id: id, active_ms: Math.round(S.activeMs(id)) });
-    var left = S.explainAfter(id) - S.activeMs(id);
-    var loupes = S.data.wallet.loupes, canBuy = loupes < S.COST.path && S.data.wallet.stamps >= S.LOUPE_PRICE;
-    function opt(type, title, sub, extraCls) {
-      var price = S.hintPrice(type, id);
-      // открытая «Ещё улика» уже видна на карточке: строка гаснет, а не молчит на нажатие (круг 0.1 второй серии)
-      var dis = (type === 'explain' && left > 0 && !h.explain) || (type === 'extra' && h.extra) || price > loupes;
-      var tag = type === 'explain' ? (h.explain ? 'Уже открыто' : left > 0 ? 'через ' + mmss(left) : 'Бесплатно') : type === 'extra' ? (h.extra ? 'Уже открыта' : 'Бесплатно') : priceText(type, id);
-      if (price > loupes) tag = 'Нужно ' + price + ' · у вас ' + loupes;
-      return '<button class="hint-opt ' + (extraCls || '') + '" data-hint="' + type + '"' + (dis ? ' disabled' : '') + '>' +
-        '<b>' + title + '</b><span class="tag">' + esc(tag) + '</span>' + (sub ? '<span class="muted sub">' + sub + '</span>' : '') + '</button>';
-    }
-    var html = '<button class="sheet-x" data-close aria-label="Вернуться к улике">×</button><h3>Подсказка</h3><p class="sheet-clue">' + esc(c.clue) + '</p><div class="hint-grid">' +
-      // лист ≤ 25 слов (план эксперта №7, п. 3.3): у «Пути» и «Разбора» — свои значки вместо одинакового «Ответ на поле»
-      opt('extra', 'Ещё улика', 'Конкретнее') +
-      opt('start', 'Начало', '1-я буква') +
-      opt('path', icon('route') + 'Путь', '') +
-      opt('explain', icon('book') + 'Разобрать', '', 'explain') + '</div>' +
-      '<p class="muted small hint-note' + (canBuy ? ' has-buy' : '') + '" aria-label="Луп: ' + loupes + '">' + icon('loupe') + ' ' + loupes +
-      // мало луп, а марки есть — лупа за марки прямо здесь (круг 3: у Нетерпеливого b022 0 луп при 700 марках)
-      (canBuy ? ' <button class="btn-buy" id="btn-buy-loupe" type="button" aria-label="Лупа за ' + S.LOUPE_PRICE + ' марок">+1 ' + icon('loupe') + ' за ' + S.LOUPE_PRICE + ' ' + icon('stamp') + '</button>' : '') + '</p>' +
-      '<button class="btn-link" data-close>К улике</button>';
-    openSheet('hints', html, function (el) {
-      el.querySelectorAll('[data-hint]').forEach(function (b) {
-        b.addEventListener('click', function () { useHint(b.dataset.hint); });
-      });
-      var buy = el.querySelector('#btn-buy-loupe');
-      if (buy) buy.addEventListener('click', function () {
-        var r = S.buyLoupe();
-        if (!r) return;
-        A.event('loupe_buy', { story_id: F.story.id, cost: r.cost, loupes: S.data.wallet.loupes, stamps: S.data.wallet.stamps });
-        window.Sound.play('reward');
-        renderFoot();
-        var ret = sheetReturn;
-        openHints();
-        sheetReturn = ret;
-        pulse($('loupes'));
-      });
-    });
-  }
-  function useHint(type) {
-    var id = selId(), c = clue(id);
-    var r = S.useHint(type, id, S.activeMs(id));
-    if (!r.ok) {
-      if (r.reason === 'loupes') toast('Не хватает луп — «Разобрать» станет бесплатной');
+    var id = selId(), c = clue(id), v = hintView(id);
+    hideArrow();
+    if (v.mode === 'off') return;
+    if (v.mode === 'accept') { acceptShown(); return; }
+    A.event('hint_requested', { story_id: F.story.id, clue_id: id, active_ms: Math.round(S.activeMs(id)), step: v.next.step });
+    if (v.mode === 'short') {
+      A.event('hint_refused', { story_id: F.story.id, clue_id: id, hint_type: v.next.type, price: v.next.price, stamps: S.data.wallet.stamps });
+      refuse($('stamps'));
+      shakeEl($('btn-hint'));
       return;
     }
-    A.event(type === 'explain' ? 'free_explain_used' : 'hint_used', { story_id: F.story.id, clue_id: id, hint_type: type,
-      price: r.price, free_demo: r.free_demo, active_ms: Math.round(S.activeMs(id)), loupes_left: S.data.wallet.loupes });
+    if (v.mode === 'ad') { watchAd(id); return; }
+    applyHint(id, c, S.useHint(id, S.activeMs(id)));
+  }
+  function applyHint(id, c, r) {
+    if (!r.ok) { refuse($('stamps')); return; }
+    A.event('hint_used', { story_id: F.story.id, clue_id: id, hint_type: r.type, price: r.price, free: r.free || null,
+      active_ms: Math.round(S.activeMs(id)), stamps_left: S.data.wallet.stamps });
     window.Sound.play('hint');
-    if (type !== 'extra') breakStreak();
-    closeSheet();
     renderClue();
-    if (type === 'start') window.Board.showStart(c.path[0]);
-    if (type === 'path' || type === 'explain') $('btn-accept').focus({ preventScroll: true });
+    if (r.price) floatText('−' + r.price + ' ' + stampIco(), 'muted', $('stamps'));
+    if (r.type === 'start') window.Board.showStart(c.path[0]);
+    if (r.type === 'path') $('btn-hint').focus({ preventScroll: true });
     else $('board').focus({ preventScroll: true });
   }
+  /* Ролик за награду (только ВК): досмотрел — шаг бесплатно, ровно один раз; отказ, таймаут,
+     нет ролика — вздрагивает счётчик марок; повторное нажатие во время показа ничего не делает. */
+  function watchAd(id) {
+    if (F.adBusy) return;
+    F.adBusy = true;
+    var field = F, story = F.story.id;
+    $('btn-hint').classList.add('busy');
+    A.event('ad_reward', { story_id: story, clue_id: id, result: 'start' });
+    P.showRewarded(function () { grant('late'); }).then(function (r) {
+      field.adBusy = false;
+      $('btn-hint').classList.remove('busy');
+      A.event('ad_reward', { story_id: story, clue_id: id, result: r.reason });
+      if (r.ok) grant('watched');
+      else refuse($('stamps'));
+    });
+    var done = false;
+    function grant(how) {
+      if (done) return;
+      done = true;
+      // за время ролика игрок мог уйти с поля или найти слово сам — тогда награды нет и ничего не ломается
+      if (F !== field || !S.cur() || S.isFound(id) || selId() !== id) return;
+      var c = clue(id), r = S.useHint(id, S.activeMs(id), { ad: true });
+      if (r.ok) applyHint(id, c, r);
+      if (how === 'late') A.event('ad_reward', { story_id: story, clue_id: id, result: 'late' });
+    }
+  }
   function acceptShown() {
-    var id = selId(), c = clue(id), h = S.hintState(id);
-    if (!c || S.isFound(id) || !(h.path || h.explain)) return;
-    solve(id, c.path, h.explain ? 'explain' : 'path');
+    var id = selId(), c = clue(id);
+    if (!c || S.isFound(id) || !S.shown(id)) return;
+    solve(id, c.path, 'path');
   }
 
   /* ---------- активное время (ТЗ §4.3, §14.1) ---------- */
@@ -1202,31 +820,23 @@
     if (screen !== 'scr-field' || !F || F.locked || sheetKind || document.hidden || t - lastInput > IDLE_MS) return;
     var id = selId();
     if (!id || S.isFound(id)) return;
-    var before = S.activeMs(id);
     S.addActive(id, dt);
-    if (before < S.explainAfter(id) && S.activeMs(id) >= S.explainAfter(id)) renderFoot();
+    // шаг стал бесплатным (застрял 45 / 30 с) — лупа меняет вид сразу
+    if (hintView(id).mode !== $('btn-hint').dataset.mode) { renderFoot(); pulse($('btn-hint')); }
     nudge(id);
   }, 1000);
-  /* Подталкивание: игра сама предлагает помощь, а не ждёт 90 с (план эксперта №4, круг 1). */
+  /* Застрял: лупа подпрыгивает; самый первый раз над ней ещё и стрелка (обучающая подсказка «hint»). */
   function nudge(id) {
-    if (tutorialOn() || F.revealTimer || window.Board.dragging) return;
-    var ms = S.activeMs(id), h = S.hintState(id);
+    if (tutorialOn() || F.revealTimer || window.Board.dragging || S.shown(id)) return;
     F.nudged = F.nudged || {};
-    if (ms >= NUDGE_MS && !F.nudged[id] && !h.path && !h.explain) {
-      F.nudged[id] = 1;
-      if (!(F.hintSeen && F.hintSeen[id])) $('btn-hint').classList.add('nudge');
-      A.event('nudge_shown', { story_id: F.story.id, clue_id: id, kind: 'hint', active_ms: Math.round(ms), loupes: S.data.wallet.loupes });
-    }
-    if (ms >= BROKE_GHOST_MS && !S.data.wallet.loupes && F.nudged[id] !== 2 && !h.start && !h.path && !h.explain) {
-      F.nudged[id] = 2;
-      var c = clue(id);
-      window.Board.stopPointer();
-      window.Board.pointAt(c.path[0]);
-      A.event('nudge_shown', { story_id: F.story.id, clue_id: id, kind: 'first_letter', active_ms: Math.round(ms), loupes: 0 });
-    }
+    if (S.activeMs(id) < NUDGE_MS || F.nudged[id]) return;
+    F.nudged[id] = 1;
+    $('btn-hint').classList.add('nudge');
+    if (S.tip('hint')) { tutor('hint'); showArrow(); }
+    A.event('nudge_shown', { story_id: F.story.id, clue_id: id, active_ms: Math.round(S.activeMs(id)), stamps: S.data.wallet.stamps });
   }
 
-  /* ---------- итог истории ---------- */
+  /* ---------- итог истории: сцена, находка, «+N», фонарь места, вопрос, «История N» ---------- */
   var resultStory = null;
   function showResult(s, reward) {
     resultStory = s;
@@ -1235,6 +845,7 @@
     $('result-scene').dataset.story = s.id;
     renderSceneItems($('result-items'), s, function () { return true; }, true);
     $('result-scene').querySelectorAll('.scene-lamp, .lamp-cost').forEach(function (x) { x.remove(); });
+    if (S.data.lanterns.indexOf(s.id) >= 0) lampScene(null);
     $('result-scene').classList.remove('lamp-flash');
     $('result-title').textContent = s.title;
     $('result-ending').textContent = s.ending;
@@ -1256,9 +867,8 @@
     }
     var nxs = end ? null : S.stories[s.index + 1];
     $('result-question-kicker').textContent = nxs ? 'История ' + (nxs.pos + 1) : 'Вопрос главы';
-    $('btn-next').textContent = full ? 'Финал главы' : end ? 'Открыть атлас' : 'Узнать · история ' + (nxs.pos + 1);
+    $('btn-next').textContent = full ? 'Финал главы' : end ? 'Атлас' : 'История ' + (nxs.pos + 1);
     $('btn-next').dataset.end = end ? '1' : '';
-    $('btn-res-atlas').hidden = end;
     S.markResultSeen(s.id);
     F = null;
     renderSecret($('result-secret'), s.chapter);
@@ -1267,13 +877,13 @@
     show('scr-result');
     var wow = !!(reward && reward.item && s.chapter === 1 && s.pos <= 1);
     $('result-keepsake').classList.toggle('wow', wow);
-    if (wow) { A.event('result_wow', { story_id: s.id }); if (s.pos === 0) flyItems(s.chapter); holdNext(WOW_MS); }
+    if (wow) { A.event('result_wow', { story_id: s.id }); if (s.pos === 0) flyItems(); holdNext(WOW_MS); }
     if (reward && reward.item) flyKeepsake(s.chapter, wow ? WOW_MS - 600 : 1200);
     window.Sound.play(end ? 'chapter' : 'win');
     setTimeout(function () { window.Sound.play('reward'); }, 900);
     $('btn-next').focus({ preventScroll: true });
   }
-  // Главная кнопка ждёт конца полёта предметов: «вау» не пролистывают за 2 с (план эксперта №7, п. 1.6).
+  // Главная кнопка ждёт конца полёта предметов: «вау» не пролистывают за 2 с.
   var WOW_MS = 2300, holdTimer = null;
   function holdNext(ms) {
     var b = $('btn-next');
@@ -1282,85 +892,16 @@
     b.disabled = true; b.classList.add('hold');
     holdTimer = setTimeout(function () { b.disabled = false; b.classList.remove('hold'); }, ms);
   }
-  function chip(ico, txt, cls) { return '<span class="rw ' + (cls || '') + '">' + (ico ? icon(ico) : '') + esc(txt) + '</span>'; }
+  // Одна сумма: марки за историю и за слова (финал главы — на своём экране).
   function renderReward(s, r) {
-    var line = $('reward-line'), big = $('reward-big');
-    big.innerHTML = '';
-    if (!r || !r.first) { line.innerHTML = 'Награда уже получена'; return; }
-    // итог ≤ 30 слов (план эксперта №7, п. 3.1): одна сумма марок за историю и слова, опыт, сундуки — без разложения
-    var out = chip('stamp', '+' + ((r.base || s.reward.first_completion_stamps) + (r.words || 0))) + chip('star', '+' + r.xp);
-    if (r.chests) out += chip('chest', '×' + r.chests, 'good');
-    if (r.no_hints && !r.extra) out += '<span class="rw good" aria-label="Без подсказок">' + icon('check') + '</span>';
-    line.innerHTML = out;
-    big.appendChild(rankBar(r));
-    var cards = [];
-    if (r.finale) cards.push(['atlas_cover', '📔', 'Финал главы', '+' + nLoupes(r.finale.loupes) + ' · +' + nStamps(r.finale.stamps)]);
-    if (r.big) cards.push(['', '🏆', 'Большая история', 'Марки и опыт ×2 · +' + nStamps(r.base)]);
-    if (r.gold_run) cards.push(['golden_stamp', '✨', 'Золотой след', 'Марки за слова и историю ×' + S.GOLD_RUN.mult]);
-    if (r.golden) cards.push(['golden_stamp', '🏅', 'Золотая марка!', '+' + nStamps(S.GOLDEN.stamps) + ' · всего ' + S.data.golden]);
-    if (r.parcel) cards.push(['reward_parcel', '🎁', 'Посылка хранителей', '+' + nLoupes(r.parcel.loupes) + ' · +' + nStamps(r.parcel.stamps)]);
-    if (r.rank) cards.push(['', '⭐', r.rank.name, 'Новое звание · +' + nStamps(r.rank.stamps)]);
-    if (r.trio && C.route_secrets[r.trio - 1]) cards.push(['map', '🧵', 'Нить маршрута ' + r.trio + '/' + C.route_secrets.length, '+1 строчка в атласе']);
-    if (r.diary) cards.push(['logbook', '📅', 'Дневник маршрута · день ' + r.diary.day + ' из ' + r.diary.of, giftText(r.diary)]);
-    if (r.cover) cards.push(['', '📘', 'Обложка «' + (C.covers[r.cover] || r.cover) + '»', 'Атлас в новой обложке']);
-    cards.forEach(function (c, i) {
-      var el = document.createElement('div');
-      el.className = 'card reward-card';
-      el.style.animationDelay = (600 + i * 350) + 'ms';
-      el.innerHTML = '<span class="rc-img art"></span><span><b>' + esc(c[2]) + '</b><span class="muted">' + esc(c[3]) + '</span></span>';
-      art(el.querySelector('.rc-img'), c[0], c[1]);
-      big.appendChild(el);
-      if (c[0] === 'golden_stamp' && c[2] !== 'Золотой след') A.event('golden_stamp', { story_id: s.id, count: S.data.golden });
-      if (c[0] === 'reward_parcel') A.event('parcel_open', { story_id: s.id, value: r.parcel.loupes, stamps: r.parcel.stamps });
-      if (c[0] === 'logbook') A.event('diary_stamp', { story_id: s.id, count: r.diary.day, page: S.data.diary_pages });
-    });
-    if (r.rank) A.event('rank_up', { story_id: s.id, rank: r.rank.name, value: r.rank.stamps });
-    if (r.trio) A.event('route_secret', { story_id: s.id, count: r.trio });
-    if (S.canPickCover()) {
-      var pick = document.createElement('button');
-      pick.className = 'card reward-card cover-pick';
-      pick.id = 'btn-cover-pick';
-      pick.style.animationDelay = (600 + cards.length * 350) + 'ms';
-      pick.innerHTML = '<span class="rc-img cv-swatch cv-river"></span><span><b>Обложка атласа</b><span class="muted">Выберите · бесплатно</span></span>';
-      pick.addEventListener('click', function () { openCovers('result'); });
-      big.appendChild(pick);
-    }
+    var line = $('reward-line');
+    if (!r || !r.first) { line.innerHTML = icon('check'); line.setAttribute('aria-label', 'Награда уже получена'); return; }
+    var sum = r.stamps - (r.finale ? r.finale.stamps : 0) + (r.words || 0);
+    line.innerHTML = '<span class="rw">+' + sum + ' ' + stampIco() + '</span>';
+    line.setAttribute('aria-label', '+' + nStamps(sum));
   }
-  // Шкала звания: ★ 75 / 110 и название (PLAYBOOK §4.11).
-  function rankBar(r) {
-    var k = S.rank(), el = document.createElement('div');
-    el.className = 'rank-bar' + (r && r.rank ? ' up' : '');
-    var pct = k.next ? Math.round(100 * (k.xp - k.from) / (k.next.xp - k.from)) : 100;
-    el.innerHTML = icon('star') + '<b>' + k.xp + (k.next ? ' / ' + k.next.xp : '') + '</b><span class="bar"><i style="width:' + pct + '%"></i></span><span class="rank-name">' + esc(k.name) + '</span>';
-    el.setAttribute('aria-label', 'Звание: ' + k.name + ', опыт ' + k.xp + (k.next ? ' из ' + k.next.xp : ''));
-    return el;
-  }
-
-  /* ---------- оформление атласа: на что тратить марки (ТЗ §8.2) ---------- */
-  function openCovers(from) {
-    window.Sound.play('tap');
-    var html = '<h3>Оформление атласа</h3><div class="cover-grid">' + S.covers().map(function (c) {
-      var tag = c.on ? icon('check') : c.own ? '' : c.lamps ? c.lamps + ' ' + icon('lamp') : c.streak ? '🔥 ' + c.streak : c.locked ? icon('lock') : c.price ? c.price + ' ' + icon('stamp') : 'бесплатно';
-      return '<button class="cover-opt' + (c.on ? ' on' : '') + '" data-cover="' + c.id + '"' + (c.can ? '' : ' disabled') + '>' +
-        '<span class="cv-swatch cv-' + c.id + '"></span><b>' + esc(C.covers[c.id] || c.id) + '</b><span class="tag">' + tag + '</span></button>';
-    }).join('') + '</div><p class="muted small">' + icon('stamp') + ' ' + S.data.wallet.stamps + '</p><button class="btn-link" data-close>Закрыть</button>';
-    openSheet('covers', html, function (el) {
-      el.querySelectorAll('[data-cover]').forEach(function (b) {
-        b.addEventListener('click', function () {
-          var r = S.setCover(b.dataset.cover);
-          if (!r) return;
-          A.event('atlas_cover', { cover: b.dataset.cover, price: r.price, bought: r.bought, stamps: S.data.wallet.stamps });
-          window.Sound.play(r.bought ? 'reward' : 'tap');
-          closeSheet();
-          if (from === 'result') { var p = $('btn-cover-pick'); if (p) p.remove(); renderLantern(resultStory); }
-          if (screen === 'scr-atlas') showAtlas(atlasFrom, atlasCh);
-        });
-      });
-    });
-  }
-  // Находка сама влетает в значок атласа (план эксперта: коллекция на виду).
-  // Итог первой истории: все предметы сцены по очереди улетают на первую страницу атласа (п. 1.5).
-  function flyItems(ch) {
+  // Итог первой истории: все предметы сцены по очереди улетают на первую страницу атласа.
+  function flyItems() {
     if (document.body.classList.contains('rm')) return;
     var to = $('res-atlas-chip');
     $('result-items').querySelectorAll('.scene-item').forEach(function (it, i) {
@@ -1401,7 +942,7 @@
       }, 800);
     }, delay || 1200);
   }
-  // Тайное слово главы: «_ _ _ _ Н _». У каждой главы своё (круг 5).
+  // Тайное слово главы: «_ _ _ _ Н _». У каждой главы своё.
   function secretCells(sw) {
     return sw.word.split('').map(function (ch, i) { return '<span class="sl' + (sw.got[i] ? ' on' : '') + '">' + (sw.got[i] || '') + '</span>'; }).join('');
   }
@@ -1411,159 +952,53 @@
     el.hidden = false;
     el.innerHTML = '<span class="muted">' + esc(sw.title) + '</span><span class="secret-cells">' + secretCells(sw) + '</span>';
   }
-  // Угадать тайное слово до последней буквы: на вступлении, одна попытка.
-  function renderGuess(s) {
-    var box = $('intro-guess'), ch = s.chapter;
-    if (!S.canGuess(ch)) { box.hidden = true; return; }
-    var sw = S.secretOf(ch), opts = [sw.word].concat(S.chapter(ch).secret_decoys || []);
-    if (opts.length < 2) { box.hidden = true; return; }
-    if ((String(S.data.seed).charCodeAt(0) + ch) % 2) opts.reverse(); // верное слово не всегда слева
-    box.hidden = false;
-    box.innerHTML = '<b>' + esc(sw.title) + ': угадаете до последней буквы?</b><span class="secret-cells">' + secretCells(sw) + '</span>' +
-      '<span class="guess-opts">' + opts.map(function (w) { return '<button class="btn-small" data-guess="' + esc(w) + '">' + esc(w) + '</button>'; }).join('') + '</span>' +
-      '<span class="muted">Одна попытка · верно — +' + nLoupes(S.GUESS.loupes) + ' и +' + nStamps(S.GUESS.stamps) + '</span>';
-    box.querySelectorAll('[data-guess]').forEach(function (b) {
-      b.addEventListener('click', function () {
-        var r = S.guess(ch, b.dataset.guess);
-        if (!r) return;
-        A.event('secret_guess', { story_id: s.id, chapter: ch, ok: r.ok });
-        window.Sound.play(r.ok ? 'reward' : 'wrong');
-        box.innerHTML = r.ok ? '<b>' + icon('check') + ' Верно: ' + esc(sw.word) + '!</b><span class="muted">+' + nLoupes(r.loupes) + ' · +' + nStamps(r.stamps) + '. Последняя буква — в этой истории.</span>'
-          : '<b>Не угадали.</b><span class="muted">Последняя буква — в этой истории, на золотой клетке.</span>';
-        box.classList.toggle('good', r.ok);
-        pulse(box);
-      });
-    });
-  }
-  /* Фонарь у пройденного места — выбор игрока (вторая серия, п. 1.4: автозажигание съедало марки, эксперт №6).
-     Хватает марок — кнопка «Зажечь»; «Дальше» по-прежнему один тап и марки не трогает.
-     Раз в 3 истории — бесплатный фонарь у одного из двух мест, у каждого свой подарок. */
-  /* Ступени места (план эксперта №7, п. 1.1): фонарь → окна → жители. На итоге — фонарь этой истории,
-     а если он уже горит — ближайшая по цене ступень любого пройденного места. */
-  var TIER = {
-    1: { title: 'Фонарь', verb: 'Зажечь фонарь', done: 'Фонарь горит', art: 'street_lamp', emoji: '🏮' },
-    2: { title: 'Окна', verb: 'Зажечь окна', done: 'Окна горят', art: 'house_window', emoji: '🪟' },
-    3: { title: 'Жители', verb: 'Позвать жителей', done: 'Жители вернулись', art: 'squirrel', emoji: '🐿️' },
-  };
+  /* Фонарь этого места — выбор игрока: марки на фонарь или на подсказки. Не хватает марок — шкала
+     «есть / нужно», нажатие вздрагивает. «Дальше» по-прежнему один тап и марки не трогает. */
   function renderLantern(s) {
-    var b = $('btn-lantern');
-    renderGoal();
-    renderLampPick(s);
-    var id = S.tierOf(s.id) === 0 ? s.id : (S.nextUpgrade() || {}).id;
-    if (!id || S.data.completed_story_ids.indexOf(s.id) < 0 || !$('lamp-pick').hidden) { b.hidden = true; return; }
-    var st = S.story(id), tier = S.tierOf(id) + 1, can = S.canUpgrade(id), cost = S.tierCost(id), T = TIER[tier];
-    b.classList.remove('lit');
-    b.onclick = function () { upgradePlace(id, b); };
+    var b = $('btn-lantern'), done = S.data.completed_story_ids.indexOf(s.id) >= 0;
+    if (!done || S.data.lanterns.indexOf(s.id) >= 0) { b.hidden = true; return; }
+    var cost = S.lanternCost(), have = S.data.wallet.stamps, can = S.canLight(s.id);
     b.hidden = false;
-    b.disabled = !can;
-    b.dataset.tier = tier;
-    b.innerHTML = '<span class="lan-img art"></span><span><b>' + (can ? T.verb : T.title) + ': ' + esc(st.place) + '</b><span class="muted">' +
-      (can ? cost + ' ' + icon('stamp') + ' · у вас ' + S.data.wallet.stamps : S.data.wallet.stamps + ' / ' + cost + ' ' + icon('stamp')) + '</span></span>';
-    art(b.querySelector('.lan-img'), T.art, T.emoji);
-  }
-  function upgradePlace(id, b, from) {
-    var st = S.story(id);
-    if (S.tierOf(id) === 0) return lightLantern(st, b, from);
-    var r = S.upgrade(id);
-    if (!r) return;
-    A.event('place_upgrade', { story_id: id, tier: r.tier, cost: r.cost, stamps: S.data.wallet.stamps, from: from || (screen === 'scr-result' ? 'result' : 'town') });
-    window.Sound.play('reward');
-    if (b) {
-      b.innerHTML = '<span class="lan-img art"></span><span><b>' + TIER[r.tier].done + ': ' + esc(st.place) + '</b><span class="muted">−' + r.cost + ' ' + icon('stamp') + '</span></span>';
-      art(b.querySelector('.lan-img'), TIER[r.tier].art, TIER[r.tier].emoji);
-      b.disabled = true; b.classList.add('lit');
-    }
-    if (screen === 'scr-result') nextOffer();
-    if (screen === 'scr-town') renderTown();
-    return r;
-  }
-  // После покупки на итоге кнопка через миг предлагает следующую ступень: марки всегда есть куда деть.
-  function nextOffer() {
-    var s = resultStory;
-    setTimeout(function () { if (screen === 'scr-result' && resultStory === s && S.nextUpgrade()) renderLantern(s); }, 1600);
-  }
-  function giftIcons(g) { return g.loupes ? '+' + g.loupes + ' ' + icon('loupe') : '+' + g.stamps + ' ' + icon('stamp'); }
-  function giftLabel(g) { return g.loupes ? '+' + nLoupes(g.loupes) : '+' + nStamps(g.stamps); }
-  function renderLampPick(s) {
-    var box = $('lamp-pick'), o = S.lampOffer();
-    if (!o) { box.hidden = true; box.innerHTML = ''; return; }
-    box.hidden = false;
-    box.innerHTML = '<b>' + icon('lamp') + ' Фонарь даром</b><span class="pick-opts">' + o.places.map(function (p) {
-      return '<button class="pick-opt" data-pick="' + p.id + '" aria-label="Зажечь фонарь даром: ' + esc(S.story(p.id).place) + ', ' + giftLabel(p.gift) + '"><b>' + esc(S.story(p.id).place) + '</b><span class="muted">' + giftIcons(p.gift) + '</span></button>';
-    }).join('') + '</span>';
-    if (!box.dataset.shown || box.dataset.shown !== String(o.trio)) { box.dataset.shown = o.trio; A.event('lamp_offer', { story_id: s.id, count: o.trio, places: o.places.map(function (p) { return p.id; }).join(',') }); }
-    box.querySelectorAll('[data-pick]').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        var r = S.pickLamp(btn.dataset.pick);
-        if (!r) return;
-        A.event('lantern_lit', { story_id: btn.dataset.pick, count: S.data.lanterns.length, stamps: S.data.wallet.stamps, cost: 0, frame: r.frame, from: 'trio_pick', value: r.gift.loupes, gift: r.gift.stamps });
-        window.Sound.play('reward');
-        if (btn.dataset.pick === s.id) lampScene(null);
-        toast(S.story(btn.dataset.pick).place + ': фонарь горит · ' + giftLabel(r.gift));
-        if (r.frame) frameGift(r.frame);
-        renderLantern(s);
-        pulse($('result-goal'));
-      });
-    });
+    b.disabled = false;
+    b.classList.remove('lit');
+    b.classList.toggle('can', can);
+    b.setAttribute('aria-label', 'Зажечь фонарь: ' + s.place + ', ' + nStamps(cost) + (can ? '' : ', у вас ' + have));
+    b.innerHTML = '<span class="lan-img art"></span><span class="lan-body"><b>' + esc(s.place) + '</b>' +
+      '<span class="lan-cost">' + (can ? cost : Math.min(have, cost) + '/' + cost) + ' ' + stampIco() + '</span>' +
+      (can ? '' : '<span class="bar"><i style="width:' + Math.round(100 * Math.min(have, cost) / cost) + '%"></i></span>') + '</span>';
+    art(b.querySelector('.lan-img'), 'street_lamp', '🏮');
+    b.onclick = function () { lightLantern(s, b); };
   }
   function lampScene(cost) {
     var sc = $('result-scene'), lamp = document.createElement('span');
     lamp.className = 'scene-lamp art';
     art(lamp, 'street_lamp', '🏮');
     sc.appendChild(lamp);
-    sc.classList.remove('lamp-flash'); void sc.offsetWidth; sc.classList.add('lamp-flash');
     if (!cost) return;
+    sc.classList.remove('lamp-flash'); void sc.offsetWidth; sc.classList.add('lamp-flash');
     var el = document.createElement('span');
     el.className = 'lamp-cost';
-    el.innerHTML = '−' + cost + ' ' + icon('stamp');
+    el.innerHTML = '−' + cost + ' ' + stampIco();
     sc.appendChild(el);
     setTimeout(function () { el.remove(); }, 1600);
   }
-  // Шкала «фонари → ближайшая рамка атласа»: рамка выдаётся сама, когда фонарей хватает.
-  function renderGoal() {
-    var g = $('result-goal'), nf = S.nextFrame();
-    if (!nf) { g.hidden = true; return; }
-    var pct = Math.min(100, Math.round(100 * nf.have / nf.lamps)), name = C.covers[nf.id] || nf.id;
-    g.hidden = false;
-    g.innerHTML = icon('lamp') + '<b>' + nf.have + ' / ' + nf.lamps + '</b><span class="bar"><i style="width:' + pct + '%"></i></span><span class="rank-name">' + esc(name) + '</span>';
-    g.setAttribute('aria-label', 'Фонари: ' + nf.have + ' из ' + nf.lamps + ' до награды «' + name + '»');
-  }
-  function lightLantern(s, b, from) {
+  function lightLantern(s, b) {
     var r = S.light(s.id);
-    if (!r) return;
-    A.event('lantern_lit', { story_id: s.id, count: S.data.lanterns.length, stamps: S.data.wallet.stamps, cost: r.cost, frame: r.frame, from: from || (screen === 'scr-result' ? 'result' : 'town') });
+    if (!r) { if (b) refuse(b); return null; }
+    A.event('lantern_lit', { story_id: s.id, count: S.data.lanterns.length, stamps: S.data.wallet.stamps, cost: r.cost, from: screen === 'scr-result' ? 'result' : 'town' });
     window.Sound.play('reward');
     if (b) {
-      b.innerHTML = '<span class="lan-img art"></span><span><b>Фонарь горит: ' + esc(s.place) + '</b><span class="muted">фонарей ' + S.data.lanterns.length + ' из ' + S.stories.length + '</span></span>';
+      b.classList.add('lit'); b.disabled = true;
+      b.innerHTML = '<span class="lan-img art"></span><span class="lan-body"><b>' + esc(s.place) + '</b><span class="lan-cost">' + icon('check') + ' ' + S.data.lanterns.length + '/' + S.stories.length + '</span></span>';
       art(b.querySelector('.lan-img'), 'street_lamp', '🏮');
-      b.disabled = true; b.classList.add('lit');
     }
-    if (screen === 'scr-result') {
-      lampScene(r.cost);
-      renderGoal();
-      pulse($('result-goal'));
-      nextOffer();
-    }
-    if (r.frame) frameGift(r.frame);
+    if (screen === 'scr-result') lampScene(r.cost);
     if (screen === 'scr-town') renderTown();
     return r;
   }
-  // Рамка атласа за фонари: карточка на итоге (или подпись в городке), рамка уже надета.
-  function frameGift(id) {
-    var name = C.covers[id] || id;
-    A.event('atlas_frame', { cover: id, lanterns: S.data.lanterns.length });
-    setTimeout(function () { window.Sound.play('reward'); }, 500);
-    if (screen !== 'scr-result') { toast(name + ' — атлас в новой рамке'); return; }
-    var el = document.createElement('div');
-    el.className = 'card reward-card frame-gift';
-    el.innerHTML = '<span class="rc-img cv-swatch cv-' + id + '"></span><span><b>' + esc(name) + '</b><span class="muted">' + S.data.lanterns.length + ' фонарей · атлас в новой рамке</span></span>';
-    var big = $('reward-big');
-    big.insertBefore(el, big.firstChild && big.firstChild.nextSibling);
-  }
 
   /* ---------- фонари Тихоречья: трата марок ---------- */
-  /* Основание фонаря (x %, y %) у своего места на картине bg_town: дом, станция, оранжерея, мост, сад… Без пересечений
-     и не над рекой (план эксперта №7, п. 3.5). Порядок — порядок историй. */
+  /* Основание фонаря (x %, y %) у своего места на картине bg_town. Порядок — порядок историй. */
   var LAMP_SPOTS = [[21, 61], [82, 57], [70, 51], [35, 55], [89, 55], [90, 70], [49, 59], [10, 72], [8, 57], [27, 66],
     [44, 47], [19, 80], [95, 59], [40, 62], [37, 77], [75, 62], [55, 48], [62, 49], [77, 47], [95, 74]];
   function showTown() {
@@ -1572,42 +1007,35 @@
     show('scr-town');
   }
   function renderTown() {
-    $('town-sub').textContent = S.data.lanterns.length + ' / ' + S.stories.length + ' · ' + nStamps(S.data.wallet.stamps);
+    $('town-sub').innerHTML = S.data.lanterns.length + '/' + S.stories.length + ' · ' + S.data.wallet.stamps + ' ' + stampIco();
     var map = $('town-lamps');
     map.innerHTML = '';
     S.stories.forEach(function (st, i) {
-      var t = S.tierOf(st.id), done = S.data.completed_story_ids.indexOf(st.id) >= 0;
+      var on = S.data.lanterns.indexOf(st.id) >= 0, done = S.data.completed_story_ids.indexOf(st.id) >= 0;
       var el = document.createElement('span');
-      el.className = 'town-lamp' + (t ? ' on t' + t : '') + (done ? '' : ' far');
+      el.className = 'town-lamp' + (on ? ' on' : '') + (done ? '' : ' far');
       el.dataset.story = st.id;
       // мест на карте меньше, чем историй, — не падаем, а ставим фонарь со сдвигом
       var sp = LAMP_SPOTS[i % LAMP_SPOTS.length], k = Math.floor(i / LAMP_SPOTS.length);
       el.style.left = Math.min(96, sp[0] + 3 * k) + '%'; el.style.top = Math.max(30, sp[1] - 6 * k) + '%';
-      el.innerHTML = '<span class="tl-lamp art"></span>' + (t >= 2 ? '<span class="tl-badge tl-win art"></span>' : '') + (t >= 3 ? '<span class="tl-badge tl-folk art"></span>' : '');
+      el.innerHTML = '<span class="tl-lamp art"></span>';
       art(el.querySelector('.tl-lamp'), 'street_lamp', '🏮');
-      if (t >= 2) art(el.querySelector('.tl-win'), TIER[2].art, TIER[2].emoji);
-      if (t >= 3) art(el.querySelector('.tl-folk'), TIER[3].art, TIER[3].emoji);
       map.appendChild(el);
     });
     var list = $('town-list');
     list.innerHTML = '';
     S.stories.forEach(function (st) {
-      var t = S.tierOf(st.id), done = S.data.completed_story_ids.indexOf(st.id) >= 0;
+      var on = S.data.lanterns.indexOf(st.id) >= 0, done = S.data.completed_story_ids.indexOf(st.id) >= 0;
       var row = document.createElement('div');
-      row.className = 'town-row' + (t ? ' on' : '');
-      // три ступени места значками: горит — цветной, ещё нет — бледный; справа — цена следующей или замок
-      var pips = '<span class="tiers" aria-label="Ступеней: ' + t + ' из 3">' + [1, 2, 3].map(function (k) {
-        return '<span class="tier art' + (t >= k ? ' got' : '') + '" data-k="' + k + '"></span>';
-      }).join('') + '</span>';
+      row.className = 'town-row' + (on ? ' on' : '');
       var right = !done ? '<span class="muted" aria-label="После истории">' + icon('lock') + '</span>' :
-        t >= 3 ? '<span class="tag" aria-label="Всё горит">' + icon('check') + '</span>' :
-        '<button class="btn-small" data-up="' + st.id + '" aria-label="' + TIER[t + 1].verb + ': ' + esc(st.place) + '"' + (S.canUpgrade(st.id) ? '' : ' disabled') + '>' + S.tierCost(st.id) + ' ' + icon('stamp') + '</button>';
-      row.innerHTML = '<b>' + esc(st.place) + '</b>' + (done ? pips : '') + right;
-      row.querySelectorAll('.tier').forEach(function (p) { var T = TIER[p.dataset.k]; art(p, T.art, T.emoji); });
+        on ? '<span class="tag" aria-label="Фонарь горит">' + icon('check') + '</span>' :
+        '<button class="btn-small" data-light="' + st.id + '" aria-label="Зажечь фонарь: ' + esc(st.place) + '">' + S.lanternCost() + ' ' + stampIco() + '</button>';
+      row.innerHTML = '<b>' + esc(st.place) + '</b>' + right;
       list.appendChild(row);
     });
-    list.querySelectorAll('[data-up]').forEach(function (b) {
-      b.addEventListener('click', function () { upgradePlace(b.dataset.up, null); });
+    list.querySelectorAll('[data-light]').forEach(function (b) {
+      b.addEventListener('click', function () { lightLantern(S.story(b.dataset.light), null) || refuse(b); });
     });
   }
 
@@ -1620,47 +1048,11 @@
     else if (s && S.chapterFull(s.chapter)) showFinale(s.chapter);
     else showAtlas('result', s ? s.chapter : null);
   }
-
-  /* ---------- «На сегодня всё»: дневник, завтрашний подарок, вопрос и открытка ---------- */
-  function showRest() {
-    var s = resultStory, d = S.diary();
-    // «На сегодня всё» на итоге последней истории главы: сначала финал главы, его кнопка «На главную» ведёт дальше
-    if (S.finaleUnseen()) { A.event('finale_shown', { chapter: S.finaleUnseen(), from: 'rest' }); showFinale(S.finaleUnseen()); return; }
-    var t = homeTarget();
-    A.event('session_rest', { story_id: s ? s.id : null, completed: S.data.completed_story_ids.length, diary: d.days, today: d.today });
-    $('rest-sub').textContent = 'Разгадано историй: ' + S.data.completed_story_ids.length + ' · ' + S.rank().name;
-    renderDiary($('rest-diary'));
-    $('rest-question').textContent = s && !S.isChapterEnd(s) ? s.next_question : t.story ? t.story.teaser : S.chapter(lastChapter()).end.question;
-    renderPostcard($('rest-postcard'));
-    show('scr-rest');
+  // Домик на итоге: на главную. Последняя история главы — сначала финал главы.
+  function resultHome() {
     window.Sound.play('tap');
-  }
-
-  /* Открытка-загадка: улика из разгаданной истории, ответ не раскрываем (план эксперта b009, круг 2). */
-  function riddle() {
-    var ids = S.data.completed_story_ids;
-    if (!ids.length || !C.share) return null;
-    var st = S.story(ids[ids.length - 1]);
-    var c = st.clues[0];
-    return { story: st, clue: c, text: C.share.text.replace('{clue}', c.clue.replace(/\n/g, ' ')).replace('{n}', String(c.answer.length)) };
-  }
-  function renderPostcard(el) {
-    var r = riddle();
-    el.hidden = !r;
-    if (!r) return;
-    el.innerHTML = '<span class="pc-img art"></span><span><b>Открытка-загадка</b><span class="muted">«' + esc(r.clue.clue.replace(/\n/g, ' ')) +
-      '» — ' + r.clue.answer.length + ' букв</span></span>';
-    art(el.querySelector('.pc-img'), 'postcard', '💌');
-  }
-  function shareRiddle(from) {
-    var r = riddle();
-    if (!r) return;
-    window.Sound.play('tap');
-    A.event('share_open', { from: from, story_id: r.story.id });
-    P.share(r.text).then(function (how) {
-      A.event('share_done', { from: from, method: how || 'cancel' });
-      if (how === 'copy') toast('Текст открытки скопирован — отправьте его другу');
-    });
+    if (S.finaleUnseen()) { A.event('finale_shown', { chapter: S.finaleUnseen(), from: 'home' }); showFinale(S.finaleUnseen()); return; }
+    showHome();
   }
 
   /* ---------- финал главы (ТЗ §6.2): отдельный экран, заполненная страница атласа ---------- */
@@ -1670,17 +1062,16 @@
     finaleCh = num;
     var list = S.chapterStories(num), last = list[list.length - 1], end = S.chapter(num).end;
     finaleNext = S.stories[last.index + 1] || null;
-    A.event('chapter_finale', { chapter: num, items: S.chapterGot(num), stamps: S.data.wallet.stamps, loupes: S.data.wallet.loupes });
+    A.event('chapter_finale', { chapter: num, items: S.chapterGot(num), stamps: S.data.wallet.stamps });
     $('finale-kicker').textContent = chTitle(num);
     $('finale-title').textContent = end.title;
     $('finale-text').textContent = end.text;
     $('finale-question').textContent = end.question;
     $('finale-q-label').textContent = finaleNext ? chTitle(finaleNext.chapter) : 'Следующий вопрос';
-    $('btn-finale-next').textContent = finaleNext ? 'Глава ' + finaleNext.chapter + ': ' + S.chapter(finaleNext.chapter).title : 'Открыть атлас';
-    $('finale-reward').innerHTML = chip('stamp', '+' + S.FINALE.stamps) + chip('loupe', '+' + S.FINALE.loupes) + chip('star', String(S.data.xp));
+    $('btn-finale-next').textContent = finaleNext ? 'Глава ' + finaleNext.chapter + ': ' + S.chapter(finaleNext.chapter).title : 'Атлас';
+    $('finale-reward').innerHTML = '<span class="rw">+' + S.FINALE.stamps + ' ' + stampIco() + '</span>';
     var g = $('finale-grid');
     g.innerHTML = '';
-    g.dataset.cover = S.data.cover;
     list.forEach(function (st, i) {
       var el = document.createElement('span');
       el.className = 'finale-item art';
@@ -1698,37 +1089,27 @@
   var atlasFrom = 'home', atlasCh = 1;
   function showAtlas(from, num) {
     atlasFrom = from || 'home';
-    atlasCh = num || (from === 'field' && F ? F.story.chapter : from === 'result' && resultStory ? resultStory.chapter : curChapter());
+    atlasCh = num || (from === 'result' && resultStory ? resultStory.chapter : curChapter());
     A.event('atlas_open', { from: atlasFrom, items: S.data.atlas_item_ids.length, chapter: atlasCh });
     var got = S.data.atlas_item_ids;
     $('atlas-page-sub').textContent = S.chapterGot(atlasCh) + ' / ' + S.chapter(atlasCh).slots;
     var tabs = $('atlas-tabs');
     tabs.innerHTML = S.chapters.map(function (c) {
       return '<button class="chip atlas-tab" data-ch="' + c.num + '" aria-pressed="' + (c.num === atlasCh) + '">Глава ' + c.num +
-        ' <b>' + chCount(c.num) + '</b></button>';
+        ' <b>' + S.chapterGot(c.num) + '/' + S.chapter(c.num).slots + '</b></button>';
     }).join('');
     tabs.querySelectorAll('[data-ch]').forEach(function (b) {
       b.addEventListener('click', function () { window.Sound.play('tap'); showAtlas(atlasFrom, +b.dataset.ch); });
     });
     $('atlas-h').textContent = chTitle(atlasCh);
-    var w = S.data.wallet;
-    $('wallet').innerHTML =
-      '<span aria-label="Марки">' + icon('stamp') + '<b>' + w.stamps + '</b></span>' +
-      '<span aria-label="Лупы">' + icon('loupe') + '<b>' + w.loupes + '</b></span>' +
-      (S.data.golden ? '<span class="gold" aria-label="Золотые марки">' + icon('stamp') + '<b>' + S.data.golden + '</b></span>' : '');
-    $('atlas-rank').innerHTML = '';
-    $('atlas-rank').appendChild(rankBar(null));
-    $('scr-atlas').dataset.cover = S.data.cover;
-    var trio = S.trioCount(), rs = $('atlas-route');
-    rs.hidden = !trio;
-    rs.innerHTML = '<b>' + icon('book') + ' Нить маршрута ' + Math.min(trio, C.route_secrets.length) + '/' + C.route_secrets.length + '</b>' +
-      C.route_secrets.slice(0, trio).map(function (t) { return '<p>' + esc(t) + '</p>'; }).join('');
+    $('wallet').innerHTML = '<span aria-label="Марки: ' + S.data.wallet.stamps + '">' + stampIco() + '<b>' + S.data.wallet.stamps + '</b></span>';
+    renderSecret($('atlas-secret'), atlasCh);
     var grid = $('atlas-grid');
     grid.innerHTML = '';
     S.chapterStories(atlasCh).forEach(function (s) {
       var has = got.indexOf(s.reward.atlas_item_id) >= 0;
       var el = document.createElement('button');
-      el.className = 'slot' + (has ? ' got' : '') + (s.index < trio * 3 ? ' linked' : '');
+      el.className = 'slot' + (has ? ' got' : '');
       el.addEventListener('click', function () { openSlot(s, has); });
       el.innerHTML = '<span class="slot-img art"></span><b>' + esc(has ? s.item_title : '?') + '</b><span class="muted">' + esc(s.place) + '</span>';
       if (has) art(el.querySelector('.slot-img'), s.keepsake_img, s.keepsake_icon);
@@ -1763,12 +1144,9 @@
     $('btn-back').innerHTML = icon('back');
     $('btn-atlas-back').innerHTML = icon('back');
     $('btn-settings').innerHTML = icon('gear');
+    $('btn-res-home').innerHTML = icon('home');
     $('clue-prev').innerHTML = icon('left');
     $('clue-next').innerHTML = icon('right');
-    $('hint-ico').innerHTML = icon('bulb');
-    $('atlas-icon').innerHTML = icon('book');
-    $('btn-covers').innerHTML = '<span class="cv-swatch cv-river"></span><span>Оформление</span>';
-    $('btn-accept').innerHTML = icon('check') + '<span>Принять ответ</span>';
 
     $('btn-open').addEventListener('click', function () {
       window.Sound.play('tap');
@@ -1794,17 +1172,6 @@
       if (open) A.event('ending_read', { story_id: resultStory && resultStory.id });
     });
     $('btn-intro-go').addEventListener('click', function () { window.Sound.play('tap'); beginStory(introStory); });
-    $('btn-intro-gold').addEventListener('click', function () {
-      var s = introStory;
-      window.Sound.play('reward');
-      var had = S.cur() && S.cur().story_id === s.id;
-      S.startStory(s.id);
-      if (!had) A.event('story_start', { story_id: s.id, story_index: s.index });
-      var g = S.goldStart();
-      if (g) A.event('gold_run', { story_id: s.id, value: g.cost, loupes: S.data.wallet.loupes });
-      openField();
-      if (g) setTimeout(function () { if (F) floatText('Золотой след: марки ×' + g.mult, 'gold tip', $('loupes')); }, 500);
-    });
     $('btn-intro-home').addEventListener('click', showHome);
     $('btn-back').addEventListener('click', function () {
       var c = S.cur();   // уход с поля до развязки: в Метрике level_quit
@@ -1816,30 +1183,19 @@
     $('clue-card').addEventListener('click', function (e) {
       if (F && F.revealTimer && !e.target.closest('.clue-nav')) endReveal();
     });
-    $('btn-hint').addEventListener('click', openHints);
-    $('btn-sprint').addEventListener('click', startSprint);
-    $('chip-bonus').addEventListener('click', openBonusSheet);
-    $('chip-cache').addEventListener('click', openCacheSheet);
-    $('chip-atlas').addEventListener('click', function () { S.flush(); showAtlas('field'); });
+    $('btn-hint').addEventListener('click', onHint);
     $('res-atlas-chip').addEventListener('click', function () { showAtlas('result'); });
     $('btn-town').addEventListener('click', function () { window.Sound.play('tap'); showTown(); });
     $('btn-town-back').innerHTML = icon('back');
     $('btn-town-back').addEventListener('click', showHome);
-    $('btn-accept').addEventListener('click', acceptShown);
     $('btn-next').addEventListener('click', onNext);
-    $('home-daily').addEventListener('click', onDailyClick);
-    $('btn-res-atlas').addEventListener('click', function () { showAtlas('result'); });
-    $('btn-res-home').addEventListener('click', showRest);
-    $('btn-rest-home').addEventListener('click', function () { window.Sound.play('tap'); showHome(); });
-    $('btn-rest-share').addEventListener('click', function () { shareRiddle('rest'); });
-    $('btn-finale-share').addEventListener('click', function () { shareRiddle('finale'); });
+    $('btn-res-home').addEventListener('click', resultHome);
     $('btn-finale-next').addEventListener('click', function () {
       window.Sound.play('tap');
       if (finaleNext) showIntro(finaleNext); else showAtlas('result', finaleCh);
     });
-    $('btn-atlas-back').addEventListener('click', function () { if (atlasFrom === 'field' && S.cur()) openField(); else showHome(); });
+    $('btn-atlas-back').addEventListener('click', showHome);
     $('btn-atlas-home').addEventListener('click', function () { window.Sound.play('tap'); showHome(); });
-    $('btn-covers').addEventListener('click', function () { openCovers('atlas'); });
     $('btn-finale-atlas').addEventListener('click', function () { window.Sound.play('tap'); showAtlas('result', finaleCh); });
     $('btn-finale-home').addEventListener('click', showHome);
     $('sheet-back').addEventListener('click', closeSheet);
@@ -1856,7 +1212,7 @@
   function boot() {
     F = null;
     visitInfo = S.visit();
-    if (visitInfo.back) A.event('visit_back', { away_days: visitInfo.away, completed: S.data.completed_story_ids.length, diary: S.diary().days });
+    if (visitInfo.back) A.event('visit_back', { away_days: visitInfo.away, completed: S.data.completed_story_ids.length });
     if (!S.data.opened) showBox();
     else {
       recapOn = visitInfo.back && visitInfo.away >= 1 && !!S.lastLearned();
@@ -1871,6 +1227,7 @@
     var restored = !!(env && env.cloud && S.adopt(env.cloud));
     A.event('launch', { persistent: P.persistent, w: innerWidth, h: innerHeight, dpr: devicePixelRatio || 1,
       cloud: P.cloud, sync: P.sync, restored: restored });
+    if (S.migrated) A.event('save_migrated', { loupes: S.migrated.loupes, stamps: S.migrated.stamps, tiers: S.migrated.tiers });
     window.Board.mount();
     bind();
     initStaticArt();

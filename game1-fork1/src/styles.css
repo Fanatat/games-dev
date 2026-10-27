@@ -167,27 +167,7 @@ p { margin: 0; }
 .finger.demo.move { transition: opacity .25s, transform .25s, left .46s ease-in-out, top .46s ease-in-out; }
 .finger.demo.gone { opacity: 0; transform: scale(1.25); }
 .board-lines .line-demo { opacity: .5; }
-.toast { position: absolute; z-index: 4; left: 50%; top: 4px; transform: translateX(-50%); max-width: calc(100% - 32px);
-  padding: 8px 14px; border-radius: 10px; background: var(--text); color: #fff; font-size: 14px; text-align: center; pointer-events: none; }
-.toast.on { animation: fadeUp .2s ease both; }
 
-.field-foot { flex: none; display: flex; align-items: center; gap: 10px; padding: 4px 12px 10px; }
-.btn-hint { position: relative; min-height: var(--btn-h); display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px;
-  border: 1px solid var(--line); border-radius: 12px; background: var(--surface); font-weight: 600; }
-.btn-hint:disabled { opacity: .45; }
-.btn-hint .ico { color: var(--amber); display: inline-flex; }
-.badge { position: absolute; top: -4px; right: -4px; width: 14px; height: 14px; border-radius: 50%; background: var(--amber); border: 2px solid var(--surface); }
-.loupes { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); }
-/* капля лупы: 10 бонусных слов = лупа (круг 10) */
-.loupes .drop { display: inline-flex; gap: 2px; margin-left: 2px; }
-.loupes .drop i { width: 5px; height: 5px; border-radius: 50%; background: var(--line); }
-.loupes .drop i.on { background: var(--amber); }
-/* подталкивание: игра сама зовёт к подсказке */
-.btn-hint.nudge { border-color: var(--amber); animation: nudge 1.6s ease-in-out 4; }
-@keyframes nudge { 50% { box-shadow: 0 0 0 7px rgba(213, 156, 69, .35); transform: scale(1.05); } }
-body.rm .btn-hint.nudge { animation: none; box-shadow: 0 0 0 4px rgba(213, 156, 69, .45); }
-.btn-accept { margin-left: auto; min-height: var(--btn-h); display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px;
-  border: 0; border-radius: 12px; background: var(--green); color: #fff; font-weight: 600; }
 .save-warn { flex: none; text-align: center; font-size: 13px; padding: 0 12px 6px; }
 
 /* ---------- итог ---------- */
@@ -248,27 +228,6 @@ button.slot.got { background: var(--surface); }
 .opt .muted { font-size: 13px; }
 .opt:disabled { opacity: .55; }
 .opt.danger b { color: var(--danger); }
-.hint-grid { display: flex; flex-direction: column; gap: 8px; }
-.hint-opt { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 2px 10px; width: 100%; min-height: 56px;
-  padding: 8px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); text-align: left; }
-.hint-opt .sub { grid-column: 1 / -1; font-size: 13px; }
-.hint-opt b { display: inline-flex; align-items: center; gap: 6px; }
-.hint-opt b .i { width: 18px; height: 18px; flex: none; }
-.hint-opt:disabled { opacity: .6; }
-/* лупа за марки в листе подсказки (вторая серия, круг 3) */
-.hint-note.has-buy { display: flex; align-items: center; justify-content: center; gap: 10px; }
-.btn-buy { display: inline-flex; align-items: center; gap: 5px; min-height: 44px; padding: 4px 14px; border: 1px solid var(--green);
-  border-radius: 22px; background: #EEF3EC; color: var(--green-d); font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; }
-.btn-buy .i { width: 18px; height: 18px; flex: none; }
-.hint-opt.explain:not(:disabled) { border-color: var(--green); background: #EEF3EC; }
-.sheet-x { position: absolute; top: 4px; right: 6px; width: 44px; height: 44px; border: 0; border-radius: 50%; background: none;
-  color: var(--muted); font-size: 26px; line-height: 1; }
-/* низкий экран (320×568): лист подсказки целиком в экране, подписи — только ярлыками (оценка №4, п. 5) */
-@media (max-height: 600px) {
-  .hint-opt, .hint-grid .hint-opt { min-height: 48px; }
-  .hint-opt .sub, .sheet .hint-note:not(.has-buy) { display: none; }
-  .sheet .hint-note.has-buy { margin: 6px 0 0; }
-}
 .tag { font-size: 13px; font-weight: 600; color: var(--green-d); background: var(--surface); border-radius: 8px; padding: 3px 8px; white-space: nowrap; }
 .sw { flex: none; width: 46px; height: 28px; border-radius: 14px; background: var(--line); position: relative; transition: background .15s; }
 .sw::after { content: ""; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; transition: transform .15s; }
@@ -292,13 +251,10 @@ button.slot.got { background: var(--surface); }
   .intro-foot { padding: 6px 18px; }
   .result-foot { display: flex; align-items: center; gap: 8px; padding: 6px 18px; }
   .result-foot .btn-main { flex: 1; }
-  .result-foot .link-row { flex-wrap: nowrap; }
   .place-art, .intro-art, .result-scene { aspect-ratio: auto; height: 34vh; max-height: none; }
   .atlas-cover { aspect-ratio: auto; height: 30vh; }
   .intro-body { padding: 12px 20px 16px; }
   .sheet { left: 50%; right: auto; width: min(100%, 720px); margin-left: max(-50%, -360px); max-height: 94%; padding-top: 6px; gap: 6px; }
-  .hint-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-  .hint-grid .hint-opt { min-height: 64px; }
   #scr-box { flex-direction: row; align-items: center; }
   .box-art { height: 100%; flex: 1; }
   .box-note { flex: 1; }
@@ -307,18 +263,10 @@ button.slot.got { background: var(--surface); }
   :root { --clue-fs: 18px; }
   .clue-card { padding: 6px 8px 6px 10px; margin-top: 6px; }
   .field-head { min-height: 44px; }
-  .btn-hint, .btn-accept { min-height: 44px; }
   .scene { min-height: 48px; }
   .board-wrap { padding: 6px 12px; }
   .field-foot { padding-bottom: 6px; }}
 
-/* ---------- награды круга 2: бонусные слова, тайник, золотая буква, фонари ---------- */
-.chip { flex: none; display: inline-flex; align-items: center; gap: 3px; min-height: 36px; min-width: 44px; padding: 4px 9px;
-  border: 1px solid var(--line); border-radius: 18px; background: var(--surface); color: var(--green-d); font-size: 14px; }
-.chip .i { width: 18px; height: 18px; color: var(--green); }
-#chip-cache { color: #8A5A12; border-color: #E2C68E; background: #FFF6E2; }
-#chip-cache .i { color: var(--amber); }
-.field-foot .chip { min-height: 44px; }
 .pulse { animation: chipPulse .5s ease; }
 @keyframes chipPulse { 40% { transform: scale(1.18); background: #FBE9C6; } }
 .cell.gold { background: #FBEBC4; border-color: #C9962B; box-shadow: inset 0 0 0 2px rgba(201, 150, 43, .55); }
@@ -330,7 +278,6 @@ button.slot.got { background: var(--surface); }
   box-shadow: 0 4px 14px rgba(60, 50, 30, .18); animation: floatUp 1.4s ease both; }
 .float-word.bonus { color: #8A5A12; border-color: #E2C68E; }
 .float-word.gold { color: #8A5A12; background: #FFF3D6; border-color: #C9962B; }
-.float-word.loupe { color: var(--green-d); background: #EEF3EC; }
 .float-word.muted { color: var(--muted); font-weight: 600; }
 .float-word.fly { animation: floatFly 1.3s ease-in both; }
 .float-word.tip { animation-duration: 2.6s; }
@@ -344,37 +291,15 @@ button.slot.got { background: var(--surface); }
 .clue-pic > .art-icon { font-size: 38px; }
 .clue-text { white-space: pre-line; }
 .clue-card.double { border-left-style: double; border-left-width: 7px; }
-.intro-new { font-size: 15px; font-weight: 600; color: #8A5A12; background: #FFF6E2; border: 1px solid #E2C68E; border-radius: 12px; padding: 8px 12px; margin-bottom: 8px; }
-.bonus-words { display: flex; flex-wrap: wrap; gap: 6px; }
-.bw { padding: 3px 10px; border-radius: 12px; background: #FFF6E2; border: 1px solid #E2C68E; font-weight: 600; letter-spacing: .04em; }
 /* итог */
 .result-body { position: relative; }
 .res-atlas-chip { position: absolute; z-index: 2; top: 12px; right: 16px; }
-.rw { display: inline-flex; align-items: center; gap: 2px; padding: 1px 8px 1px 4px; border-radius: 10px; background: #EEF3EC; }
-.rw.good { background: #FFF3D6; color: #8A5A12; }
-.reward-big { display: flex; flex-direction: column; gap: 8px; }
-.reward-big:empty { display: none; }
-.reward-card { display: flex; align-items: center; gap: 12px; padding: 8px 12px; background: #FFF8E8; border-color: #E2C68E;
-  animation: rewardIn .5s cubic-bezier(.2, .9, .3, 1.3) both; }
-.reward-card > span:last-child { display: flex; flex-direction: column; }
-.rc-img { width: 52px; height: 52px; flex: none; border-radius: 10px; }
-.rc-img > img { object-fit: contain; }
-.rc-img > .art-icon { font-size: 32px; }
-@keyframes rewardIn { from { opacity: 0; transform: scale(.7); } }
 .secret-strip { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 14px; flex-wrap: wrap; }
 .secret-strip > .muted { font-size: 14px; }
 .secret-cells { display: flex; gap: 4px; }
 .sl { width: 28px; height: 32px; display: grid; place-items: center; border-radius: 6px; border: 1px dashed #C9962B; font-family: var(--font); font-weight: 700; color: #8A5A12; }
 .sl.on { background: #FBEBC4; border-style: solid; }
-.btn-lantern { display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 48px; padding: 8px 14px; border-radius: 12px;
-  border: 1px solid #E2C68E; background: #FFF6E2; color: #6B4A12; font-weight: 600; flex-wrap: wrap; }
-.btn-lantern:disabled { opacity: .7; }
-.btn-lantern.lit { background: #FBEBC4; opacity: 1; }
-.btn-lantern .i { color: var(--amber); }
 .fly-keep { position: fixed; z-index: 30; pointer-events: none; transition: transform .75s cubic-bezier(.5, 0, .7, .4), opacity .75s; }
-/* фонари */
-.tile-icon.lamp { background: #FFF6E2; }
-.tile-icon.lamp > img { object-fit: contain; }
 .town-scroll { flex: 1; overflow-y: auto; padding: 4px 16px 24px; display: flex; flex-direction: column; gap: 12px; }
 .town-map { position: relative; flex: none; aspect-ratio: 16 / 10; border-radius: var(--r); overflow: hidden; background: linear-gradient(160deg, #E7DDC5, #CFDCC9); }
 .town-bg { position: absolute; inset: 0; }
@@ -384,21 +309,6 @@ button.slot.got { background: var(--surface); }
 .tl-lamp > img { object-fit: contain; }
 .town-lamp.far .tl-lamp { opacity: .35; }
 .town-lamp.on .tl-lamp { filter: drop-shadow(0 0 6px rgba(255, 200, 90, .95)); opacity: 1; }
-.town-lamp.t2 .tl-lamp, .town-lamp.t3 .tl-lamp { filter: drop-shadow(0 0 10px rgba(255, 210, 110, 1)) brightness(1.08); }
-/* ступени места: окна и жители — маленькие значки у фонаря */
-.tl-badge { position: absolute; width: 120%; aspect-ratio: 1; left: 60%; border-radius: 50%; background: rgba(255, 246, 226, .92);
-  box-shadow: 0 0 6px rgba(255, 200, 90, .9); }
-.tl-badge > img { object-fit: contain; }
-.tl-badge > .art-icon { font-size: 9px; }
-.tl-win { top: 10%; }
-.tl-folk { top: 52%; }
-.town-row b { flex: 1; min-width: 0; }
-.tiers { display: inline-flex; gap: 3px; flex: none; }
-.tier { width: 24px; height: 24px; border-radius: 6px; background: #F1ECDF; filter: grayscale(1); opacity: .45; }
-.tier > img { object-fit: contain; }
-.tier > .art-icon { font-size: 15px; }
-.tier.got { filter: none; opacity: 1; background: #FBEBC4; }
-#btn-town.ready .tile-sub, #btn-town.ready #town-tile-sub { color: #8A5A12; font-weight: 700; }
 /* «вау»: главная кнопка ждёт конца полёта находки */
 #btn-next.hold { opacity: .55; }
 .town-list { display: flex; flex-direction: column; gap: 6px; }
@@ -415,50 +325,7 @@ button.slot.got { background: var(--surface); }
   .town-map { aspect-ratio: auto; height: 40vh; }
 }
 
-/* ---------- круг 3: звание, обложки, нить маршрута, финал главы ---------- */
-.toast.new { top: auto; bottom: 8px; padding: 10px 16px; background: #6B4A12; font-size: 15px; font-weight: 600; max-width: calc(100% - 24px); }
-.rank-bar { display: flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 12px; background: var(--surface);
-  border: 1px solid var(--line); font-size: 14px; color: var(--green-d); }
-.rank-bar .i { width: 18px; height: 18px; color: var(--amber); flex: none; }
-.rank-bar .bar { flex: 1; min-width: 50px; height: 8px; border-radius: 4px; background: var(--soft); overflow: hidden; }
-.rank-bar .bar i { display: block; height: 100%; background: var(--amber); border-radius: 4px; transition: width .6s ease; }
-.rank-bar .rank-name { flex: none; max-width: 48%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
-.rank-bar.up { background: #FFF8E8; border-color: #E2C68E; }
-#atlas-rank .rank-bar { margin-bottom: 10px; }
-button.reward-card { width: 100%; text-align: left; font: inherit; color: inherit; }
-.cv-swatch { display: block; width: 52px; height: 52px; flex: none; border-radius: 10px; border: 1px solid var(--line); }
-.cv-paper { background: #F5EEDD; }
-.cv-river { background: linear-gradient(160deg, #CFE0E4, #8FB3BC); }
-.cv-garden { background: linear-gradient(160deg, #DDE8C9, #9FBF86); }
-.cv-copper { background: #F3E3D3; box-shadow: inset 0 0 0 5px #B8733F; }
-.cv-silver { background: #EEF0F0; box-shadow: inset 0 0 0 5px #9EA6AA; }
-.cv-gold { background: #FBF0D2; box-shadow: inset 0 0 0 5px #C9962B; }
-.cv-ember { background: radial-gradient(circle at 50% 70%, #FFD58A, #F6E6C8 70%); box-shadow: inset 0 0 0 5px #D4652B; }
-.covers-btn { margin: 0 auto 10px; min-height: 44px; padding: 4px 12px 4px 4px; gap: 8px; }
-.covers-btn .cv-swatch { width: 34px; height: 34px; }
-.cover-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-.cover-opt { display: flex; flex-direction: column; align-items: center; gap: 4px; min-height: 104px; padding: 8px 4px; border: 1px solid var(--line);
-  border-radius: 12px; background: var(--surface); font: inherit; font-size: 13px; color: inherit; }
-.cover-opt.on { border: 2px solid var(--green); background: #EEF3EC; }
-.cover-opt:disabled { opacity: .5; }
-.cover-opt .tag { display: inline-flex; align-items: center; gap: 2px; color: var(--muted); font-size: 13px; min-height: 18px; }
-.cover-opt .tag .i { width: 16px; height: 16px; }
-#scr-atlas[data-cover="river"] .atlas-scroll { background: linear-gradient(180deg, #E3EDEE, var(--bg) 40%); }
-#scr-atlas[data-cover="garden"] .atlas-scroll { background: linear-gradient(180deg, #E6EDD8, var(--bg) 40%); }
-#scr-atlas[data-cover="copper"] .atlas-cover { outline: 6px solid #B8733F; outline-offset: -6px; }
-#scr-atlas[data-cover="silver"] .atlas-cover { outline: 6px solid #9EA6AA; outline-offset: -6px; }
-#scr-atlas[data-cover="gold"] .atlas-cover { outline: 6px solid #C9962B; outline-offset: -6px; box-shadow: 0 0 18px rgba(201, 150, 43, .45); }
-#scr-atlas[data-cover="copper"] .slot.got { border-color: #B8733F; }
-#scr-atlas[data-cover="silver"] .slot.got { border-color: #9EA6AA; }
-#scr-atlas[data-cover="gold"] .slot.got { border-color: #C9962B; }
-#scr-atlas[data-cover="ember"] .atlas-cover { outline: 6px solid #D4652B; outline-offset: -6px; box-shadow: 0 0 18px rgba(212, 101, 43, .4); }
-#scr-atlas[data-cover="ember"] .slot.got { border-color: #D4652B; }
-.finale-grid[data-cover="ember"] .finale-item { border-color: #D4652B; }
 .atlas-cover { position: relative; }
-.route-secret { display: flex; flex-direction: column; gap: 6px; padding: 10px 14px; margin-bottom: 4px; background: #FFF8E8; border-color: #E2C68E; }
-.route-secret b { display: inline-flex; align-items: center; gap: 6px; color: #6B4A12; }
-.route-secret p { margin: 0; font-family: var(--font); font-size: 16px; line-height: 1.4; }
-.slot.linked { box-shadow: 0 0 0 2px rgba(213, 156, 69, .55); }
 /* финал главы */
 .finale-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
 .finale-bg { aspect-ratio: 16 / 9; margin: 12px 12px 0; border-radius: var(--r); overflow: hidden; background: linear-gradient(160deg, #E7DDC5, #CFDCC9); }
@@ -470,7 +337,6 @@ button.reward-card { width: 100%; text-align: left; font: inherit; color: inheri
   animation: rewardIn .5s cubic-bezier(.2, .9, .3, 1.3) both; }
 .finale-item > img { object-fit: contain; }
 .finale-item > .art-icon { font-size: 24px; }
-.finale-grid[data-cover="gold"] .finale-item { border-color: #C9962B; }
 .finale-reward { justify-content: center; font-size: 16px; }
 @media (orientation: landscape) and (max-height: 560px), (min-aspect-ratio: 3/2) and (max-height: 760px) {
   .finale-scroll, #scr-finale .result-foot { max-width: 560px; margin: 0 auto; width: 100%; }
@@ -478,40 +344,11 @@ button.reward-card { width: 100%; text-align: left; font: inherit; color: inheri
   .finale-grid { grid-template-columns: repeat(10, 1fr); }
 }
 
-/* круг 4: главы в атласе, дневник маршрута, «На сегодня всё», открытка */
-.atlas-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin: 6px 0 2px; }
-.atlas-tab { min-height: 44px; padding: 6px 14px; font-size: 15px; }
-.atlas-tab[aria-pressed="true"] { background: var(--green); color: #fff; border-color: var(--green); }
-.diary { display: flex; flex-direction: column; gap: 6px; padding: 10px 14px; }
-.diary-days { display: flex; gap: 6px; }
-.dd { width: 34px; height: 34px; border-radius: 50%; border: 2px dashed #CDBB95; display: grid; place-items: center;
-  font-size: 13px; color: var(--muted); }
-.dd.on { border: 2px solid var(--green); background: #E5F0E2; color: var(--green); }
-.dd .i { width: 18px; height: 18px; }
-.postcard { display: flex; gap: 12px; align-items: center; padding: 10px 12px; }
-.pc-img { width: 72px; height: 54px; flex: none; border-radius: 8px; background: var(--soft); }
-.pc-img > img { object-fit: contain; }
-.postcard > span:last-child { display: flex; flex-direction: column; gap: 2px; font-family: var(--font); }
-#scr-finale .result-foot .link-row, #scr-rest .result-foot .link-row { flex-wrap: wrap; }
-@media (orientation: landscape) and (max-height: 560px), (min-aspect-ratio: 3/2) and (max-height: 760px) {
-  #scr-rest .finale-scroll, #scr-rest .result-foot { max-width: 560px; margin: 0 auto; width: 100%; }
-}
 
 /* ---------- меньше движения ---------- */
 body.rm *, body.rm *::before, body.rm *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 body.rm .finger { animation: none; opacity: 1; }
 body.rm .cell.hint-start { animation: none; }
-/* круг 4: золотые марки в кошельке атласа отличаются от обычных; 15 фонарей не налезают друг на друга */
-#wallet .gold { color: #A86F12; }
-#wallet .gold svg { color: #C9962B; }
-/* круг 5: фонарь прямо на итоге — карточка с картинкой, вспышка на сцене */
-.btn-lantern.card { justify-content: flex-start; gap: 12px; text-align: left; width: 100%; font: inherit; }
-.btn-lantern > span:last-child { display: flex; flex-direction: column; }
-.btn-lantern .muted { font-weight: 400; }
-.lan-img { width: 52px; height: 52px; flex: none; border-radius: 10px; filter: grayscale(.7) brightness(.85); }
-.lan-img > img { object-fit: contain; }
-.lan-img > .art-icon { font-size: 32px; }
-.btn-lantern.lit .lan-img { filter: drop-shadow(0 0 8px rgba(255, 196, 80, .9)); }
 .scene-lamp { position: absolute; right: 8%; bottom: 10%; width: 22%; height: 46%; pointer-events: none;
   filter: drop-shadow(0 0 14px rgba(255, 200, 90, .95)); animation: lampPop .7s cubic-bezier(.3, 1.6, .5, 1) both; }
 .scene-lamp > img { object-fit: contain; }
@@ -520,73 +357,31 @@ body.rm .cell.hint-start { animation: none; }
   background: radial-gradient(circle at 80% 60%, rgba(255, 214, 120, .85), rgba(255, 214, 120, 0) 60%); animation: lampFlash 1.4s ease both; }
 @keyframes lampPop { from { opacity: 0; transform: scale(.3) translateY(20px); } }
 @keyframes lampFlash { 0% { opacity: 0; } 25% { opacity: 1; } 100% { opacity: .35; } }
-/* круг 5: шкала «Нити маршрута» на поле */
-.scene-thread { position: absolute; left: 6px; bottom: 6px; display: flex; align-items: center; gap: 5px; padding: 3px 8px; border-radius: 10px;
-  background: rgba(255, 253, 246, .9); font-size: 12px; color: var(--green-d); pointer-events: none; }
-.scene-thread .i { width: 14px; height: 14px; color: var(--amber); }
-.th-dots { display: flex; gap: 3px; }
-.th-dots i { width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid var(--amber); }
-.th-dots i.on { background: var(--amber); }
-.th-dots i.cur { box-shadow: 0 0 0 2px rgba(213, 156, 69, .35); }
 /* круг 5: письмо Полины и улика-силуэт */
 .clue-card.letter { background: #FFFBF0; border-left-color: #8A5A12; }
 .clue-card.letter .clue-text { font-style: italic; }
 .clue-card.letter::before { content: '✉ ' attr(data-letter); position: absolute; top: -9px; left: 14px; padding: 0 6px; font-size: 11px; font-weight: 700;
   color: #8A5A12; background: #FFF6E2; border: 1px solid #E2C68E; border-radius: 6px; }
 .clue-pic.sil > img { filter: brightness(0) opacity(.8); }
-/* круг 5: угадать тайное слово на вступлении */
-.intro-guess { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; padding: 10px 14px; margin-bottom: 8px; }
-.intro-guess.good { background: #E4EFE7; }
-.guess-opts { display: flex; gap: 8px; flex-wrap: wrap; }
-.guess-opts .btn-small { min-height: 44px; min-width: 96px; font-weight: 700; letter-spacing: .04em;
-  background: var(--surface); color: var(--green-d); border: 2px solid var(--green); box-shadow: none; }
 
 /* Вечернее поле (пометка evening): сумерки и тёплый свет фонарей */
 #scr-field.evening { background: linear-gradient(180deg, #3B3F5C 0%, #5A4A5E 38%, #7A5844 100%); --muted: #E6D9C2; }
-#scr-field.evening .field-head, #scr-field.evening .loupes { color: #FFF4DE; }
+#scr-field.evening .field-head, #scr-field.evening .stamps { color: #FFF4DE; }
 #scr-field.evening .clue-card { --muted: #6E6A5C; }
 #scr-field.evening .scene::after { content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
   background: radial-gradient(circle at 18% 30%, rgba(255, 196, 92, .38), transparent 28%),
     radial-gradient(circle at 82% 26%, rgba(255, 196, 92, .34), transparent 26%),
     linear-gradient(180deg, rgba(34, 38, 76, .34), rgba(110, 64, 28, .14)); }
-/* Улика дня на главной (круг 8): загадка, ячейки ответа, плитки букв, серия «🔥 N» */
-.daily { padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; border-left: 4px solid var(--amber); }
-.daily-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.daily .day-streak { font-weight: 700; color: var(--danger); background: #FBE9C6; border-radius: 12px; padding: 2px 10px; }
-.daily-clue { font-family: var(--font); font-size: calc(var(--clue-fs) - 1px); line-height: 1.35; }
-.daily-slots { display: flex; gap: 4px; justify-content: center; flex-wrap: wrap; }
-.daily-slots.shake { animation: shake .3s ease; }
-.daily .ds { width: 34px; height: 40px; border: 0; border-bottom: 3px solid var(--line); background: none; font: 700 20px var(--font); color: var(--text);
-  display: inline-flex; align-items: center; justify-content: center; padding: 0; }
-.daily .ds.on { border-bottom-color: var(--green); cursor: pointer; }
-.daily-tiles { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; }
-.daily .dt { min-width: 44px; height: 44px; border-radius: 10px; border: 1px solid var(--line); background: var(--soft); box-shadow: 0 2px 0 var(--line);
-  font: 700 20px var(--font); color: var(--text); }
-.daily .dt:disabled { opacity: .3; box-shadow: none; }
-.daily-done { color: var(--green-d); display: inline-flex; align-items: center; gap: 4px; }
 /* Напоминание при возвращении (круг 8): картинка прошлой истории и висящий вопрос */
 /* цена с значком марки не разрывается на 320 (круг 8) */
 .nw { white-space: nowrap; }
 @media (max-width: 359px) { #btn-next { font-size: 15px; padding-left: 10px; padding-right: 10px; } }
 
-/* ---------- круг 9 (план эксперта №5, круг 3): интерфейс ---------- */
-/* 3.1 «Принять ответ» не уходит за край: пока она видна, чипы и лупы прячутся, кнопка занимает остаток строки */
-.field-foot.accepting .chip, .field-foot.accepting .loupes { display: none; }
-.field-foot.accepting .btn-accept { flex: 1 1 auto; min-width: 0; justify-content: center; margin-left: 0; }
-.chip { min-height: 44px; }
 /* 3.2 итог: развязка свёрнута */
 .ending-toggle { margin: 4px 0 0; padding-left: 0; text-align: left; }
 .ending-toggle::after { content: ' ›'; }
 .ending-toggle[aria-expanded="true"]::after { content: ' ⌄'; }
 .keepsake #keepsake-note { display: none; }
-/* 3.3 новинка — значок и 1–2 слова */
-.new-badge { display: inline-block; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: #FFF6E2;
-  background: #B7791F; border-radius: 6px; padding: 1px 6px; margin-right: 4px; vertical-align: 1px; }
-.daily-gain .i { width: 15px; height: 15px; vertical-align: -2px; color: var(--amber); }
-.btn-gold { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; min-height: 44px; margin-bottom: 8px;
-  border: 1.5px solid #C9962B; border-radius: 14px; background: #FFF6E2; color: #7A4E0E; font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; }
-.btn-gold .i { width: 18px; height: 18px; flex: none; }
-.big-badge { background: #2F6B53; text-transform: none; letter-spacing: 0; font-size: 13px; }
 /* 3.6 звук — круглая кнопка в углу главной и плитка в настройках */
 .head-btns { display: flex; gap: 4px; flex: none; }
 #btn-sound, #btn-music { border-radius: 50%; }
@@ -597,35 +392,6 @@ body.rm .cell.hint-start { animation: none; }
 .tile-btn .i { width: 26px; height: 26px; color: var(--green); }
 .tile-btn[aria-checked="false"] { background: var(--soft); color: var(--muted); }
 .tile-btn[aria-checked="false"] .i { color: var(--muted); }
-/* 3.7 на телефоне: заголовок поля целиком — точки улик во второй строке вместо места; на 320 звание без обрезки */
-@media (max-width: 419px) {
-  .field-head { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "back title atlas" "back dots atlas"; column-gap: 6px; row-gap: 3px; }
-  .field-head #btn-back { grid-area: back; }
-  .field-head .field-title { grid-area: title; }
-  .field-head #field-sub { display: none; }
-  .field-head #chip-atlas { grid-area: atlas; }
-  .field-head .dots { grid-area: dots; gap: 5px; }
-  .field-head .dot { width: 10px; height: 10px; }
-  .rank-bar .rank-name { max-width: none; flex: 0 1 auto; white-space: normal; text-overflow: clip; line-height: 1.15; text-align: right; }
-  .rank-bar .bar { min-width: 24px; }
-}
-@media (max-width: 359px) {
-  .field-head { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "back title atlas" "back dots atlas"; column-gap: 6px; row-gap: 3px; }
-  .field-head #btn-back { grid-area: back; }
-  .field-head .field-title { grid-area: title; }
-  .field-head #field-sub { display: none; }
-  .field-head #chip-atlas { grid-area: atlas; }
-  .field-head .dots { grid-area: dots; gap: 5px; }
-  .field-head .dot { width: 10px; height: 10px; }
-  .field-title b { font-size: 16px; }
-  .rank-bar { font-size: 13px; }
-  .rank-bar .bar { min-width: 24px; }
-  .rank-bar .rank-name { max-width: none; flex: 0 1 auto; white-space: normal; text-overflow: clip; line-height: 1.15; text-align: right; }
-}
-/* 2.2 улика дня — чем поделиться (круг 10) */
-.daily-share { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
-.daily-marks { font-size: 18px; letter-spacing: 2px; }
-#btn-daily-share .i { width: 18px; height: 18px; margin-right: 4px; }
 /* круг 10 (п. 1.3): фонарь зажигается сам — цена улетает со сцены */
 .lamp-cost { position: absolute; right: 10%; bottom: 58%; display: inline-flex; align-items: center; gap: 3px; padding: 2px 8px;
   border-radius: 10px; background: rgba(255, 246, 226, .92); color: #8A5A12; font-weight: 700; font-size: 15px; pointer-events: none;
@@ -633,14 +399,6 @@ body.rm .cell.hint-start { animation: none; }
 .lamp-cost .i { width: 15px; height: 15px; }
 @keyframes lampCost { 0% { opacity: 0; transform: translateY(6px); } 20% { opacity: 1; transform: none; } 100% { opacity: 0; transform: translateY(-26px); } }
 .rm .lamp-cost { animation: none; }
-/* круг 10 (п. 4.3): на низком телефоне (320×568) картинка вступления ниже — варианты имени не прячутся под «Искать улики» */
-@media (max-height: 640px) and (max-width: 559px) {
-  .intro-art { aspect-ratio: auto; height: 30vh; }
-}
-/* круг 10: на 320–360 «Принять ответ» переносилась в две строки (61 px) и подвал уходил под нижний край на 8–14 px */
-.field-foot.accepting .btn-accept { white-space: nowrap; padding-left: 10px; padding-right: 10px; }
-.field-foot.accepting .btn-hint { padding-left: 12px; padding-right: 12px; }
-.field-foot.accepting { gap: 6px; }
 /* вторая серия, круг 1: марки за слово, серия, счётчик бонусов, выбор фонаря, «вау» на первых итогах */
 .fly-letter { position: fixed; z-index: 30; display: grid; place-items: center; pointer-events: none; font-weight: 800; font-size: 24px;
   color: #8A5A12; background: #FFF3D6; border-radius: 10px; transition: transform .6s cubic-bezier(.5, 0, .7, .4), opacity .6s ease-in; }
@@ -651,37 +409,138 @@ body.rm .cell.hint-start { animation: none; }
 .word-stamps i { font-style: normal; margin-left: 3px; padding: 0 4px; border-radius: 6px; background: #C9962B; color: #fff; font-size: 13px; }
 @keyframes wordStamps { 0% { opacity: 0; transform: translate(-50%, 8px) scale(.7); } 15% { opacity: 1; transform: translate(-50%, 0) scale(1.1); }
   25%, 75% { opacity: 1; transform: translate(-50%, 0) scale(1); } 100% { opacity: 0; transform: translate(-50%, -18px); } }
-#streak { position: absolute; z-index: 4; top: 6px; right: 6px; padding: 2px 10px; border-radius: 12px; background: #C9962B; color: #fff;
-  font-weight: 800; font-size: 14px; box-shadow: 0 2px 6px rgba(60, 50, 30, .25); pointer-events: none; }
-/* Пыль на клетке и спринт (вторая серия, круг 3; план эксперта №7, п. 1.4) */
-.cell.dust { background: radial-gradient(circle at 30% 35%, rgba(255,255,255,.35) 0 18%, transparent 19%),
-  radial-gradient(circle at 70% 65%, rgba(255,255,255,.25) 0 14%, transparent 15%), #CDBF9F; border-color: #B5A47E; }
-.cell.dust::after { content: ''; width: 34%; height: 34%; border-radius: 50%; background: rgba(120,100,60,.18); }
-.cell.swept { animation: swept .8s ease-out both; }
-@keyframes swept { 0% { box-shadow: 0 0 0 0 rgba(205,191,159,.95); background: #E9DFC8; } 100% { box-shadow: 0 0 0 16px rgba(205,191,159,0); } }
-.sprint { position: absolute; z-index: 4; top: 6px; left: 6px; display: inline-flex; align-items: center; gap: 6px; min-height: 40px;
-  padding: 4px 12px; border: 0; border-radius: 20px; background: #2F6B53; color: #fff; font: inherit; font-size: 15px; cursor: pointer;
-  box-shadow: 0 2px 6px rgba(0,0,0,.18); }
-.sprint .i { width: 18px; height: 18px; }
-.sprint.run { background: linear-gradient(90deg, #C9962B calc(var(--left, 1) * 100%), #8A7A55 0); opacity: 1; cursor: default; }
-.sprint:disabled { color: #fff; }
-.sprint .sp-t { font-variant-numeric: tabular-nums; opacity: .9; }
-/* низкая сцена (320×568, 360×640 — 52–57 px): спринт и «Нить» не помещаются рядом — пока виден спринт, «Нить» скрыта */
-.scene.sprint-tight .scene-thread { display: none; }
-#streak.out { opacity: 0; transform: scale(.8); transition: opacity .35s, transform .35s; }
-#chip-bonus .of { font-weight: 600; color: var(--muted); font-size: 14px; }
-#chip-bonus .i { color: var(--amber); }
-#chip-bonus.full { background: #FFF3D6; }
-.lamp-pick { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; background: #FFF8E8; }
-.lamp-pick > b { display: flex; align-items: center; gap: 6px; }
-.lamp-pick .i { width: 18px; height: 18px; color: var(--amber); }
-.pick-opts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.pick-opt { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-height: 48px; padding: 8px 10px; border-radius: 12px;
-  border: 1px solid #E2C68E; background: var(--surface); font: inherit; text-align: left; cursor: pointer; }
-.pick-opt .muted { display: inline-flex; align-items: center; gap: 3px; font-size: 15px; color: #8A5A12; font-weight: 700; }
-.pick-opt .muted .i { width: 16px; height: 16px; }
 .keepsake.wow .keepsake-img { animation: keepWow 2s ease both; position: relative; z-index: 6; }
 @keyframes keepWow { 0% { transform: scale(.4); opacity: 0; } 18% { transform: translate(calc(50vw - 100px), -40px) scale(3); opacity: 1;
   box-shadow: 0 0 0 10px rgba(255, 220, 140, .5), 0 0 40px rgba(255, 196, 80, .8); } 70% { transform: translate(calc(50vw - 100px), -40px) scale(3);
   box-shadow: 0 0 0 10px rgba(255, 220, 140, .5), 0 0 40px rgba(255, 196, 80, .8); } 100% { transform: none; box-shadow: none; } }
 .rm .keepsake.wow .keepsake-img { animation: none; }
+
+/* ---------- упрощение 2026-10: значки и числа вместо фраз ---------- */
+.chip { flex: none; display: inline-flex; align-items: center; gap: 4px; min-height: 44px; min-width: 44px; padding: 4px 10px;
+  border: 1px solid var(--line); border-radius: 22px; background: var(--surface); color: var(--green-d); font-size: 15px; }
+.chip-img { width: 26px; height: 26px; border-radius: 6px; }
+.chip-img > img { object-fit: contain; }
+.chip-img > .art-icon { font-size: 18px; }
+@keyframes rewardIn { from { opacity: 0; transform: scale(.7); } }
+/* марка — одна валюта, везде один значок */
+.st-ico { width: 1.25em; height: 1.25em; flex: none; object-fit: contain; vertical-align: -.28em; }
+/* шкатулка: как играть — картинкой: буквы → предмет */
+.box-how { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 0 0 18px; }
+.bh-tiles { display: flex; gap: 4px; }
+.bh-tiles i { width: 40px; height: 40px; display: grid; place-items: center; font: 700 22px var(--font); font-style: normal;
+  background: #FBE9C6; border: 1px solid var(--amber); border-radius: 9px; box-shadow: 0 2px 0 var(--line); }
+.bh-arrow { font-size: 24px; color: var(--amber); font-weight: 700; }
+.bh-item { width: 56px; height: 56px; border-radius: 12px; background: var(--surface); border: 1px solid var(--line); }
+.bh-item > img { object-fit: contain; }
+.bh-item > .art-icon { font-size: 32px; }
+/* главная: фонарь и атлас — две плитки с шкалой */
+.home-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.home-tiles .tile { min-height: 72px; padding: 10px 12px; gap: 10px; }
+.home-tiles .tile-text { flex: 1; min-width: 0; gap: 6px; }
+.home-tiles .tile-text b { font-size: 18px; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.tile-icon > img { object-fit: contain; }
+.tile-icon.lamp { background: #FFF6E2; }
+.bar { display: block; height: 8px; border-radius: 4px; background: var(--soft); overflow: hidden; }
+.bar i { display: block; height: 100%; width: 0; background: var(--amber); border-radius: 4px; transition: width .6s ease; }
+#btn-town.ready { border-color: #C9962B; background: #FFF8E8; animation: nudge 1.6s ease-in-out 2; }
+#btn-town.ready .tile-text b { color: #8A5A12; }
+/* поле: шапка в две строки на телефоне — назад, название, точки */
+@media (max-width: 419px) {
+  .field-head { display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "back title" "back dots"; column-gap: 6px; row-gap: 3px; }
+  .field-head #btn-back { grid-area: back; }
+  .field-head .field-title { grid-area: title; }
+  .field-head .dots { grid-area: dots; gap: 5px; }
+  .field-head .dot { width: 10px; height: 10px; }
+}
+/* длина ответа — клетками; первая буква после подсказки, всё слово после показа */
+.clue-meta { gap: 3px; flex-wrap: wrap; padding-right: 92px; }
+.clue-meta i { width: 20px; height: 24px; display: grid; place-items: center; font: 700 15px var(--font); font-style: normal;
+  border-radius: 5px; border: 1.5px solid var(--line); background: var(--bg); color: var(--text); }
+.clue-meta i.on { border-color: var(--amber); background: #FBE9C6; }
+.clue-card.done .clue-meta i { border-color: transparent; background: #E4EFE7; }
+.clue-card.double .clue-meta::before { content: '×2'; margin-right: 4px; font-weight: 800; color: var(--green-d); }
+.pic-q { font: 700 30px var(--font); color: var(--muted); }
+.clue-card.shake { animation: shake .3s ease; }
+/* подвал поля: марки слева, кнопка-лупа справа */
+.field-foot { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 4px 12px 10px; }
+.stamps { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 4px 12px 4px 6px; border-radius: 22px;
+  background: var(--surface); border: 1px solid var(--line); font-size: 19px; font-weight: 800; color: #8A5A12; font-variant-numeric: tabular-nums; }
+.st-img { width: 32px; height: 32px; flex: none; }
+.st-img > img { object-fit: contain; }
+.st-img > .art-icon { font-size: 24px; }
+.stamps.shake { animation: shake .3s ease; border-color: var(--danger); color: var(--danger); }
+.btn-hint { position: relative; min-height: 56px; min-width: 96px; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 6px 16px 6px 10px; border: 2px solid #E2C68E; border-radius: 16px; background: #FFF6E2; font-weight: 800; font-size: 18px; color: #8A5A12; }
+.btn-hint:disabled { opacity: .45; }
+.hint-img { width: 40px; height: 40px; flex: none; }
+.hint-img > img { object-fit: contain; }
+.hint-img > .art-icon { font-size: 28px; }
+.hint-price { display: inline-flex; align-items: center; gap: 3px; font-variant-numeric: tabular-nums; }
+.hint-price:empty { display: none; }
+.btn-hint[data-mode="free"] { border-color: var(--green); background: #EEF3EC; }
+.btn-hint[data-mode="short"] .hint-price { color: var(--danger); }
+.btn-hint[data-mode="ad"] .hint-price .i { width: 22px; height: 22px; fill: currentColor; }
+.btn-hint[data-mode="accept"] { background: var(--green); border-color: var(--green-d); color: #fff; min-width: 120px; }
+.btn-hint[data-mode="accept"] .hint-img { display: none; }
+.btn-hint[data-mode="accept"] .hint-price .i { width: 30px; height: 30px; stroke-width: 3; }
+.btn-hint.busy { opacity: .6; }
+.btn-hint.shake { animation: shake .3s ease; }
+.btn-hint.nudge { animation: nudge 1.6s ease-in-out 4; }
+@keyframes nudge { 50% { box-shadow: 0 0 0 7px rgba(213, 156, 69, .35); transform: scale(1.05); } }
+body.rm .btn-hint.nudge { animation: none; box-shadow: 0 0 0 4px rgba(213, 156, 69, .45); }
+/* обучение: прыгающая стрелка над лупой, когда игрок впервые застрял */
+.hint-arrow { position: absolute; left: 50%; bottom: 100%; width: 0; height: 0; margin: 0 0 6px -14px; pointer-events: none;
+  border-left: 14px solid transparent; border-right: 14px solid transparent; border-top: 20px solid var(--amber);
+  filter: drop-shadow(0 2px 2px rgba(60, 50, 30, .3)); animation: arrowBob .8s ease-in-out infinite; }
+@keyframes arrowBob { 50% { transform: translateY(-8px); } }
+.save-warn { flex: none; text-align: center; font-size: 13px; padding: 0 12px 6px; }
+.float-word { display: inline-flex; align-items: center; gap: 4px; }
+.float-word.secret-float { font: 700 30px var(--font); padding: 4px 16px; }
+.word-stamps { position: absolute; z-index: 4; transform: translateX(-50%); display: inline-flex; align-items: center; gap: 3px; padding: 2px 8px;
+  border-radius: 10px; background: rgba(255, 246, 226, .95); color: #8A5A12; font-weight: 800; font-size: 17px; pointer-events: none;
+  box-shadow: 0 2px 8px rgba(60, 50, 30, .2); animation: wordStamps 1.8s ease-out forwards; }
+@keyframes wordStamps { 0% { opacity: 0; transform: translate(-50%, 8px) scale(.7); } 15% { opacity: 1; transform: translate(-50%, 0) scale(1.1); }
+  25%, 75% { opacity: 1; transform: translate(-50%, 0) scale(1); } 100% { opacity: 0; transform: translate(-50%, -18px); } }
+.fly-letter { position: fixed; z-index: 30; display: grid; place-items: center; pointer-events: none; font-weight: 800; font-size: 24px;
+  color: #8A5A12; background: #FFF3D6; border-radius: 10px; transition: transform .6s cubic-bezier(.5, 0, .7, .4), opacity .6s ease-in; }
+/* итог: одна сумма «+N марок», фонарь места, домик и «История N» */
+.rw { display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px 2px 8px; border-radius: 12px; background: #FFF3D6; color: #8A5A12; font-size: 18px; font-weight: 800; }
+.reward-line { margin-top: 4px; }
+.btn-lantern { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 64px; padding: 8px 12px; text-align: left; font: inherit;
+  border: 1px solid #E2C68E; border-radius: 12px; background: #FFF6E2; color: #6B4A12; }
+.btn-lantern.can { border: 2px solid #C9962B; background: #FFEFC8; animation: nudge 1.6s ease-in-out 2; }
+.btn-lantern.lit { background: #FBEBC4; }
+.btn-lantern.shake { animation: shake .3s ease; }
+.lan-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.lan-body b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lan-cost { display: inline-flex; align-items: center; gap: 4px; font-size: 18px; font-weight: 800; }
+.lan-cost .i { color: var(--green); }
+.lan-img { width: 52px; height: 52px; flex: none; border-radius: 10px; filter: grayscale(.7) brightness(.85); }
+.lan-img > img { object-fit: contain; }
+.lan-img > .art-icon { font-size: 32px; }
+.btn-lantern.can .lan-img, .btn-lantern.lit .lan-img { filter: drop-shadow(0 0 8px rgba(255, 196, 80, .9)); }
+.foot-row { display: flex; align-items: center; gap: 10px; }
+.foot-row .btn-main { flex: 1; }
+.home-btn { width: var(--btn-h); height: var(--btn-h); border: 1px solid var(--line); background: var(--surface); }
+.result-foot { padding-bottom: 10px; }
+#town-sub { display: inline-flex; align-items: center; gap: 4px; }
+.wallet { justify-content: center; font-size: 20px; font-weight: 800; color: #8A5A12; }
+.wallet .st-ico { width: 30px; height: 30px; }
+#atlas-secret { margin-bottom: 4px; }
+.btn-small .st-ico { width: 20px; height: 20px; }
+/* низкий телефон: фонарь места на итоге виден без прокрутки */
+@media (max-height: 700px) and (orientation: portrait) {
+  .result-scene { aspect-ratio: auto; height: 22vh; }
+  .result-body { padding-top: 10px; gap: 8px; }
+}
+/* низкий телефон (320×568): вторая улика не сжимает клетки меньше 40 px */
+@media (max-height: 600px) and (orientation: portrait) {
+  .clue-card { min-height: 72px; }
+  .clue-main { gap: 2px; }
+  .clue-extra { font-size: 15px; line-height: 1.2; }
+  .clue-meta { min-height: 24px; }
+  .clue-meta i { width: 18px; height: 22px; font-size: 14px; }
+  .board-wrap { padding: 4px 12px; }
+  .btn-hint { min-height: 50px; }
+  .hint-img { width: 34px; height: 34px; }
+}

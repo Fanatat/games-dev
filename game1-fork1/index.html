@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-<meta name="g1f-build" content="0.1.0+b023 · eef369c">
+<meta name="g1f-build" content="0.1.0+b024 · fa45773">
 <meta name="g1f-telemetry" content="">
 <meta name="theme-color" content="#F5EEDD">
 <title>Слова по уликам</title>
-<link rel="stylesheet" href="src/styles.css?v=b57f59d03b">
+<link rel="stylesheet" href="src/styles.css?v=85de7df9bb">
 </head>
 <body>
 <div id="app">
@@ -17,6 +17,11 @@
     <div class="box-art art" data-art="box_intro" data-icon="📦"></div>
     <div class="box-note">
       <p class="note-hand" id="box-note"></p>
+      <div class="box-how" aria-hidden="true">
+        <span class="bh-tiles"><i>К</i><i>Л</i><i>Ю</i><i>Ч</i></span>
+        <span class="bh-arrow">→</span>
+        <span class="bh-item art" data-art="key" data-icon="🗝️"></span>
+      </div>
       <button class="btn-main" id="btn-open">Открыть</button>
     </div>
   </section>
@@ -40,21 +45,17 @@
           <button class="btn-main" id="btn-continue">Продолжить историю</button>
         </div>
       </div>
-      <div class="card daily" id="home-daily" hidden></div>
-      <div class="card soft diary" id="home-diary" hidden></div>
-      <button class="card tile" id="btn-atlas">
-        <span class="tile-icon" id="atlas-icon"></span>
-        <span class="tile-text"><b>Мой атлас</b><span class="muted" id="atlas-sub"></span></span>
-      </button>
-      <button class="card tile" id="btn-town">
-        <span class="tile-icon lamp art" data-art="street_lamp" data-icon="🏮"></span>
-        <span class="tile-text"><b>Фонари Тихоречья</b><span class="muted" id="town-tile-sub"></span></span>
-      </button>
-      <div class="secret-strip card soft" id="home-secret" hidden></div>
-      <div class="card soft" id="home-next" hidden>
-        <b id="home-next-title"></b>
-        <span class="muted" id="home-next-sub"></span>
+      <div class="home-tiles">
+        <button class="card tile" id="btn-town" aria-label="Фонари Тихоречья">
+          <span class="tile-icon lamp art" data-art="street_lamp" data-icon="🏮"></span>
+          <span class="tile-text"><b id="town-tile-num"></b><span class="bar"><i id="town-tile-bar"></i></span></span>
+        </button>
+        <button class="card tile" id="btn-atlas" aria-label="Мой атлас">
+          <span class="tile-icon art" data-art="atlas_cover" data-icon="📔"></span>
+          <span class="tile-text"><b id="atlas-sub"></b><span class="bar"><i id="atlas-tile-bar"></i></span></span>
+        </button>
       </div>
+      <div class="secret-strip card soft" id="home-secret" hidden></div>
       <p class="save-line muted" id="home-save"></p>
     </div>
   </section>
@@ -66,15 +67,12 @@
       <div class="intro-body">
         <p class="muted" id="intro-kicker"></p>
         <h2 id="intro-title"></h2>
-        <!-- угадывание имени — над текстом: на 1366×768 варианты не уходят под «Искать улики» (план эксперта №5, п. 4.3) -->
-        <div class="intro-guess card soft" id="intro-guess" hidden></div>
         <p class="intro-text" id="intro-text"></p>
-        <p class="intro-new" id="intro-new" hidden></p>
         <button class="btn-link" id="btn-intro-home">На главную</button>
       </div>
     </div>
     <!-- главная кнопка всегда у нижнего края, как на итоге (оценка №4, п. 5: на 1366×768 она уходила под край) -->
-    <div class="intro-foot"><button class="btn-gold" id="btn-intro-gold" type="button" hidden></button><button class="btn-main" id="btn-intro-go">Искать улики</button></div>
+    <div class="intro-foot"><button class="btn-main" id="btn-intro-go">Искать улики</button></div>
   </section>
 
   <!-- Поле -->
@@ -83,24 +81,19 @@
       <button class="icon-btn" id="btn-back" aria-label="На главную"></button>
       <div class="field-title">
         <b id="field-title"></b>
-        <span class="muted" id="field-sub"></span>
       </div>
-      <button class="chip" id="chip-atlas" aria-label="Атлас"></button>
       <div class="dots" id="dots" aria-hidden="true"></div>
     </header>
     <div class="scene" id="scene">
       <div class="scene-bg art" id="scene-bg" data-icon="🏞️"></div>
       <div class="scene-items" id="scene-items"></div>
-      <div class="scene-thread" id="scene-thread" hidden></div>
-      <span class="streak" id="streak" hidden aria-live="polite"></span>
-      <button class="sprint" id="btn-sprint" type="button" hidden></button>
     </div>
     <div class="clue-card" id="clue-card" aria-live="polite">
       <button class="clue-nav" id="clue-prev" aria-label="Предыдущая улика"></button>
       <div class="clue-main" id="clue-main">
         <p class="clue-text" id="clue-text"></p>
         <p class="clue-extra" id="clue-extra" hidden></p>
-        <p class="clue-meta muted" id="clue-meta"></p>
+        <p class="clue-meta" id="clue-meta" aria-hidden="true"></p>
       </div>
       <div class="clue-reveal" id="clue-reveal" hidden>
         <span class="reveal-icon art" id="reveal-icon"></span>
@@ -111,14 +104,10 @@
     <div class="board-wrap" id="board-wrap">
       <div class="board" id="board" tabindex="0" aria-label="Поле букв. Стрелки — выбор клетки, пробел — добавить, Enter — проверить, Escape — сбросить"></div>
       <svg class="board-lines" id="board-lines" aria-hidden="true"></svg>
-      <div class="toast" id="toast" hidden></div>
     </div>
     <footer class="field-foot">
-      <button class="chip" id="chip-bonus" hidden aria-label="Бонусные слова"></button>
-      <button class="chip" id="chip-cache" hidden aria-label="Тайник"></button>
-      <button class="btn-hint" id="btn-hint"><span class="ico" id="hint-ico"></span><span>Подсказка</span><span class="badge" id="hint-badge" hidden></span></button>
-      <span class="loupes" id="loupes" title="Лупы"></span>
-      <button class="btn-accept" id="btn-accept" hidden>Принять ответ</button>
+      <span class="stamps" id="stamps" data-counter="stamps"><span class="st-img art" data-art="golden_stamp" data-icon="🏅"></span><b id="stamps-n"></b></span>
+      <button class="btn-hint" id="btn-hint"><span class="hint-img art" data-art="magnifier" data-icon="🔍"></span><span class="hint-price" id="hint-price" data-counter="hint"></span></button>
     </footer>
     <p class="save-warn" id="field-save" hidden>Сейчас прогресс не сохраняется</p>
   </section>
@@ -145,11 +134,8 @@
           <span class="keepsake-img art" id="keepsake-img"></span>
           <span><b id="keepsake-title"></b><span class="muted" id="keepsake-note"></span><span class="reward-line" id="reward-line"></span></span>
         </div>
-        <!-- фонарь — выбор игрока, сразу под находкой (вторая серия, п. 1.4) -->
-        <div class="card lamp-pick" id="lamp-pick" hidden></div>
+        <!-- фонарь места — выбор игрока: марки на фонарь или на подсказки -->
         <button class="card btn-lantern" id="btn-lantern" hidden></button>
-        <div class="rank-bar goal-bar" id="result-goal" hidden></div>
-        <div class="reward-big" id="reward-big"></div>
         <div class="secret-strip card soft" id="result-secret" hidden></div>
         <div class="card soft" id="demo-end" hidden>
           <b id="demo-end-title"></b>
@@ -159,10 +145,9 @@
     </div>
     <!-- главная кнопка — под прокруткой, а не поверх наград (оценка b007, п. 21) -->
     <div class="result-foot">
-      <button class="btn-main" id="btn-next">Следующая история</button>
-      <div class="link-row">
-        <button class="btn-link" id="btn-res-atlas">В атлас</button>
-        <button class="btn-link" id="btn-res-home">На сегодня всё</button>
+      <div class="foot-row">
+        <button class="icon-btn home-btn" id="btn-res-home" aria-label="На главную"></button>
+        <button class="btn-main" id="btn-next">Следующая история</button>
       </div>
     </div>
   </section>
@@ -176,9 +161,7 @@
     <div class="atlas-scroll">
       <div class="atlas-cover art" data-art="atlas_cover" data-icon="📔"></div>
       <div class="wallet" id="wallet"></div>
-      <div id="atlas-rank"></div>
-      <button class="chip covers-btn" id="btn-covers"></button>
-      <div class="card soft route-secret" id="atlas-route" hidden></div>
+      <div class="secret-strip card soft" id="atlas-secret" hidden></div>
       <div class="atlas-tabs" id="atlas-tabs"></div>
       <h3 class="atlas-h" id="atlas-h">Первые открытия</h3>
       <div class="atlas-grid" id="atlas-grid"></div>
@@ -205,27 +188,8 @@
       <button class="btn-main" id="btn-finale-next">Глава 2</button>
       <div class="link-row">
         <button class="btn-link" id="btn-finale-atlas">Атлас</button>
-        <button class="btn-link" id="btn-finale-share">Открытка другу</button>
         <button class="btn-link" id="btn-finale-home">На главную</button>
       </div>
-    </div>
-  </section>
-
-  <!-- На сегодня всё: дневник, завтрашний подарок, открытка (план эксперта b009, круг 2) -->
-  <section class="screen" id="scr-rest" hidden>
-    <div class="finale-scroll">
-      <div class="finale-bg art" data-art="bg_town" data-icon="🏞️"></div>
-      <div class="finale-body">
-        <h2>На сегодня всё</h2>
-        <p class="muted" id="rest-sub"></p>
-        <div class="card soft diary" id="rest-diary"></div>
-        <div class="card question"><span class="muted">Вопрос на завтра</span><b id="rest-question"></b></div>
-        <div class="card postcard" id="rest-postcard" hidden></div>
-      </div>
-    </div>
-    <div class="result-foot">
-      <button class="btn-main" id="btn-rest-home">На главную</button>
-      <div class="link-row"><button class="btn-link" id="btn-rest-share">Отправить открытку другу</button></div>
     </div>
   </section>
 
@@ -253,11 +217,11 @@
 <script src="data/content.js?v=5b6bd053ec"></script>
 <script src="src/logic.js?v=5b87c230d0"></script>
 <script src="vendor/vk-bridge.min.js?v=827ba6f457"></script>
-<script src="src/platform.js?v=cd34a59168"></script>
-<script src="src/analytics.js?v=8aec4219f9"></script>
-<script src="src/state.js?v=9204961c8c"></script>
+<script src="src/platform.js?v=1a62ad76ac"></script>
+<script src="src/analytics.js?v=07d3304703"></script>
+<script src="src/state.js?v=1d4b5d57cc"></script>
 <script src="src/sound.js?v=6a51a1e849"></script>
 <script src="src/board.js?v=152a18d134"></script>
-<script src="src/app.js?v=7564e1e194"></script>
+<script src="src/app.js?v=772de54a4e"></script>
 </body>
 </html>

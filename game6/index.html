@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="build" content="mobile/siege@6740271 2026-10-27 06:37">
+<title>Asgard's Vanguard: Осада</title>
+<!-- Страница мобильной версии (docs/MOBILE_GDD.md §8.10, §11, §12): загрузка .gz с полосой,
+     штамп сборки, мост ВК (vk_glue.js), события страницы для игры (window.AvPage) и цели
+     Метрики (window.avGoal). tools/pack.py подставляет mobile/siege@6740271 2026-10-27 06:37, 113816305 и размеры .gz. -->
+<style>
+html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #120d09; }
+body { touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; overscroll-behavior: none; }
+#canvas { display: block; position: fixed; inset: 0; width: 100%; height: 100%; outline: none; touch-action: none; }
+#load { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+	background: #120d09 url('loading_bg.jpg') center / cover no-repeat; font-family: system-ui, sans-serif; color: #fff; }
+#load img { width: min(70vw, 520px); max-height: 46vh; object-fit: contain; filter: drop-shadow(0 6px 10px rgba(0,0,0,.6)); }
+#bar { width: min(70vw, 460px); height: 18px; margin-top: 4vh; border-radius: 9px; background: rgba(0,0,0,.6);
+	border: 3px solid #6b4a2b; overflow: hidden; }
+#fill { width: 0; height: 100%; background: linear-gradient(#ffe08a, #f0b23c); transition: width .15s; }
+#err { display: none; margin-top: 4vh; text-align: center; font-size: 22px; font-weight: 800; text-shadow: 0 2px 4px #000; }
+#err button { margin-top: 16px; font: 800 22px system-ui, sans-serif; color: #fff; background: #b8261a;
+	border: 4px solid #f0c24a; border-radius: 14px; padding: 12px 34px; }
+#stamp { position: fixed; right: 6px; bottom: 4px; font: 11px monospace; color: rgba(255,255,255,.45); pointer-events: none; }
+</style>
+</head>
+<body>
+<canvas id="canvas" tabindex="-1"></canvas>
+<div id="load">
+	<img src="logo.png" alt="">
+	<div id="bar"><div id="fill"></div></div>
+	<div id="err">Не удалось загрузить игру<br><button onclick="location.reload()">Ещё раз</button></div>
+</div>
+<div id="stamp">mobile/siege@6740271 2026-10-27 06:37</div>
+<script>
+'use strict';
+// Размеры .gz (подставляет tools/pack.py) — для доли скачанного.
+const GZ_SIZES = /*GZ*/{"index.wasm.gz": 10054758, "index.pck.gz": 4267900}/*GZ*/;
+const BUILD = 'mobile/siege@6740271 2026-10-27 06:37';
+const METRIKA = Number('113816305') || 0;
+
+// События страницы для игры: скрыта / показана (вкладка, свёрнутое окно ВК).
+window.AvPage = (function () {
+	let callback = null;
+	let pending = [];
+	const api = {
+		setCallback: function (cb) {
+			callback = cb;
+			const queued = pending;
+			pending = [];
+			queued.forEach(function (name) { cb(name); });
+		},
+		emit: function (name) {
+			try {
+				if (callback) { callback(name); } else { pending.push(name); }
+			} catch (err) { /* игра не должна падать от события страницы */ }
+		},
+	};
+	document.addEventListener('visibilitychange', function () {
+		api.emit(document.hidden ? 'hide' : 'show');
+	});
+	window.addEventListener('pagehide', function () { api.emit('hide'); });
+	return api;
+}());
+
+// Метрика: счётчик game6 (реестр game_studio/metrika.json). Ничего не ждёт и не бросает;
+// локальный запуск не шлёт. Параметры цели вложены под её имя (docs/METRIKA.md).
+window.avGoal = (function () {
+	const host = location.hostname;
+	const local = !host || host === 'localhost' || host === '127.0.0.1' || location.protocol === 'file:';
+	const enabled = METRIKA > 0 && !local;
+	const platform = location.pathname.indexOf('/games-dev/') !== -1 ? 'dev'
+		: (new URLSearchParams(location.search).has('vk_app_id') ? 'vk' : 'web');
+	const debug = new URLSearchParams(location.search).get('debug') === '1';
+	let state = 'idle';
+	let queue = [];
+	function ym() {
+		try { window.ym.apply(null, arguments); } catch (err) { /* аналитика не роняет игру */ }
+	}
+	function send(name, params) {
+		const visit = { platform: platform, build: BUILD };
+		const body = Object.assign({}, visit);
+		if (params && Object.keys(params).length) { body[name] = params; }
+		ym(METRIKA, 'reachGoal', name, body);
+	}
+	function start() {
+		if (!enabled || state !== 'idle') { return; }
+		state = 'loading';
+		window.ym = window.ym || function () { (window.ym.a = window.ym.a || []).push(arguments); };
+		window.ym.l = Date.now();
+		const s = document.createElement('script');
+		s.async = true;
+		s.src = 'https://mc.yandex.ru/metrika/tag.js';
+		s.onload = function () {
+			state = 'ready';
+			ym(METRIKA, 'init', { webvisor: false, clickmap: false, trackLinks: false, accurateTrackBounce: true,
+				params: { platform: platform, build: BUILD } });
+			const pendingGoals = queue;
+			queue = [];
+			pendingGoals.forEach(function (e) { send(e.name, e.params); });
+		};
+		s.onerror = function () { state = 'failed'; queue = []; };
+		document.head.appendChild(s);
+	}
+	if (document.readyState === 'complete') { setTimeout(start, 0); } else { window.addEventListener('load', start); }
+	return function (name, params) {
+		try {
+			if (debug) { console.log('[goal]', name, params || {}); }
+			if (!enabled || state === 'failed') { return; }
+			if (state === 'ready') { send(name, params); return; }
+			if (queue.length < 50) { queue.push({ name: name, params: params }); }
+		} catch (err) { /* аналитика не роняет игру */ }
+	};
+}());
+</script>
+<script src="vk-bridge.min.js"></script>
+<script src="vk_glue.js"></script>
+<script src="index.js"></script>
+<script>
+'use strict';
+const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":4531876,"index.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
+(function () {
+	const fill = document.getElementById('fill');
+	const load = document.getElementById('load');
+	const files = {};
+	function progress() {
+		let loaded = 0;
+		let total = 0;
+		Object.keys(files).forEach(function (k) { loaded += files[k].loaded; total += files[k].total; });
+		if (total > 0) { fill.style.width = Math.min(100, 100 * loaded / total).toFixed(1) + '%'; }
+	}
+	function fail() {
+		document.getElementById('bar').style.display = 'none';
+		document.getElementById('err').style.display = 'block';
+	}
+
+	// Сжатая загрузка: index.wasm и index.pck лежат рядом ещё и в .gz (площадка не сжимает большие
+	// файлы). Распаковка — DecompressionStream; нет .gz или старый браузер — обычный файл.
+	const exe = GODOT_CONFIG.executable;
+	const pack = GODOT_CONFIG.mainPack || (exe + '.pck');
+	const TYPES = {};
+	TYPES[exe + '.wasm'] = 'application/wasm';
+	TYPES[pack] = 'application/octet-stream';
+	const plainFetch = window.fetch.bind(window);
+	function counted(response, name, total) {
+		const file = files[name] = { loaded: 0, total: total };
+		const reader = response.body.getReader();
+		return new ReadableStream({
+			pull: function (controller) {
+				return reader.read().then(function (r) {
+					if (r.done) { controller.close(); return; }
+					file.loaded += r.value.length;
+					progress();
+					controller.enqueue(r.value);
+				});
+			},
+			cancel: function (reason) { return reader.cancel(reason); },
+		});
+	}
+	// Сервер мог сам распаковать .gz (Content-Encoding): тогда байты уже не gzip — отдаём как есть.
+	function maybeInflate(stream) {
+		const reader = stream.getReader();
+		return reader.read().then(function (first) {
+			const isGz = !first.done && first.value.length > 1 && first.value[0] === 0x1f && first.value[1] === 0x8b;
+			const restored = new ReadableStream({
+				start: function (controller) {
+					if (first.done) { controller.close(); } else { controller.enqueue(first.value); }
+				},
+				pull: function (controller) {
+					return reader.read().then(function (r) {
+						if (r.done) { controller.close(); } else { controller.enqueue(r.value); }
+					});
+				},
+				cancel: function (reason) { return reader.cancel(reason); },
+			});
+			return isGz ? restored.pipeThrough(new DecompressionStream('gzip')) : restored;
+		});
+	}
+	window.fetch = function (input, init) {
+		const url = typeof input === 'string' ? input : (input && input.url) || '';
+		const name = url.split('?')[0].split('/').pop();
+		if (!Object.prototype.hasOwnProperty.call(TYPES, name)) {
+			return plainFetch(input, init);
+		}
+		const plain = function () {
+			return plainFetch(input, init).then(function (response) {
+				if (!response.ok || !response.body) { return response; }
+				const size = (GODOT_CONFIG.fileSizes || {})[name] || Number(response.headers.get('Content-Length')) || 0;
+				return new Response(counted(response, name, size), { status: 200, headers: { 'Content-Type': TYPES[name] } });
+			});
+		};
+		if (typeof DecompressionStream === 'undefined') {
+			return plain();
+		}
+		return plainFetch(url.split('?')[0] + '.gz', init).then(function (response) {
+			if (!response.ok || !response.body) { return plain(); }
+			const head = response.headers.get('Content-Type') || '';
+			if (head.indexOf('text/html') !== -1) { return plain(); }
+			const raw = counted(response, name, GZ_SIZES[name + '.gz'] || Number(response.headers.get('Content-Length')) || 0);
+			return maybeInflate(raw).then(function (body) {
+				return new Response(body, { status: 200, headers: { 'Content-Type': TYPES[name] } });
+			});
+		}, plain);
+	};
+
+	const missing = Engine.getMissingFeatures({ threads: false });
+	if (missing.length !== 0) {
+		fail();
+		return;
+	}
+	GODOT_CONFIG.onProgress = function () { progress(); };
+	const engine = new Engine(GODOT_CONFIG);
+	engine.startGame({
+		onProgress: function () { progress(); },
+	}).then(function () {
+		fill.style.width = '100%';
+		setTimeout(function () { load.style.display = 'none'; }, 150);
+	}, function (err) {
+		console.error(err);
+		fail();
+	});
+}());
+</script>
+</body>
+</html>
+

@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<meta name="build" content="mobile/siege@0539e40 2026-10-27 07:17">
+<meta name="build" content="mobile/siege@350c154 2026-10-27 10:33">
 <title>Asgard's Vanguard: Осада</title>
 <!-- Страница мобильной версии (docs/MOBILE_GDD.md §8.10, §11, §12): загрузка .gz с полосой,
      штамп сборки, мост ВК (vk_glue.js), события страницы для игры (window.AvPage) и цели
-     Метрики (window.avGoal). tools/pack.py подставляет mobile/siege@0539e40 2026-10-27 07:17, 113816305 и размеры .gz. -->
+     Метрики (window.avGoal). tools/pack.py подставляет mobile/siege@350c154 2026-10-27 10:33, 113816305 и размеры .gz. -->
 <style>
 html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #120d09; }
 body { touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; overscroll-behavior: none; }
@@ -31,12 +31,12 @@ body { touch-action: none; -webkit-user-select: none; user-select: none; -webkit
 	<div id="bar"><div id="fill"></div></div>
 	<div id="err">Не удалось загрузить игру<br><button onclick="location.reload()">Ещё раз</button></div>
 </div>
-<div id="stamp">mobile/siege@0539e40 2026-10-27 07:17</div>
+<div id="stamp">mobile/siege@350c154 2026-10-27 10:33</div>
 <script>
 'use strict';
 // Размеры .gz (подставляет tools/pack.py) — для доли скачанного.
-const GZ_SIZES = /*GZ*/{"index.wasm.gz": 10054758, "index.pck.gz": 4271574}/*GZ*/;
-const BUILD = 'mobile/siege@0539e40 2026-10-27 07:17';
+const GZ_SIZES = /*GZ*/{"index.wasm.gz": 10054758, "index.pck.gz": 4774385}/*GZ*/;
+const BUILD = 'mobile/siege@350c154 2026-10-27 10:33';
 const METRIKA = Number('113816305') || 0;
 
 // События страницы для игры: скрыта / показана (вкладка, свёрнутое окно ВК).
@@ -118,7 +118,7 @@ window.avGoal = (function () {
 <script src="index.js"></script>
 <script>
 'use strict';
-const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":4535524,"index.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
+const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":5100448,"index.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
 (function () {
 	const fill = document.getElementById('fill');
 	const load = document.getElementById('load');

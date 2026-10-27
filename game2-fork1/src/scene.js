@@ -102,10 +102,13 @@ window.Scene = (function () {
       spot.appendChild(el('img', 'decor-ghost', { src: ART + d.sprite + '.webp', alt: '', draggable: 'false' }));
       if (back) { host.appendChild(spot); return; }
       if (d.back) { spot.removeAttribute('data-spot'); spot.firstChild.className = 'decor-ghost is-blank'; }
-      var b = el('button', 'decor-price' + (S.coins >= d.price ? ' is-afford' : ''),
+      // Хватает монет — ценник с числом и подсветкой; не хватает — только монетка (разбор
+      // 27.10: три «900» на сцене шумели и закрывали вещи), цена — в окне по касанию.
+      var afford = S.coins >= d.price;
+      var b = el('button', 'decor-price' + (afford ? ' is-afford' : ' is-mini'),
         { type: 'button', 'data-decor': id, 'aria-label': d.title + ' — ' + d.price + ' монет' });
       b.appendChild(el('img', '', { src: ART + 'coin.webp', alt: '', draggable: 'false' }));
-      b.appendChild(el('b')).textContent = String(d.price);
+      if (afford) b.appendChild(el('b')).textContent = String(d.price);
       spot.appendChild(b);
       host.appendChild(spot);
     });

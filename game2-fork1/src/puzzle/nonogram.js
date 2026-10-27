@@ -67,7 +67,10 @@ window.Nonogram = (function () {
   var _puzzleEl   = null;    // .puzzle — на нём выставляется --cell
   // Лупа: если «вписанная» клетка меньше MIN_CELL, поле само открывается крупно
   // (ZOOM_CELL), числа прилипают к краям, двигать — за числа или двумя пальцами.
-  var MIN_CELL = 24, ZOOM_CELL = 26;
+  // На касании лупа есть и при клетке мельче LENS_CELL (палец ~40 px), но сама не
+  // открывается: по нажатию — клетка LENS_ZOOM (разбор 27.10: на 360 px клетка 24–27).
+  var MIN_CELL = 24, ZOOM_CELL = 26, LENS_CELL = 32, LENS_ZOOM = 36;
+  var COARSE = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
   var _fitAll   = false;      // игрок нажал лупу «показать всё поле» — держим до следующей картинки
   var _colArea  = null, _rowArea = null, _cornerEl = null;
   var _cluePan  = null;       // { id, x, y, tx, ty, moved } — протяжка за числа
@@ -190,14 +193,15 @@ window.Nonogram = (function () {
     if (!_viewport || !_container) return false;
     return _viewport.scrollWidth > _container.clientWidth + 1 || _viewport.scrollHeight > _container.clientHeight + 1;
   }
-  // Лупа нужна, если вписанная клетка мельче MIN_CELL.
-  function isZoomable() { return !!_level && _baseCell < MIN_CELL; }
+  // Лупа нужна, если вписанная клетка мельче MIN_CELL (на касании — LENS_CELL).
+  function isZoomable() { return !!_level && _baseCell < (COARSE ? LENS_CELL : MIN_CELL); }
+  function zoomScale() { return Math.min(SCALE_MAX, (_baseCell < MIN_CELL ? ZOOM_CELL : LENS_ZOOM) / _baseCell); }
 
   // Вписать поле или открыть крупно с левого верхнего угла (там числа).
   function fitOrZoom() {
     _tx = 0; _ty = 0;
-    if (isZoomable() && !_fitAll) {
-      _scale = Math.min(SCALE_MAX, ZOOM_CELL / _baseCell);
+    if (_level && _baseCell < MIN_CELL && !_fitAll) {
+      _scale = zoomScale();
       _tx = 1e6; _ty = 1e6; // applyTransform прижмёт к краю
     } else {
       _scale = 1;
@@ -210,7 +214,7 @@ window.Nonogram = (function () {
     if (!_level) return false;
     _fitAll = isZoomed();
     if (_fitAll) { _scale = 1; _tx = 0; _ty = 0; applyTransform(); return false; }
-    _scale = Math.min(SCALE_MAX, ZOOM_CELL / _baseCell);
+    _scale = zoomScale();
     _tx = 1e6; _ty = 1e6;
     applyTransform();
     return true;

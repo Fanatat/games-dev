@@ -1527,14 +1527,17 @@
 
   /* ---------------- обучение действием (лампа) ---------------- */
 
-  // Лампа: ряды 2 и 3 по 5 клеток, столбец 3 — 5 клеток, ряд 4 — одна клетка.
+  // Лампа: ряды 2 и 3 по 5 клеток, столбец 3 — 5 клеток, ряд 4 — одна клетка,
+  // столбец 2 — «3 1». pic — число и как оно ложится в линию картинкой
+  // (# — закрашено, x — крестик): цифры объясняются без слов (разбор 27.10).
   var COACH = [
-    { text: 'Закрась ряд', line: ['row', 1], done: function (b) { return lineFilled(b, 'row', 1); } },
-    { text: 'И этот тоже', line: ['row', 2], done: function (b) { return lineFilled(b, 'row', 2); } },
-    { text: 'Теперь столбец', line: ['col', 2], done: function (b) { return lineFilled(b, 'col', 2); } },
+    { text: 'Закрась ряд', pic: ['5', '#####'], line: ['row', 1], done: function (b) { return lineFilled(b, 'row', 1); } },
+    { text: 'И этот тоже', pic: ['5', '#####'], line: ['row', 2], done: function (b) { return lineFilled(b, 'row', 2); } },
+    { text: 'Теперь столбец', pic: ['5', '#####'], line: ['col', 2], done: function (b) { return lineFilled(b, 'col', 2); } },
     { text: 'Пустое — крестиком', target: 'mode-cross', done: function () { return mode === 2; } },
-    { text: 'Тут одна клетка. Остальные — ×', line: ['row', 3], done: function (b) { return countIn(b, 'row', 3, 2) >= 2; } },
+    { text: 'Тут одна клетка', pic: ['1', 'xx#xx'], line: ['row', 3], done: function (b) { return countIn(b, 'row', 3, 2) >= 2; } },
     { text: 'Назад к кисти', target: 'mode-fill', done: function () { return mode === 1; } },
+    { text: 'Два куска', pic: ['3 1', '###x#'], line: ['col', 1], done: function (b) { return lineFilled(b, 'col', 1); } },
     { text: 'Дорисуй лампу!', done: function () { return false; }, last: true }
   ];
 
@@ -1575,6 +1578,14 @@
   function coachShow(step) {
     coachHide();
     $('coach-text').textContent = step.text;
+    var pic = $('coach-pic');
+    pic.innerHTML = '';
+    pic.hidden = !step.pic;
+    if (step.pic) {
+      pic.appendChild(h('b', '', step.pic[0]));
+      pic.appendChild(h('span', 'coach-eq', '='));
+      step.pic[1].split('').forEach(function (ch) { pic.appendChild(h('i', ch === '#' ? 'is-fill' : 'is-cross')); });
+    }
     $('coach').hidden = false;
     $('coach').classList.toggle('is-down', !!step.target);
     var box = $('puzzle-container');
@@ -2280,13 +2291,13 @@
     return w;
   }
 
-  // Чтобы вернуться завтра: закладка ВК и напоминание о письме. Только в ВК,
-  // только по нажатию; согласился — кнопка больше не показывается.
+  // Чтобы вернуться завтра: закладка ВК. Только в ВК, только по нажатию;
+  // согласился — кнопка больше не показывается. Напоминаний нет: сервер
+  // уведомлений не шлёт, а правила ВК 2.7 требуют пояснения и выключателя.
   function remindRow() {
     if (Platform.name !== 'vk') return null;
     var acts = [];
     if (!Platform.isFavorite && !S.story_flags.fav_added) acts.push(['fav', 'star', 'В избранное', Platform.addFavorite, 'fav_added']);
-    if (!Platform.notifyOn && !S.story_flags.notify_ok) acts.push(['notify', 'bell', 'Напомнить', Platform.allowNotify, 'notify_ok']);
     if (!acts.length) return null;
     var row = h('div', 'remind-row');
     acts.forEach(function (a) {
@@ -2298,7 +2309,7 @@
           if (!ok) { b.disabled = false; return; }
           S.story_flags[a[4]] = true;
           saveNow();
-          toast(a[0] === 'fav' ? 'В избранном' : 'Напомним!', null, a[0] === 'fav' ? 'star' : 'bell');
+          toast('В избранном', null, 'star');
           if (screen === 'letters') renderLetters();
         });
       });
@@ -2766,7 +2777,7 @@
         var tag = h('span', 'price price-ad');
         tag.appendChild(icon('video'));
         tag.appendChild(h('b', '', left + '/' + R.per_day));
-        var b = offer(a[0], a[1], tag, function () { watchAd(a[2], after); });
+        var b = offer(a[0], a[1], tag, function () { askAd(a[2], after); });
         b.setAttribute('data-offer', 'ad_' + a[2]);
         b.classList.add('is-ad');
         if (left <= 0) b.disabled = true;
@@ -2889,7 +2900,9 @@
     b.type = 'button';
     b.setAttribute('data-v', v.id);
     b.appendChild(pic(v.sprite, 'deco-art'));
-    b.appendChild(h('span', 'deco-title', v.title));
+    // Сначала — что это за вещь, ниже — вариант: «Полночная» без «Шкатулки» непонятна (разбор 27.10).
+    b.appendChild(h('span', 'deco-title', C.objects[oid].title));
+    b.appendChild(h('span', 'deco-sub', v.title));
     if (worn) { var ck = h('span', 'variant-check'); ck.appendChild(icon('check')); b.appendChild(ck); }
     if (owned) b.appendChild(h('span', 'deco-state', worn ? 'Стоит' : 'Есть'));
     else if (!restored) { var l = h('span', 'price price-lock'); l.appendChild(icon('lock')); b.appendChild(l); }
@@ -2981,6 +2994,41 @@
      тост, и кнопка снова работает. Поздний «досмотрен» после срока даёт
      награду один раз (late), без after — экран к тому времени уже другой. */
   var adBusy = false;
+  /* Перед роликом — окно-картинка (правила ВК: игрок сам жмёт показ и видит
+     награду): значок ролика → награда «+N», точки — сколько роликов осталось
+     сегодня, одна кнопка «Смотреть». Крестик или касание мимо — без ролика. */
+  function askAd(kind, after) {
+    if (adBusy) return;
+    var left = St.adsLeft(C, S, St.today());
+    if (left <= 0) { toast('До завтра', null, 'video'); return; }
+    var R = C.economy.rewarded;
+    var n = kind === 'pencil' ? R.pencils : R.coins;
+    var node = h('div', 'ad-ask');
+    node.appendChild(sheetHead('Подарок за ролик'));
+    var row = h('div', 'ad-ask-row');
+    row.setAttribute('role', 'img');
+    row.setAttribute('aria-label', 'Посмотри ролик и получи ' + n + ' ' +
+      (kind === 'pencil' ? plural(n, 'карандаш', 'карандаша', 'карандашей') : plural(n, 'монету', 'монеты', 'монет')));
+    var v = h('span', 'ad-ask-video');
+    v.appendChild(icon('video'));
+    row.appendChild(v);
+    var arrow = icon('chev');
+    arrow.classList.add('ad-ask-arrow');
+    row.appendChild(arrow);
+    var g = h('span', 'ad-ask-gift');
+    g.appendChild(pic(kind === 'pencil' ? 'pencil' : 'coin'));
+    g.appendChild(h('b', '', '+' + n));
+    row.appendChild(g);
+    node.appendChild(row);
+    var dots = h('div', 'ad-ask-dots');
+    dots.setAttribute('aria-label', 'Сегодня ещё ' + left + ' из ' + R.per_day);
+    for (var i = 0; i < R.per_day; i++) dots.appendChild(h('i', i < left ? 'is-on' : ''));
+    node.appendChild(dots);
+    node.appendChild(button('btn-main ad-ask-go', 'Смотреть', 'play', function () {
+      Sound.play('tap'); closeSheet(true); watchAd(kind, after);
+    }));
+    openSheet(node, null, 'sheet-ad-ask');
+  }
   function watchAd(kind, after) {
     if (adBusy) return;
     if (St.adsLeft(C, S, St.today()) <= 0) { toast('До завтра', null, 'video'); return; }
@@ -3153,6 +3201,17 @@
       dev.appendChild(reset);
       node.appendChild(dev);
     }
+    // Политика и соглашение — те же страницы, что в кабинете ВК (правила 1.1.4).
+    var legal = h('p', 'legal-links');
+    [['privacy.html', 'Конфиденциальность'], ['terms.html', 'Соглашение']].forEach(function (d, i) {
+      if (i) legal.appendChild(document.createTextNode(' · '));
+      var a = h('a', '', d[1]);
+      a.href = d[0];
+      a.target = '_blank';
+      a.rel = 'noopener';
+      legal.appendChild(a);
+    });
+    node.appendChild(legal);
     node.appendChild(h('p', 'build-stamp', 'Сборка ' + BUILD + ' · контент ' + C.content_version + (St.getDayOffset() ? ' · день ' + St.today() : '')));
     openSheet(node, null, 'sheet-settings');
   }

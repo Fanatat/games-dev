@@ -1,14 +1,14 @@
 {
  "game": "house-of-pictures",
- "build_number": "017",
- "app_build": "0.1.0+b017",
+ "build_number": "018",
+ "app_build": "0.1.0+b018",
  "git_branch": "worktree-prerelease-audit",
- "git_sha": "934f108",
+ "git_sha": "67fa799",
  "dirty": false,
  "content_version": 4,
  "api": "https://api.vanatat.ru/hop",
- "built_at": "2026-10-27T07:05:05+00:00",
- "total_bytes": 9097836,
+ "built_at": "2026-10-27T10:00:33+00:00",
+ "total_bytes": 9124774,
  "files": [
   {
    "path": "assets/art/armchair_a.webp",
@@ -1332,13 +1332,18 @@
   },
   {
    "path": "index.html",
-   "bytes": 12523,
-   "sha256": "d8575241c2101e0e4e71836659bc5722827487e9e5652c74fe2c7c8c7b157e8f"
+   "bytes": 12595,
+   "sha256": "bb73da57f0c9e573ad85627ca20596b02dcde41343e5d91591bdb89de8105572"
   },
   {
    "path": "metrika.html",
    "bytes": 1814,
    "sha256": "31002a833efb3e51045c7a09f646c70086da244d2828b424e2df02f5ce6d3eaf"
+  },
+  {
+   "path": "privacy.html",
+   "bytes": 12146,
+   "sha256": "492434541d3cd08c055ebe66e7f530bf718b2d5d6e085bf1ca9b572e0aaa4503"
   },
   {
    "path": "src/analytics.js",
@@ -1347,8 +1352,8 @@
   },
   {
    "path": "src/app.js",
-   "bytes": 150506,
-   "sha256": "0c8f934805bfbf5787b8b545288bb024141be4f25054d3dda827fee51014d019"
+   "bytes": 153927,
+   "sha256": "e5acc567f5c4e484d5ec059e63dd3f55ff2cc4eb433c3bf37701c6a1721637a8"
   },
   {
    "path": "src/cloud.js",
@@ -1357,13 +1362,13 @@
   },
   {
    "path": "src/platform.js",
-   "bytes": 8551,
-   "sha256": "5c753db2af01f1541f76f04ebf716162f0bf1a5f99b4478d4a6277e472acce06"
+   "bytes": 8310,
+   "sha256": "7dbdba38789441f316f7c3a5d48982b67f0820997c1d99018511dec1e756acf5"
   },
   {
    "path": "src/puzzle/nonogram.js",
-   "bytes": 59274,
-   "sha256": "b338407336e3b609b4179e67f08af012bfbd4fd4d23898d1ce2d6a5847abf3a1"
+   "bytes": 59785,
+   "sha256": "ab081266c64770421bfe58ee3c925d63296656fee28a9fe0eb1a2b9308a74b27"
   },
   {
    "path": "src/puzzle/nonogram_logic.js",
@@ -1372,8 +1377,8 @@
   },
   {
    "path": "src/scene.js",
-   "bytes": 20369,
-   "sha256": "58678daa1a059c3f62f54872104f3bd4e095305558d7a596d9fc1442da43b6c1"
+   "bytes": 20714,
+   "sha256": "8de4b16c822ba68eb4e57bb8b0679db8008183560f7df89ce9c43d526318f1f5"
   },
   {
    "path": "src/sound.js",
@@ -1387,8 +1392,8 @@
   },
   {
    "path": "src/styles.css",
-   "bytes": 84310,
-   "sha256": "b89f0b1178a91ba576a03865502d9b7190a0c76b8700de2721bc5535f5e4a106"
+   "bytes": 87275,
+   "sha256": "1ad228ca84fd6e15d6444c2018d248a24d2ae2b23fe5ab13d5d60c7068029613"
   },
   {
    "path": "src/track.js",
@@ -1399,6 +1404,11 @@
    "path": "src/vendor/vk-bridge.min.js",
    "bytes": 4428,
    "sha256": "827ba6f457cd9e73519b58b2c66564caf138645202f1bba37dca0b567f601bb4"
+  },
+  {
+   "path": "terms.html",
+   "bytes": 7719,
+   "sha256": "826cea7b510ebdf31d3111e2bdae471c4d0eb93c5457553f8ac555a9b74db104"
   }
  ]
 }

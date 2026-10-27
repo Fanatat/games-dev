@@ -130,7 +130,7 @@ window.Platform = (function () {
     return Promise.resolve(download(dataUrl, name));
   }
 
-  // Закладка ВК и согласие на уведомления — только по нажатию игрока. → true при согласии.
+  // Закладка ВК — только по нажатию игрока. → true при согласии.
   function ask(method) {
     return send(method).then(function (d) { return !!(d && d.result); }).catch(function () { return false; });
   }
@@ -144,10 +144,8 @@ window.Platform = (function () {
     showRewarded: showRewarded,
     shareImage: shareImage,
     addFavorite: function () { return ask('VKWebAppAddToFavorites'); },
-    allowNotify: function () { return ask('VKWebAppAllowNotifications'); },
-    // уже в избранном / уведомления уже разрешены (параметры запуска ВК)
+    // уже в избранном (параметры запуска ВК)
     isFavorite: params.get('vk_is_favorite') === '1',
-    notifyOn: params.get('vk_are_notifications_enabled') === '1',
     // Инструменты проверки (?journal, ?day=N) — только на стенде: в ВК сейв уходит в облако.
     journal: !inVk && params.has('journal'),
     dayShift: inVk ? 0 : parseInt(params.get('day') || '0', 10) || 0,

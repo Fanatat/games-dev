@@ -525,7 +525,20 @@ button.obj::after, button.spr-letter::after {
   box-shadow: var(--shadow);
   pointer-events: none;
   animation: coach-in .25s ease-out;
+  /* картинка числа — в ту же строку: облачко в одну строку не наезжает на числа столбцов */
+  display: flex; align-items: center; justify-content: center; gap: 2px 10px; width: max-content;
 }
+.coach-pic { display: flex; align-items: center; justify-content: center; gap: 2px; }
+.coach-pic b { font-size: 17px; margin-right: 1px; color: var(--accent); }
+.coach-eq { margin: 0 3px 0 1px; opacity: .7; }
+.coach-pic i { width: 13px; height: 13px; border-radius: 3px; display: block; position: relative; }
+.coach-pic i.is-fill { background: #fff; }
+.coach-pic i.is-cross { box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, .45); }
+.coach-pic i.is-cross::before, .coach-pic i.is-cross::after {
+  content: ''; position: absolute; left: 2px; right: 2px; top: 50%; height: 2px; margin-top: -1px;
+  background: rgba(255, 255, 255, .8); border-radius: 1px; transform: rotate(45deg);
+}
+.coach-pic i.is-cross::after { transform: rotate(-45deg); }
 .coach.is-down { top: auto; bottom: 4px; }
 .coach.is-down::after {
   content: ''; position: absolute; left: 50%; bottom: -8px; margin-left: -8px;
@@ -718,6 +731,8 @@ button.obj::after, button.spr-letter::after {
   background: var(--off); transform: translate(-50%, -50%) rotate(-45deg);
 }
 .dev-row { display: flex !important; flex-direction: row !important; gap: 10px; flex-wrap: wrap; }
+.legal-links { margin: 0; text-align: center; font-size: 13px; }
+.legal-links a { color: var(--ink-2); }
 .build-stamp { margin: 0; text-align: center; font-size: 12px; color: var(--ink-light); user-select: text; -webkit-user-select: text; }
 
 /* ================= P1: валюты, разделы, письма, лавка ================= */
@@ -1170,7 +1185,9 @@ img.postcard-pic { aspect-ratio: 1; object-fit: contain; }
 }
 .deco:active { transform: scale(.96); }
 .deco-art { width: 100%; height: 64px; object-fit: contain; display: block; }
-.deco-title { font-size: 13px; font-weight: 800; line-height: 1.15; text-align: center; flex: 1; }
+.deco-title { font-size: 12px; font-weight: 800; line-height: 1.15; text-align: center; overflow-wrap: break-word; hyphens: auto; }
+.deco-sub { font-size: 12px; font-weight: 700; line-height: 1.15; text-align: center; color: var(--ink-2); overflow-wrap: break-word; hyphens: auto; }
+.deco > .price, .deco > .deco-state { margin-top: auto; }
 .deco.is-locked .deco-art { filter: grayscale(1) brightness(1.15); opacity: .45; }
 .deco.is-worn { border-color: var(--sage); }
 .deco.is-worn .variant-check { opacity: 1; transform: scale(1); }
@@ -1181,8 +1198,9 @@ img.postcard-pic { aspect-ratio: 1; object-fit: contain; }
 
 .sheet-art { width: 38px; height: 38px; display: block; flex: none; }
 .variant.is-premium img { opacity: .9; }
+/* цена — под картинкой, а не поверх абажура (разбор 27.10) */
 .variant .price {
-  position: absolute; left: 6px; top: 6px; padding: 2px 7px 2px 3px; border-radius: 10px;
+  margin-top: -2px; padding: 2px 7px 2px 3px; border-radius: 10px;
   background: rgba(255, 250, 240, .95); box-shadow: var(--shadow); font-size: 13px;
 }
 .variant .price img { width: 20px; height: 20px; }
@@ -1225,6 +1243,26 @@ img.postcard-pic { aspect-ratio: 1; object-fit: contain; }
 .ad-bar { height: 12px; border-radius: 6px; background: var(--paper-2); overflow: hidden; display: block !important; }
 .ad-bar i { display: block; height: 100%; width: 0; background: var(--terra); animation: ad-fill 2s linear forwards; }
 @keyframes ad-fill { to { width: 100%; } }
+.ad-ask { align-items: center; }
+.ad-ask .sheet-head { align-self: stretch; }
+.ad-ask-row { display: flex !important; flex-direction: row !important; align-items: center; justify-content: center; gap: 14px !important; padding: 6px 0; }
+.ad-ask-video {
+  display: flex; align-items: center; justify-content: center; width: 92px; height: 92px;
+  border-radius: 24px; background: var(--paper-2); color: var(--terra);
+}
+.ad-ask-video .ico { width: 60px; height: 60px; }
+.ad-ask-arrow { width: 30px; height: 30px; color: var(--ink-2); animation: ad-nudge 1.2s ease-in-out infinite; }
+@keyframes ad-nudge { 50% { transform: translateX(5px); } }
+.ad-ask-gift { position: relative; display: flex; align-items: center; justify-content: center; width: 92px; height: 92px; }
+.ad-ask-gift img { width: 78px; height: 78px; object-fit: contain; display: block; animation: gift-in .7s cubic-bezier(.3, 1.5, .5, 1); }
+.ad-ask-gift b {
+  position: absolute; right: -10px; bottom: -2px; font-size: 26px; font-weight: 900; color: var(--ink);
+  text-shadow: 0 0 3px #fff, 0 0 3px #fff, 0 0 8px #fff;
+}
+.ad-ask-dots { display: flex !important; flex-direction: row !important; gap: 8px !important; }
+.ad-ask-dots i { width: 12px; height: 12px; border-radius: 50%; background: var(--paper-2); box-shadow: inset 0 0 0 2px var(--line, #d8cbb8); }
+.ad-ask-dots i.is-on { background: var(--terra); box-shadow: none; }
+.ad-ask-go { width: min(100%, 300px); }
 
 /* ---------------- карандаш на поле ---------------- */
 
@@ -1462,7 +1500,7 @@ html.rm .hs-ring { animation: none !important; opacity: .9; }
 
 @media (orientation: landscape) and (max-height: 500px) {
   /* облачко обучения сбоку от поля, а не поверх чисел столбцов */
-  .coach { top: 50%; left: 12px; transform: translateY(-50%); white-space: normal; max-width: 26%; text-align: center; animation: none; }
+  .coach { top: 50%; left: 12px; transform: translateY(-50%); white-space: normal; max-width: 26%; text-align: center; animation: none; flex-wrap: wrap; }
   .coach.is-down { top: 50%; bottom: auto; left: auto; right: 8px; }
   .coach.is-down::after { left: auto; right: -8px; bottom: auto; top: 50%; margin: -8px 0 0; border: 8px solid transparent; border-right: 0; border-left-color: var(--ink); }
 
@@ -1494,6 +1532,7 @@ html.rm .hs-ring { animation: none !important; opacity: .9; }
   box-shadow: var(--shadow); white-space: nowrap;
 }
 .decor-price img { width: 18px; height: 18px; display: block; }
+.decor-price.is-mini { width: 26px; padding: 0; justify-content: center; opacity: .8; }
 .decor-price.is-afford { background: #fff3cf; animation: decor-pulse 1.6s ease-in-out infinite; }
 .decor-price::after { content: ''; position: absolute; left: 50%; top: 50%; width: max(100%, 44px); height: 44px; transform: translate(-50%, -50%); }
 @keyframes decor-pulse {

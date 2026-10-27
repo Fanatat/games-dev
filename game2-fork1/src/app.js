@@ -106,6 +106,7 @@
     else {
       if (dayNow !== St.today()) onNewDay();
       syncPurchases();
+      cloudKick();
     }
   });
   window.addEventListener('pagehide', saveNow);
@@ -133,7 +134,8 @@
      в игру; выдача одна по ключу vk-<номер заказа>. */
 
   var CLOUD_DELAY = 8000; // сервер пускает игрока 30 раз в минуту
-  var cloud = { rev: 0, ready: false, busy: false, dirty: false, timer: null, pending: null, syncing: false, tries: 0 };
+  var CLOUD_RETRY_MAX = 300000;
+  var cloud = { rev: 0, ready: false, busy: false, dirty: false, timer: null, pending: null, syncing: false, tries: 0, fails: 0 };
 
   function scheduleCloud() {
     if (!HopCloud.enabled || !cloud.ready) return;
@@ -148,7 +150,8 @@
     cloud.dirty = false;
     HopCloud.push(St.cloudSave(S), cloud.rev, keepalive).then(function (r) {
       cloud.busy = false;
-      if (!r) { cloud.dirty = true; return; } // нет сети — уйдёт со следующим сохранением
+      if (!r) { cloud.dirty = true; cloudRetry(); return; }
+      cloud.fails = 0;
       cloud.rev = r.rev;
       if (r.ok) { if (cloud.dirty) scheduleCloud(); return; }
       if (St.preferRemote(S, r.save)) { cloud.pending = r.save; adoptPending(); return; }
@@ -156,6 +159,22 @@
       cloudPush(keepalive);
     });
   }
+  /* Отказ записи (нет сети, 429, 5xx): повтор сам, без нового действия
+     игрока — через 8 с, 16 с, … до 5 мин. Таймер тот же, что у обычной
+     отправки (cloud.timer), а cloudPush не идёт при busy — запрос всегда один.
+     Уходит текущий сейв (St.cloudSave(S)) с последней известной ревизией,
+     поэтому более новое облако сервер отклонит (409), и дальше работает
+     обычная сверка preferRemote; купленное возвращает журнал покупок. */
+  function cloudRetry() {
+    if (cloud.timer) clearTimeout(cloud.timer);
+    var wait = Math.min(CLOUD_DELAY * Math.pow(2, cloud.fails++), CLOUD_RETRY_MAX);
+    cloud.timer = setTimeout(function () { cloud.timer = null; cloudPush(false); }, wait);
+  }
+  // Сеть вернулась или игрок вернулся в игру — не ждать конца паузы.
+  function cloudKick() {
+    if (cloud.ready && cloud.dirty && !cloud.busy) cloudPush(false);
+  }
+  window.addEventListener('online', cloudKick);
   function adoptPending() {
     if (!cloud.pending || screen === 'puzzle' || !$('sheet').hidden) return;
     var next = St.adoptRemote(C, S, cloud.pending);
@@ -256,6 +275,7 @@
       tabs[i].classList.toggle('is-on', on);
       if (on) tabs[i].setAttribute('aria-current', 'page'); else tabs[i].removeAttribute('aria-current');
     }
+    if (name === 'home') fitRoomTitle();
     if (name === 'letters') renderLetters();
     if (name === 'shop') renderShop();
     renderHud();
@@ -843,6 +863,15 @@
     $('room-bar').style.width = Math.round(100 * pc.done / pc.n) + '%';
     $('room-pill').setAttribute('aria-label', 'Комнаты. ' + R.title + ': ' + pc.done + ' из ' + pc.n + ' картинок');
     $('room-pill').classList.toggle('has-more', St.openRooms(C, S).length > 1);
+    fitRoomTitle();
+  }
+
+  // Длинное название при трёх значках: шрифт ужимается до 12 px, а не режется многоточием.
+  function fitRoomTitle() {
+    var t = $('room-title');
+    t.style.fontSize = '';
+    if (!t.clientWidth) return;
+    for (var fs = 14; fs >= 12 && t.scrollWidth > t.clientWidth + 1; fs--) t.style.fontSize = fs + 'px';
   }
 
   function renderHome(sceneOpts) {
@@ -855,6 +884,7 @@
     Scene.render($('scene'), C, S, curRoom(), so);
     renderPill();
     renderChips();
+    fitRoomTitle();
     renderPanel();
     renderHud();
   }
@@ -1173,21 +1203,20 @@
     if (d) N.restoreBoard(St.decodeBoard(d.board, sol[0].length, sol.length));
     setMode(1);
     updateUndo();
-    $('btn-pencil').hidden = cur.tutorial || !S.story_flags.tutorial_done;
+    cur.pencilOk = !cur.tutorial && !!S.story_flags.tutorial_done;
+    // Второе касание по большой кнопке «Посадить» приходится туда, где через миг стоит
+    // панель поля, и молча включало крестик (бот «Новичок», 27.10.2026): первые 450 мс
+    // панель касаний не принимает.
+    var tb = $('toolbar');
+    tb.classList.add('is-arming');
+    clearTimeout(tb._arm);
+    tb._arm = setTimeout(function () { tb.classList.remove('is-arming'); }, 450);
     renderHud();
     renderHintCount();
     renderFieldCoins();
     fitTitle();
     log('puzzle_start', { puzzle_id: pid, object_id: cur.oid, resumed: !!d });
     coachStart();
-    if (!cur.tutorial && !$('btn-pencil').hidden && !S.story_flags.pencil_tip) {
-      St.setFlag(S, 'pencil_tip');
-      setTimeout(function () {
-        if (!cur) return;
-        toast('Открывает линию', 3800, 'pencil');
-        bump($('btn-pencil'));
-      }, 700);
-    }
   }
 
   // Толстая линия через каждые пять клеток (ТЗ 01 §12).
@@ -1223,9 +1252,13 @@
   }
   function updateUndo() { $('btn-undo').disabled = !N.canUndo(); }
 
-  function onMove(kind) {
+  function onMove(kind, at) {
     if (!cur) return;
-    if (kind === 'fill') { Sound.play('fill'); Sound.buzz(8); }
+    // Штрих лёг в стек отмены (палец поднят) — ожила «Отменить», больше ничего.
+    if (kind === 'stroke') { updateUndo(); return; }
+    // Неверная клетка видна сразу (ТЗ 02 доводки): свой мягкий звук и вздрагивание, без штрафа.
+    if (at && at.wrong) { Sound.cue('oops'); Sound.buzz([6, 30, 6]); wrongTip(); }
+    else if (kind === 'fill') { Sound.play('fill'); Sound.buzz(8); }
     else if (kind === 'cross') Sound.play('cross');
     else if (kind === 'erase') Sound.play('erase');
     else if (kind === 'undo') Sound.play('back');
@@ -1243,6 +1276,14 @@
     }
     updateUndo();
     coachCheck();
+  }
+
+  // Первая ошибка в игре — одно слово-подсказка, как её убрать; дальше только цвет и звук.
+  function wrongTip() {
+    if (S.story_flags.wrong_tip) return;
+    St.setFlag(S, 'wrong_tip');
+    log('wrong_tip', { puzzle_id: cur.pid });
+    toast('Коснись — сотрётся', 2600, 'cross');
   }
 
   // Монетка в клетке: верно закрашенная клетка с монеткой отдаёт её сразу.
@@ -1357,7 +1398,7 @@
     log('zoom_toggle', { puzzle_id: cur.pid, zoomed: N.isZoomed() });
   });
   window.addEventListener('resize', function () {
-    setTimeout(function () { if (cur && screen === 'puzzle') { setupLens(); fitTitle(); } }, 220);
+    setTimeout(function () { if (cur && screen === 'puzzle') { setupLens(); fitTitle(); } else fitRoomTitle(); }, 220);
   });
 
   function goHomeFromPuzzle() {
@@ -1388,7 +1429,7 @@
     if (k === 'x' || k === 'ч') { pickCancel(); setMode(mode === 1 ? 2 : 1); }
     else if (k === 'z' || k === 'я') { pickCancel(); N.undo(); }
     else if (k === 'h' || k === 'р') { pickCancel(); doHint(); }
-    else if ((k === 'p' || k === 'з') && !$('btn-pencil').hidden) pencilTap();
+    else if ((k === 'p' || k === 'з') && cur.pencilOk) pencilTap();
     else if (k === 'escape') goHomeFromPuzzle();
   });
 
@@ -1570,7 +1611,7 @@
     if (St.freeHintsLeft(C, S, cur.pid) <= 0) {
       Sound.play('back');
       shake($('btn-hint'));
-      if (!$('btn-pencil').hidden) { bump($('btn-pencil')); flash($('btn-pencil'), 'is-call'); }
+      if (cur.pencilOk) { bump($('btn-pencil')); flash($('btn-pencil'), 'is-call'); }
       log('hint_out', { puzzle_id: cur.pid });
       return;
     }
@@ -1581,7 +1622,7 @@
       toast((d.kind === 'row' ? 'Строка ' : 'Столбец ') + (d.idx + 1), null, 'hint');
       St.useFreeHint(C, S, cur.pid);
       log('hint', { puzzle_id: cur.pid, kind: 'line', line: d.kind + d.idx });
-      renderHintCount();
+      renderHintCount(true);
       return;
     }
     var any = N.findHint();
@@ -1590,17 +1631,31 @@
       toast('Верная клетка', null, 'hint');
       St.useFreeHint(C, S, cur.pid);
       log('hint', { puzzle_id: cur.pid, kind: 'cell' });
-      renderHintCount();
+      renderHintCount(true);
     }
   }
 
-  function renderHintCount() {
+  function renderHintCount(used) {
     var n = cur ? St.freeHintsLeft(C, S, cur.pid) : Infinity;
     var b = $('hint-n');
     b.hidden = n === Infinity;
     b.textContent = n === Infinity ? '' : String(n);
     $('btn-hint').classList.toggle('is-out', n === 0);
     $('btn-hint').setAttribute('aria-label', n === Infinity ? 'Подсказка' : 'Подсказка, осталось ' + n);
+    // Одна кнопка помощи: пока есть бесплатные подсказки — лампа, кончились — на её
+    // месте карандаш (ТЗ 02 доводки: на поле 2–3 кнопки). Без карандаша лампа остаётся.
+    var pen = !!(cur && cur.pencilOk) && n === 0;
+    var was = !$('btn-pencil').hidden;
+    $('btn-hint').hidden = pen;
+    $('btn-pencil').hidden = !pen;
+    if (pen && !was && used) {
+      bump($('btn-pencil'));
+      if (!S.story_flags.pencil_tip) {
+        St.setFlag(S, 'pencil_tip');
+        var pid = cur.pid;
+        setTimeout(function () { if (cur && cur.pid === pid) toast('Карандаш открывает линию', 3800, 'pencil'); }, 1500);
+      }
+    }
   }
 
   function shake(node) {
@@ -1656,6 +1711,7 @@
     if (cur.tutorial) { St.setFlag(S, 'tutorial_done'); log('tutorial_done'); }
     saveNow(); // награда записана до любой анимации
     coachHide();
+    hideToast(); // подсказка поля («Коснись — сотрётся») не висит поверх показа вещи
     setToolbarEnabled(false);
     Sound.play('win');
     var rm = reducedMotion();
@@ -2848,12 +2904,21 @@
 
   /* Покупка набора за голоса. В ВК — окно оплаты ВК; на стенде — тестовая
      покупка без денег (чтобы проверить выдачу и интерфейс). */
+  var buyBusy = false, buyBusyTimer = null;
+  function buyRelease() { buyBusy = false; if (buyBusyTimer) { clearTimeout(buyBusyTimer); buyBusyTimer = null; } }
   function buySku(sku, after) {
     var d = C.skus[sku];
     if (!St.canOfferSku(C, S, sku)) { toast('Уже куплено', null, 'check'); return; }
+    if (Platform.canPay && buyBusy) { log('buy_busy', { sku: sku }); return; }
     log('buy_start', { sku: sku });
     if (Platform.canPay) {
+      /* Окно оплаты уже открыто — второе не открываем. Если мост так и не
+         ответил, через 3 мин защита снимается; поздний ответ всё равно
+         выдастся по номеру заказа (grantOrder), а потерянный — по журналу. */
+      buyBusy = true;
+      buyBusyTimer = setTimeout(buyRelease, 180000);
       Platform.buy(sku).then(function (r) {
+        buyRelease();
         if (r.ok) grantOrder('vk-' + r.order_id, sku, after);
         else if (r.reason !== 'cancel') toast('Голоса не списаны', null, 'close');
         log('buy_result', { sku: sku, ok: r.ok, reason: r.reason || null });
@@ -2908,32 +2973,48 @@
     log('order_applied', { sku: sku, order_id: String(orderId), title: d.title });
   }
 
-  /* Ролик за награду — только по нажатию игрока, не больше 3 в день. */
+  /* Ролик за награду — только по нажатию игрока, не больше 3 в день.
+     Один показ за раз: пока ролик идёт, повторные нажатия ничего не делают.
+     Ожидание ролика ограничено (Platform.showRewarded): по сроку игрок видит
+     тост, и кнопка снова работает. Поздний «досмотрен» после срока даёт
+     награду один раз (late), без after — экран к тому времени уже другой. */
+  var adBusy = false;
   function watchAd(kind, after) {
+    if (adBusy) return;
     if (St.adsLeft(C, S, St.today()) <= 0) { toast('До завтра', null, 'video'); return; }
-    var done = function (ok) {
-      Metrika.goal('rewarded_result', { ok: !!ok, kind: kind });
-      if (!ok) { toast('Без награды', null, 'video'); return; }
+    var grant = function (late) {
       var r = St.rewardedGrant(C, S, kind);
       if (!r.ok) return;
       saveNow();
       Sound.play('reward');
       renderHud();
       bump(kind === 'pencil' ? $('hud-pencils') : $('hud-coins'));
+      if (late) { log('ad_late', { kind: kind }); rerender(); toast('Ролик засчитан — награда получена'); return; }
       if (after) after();
       if (screen === 'shop') renderShop();
     };
+    var done = function (res) {
+      adBusy = false;
+      if (res.reason !== 'busy') Metrika.goal('rewarded_result', { ok: !!res.ok, kind: kind });
+      if (res.ok) { grant(false); return; }
+      if (res.reason === 'busy') return;
+      log('ad_fail', { kind: kind, reason: res.reason });
+      if (res.reason === 'unavailable') toast('Ролик сейчас недоступен — попробуй чуть позже');
+      else if (res.reason === 'timeout') toast('Ролик не ответил — попробуй чуть позже');
+      else toast('Ролик не досмотрен — награды нет');
+    };
+    adBusy = true;
     log('ad_start', { kind: kind });
-    if (Platform.canAds) { Platform.showRewarded().then(done); return; }
+    if (Platform.canAds) { Platform.showRewarded(function () { grant(true); }).then(done); return; }
     // Стенд: тестовый «ролик» на две секунды.
     var node = h('div', 'ad-test');
     node.appendChild(sheetHead('Ролик (тест)'));
     var bar = h('div', 'ad-bar');
     bar.appendChild(h('i'));
     node.appendChild(bar);
-    node.appendChild(h('p', 'test-note', 'Стенд: пауза 2 секунды.'));
-    openSheet(node, function () { clearTimeout(t); }, 'sheet-ad');
-    var t = setTimeout(function () { closeSheet(true); done(true); }, reducedMotion() ? 300 : 2000);
+    node.appendChild(h('p', 'test-note', 'На стенде вместо рекламы — пауза в 2 секунды.'));
+    openSheet(node, function () { clearTimeout(t); adBusy = false; }, 'sheet-ad');
+    var t = setTimeout(function () { closeSheet(true); done({ ok: true, reason: 'watched' }); }, reducedMotion() ? 300 : 2000);
   }
 
   /* ---------------- возвращение после паузы ---------------- */

@@ -491,6 +491,15 @@ button.obj::after, button.spr-letter::after {
 }
 .grid-cell.is-cross { animation: cell-stamp 90ms ease-out; }
 @keyframes cell-stamp { from { transform: scale(.85); opacity: .4; } to { transform: scale(1); opacity: 1; } }
+/* Ошибка видна сразу (ТЗ 02 доводки): лишняя закраска — терракота в косую полоску
+   (отличима и без цвета), крестик на клетке картинки — красный на розоватом. */
+.grid-cell.is-filled.is-wrong {
+  background: repeating-linear-gradient(135deg, var(--terra-d) 0 4px, #e7a184 4px 8px);
+  animation: cell-wrong 260ms ease-out;
+}
+.grid-cell.is-cross.is-wrong { background: #f8dccf; animation: cell-wrong 260ms ease-out; }
+.grid-cell.is-cross.is-wrong::after { color: var(--off); }
+@keyframes cell-wrong { 0% { transform: scale(.85); } 35% { transform: scale(1.08) rotate(-4deg); } 70% { transform: rotate(3deg); } 100% { transform: none; } }
 .grid-cell.is-shake { animation: cell-shake 120ms ease-in-out; }
 @keyframes cell-shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
 .grid-cell::before {
@@ -498,9 +507,10 @@ button.obj::after, button.spr-letter::after {
   background: var(--accent); opacity: 0; pointer-events: none;
 }
 .grid-cell.is-line-flash::before { animation: cell-glow 180ms ease-out var(--flash-d, 0ms) both; }
-.grid-cell.is-line-flash.is-filled { animation: cell-pop 180ms ease-out var(--flash-d, 0ms) both; }
+/* cell-stamp первым в списке: когда вспышка снимается, штамп не запускается заново (клетка не мигает) */
+.grid-cell.is-line-flash.is-filled { animation: cell-stamp 90ms ease-out, cell-pop 180ms ease-out var(--flash-d, 0ms) both; }
 .grid-cell.is-win-wave::before { animation: cell-glow 520ms ease-out var(--wave-d, 0ms) both; }
-.grid-cell.is-win-wave.is-filled { animation: cell-pop-big 460ms cubic-bezier(.3, 1.6, .5, 1) var(--wave-d, 0ms) both; }
+.grid-cell.is-win-wave.is-filled { animation: cell-stamp 90ms ease-out, cell-pop-big 460ms cubic-bezier(.3, 1.6, .5, 1) var(--wave-d, 0ms) both; }
 @keyframes cell-glow { 0% { opacity: 0; } 35% { opacity: .45; } 100% { opacity: 0; } }
 @keyframes cell-pop { 0% { transform: scale(1); } 40% { transform: scale(.82); } 100% { transform: scale(1); } }
 @keyframes cell-pop-big { 0% { transform: scale(1); } 45% { transform: scale(1.14); } 100% { transform: scale(1); } }
@@ -774,6 +784,9 @@ button.obj::after, button.spr-letter::after {
   .tab span { display: none; }
 }
 
+/* панель поля сразу после открытия: двойное касание кнопки запуска не попадает в режим */
+#toolbar.is-arming { pointer-events: none; }
+
 /* ---------------- плашка комнаты над сценой ---------------- */
 
 .room-pill {
@@ -785,11 +798,15 @@ button.obj::after, button.spr-letter::after {
   font-weight: 800; font-size: 15px;
   -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px);
 }
-.room-pill .ico { width: 20px; height: 20px; color: var(--terra); }
-.room-pill span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.room-pill .ico { width: 20px; height: 20px; color: var(--terra); flex: none; }
+/* Две строки: название целиком сверху, счётчик картинок и полоса под ним —
+   так название не делит строку со счётчиком и не режется при трёх значках. */
+.room-pill .rp-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; line-height: 1.1; text-align: left; }
+#room-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.room-pill .rp-meta { display: flex; align-items: center; gap: 6px; }
 .room-pill small {
-  font-size: 13px; font-weight: 900; color: var(--sage-d);
-  background: rgba(127, 154, 110, .18); padding: 1px 7px; border-radius: 9px;
+  flex: none; font-size: 11px; font-weight: 900; line-height: 14px; color: var(--sage-d);
+  background: rgba(127, 154, 110, .18); padding: 0 6px; border-radius: 7px;
 }
 .room-pill.has-more::after {
   content: ''; width: 7px; height: 7px; margin-left: 2px;
@@ -818,13 +835,11 @@ button.obj::after, button.spr-letter::after {
 .scene-chip.is-new { background: var(--accent); }
 .scene-chip.is-new .chip-badge { background: var(--terra); color: #fff; }
 .scene-chip.is-new img, .scene-chip.is-new .ico { animation: letter-hop 1.6s ease-in-out infinite; }
-/* 320 px: рядом два значка — домик в плашке убираем, чтобы название комнаты читалось целиком. */
+/* до 360 px: рядом три значка — домик в плашке убираем, чтобы название комнаты читалось целиком. */
 @media (max-width: 360px) {
   .room-pill { gap: 4px; padding: 0 9px 0 11px; font-size: 14px; }
   .room-pill > .ico { display: none; }
   .scene-chips { gap: 7px; }
-  /* сундучок подарка вытесняет значок письма, пока подарок не взят: третьему значку места нет */
-  .scene-chips .chip-gift ~ .chip-mail { display: none; }
 }
 
 .scene-garland { position: absolute; left: 0; right: 0; top: 0; height: 9%; z-index: 2; pointer-events: none; }
@@ -1290,6 +1305,7 @@ img.postcard-pic { aspect-ratio: 1; object-fit: contain; }
 .glow-spark:nth-of-type(3) { left: 46%; top: 2%; animation-delay: 1.7s; }
 @keyframes glow-spark { 0%, 60%, 100% { transform: rotate(45deg) scale(0); opacity: 0; } 75% { transform: rotate(45deg) scale(1); opacity: 1; } }
 html.rm .glow-spark { display: none; }
+html.rm .grid-cell.is-wrong { animation: none; }
 
 /* «Хватает!»: на вещь, которую уже можно оформить */
 .hs-badge.hs-afford { background: #fff3cf; box-shadow: 0 0 0 2px var(--accent), var(--shadow); }
@@ -1370,7 +1386,7 @@ html.rm .cell-gold { animation-duration: .01s; }
 
 /* Плашка комнаты: полоса картинок */
 .room-pill .room-bar {
-  position: absolute; left: 14px; right: 14px; bottom: 5px; height: 4px;
+  flex: 1 1 auto; min-width: 24px; height: 4px;
   border-radius: 2px; background: rgba(127, 154, 110, .2); overflow: hidden; display: block;
 }
 .room-pill .room-bar i { display: block; height: 100%; width: 0; background: var(--sage-d); border-radius: 2px; transition: width .8s ease-out; }

@@ -1,14 +1,14 @@
 {
  "game": "house-of-pictures",
- "build_number": "012",
- "app_build": "0.1.0+b012",
- "git_branch": "feat/metrika",
- "git_sha": "a27fd1e",
+ "build_number": "013",
+ "app_build": "0.1.0+b013",
+ "git_branch": "worktree-tz02-polish",
+ "git_sha": "fc7cb26",
  "dirty": false,
  "content_version": 3,
  "api": "https://api.vanatat.ru/hop",
- "built_at": "2026-10-17T18:48:24+00:00",
- "total_bytes": 7027813,
+ "built_at": "2026-10-27T03:54:26+00:00",
+ "total_bytes": 7041417,
  "files": [
   {
    "path": "assets/art/armchair_a.webp",
@@ -1017,8 +1017,8 @@
   },
   {
    "path": "index.html",
-   "bytes": 12465,
-   "sha256": "715f2cae9b71d5c0312045e93cb008cbbc5353919c4f2c7fc72b0f53cec3e7b6"
+   "bytes": 12523,
+   "sha256": "6bd7c6e9f45e0e9eefc323d0619db937f43fa4058024959d888859340ee57a0f"
   },
   {
    "path": "metrika.html",
@@ -1032,23 +1032,23 @@
   },
   {
    "path": "src/app.js",
-   "bytes": 144384,
-   "sha256": "5676266b7436ceb98006ba51fb1dc45336ebef6face8c5010cb4f5ba49652f92"
+   "bytes": 150121,
+   "sha256": "a7d6f1b44db99554823773f0ded9ea7f559bdbb79f1d95ad460b4eed509da7e4"
   },
   {
    "path": "src/cloud.js",
-   "bytes": 3699,
-   "sha256": "26400a83ee1ea7bc49509f9ce5435ae6d07b4575e3cad9770f076075c1b39202"
+   "bytes": 4537,
+   "sha256": "2f11bd45d61baedfe2666d72a27dd475d318bcb07f1cb752da10e43177a9f783"
   },
   {
    "path": "src/platform.js",
-   "bytes": 5354,
-   "sha256": "9102c90255bc002ed19e82ff6e2c20380fd2c92dcb5decab5336067f2b33acc5"
+   "bytes": 7878,
+   "sha256": "6c95a1bab6d759cf775d83c3eea46b9bb5dee940af6401f7bf4fdcb68dd0d650"
   },
   {
    "path": "src/puzzle/nonogram.js",
-   "bytes": 56577,
-   "sha256": "e75eedc83026e06a9a43317d9ac123b7e14bd8a9548b32426b3eb1f2090ed481"
+   "bytes": 59274,
+   "sha256": "b338407336e3b609b4179e67f08af012bfbd4fd4d23898d1ce2d6a5847abf3a1"
   },
   {
    "path": "src/puzzle/nonogram_logic.js",
@@ -1062,8 +1062,8 @@
   },
   {
    "path": "src/sound.js",
-   "bytes": 13920,
-   "sha256": "f048a68711f827ebc4f493e7c9761cacfd0a6c7704ebfa00abb966850139a97f"
+   "bytes": 14169,
+   "sha256": "596a40ce4d17856a67e0372b2a0efad9a58db75fa5f2caf9cc3f11bf35bfa100"
   },
   {
    "path": "src/state.js",
@@ -1072,8 +1072,8 @@
   },
   {
    "path": "src/styles.css",
-   "bytes": 82809,
-   "sha256": "e20ac0450a292e1255e43cab334a4d4fea3c31ed1f31690ff713a18e3977010c"
+   "bytes": 84310,
+   "sha256": "b89f0b1178a91ba576a03865502d9b7190a0c76b8700de2721bc5535f5e4a106"
   },
   {
    "path": "src/track.js",

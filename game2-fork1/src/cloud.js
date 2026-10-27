@@ -13,6 +13,8 @@ window.HopCloud = (function () {
   var launch = location.search.replace(/^\?/, '');
   var enabled = !!base && window.Platform && Platform.name === 'vk' && /^https:\/\//.test(base);
 
+  var REQ_MS = 20000; // ответ и тело дольше — считаем обрывом
+
   function req(method, path, body, keepalive) {
     if (!enabled) return Promise.resolve(null);
     var opts = { method: method, headers: { 'X-Launch-Params': launch }, cache: 'no-store', credentials: 'omit' };
@@ -21,10 +23,20 @@ window.HopCloud = (function () {
       opts.body = JSON.stringify(body);
       if (keepalive) opts.keepalive = true;
     }
-    return fetch(base + path, opts).then(function (r) {
+    /* Срок на запрос целиком: и на ответ, и на чтение тела. Без него зависший
+       ответ вечно держал бы cloud.busy / cloud.syncing в app.js. По сроку —
+       null, как при обрыве сети: дальше работает обычный повтор. */
+    var ctl = typeof AbortController === 'function' ? new AbortController() : null;
+    if (ctl) opts.signal = ctl.signal;
+    var timer;
+    var deadline = new Promise(function (resolve) {
+      timer = setTimeout(function () { if (ctl) ctl.abort(); resolve(null); }, REQ_MS);
+    });
+    var call = fetch(base + path, opts).then(function (r) {
       return r.json().then(function (data) { return { status: r.status, data: data }; },
         function () { return { status: r.status, data: null }; });
     }).catch(function () { return null; });
+    return Promise.race([call, deadline]).then(function (res) { clearTimeout(timer); return res; });
   }
 
   // → { rev, save } | null

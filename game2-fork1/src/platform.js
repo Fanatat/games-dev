@@ -50,12 +50,49 @@ window.Platform = (function () {
     });
   }
 
-  // → true, если ролик досмотрен.
-  function showRewarded() {
-    return send('VKWebAppCheckNativeAds', { ad_format: 'reward' }).then(function (c) {
-      if (!c || !c.result) return false;
-      return send('VKWebAppShowNativeAds', { ad_format: 'reward' }).then(function (d) { return !!(d && d.result); });
-    }).catch(function () { return false; });
+  /* Ролик за награду. → { ok, reason }: ok — досмотрен (reason 'watched');
+     иначе reason 'unavailable' (ролика нет или проверка молчит), 'timeout'
+     (показ не ответил), 'skipped' (закрыт или ошибка показа), 'busy' (уже идёт).
+     Ожидание ограничено, у игрока всегда есть исход:
+     - проверка (CheckNativeAds) — AD_CHECK_MS; опоздавший ответ проверки
+       отбрасывается, показ после него не начинается — ролик не всплывёт
+       внезапно, когда игрок уже ушёл;
+     - показ (ShowNativeAds) — AD_SHOW_MS, с запасом на длинный ролик, чтобы не
+       обрывать идущий показ. Если показ ответил «досмотрен» уже после этого
+       срока, вызывается onLate() — ровно один раз на попытку (промис показа
+       завершается один раз, а finish отделяет «вовремя» от «поздно»). Поздний
+       успех засчитываем, а не выбрасываем: ролик реально досмотрен и
+       засчитан площадкой, задержка ответа — не вина игрока. Двойной награды
+       нет: вовремя → только resolve, поздно → только onLate; дневной лимит
+       по-прежнему проверяет HopState.rewardedGrant. */
+  var AD_CHECK_MS = 8000;
+  var AD_SHOW_MS = 120000;
+  var adActive = false;
+  function showRewarded(onLate) {
+    if (adActive) return Promise.resolve({ ok: false, reason: 'busy' });
+    adActive = true;
+    return new Promise(function (resolve) {
+      var settled = false;
+      var timer = setTimeout(function () { finish(false, 'unavailable'); }, AD_CHECK_MS);
+      function finish(ok, reason) {
+        if (settled) return false;
+        settled = true;
+        adActive = false;
+        clearTimeout(timer);
+        resolve({ ok: ok, reason: reason });
+        return true;
+      }
+      send('VKWebAppCheckNativeAds', { ad_format: 'reward' }).then(function (c) {
+        if (settled) return;
+        if (!c || !c.result) { finish(false, 'unavailable'); return; }
+        clearTimeout(timer);
+        timer = setTimeout(function () { finish(false, 'timeout'); }, AD_SHOW_MS);
+        send('VKWebAppShowNativeAds', { ad_format: 'reward' }).then(function (d) {
+          var ok = !!(d && d.result);
+          if (!finish(ok, ok ? 'watched' : 'skipped') && ok && onLate) onLate();
+        }, function () { finish(false, 'skipped'); });
+      }, function () { finish(false, 'unavailable'); });
+    });
   }
 
   // Поделиться картинкой: в ВК — редактор истории; вне ВК — системное «Поделиться»

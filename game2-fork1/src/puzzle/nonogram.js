@@ -3,6 +3,9 @@
    Перенесено из game2 (main@3ee88c1, nonogram.js) для «Дома картинок».
    Изменения форка: отмена последнего жеста (undo), пересчёт размера
    по видимости своего контейнера, а не по экрану #game старой игры.
+   Доводка (ТЗ 02, 27.10): ошибка видна сразу — неверная клетка получает
+   .is-wrong и aria-invalid (без штрафа); авто-крестики не ставятся в линии
+   с ошибкой; отмена снимает ровно один штрих вместе с его авто-крестиками.
    ============================================================ */
 
 window.Nonogram = (function () {
@@ -28,7 +31,8 @@ window.Nonogram = (function () {
   // закраску игрок — авто-крестики той же строки и столбца, которые из доски
   // больше не следуют, уходят; свои крестики игрока не трогаем никогда.
   var _auto = [];
-  // Форк: стек отмены — снимок доски до каждого жеста/подсказки, изменившего поле.
+  // Форк: стек отмены — снимок доски и авто-крестиков до каждого жеста/подсказки,
+  // изменившего поле: { b: доска, a: какие крестики поставила игра }.
   var _undoStack = [];
   var UNDO_MAX = 60;
   // ТЗ №57: счётчик ходов игрока для аналитики (level_win.moves). Ход —
@@ -447,12 +451,25 @@ window.Nonogram = (function () {
     return (_cellEls[r] && _cellEls[r][c]) || null;
   }
 
+  // Неверная клетка: закрашена вне картинки или крестик на клетке картинки.
+  // Видна сразу (ТЗ 02 доводки): отличимый цвет и aria-invalid, штрафа нет —
+  // повторное касание стирает её, как любую другую.
+  function isWrongAt(r, c) {
+    var s = _boardState[r][c], want = _level.solution[r][c];
+    return (s === 1 && want === 0) || (s === 2 && want === 1);
+  }
+
   function renderCell(r, c) {
     var el = cellEl(r, c);
     if (!el) return;
     var s = _boardState[r][c];
+    var wrong = isWrongAt(r, c);
     el.classList.toggle('is-filled', s === 1);
     el.classList.toggle('is-cross',  s === 2);
+    if (wrong !== el.classList.contains('is-wrong')) {
+      el.classList.toggle('is-wrong', wrong);
+      if (wrong) el.setAttribute('aria-invalid', 'true'); else el.removeAttribute('aria-invalid');
+    }
   }
 
   /* ----------------------------------------------------------
@@ -594,7 +611,7 @@ window.Nonogram = (function () {
         _boardState[r][c] = _dragValue;
         renderCell(r, c);
         countStroke();
-        if (_onMove) _onMove(_dragValue === 1 ? 'fill' : 'cross');
+        if (_onMove) _onMove(_dragValue === 1 ? 'fill' : 'cross', { r: r, c: c, wrong: isWrongAt(r, c) });
         return _dragValue === 1;
       }
     } else {
@@ -699,12 +716,23 @@ window.Nonogram = (function () {
 
   /* ----------------------------------------------------------
      autoFillCrosses — ставит крестики только на клетки,
-     гарантированно пустые во ВСЕХ допустимых расстановках
-     (по логике подсказок, без обращения к _level.solution).
+     гарантированно пустые во ВСЕХ допустимых расстановках.
+     Доводка: линию с неверной клеткой (видимой ошибкой) не трогаем —
+     расстановки от ошибки ложные, и крестик лёг бы на картинку
+     (эксперт №5, b011). На линии без ошибок решение — одна из допустимых
+     расстановок, поэтому «пусто во всех» не бывает клеткой картинки;
+     проверка want === 0 — страховка на этот инвариант.
   ---------------------------------------------------------- */
   function autoFillCrosses(r, c) {
     if (!_level || !_clues) return;
     var W = _level.width, H = _level.height;
+    var sol = _level.solution;
+
+    function lineHasError(isRow, idx) {
+      var n = isRow ? W : H;
+      for (var k = 0; k < n; k++) if (isRow ? isWrongAt(idx, k) : isWrongAt(k, idx)) return true;
+      return false;
+    }
 
     function processLine(line, clue, setCell) {
       var placements = getValidPlacements(line, clue);
@@ -721,18 +749,19 @@ window.Nonogram = (function () {
       if (changed && _onMove) _onMove('auto');
     }
 
-    processLine(
+    if (!lineHasError(true, r)) processLine(
       _boardState[r].slice(),
       _clues.rows[r],
-      function (i) { _boardState[r][i] = 2; _auto[r][i] = true; renderCell(r, i); }
+      function (i) { if (sol[r][i]) return; _boardState[r][i] = 2; _auto[r][i] = true; renderCell(r, i); }
     );
 
+    if (lineHasError(false, c)) return;
     var col = [];
     for (var rr = 0; rr < H; rr++) col.push(_boardState[rr][c]);
     processLine(
       col,
       _clues.cols[c],
-      function (i) { _boardState[i][c] = 2; _auto[i][c] = true; renderCell(i, c); }
+      function (i) { if (sol[i][c]) return; _boardState[i][c] = 2; _auto[i][c] = true; renderCell(i, c); }
     );
   }
 
@@ -773,6 +802,10 @@ window.Nonogram = (function () {
     return false;
   }
 
+  function snapshot() {
+    return { b: _boardState.map(function (row) { return row.slice(); }), a: _auto.map(function (row) { return row.slice(); }) };
+  }
+
   function pushUndo(snap) {
     _undoStack.push(snap);
     if (_undoStack.length > UNDO_MAX) _undoStack.shift();
@@ -787,8 +820,8 @@ window.Nonogram = (function () {
     var snap = _undoStack.pop();
     for (var r = 0; r < _level.height; r++) {
       for (var c = 0; c < _level.width; c++) {
-        if (_boardState[r][c] !== snap[r][c]) { _boardState[r][c] = snap[r][c]; renderCell(r, c); }
-        if (_boardState[r][c] !== 2) _auto[r][c] = false;
+        if (_boardState[r][c] !== snap.b[r][c]) { _boardState[r][c] = snap.b[r][c]; renderCell(r, c); }
+        _auto[r][c] = snap.a[r][c];
       }
     }
     refreshAllClueFade();
@@ -851,12 +884,16 @@ window.Nonogram = (function () {
     _dragAction      = null;
     _lastCell        = null;
     _dragPointerId   = null;
-    if (_strokeSnapshot && boardDiffers(_strokeSnapshot)) pushUndo(_strokeSnapshot);
+    var pushed = false;
+    if (_strokeSnapshot && boardDiffers(_strokeSnapshot)) { pushUndo({ b: _strokeSnapshot, a: _strokeAuto }); pushed = true; }
     _strokeSnapshot  = null; // штрих зафиксирован
     _strokeAuto      = null;
     window.removeEventListener('pointermove',   onPointerMove);
     window.removeEventListener('pointerup',     onPointerUp);
     window.removeEventListener('pointercancel', onPointerUp);
+    // Штрих лёг в стек отмены только сейчас: «Отменить» должна ожить сразу после
+    // первого штриха, а не после второго (эксперт №5: кнопка отставала на штрих).
+    if (pushed && _onMove) _onMove('stroke');
   }
 
   /* ----------------------------------------------------------
@@ -1019,7 +1056,7 @@ window.Nonogram = (function () {
   ---------------------------------------------------------- */
   function applyHint(hint) {
     if (!hint || _won) return;
-    pushUndo(getBoardState());
+    pushUndo(snapshot());
     if (hint.action === 'clear') {
       // Клетка была закрашена ошибочно (единственное место в свободном
       // режиме, где мы явно знаем об ошибке) — короткий шейк, антистресс-
@@ -1049,7 +1086,7 @@ window.Nonogram = (function () {
 
   function revealLine(kind, idx) {
     if (!_level || _won || lineClosed(kind, idx)) return false;
-    pushUndo(getBoardState());
+    pushUndo(snapshot());
     var n = kind === 'row' ? _level.width : _level.height;
     for (var i = 0; i < n; i++) {
       var r = kind === 'row' ? idx : i, c = kind === 'row' ? i : idx;
@@ -1084,7 +1121,7 @@ window.Nonogram = (function () {
   ---------------------------------------------------------- */
   function clearBoard() {
     if (!_level) return;
-    pushUndo(getBoardState());
+    pushUndo(snapshot());
     var H = _level.height, W = _level.width;
     for (var r = 0; r < H; r++) {
       for (var c = 0; c < W; c++) {
@@ -1235,6 +1272,7 @@ window.Nonogram = (function () {
     isZoomed:      isZoomed,
     toggleZoom:    toggleZoom,
     findErrors:      findErrors,
+    isWrongAt:       function (r, c) { return !!_level && isWrongAt(r, c); },
     hasErrors:       hasErrors,
     findWrongCrosses: findWrongCrosses,
     hasWrongCrosses: hasWrongCrosses,

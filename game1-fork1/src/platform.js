@@ -185,6 +185,15 @@
     });
   }
 
+  // Скопировать текст (адрес поддержки): в ВК — VKWebAppCopyText, в браузере — буфер обмена. → Promise
+  function copyText(text) {
+    try {
+      if (vk) return Promise.resolve(bridge.send('VKWebAppCopyText', { text: text }));
+      if (root.navigator && navigator.clipboard) return navigator.clipboard.writeText(text);
+    } catch (e) { return Promise.reject(e); }
+    return Promise.reject(new Error('no clipboard'));
+  }
+
   root.Platform = {
     name: vk ? 'vk' : 'web',
     storage: storage,
@@ -198,6 +207,7 @@
     onView: onView,
     canAds: vk,
     showRewarded: showRewarded,
+    copyText: copyText,
     params: params,
     dev: dev,
   };

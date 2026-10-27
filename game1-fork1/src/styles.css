@@ -219,6 +219,8 @@ button.slot.got { background: var(--surface); }
   padding: 8px 16px calc(16px + env(safe-area-inset-bottom)); border-radius: 18px 18px 0 0; background: var(--surface);
   display: flex; flex-direction: column; gap: 8px; animation: sheetIn .22s ease both; }
 @keyframes sheetIn { from { transform: translateY(30px); opacity: 0; } }
+/* высокая шторка на низком экране прокручивается, а не сжимает кнопки */
+.sheet > * { flex-shrink: 0; }
 .sheet-grip { width: 40px; height: 4px; border-radius: 2px; background: var(--line); margin: 0 auto 6px; flex: none; }
 .sheet h3 { margin-bottom: 2px; }
 .sheet-clue { font-family: var(--font); font-size: 16px; color: var(--muted); margin-bottom: 4px; }
@@ -226,6 +228,7 @@ button.slot.got { background: var(--surface); }
   border: 1px solid var(--line); border-radius: 12px; background: var(--bg); text-align: left; }
 .opt > span:first-child { display: flex; flex-direction: column; min-width: 0; }
 .opt .muted { font-size: 13px; }
+.opt .help-mail { font-size: 15px; color: var(--text); user-select: text; -webkit-user-select: text; overflow-wrap: anywhere; }
 .opt:disabled { opacity: .55; }
 .opt.danger b { color: var(--danger); }
 .tag { font-size: 13px; font-weight: 600; color: var(--green-d); background: var(--surface); border-radius: 8px; padding: 3px 8px; white-space: nowrap; }

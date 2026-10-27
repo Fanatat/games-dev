@@ -1,6 +1,6 @@
 /* Звук: сэмплы Kenney CC0 из Словохода (assets/sfx, лицензии — assets/sfx/CREDITS.md).
    Web Audio, загрузка после первого касания; выход приглушён и смягчён по верхам, как в
-   родителе (−10 дБ, полка −8 дБ от 2,5 кГц). Скрытая вкладка — звук на паузе.
+   родителе (−10 дБ, полка −8 дБ от 2,5 кГц). Скрытая вкладка, свёрнутый ВК и ролик — звук на паузе.
    Музыка — своя петля assets/music/day.mp3 (tools/make_music.py), грузится через 1,5 с после
    первого касания, вступает плавно, на итоге приглушается; включается отдельно от звуков. */
 (function (root) {
@@ -23,7 +23,7 @@
   var BASE = base();
 
   function unlock() {
-    if (ctx) { if (ctx.state === 'suspended' && !document.hidden) ctx.resume(); return; }
+    if (ctx) { apply(); return; }
     var AC = root.AudioContext || root.webkitAudioContext;
     if (!AC) return;
     ctx = new AC();
@@ -99,10 +99,15 @@
 
   document.addEventListener('pointerdown', unlock, true);
   document.addEventListener('keydown', unlock, true);
-  document.addEventListener('visibilitychange', function () {
+  /* Пауза всего звука: скрытая вкладка, свёрнутое приложение ВК (VKWebAppViewHide, правила ВК 2.2.5), ролик. */
+  var holds = {};
+  function apply() {
     if (!ctx) return;
-    if (document.hidden) ctx.suspend(); else ctx.resume();
-  });
+    if (document.hidden || Object.keys(holds).length) { if (ctx.state === 'running') ctx.suspend(); }
+    else if (ctx.state === 'suspended') ctx.resume();
+  }
+  function hold(why, on) { if (on) holds[why] = true; else delete holds[why]; apply(); }
+  document.addEventListener('visibilitychange', apply);
 
   root.Sound = {
     play: play,
@@ -110,6 +115,8 @@
     get enabled() { return enabled; },
     setMusic: setMusic,
     duck: duck,
+    hold: hold,
+    get held() { return Object.keys(holds); },
     get music() { return { on: music.on, loaded: !!music.buf, playing: !!music.src, duck: music.duck }; },
   };
 })(this);

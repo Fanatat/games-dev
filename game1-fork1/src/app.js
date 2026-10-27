@@ -159,9 +159,9 @@
       '<div class="tile-row">' + tile('sound', 'Звук') + tile('music', 'Музыка') + '</div>' +
       toggleRow('reduced_motion', 'Меньше движения') +
       toggleRow('large_text', 'Крупный текст') +
-      (P.params.has('journal') ? '<button class="opt" id="opt-journal"><span><b>Журнал событий</b><span class="muted">Скачать JSON для разбора плейтеста</span></span></button>' : '') +
+      (P.dev && P.params.has('journal') ? '<button class="opt" id="opt-journal"><span><b>Журнал событий</b><span class="muted">Скачать JSON для разбора плейтеста</span></span></button>' : '') +
       '<button class="opt danger" id="opt-reset"><span><b>Начать заново</b><span class="muted">Сотрёт весь прогресс</span></span></button>' +
-      '<p class="muted small">Сборка ' + esc(build) + ' · ' + esc(C.content_version) + '</p>' +
+      '<p class="muted small">Версия ' + esc(build) + '</p>' +
       '<button class="btn-link" data-close>Закрыть</button>';
     openSheet('settings', html, function (el) {
       el.querySelectorAll('[data-set]').forEach(function (b) {
@@ -776,14 +776,26 @@
   }
   /* Ролик за награду (только ВК): досмотрел — шаг бесплатно, ровно один раз; отказ, таймаут,
      нет ролика — вздрагивает счётчик марок; повторное нажатие во время показа ничего не делает. */
+  /* Перед роликом — окно согласия с наградой (правила ВК: rewarded только по явному вызову за обозначенный бонус). */
+  var AD_PRIZE = { extra: 'ещё одну подсказку к улике', start: 'первую букву слова на поле', path: 'весь путь слова на поле' };
   function watchAd(id) {
     if (F.adBusy) return;
+    var v = hintView(id);
+    openSheet('ad', '<h3>Подсказка за ролик</h3><p>Посмотрите короткий ролик — и получите ' + esc(AD_PRIZE[v.next.type] || 'следующую подсказку') +
+      ' бесплатно. Марки не тратятся.</p><button class="btn-main" id="ad-go">Смотреть ролик</button><button class="btn-link" data-close>Не сейчас</button>', function (el) {
+      el.querySelector('#ad-go').addEventListener('click', function () { closeSheet(); playAd(id); });
+    });
+  }
+  function playAd(id) {
+    if (!F || F.adBusy) return;
     F.adBusy = true;
     var field = F, story = F.story.id;
     $('btn-hint').classList.add('busy');
     A.event('ad_reward', { story_id: story, clue_id: id, result: 'start' });
+    window.Sound.hold('ad', true);
     P.showRewarded(function () { grant('late'); }).then(function (r) {
       field.adBusy = false;
+      window.Sound.hold('ad', false);
       $('btn-hint').classList.remove('busy');
       A.event('ad_reward', { story_id: story, clue_id: id, result: r.reason });
       if (r.ok) grant('watched');
@@ -1208,7 +1220,8 @@
     function stash() { S.flush(); P.flush(); A.flush(); }
     document.addEventListener('visibilitychange', function () { if (document.hidden) stash(); });
     window.addEventListener('pagehide', stash);
-    P.onHide(stash); // ВК: приложение свёрнуто
+    // ВК: приложение свёрнуто — сохранить и замолчать (правила ВК 2.2.5), вернулось — звук назад
+    P.onView(function (shown) { if (!shown) stash(); window.Sound.hold('view', !shown); });
   }
 
   function boot() {

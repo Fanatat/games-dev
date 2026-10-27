@@ -294,6 +294,8 @@ button.slot.got { background: var(--surface); }
 /* итог */
 .result-body { position: relative; }
 .res-atlas-chip { position: absolute; z-index: 2; top: 12px; right: 16px; }
+/* значок атласа не наезжает на название истории на узком экране */
+#result-kicker, #result-title { padding-right: 76px; }
 .secret-strip { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 14px; flex-wrap: wrap; }
 .secret-strip > .muted { font-size: 14px; }
 .secret-cells { display: flex; gap: 4px; }

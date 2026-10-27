@@ -369,7 +369,8 @@
     function finaleUnseen() { return data.finales.filter(function (n) { return data.finales_seen.indexOf(n) < 0; })[0] || null; }
     function markFinaleSeen(n) { if (data.finales_seen.indexOf(n) < 0) { data.finales_seen.push(n); saveSoon(); } }
     function markResultSeen(id) { if (data.seen_result_ids.indexOf(id) < 0) { data.seen_result_ids.push(id); saveSoon(); } }
-    function reset() { data = blank(content.content_version); writeNow(); }
+    // Номер ревизии не обнуляется: иначе старая копия в облаке ВК окажется «новее» и вернёт стёртый прогресс.
+    function reset() { var rev = data.revision || 0; data = blank(content.content_version); data.revision = rev; writeNow(); }
 
     load();
     if (migrated) writeNow();

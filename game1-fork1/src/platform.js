@@ -8,12 +8,12 @@
    последняя неподтверждённая ревизия ждёт успеха и повторяется сама — по таймеру с растущей
    паузой, при возврате сети и вкладки; в полёте не больше одного запроса, новая ревизия
    заменяет ждущую. Слишком длинное для ВК сохранение — громкий отказ, локальная копия остаётся.
-   ?nostore — проверка A20: хранилище «ломается», игра должна честно об этом сказать. */
+   ?nostore — проверка A20: хранилище «ломается», игра должна честно об этом сказать (только вне ВК). */
 (function (root) {
   'use strict';
   var params = new URLSearchParams(location.search);
   var mem = {};
-  var broken = params.has('nostore');
+  var broken;
   var SAVE_KEY = 'g1f1.save.v1';   // ключ State в localStorage
   var CLOUD_KEY = 'g1f1_save';     // в облаке ВК точки в ключе запрещены
   var CLOUD_MAX = 4000;            // ВК: значение до 4096 знаков
@@ -24,6 +24,9 @@
   var bridge = root.vkBridge;
   var vk = false;
   try { vk = !!(bridge && bridge.isEmbedded && bridge.isEmbedded()); } catch (e) { vk = false; }
+  // Инструменты проверки (?nostore, ?journal) — только на стенде и в автотестах, в ВК их нет.
+  var dev = !vk;
+  broken = dev && params.has('nostore');
 
   function lsOk() {
     if (broken) return false;
@@ -132,9 +135,14 @@
     if (doc && doc.addEventListener) doc.addEventListener('visibilitychange', function () { if (!doc.hidden) flush(); });
   }
 
-  function onHide(f) {
+  // Приложение ВК свёрнуто / снова на экране: f(false) на VKWebAppViewHide, f(true) на VKWebAppViewRestore.
+  function onView(f) {
     if (!vk || typeof bridge.subscribe !== 'function') return;
-    bridge.subscribe(function (e) { if (e && e.detail && e.detail.type === 'VKWebAppViewHide') f(); });
+    bridge.subscribe(function (e) {
+      var t = e && e.detail && e.detail.type;
+      if (t === 'VKWebAppViewHide') f(false);
+      else if (t === 'VKWebAppViewRestore') f(true);
+    });
   }
 
   /* Ролик за награду (VKWebAppShowNativeAds, ad_format reward) — только по нажатию игрока, только в ВК.
@@ -187,9 +195,10 @@
     onSync: function (f) { syncListeners.push(f); },
     ready: ready,
     flush: flush,
-    onHide: onHide,
+    onView: onView,
     canAds: vk,
     showRewarded: showRewarded,
     params: params,
+    dev: dev,
   };
 })(this);

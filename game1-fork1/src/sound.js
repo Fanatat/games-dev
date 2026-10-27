@@ -5,13 +5,15 @@
    первого касания, вступает плавно, на итоге приглушается; включается отдельно от звуков. */
 (function (root) {
   'use strict';
+  // Звуки вдвое тише музыки по сравнению с b023 (−6 дБ, решение основателя 27.10): на тихом телефоне
+  // динамик теряет низы музыки первыми, а щелчки и звоны оставались громкими.
   var EVENTS = {
-    step: { vol: 0.3 }, found: { vol: 0.55 }, wrong: { vol: 0.35 }, win: { vol: 0.5 },
-    hint: { vol: 0.45 }, tap: { vol: 0.35 }, reward: { vol: 0.5 }, chapter: { vol: 0.5 },
+    step: { vol: 0.15 }, found: { vol: 0.28 }, wrong: { vol: 0.18 }, win: { vol: 0.25 },
+    hint: { vol: 0.22 }, tap: { vol: 0.18 }, reward: { vol: 0.25 }, chapter: { vol: 0.25 },
   };
   var STEPS = [-5, -3, 0, 2, 5, 7, 9, 12];
   var ctx = null, out = null, buffers = {}, enabled = true, loading = false;
-  var MUSIC_LOOP = 16 * 4 * 60 / 68, MUSIC_VOL = 0.32, DUCK = 0.35;
+  var MUSIC_LOOP = 16 * 4 * 60 / 68, MUSIC_VOL = 0.4, DUCK = 0.35;
   var music = { on: true, buf: null, src: null, gain: null, duck: false, loading: false };
 
   function base() {

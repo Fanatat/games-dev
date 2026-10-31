@@ -123,6 +123,10 @@
   // параметров: в адресе игры ВК — параметры запуска с номером игрока, им
   // в Метрике не место; источник перехода — только сайт. Заказы
   // электронной коммерции счётчик читает из window.dataLayer.
+  // Сам тег живёт в рамке metrica.html без адреса запуска и без referrer:
+  // иначе цели несут page-url=location.href, а в нём подпись ВК — пропуск
+  // в API игры (проверка безопасности 31.10.2026). window.ym здесь —
+  // посредник: копирует вызовы в рамку, до её загрузки держит очередь.
   (function () {
     var id = 113440682;
     if (false) {
@@ -134,15 +138,27 @@
     };
     if (!id) return;
     window.dataLayer = window.dataLayer || [];
-    (function (m, e, t, r, i, k, a) {
-      m[i] = m[i] || function () { (m[i].a = m[i].a || []).push(arguments); };
-      m[i].l = 1 * new Date();
-      for (var j = 0; j < document.scripts.length; j++) {
-        if (document.scripts[j].src === r) return;
-      }
-      k = e.createElement(t); a = e.getElementsByTagName(t)[0];
-      k.async = 1; k.src = r; a.parentNode.insertBefore(k, a);
-    })(window, document, "script", "https://mc.yandex.ru/metrika/tag.js", "ym");
+    var frame = document.createElement("iframe"), ready = false, queue = [];
+    function forward(args) {
+      var w = frame.contentWindow;
+      // Аргументы — через JSON: объекты родного окна рамки.
+      w.ym.apply(w, w.JSON.parse(JSON.stringify(args)));
+    }
+    window.ym = function () {
+      var args = Array.prototype.slice.call(arguments);
+      if (ready) forward(args); else queue.push(args);
+    };
+    frame.onload = function () {
+      ready = true;
+      for (var j = 0; j < queue.length; j++) forward(queue[j]);
+      queue = [];
+    };
+    frame.src = "metrica.html";
+    frame.referrerPolicy = "no-referrer";
+    frame.tabIndex = -1;
+    frame.setAttribute("aria-hidden", "true");
+    frame.style.cssText = "position:absolute;width:0;height:0;border:0;visibility:hidden";
+    (document.body || document.documentElement).appendChild(frame);
     window.ym(id, "init", {
       defer: true, clickmap: false, trackLinks: false, accurateTrackBounce: true, webvisor: false,
       ecommerce: "dataLayer"
@@ -187,7 +203,25 @@
     var ChunkHeader = "#game7chunks:";
     var WriteDelay = 3000;
     var RetryMax = 60000;
-    var vk = (window.game7Vk = { available: false, storage: null, storageError: "", writeError: "" });
+    // Storage belongs to the Unity runtime, not the console-facing diagnostics.
+    // This reduces accidental exposure; it is not an anti-cheat trust boundary.
+    var vk = { available: false, storage: null, storageError: "", writeError: "" };
+    var diagnostics = (window.game7Vk = {});
+    Object.defineProperties(diagnostics, {
+      available: { get: function () { return vk.available; } },
+      storageReady: { get: function () { return !!vk.storage; } },
+      storageError: { get: function () { return vk.storageError; } },
+      writeError: { get: function () { return vk.writeError; } },
+    });
+    // Emscripten consumes this once during framework initialization and keeps
+    // the handle inside its closure. Never return it from PlatformReady.
+    var storageTaken = false;
+    window.game7TakeVkStorage = function () {
+      if (storageTaken) return null;
+      storageTaken = true;
+      delete window.game7TakeVkStorage;
+      return vk;
+    };
     var pending = {};
     var timer = 0;
     var flushing = false;
@@ -208,6 +242,13 @@
     vk.send = function (method, params, ms) {
       return withTimeout(window.vkBridge.send(method, params || {}), ms || 8000);
     };
+
+    diagnostics.send = function (method, params, ms) {
+      if (/^VKWebAppStorage/.test(method)) return Promise.reject(new Error("storage is private"));
+      return vk.send(method, params, ms);
+    };
+    // Flushing contains no data supplied by the caller (also used by QA).
+    diagnostics.flush = function () { vk.flush(); };
 
     function hash(text) {
       var h = 0x811c9dc5;
@@ -530,9 +571,19 @@
   <body>
     <canvas id="unity-canvas" tabindex="-1"></canvas>
     <div id="game7-loading">
-      <div id="game7-loading-title">&#1047;&#1086;&#1084;&#1073;&#1080; &#1051;&#1077;&#1085;&#1076;</div>
+      <div id="game7-loading-title" data-en="Zomboland">&#1047;&#1086;&#1084;&#1073;&#1080; &#1051;&#1077;&#1085;&#1076;</div>
       <div id="unity-loading-bar"><div id="unity-progress-bar-full"></div></div>
     </div>
+    <script>
+      // Название на заставке — на языке игрока (отказ CrazyGames 26.10: в
+      // ?lang=en стояло «Зомби Ленд»): русское — при ?lang=ru или русском
+      // браузере, иначе английское (title_crazygames из game.json).
+      (function () {
+        var title = document.getElementById("game7-loading-title");
+        var lang = (new URLSearchParams(location.search).get("lang") || navigator.language || "").toLowerCase();
+        if (title && title.dataset.en && lang.indexOf("ru") !== 0) title.textContent = title.dataset.en;
+      })();
+    </script>
     <div id="unity-warning"></div>
     <script>
       var canvas = document.querySelector("#unity-canvas");
@@ -575,8 +626,8 @@
       // текстуры на CPU при загрузке. ASTC берём, только если DXT нет, а
       // ASTC есть: ПК с обоими форматами остаётся на основном. ?tex=astc
       // или ?tex=dxt в адресе — выбрать файл вручную (проверки).
-      var dataFile = "vk-20261026-072852.data.unityweb";
-      var astcDataFile = "vk-20261026-072852.astc.data.unityweb";
+      var dataFile = "vk-20261031-080059.data.unityweb";
+      var astcDataFile = "vk-20261031-080059.astc.data.unityweb";
       var texFormat = "dxt";
       if (astcDataFile) {
         var texForce = /[?&]tex=(astc|dxt)(&|$)/.exec(location.search);
@@ -600,16 +651,16 @@
       window.game7TexFormat = texFormat;
 
       var buildUrl = "Build";
-      var loaderUrl = buildUrl + "/vk-20261026-072852.loader.js";
+      var loaderUrl = buildUrl + "/vk-20261031-080059.loader.js";
       var config = {
         arguments: [],
         dataUrl: buildUrl + "/" + dataFile,
-        frameworkUrl: buildUrl + "/vk-20261026-072852.framework.js.unityweb",
-        codeUrl: buildUrl + "/vk-20261026-072852.wasm.unityweb",
+        frameworkUrl: buildUrl + "/vk-20261031-080059.framework.js.unityweb",
+        codeUrl: buildUrl + "/vk-20261031-080059.wasm.unityweb",
         streamingAssetsUrl: "StreamingAssets",
         companyName: "Vanatat",
         productName: "Zomboland",
-        productVersion: "vk-20261026-072852",
+        productVersion: "vk-20261031-080059",
         showBanner: unityShowBanner,
         // Экраны с плотностью 3 рисовали бы в 9 раз больше пикселей, чем
         // с плотностью 1: потолок 2 держит 60 FPS на среднем телефоне.
